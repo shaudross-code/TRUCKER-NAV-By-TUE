@@ -1,0 +1,8 @@
+{
+  "name": "TRUCKERS NAV By TUE",
+  "description": "A comprehensive trucking fleet management dashboard featuring predictive parking, real-time navigation, and advanced analytics.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
