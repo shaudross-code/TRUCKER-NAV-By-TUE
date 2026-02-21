@@ -30,7 +30,7 @@ const decodeAudioData = async (
 };
 
 export async function processVoiceCommand(text: string) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `The user said: "${text}". 
@@ -45,9 +45,79 @@ export async function processVoiceCommand(text: string) {
   return response.text;
 }
 
+export async function fetchTruckStops(lat: number, lon: number) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Find 4 real truck stops or travel centers near coordinates ${lat}, ${lon}. 
+    For each, provide: name, location (address or exit), distance from these coordinates, current estimated availability (as a percentage), and a list of 3-4 amenities.
+    Return the data in a clean JSON array format.`,
+    config: {
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING" },
+            location: { type: "STRING" },
+            distance: { type: "STRING" },
+            status: { type: "STRING", description: "One of: LIKELY OPEN, FULL SOON, FILLING UP" },
+            available: { type: "NUMBER" },
+            total: { type: "NUMBER" },
+            amenities: { type: "ARRAY", items: { type: "STRING" } }
+          },
+          required: ["name", "location", "distance", "status", "available", "total", "amenities"]
+        }
+      }
+    }
+  });
+
+  try {
+    return JSON.parse(response.text);
+  } catch (e) {
+    console.error("Failed to parse truck stops", e);
+    return [];
+  }
+}
+
+export async function fetchTruckPOIs(lat: number, lon: number) {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `Find 10 real truck-related points of interest (truck stops, weigh stations, rest areas, service centers) near coordinates ${lat}, ${lon}. 
+    Return a JSON array of objects with: name, type, lat, lon.`,
+    config: {
+      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: {
+            name: { type: "STRING" },
+            type: { type: "STRING" },
+            lat: { type: "NUMBER" },
+            lon: { type: "NUMBER" }
+          },
+          required: ["name", "type", "lat", "lon"]
+        }
+      }
+    }
+  });
+
+  try {
+    return JSON.parse(response.text);
+  } catch (e) {
+    console.error("Failed to parse POIs", e);
+    return [];
+  }
+}
+
 export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephyr' = 'Kore') {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],

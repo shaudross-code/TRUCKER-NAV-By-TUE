@@ -1,5 +1,5 @@
-import React from 'react';
-import { Wrench, Droplets, Gauge, AlertCircle, CheckCircle2, Truck } from 'lucide-react';
+import React, { useState } from 'react';
+import { Droplets, Gauge, AlertCircle, CheckCircle2, History } from 'lucide-react';
 
 const StatusItem: React.FC<{ label: string, value: string, percentage: number, color: string, icon: any }> = ({ label, value, percentage, color, icon: Icon }) => (
   <div className="bg-[#0a0a0a] border border-zinc-900 p-6 rounded-[2rem] hover:border-[#D4AF37]/30 transition-all group">
@@ -30,6 +30,30 @@ const StatusItem: React.FC<{ label: string, value: string, percentage: number, c
 );
 
 const Maintenance: React.FC = () => {
+  const [alerts, setAlerts] = useState([
+    { id: 1, title: 'Brake Pad Replacement Required', urgency: 'High', date: 'Within 500 mi', type: 'Repair' },
+    { id: 2, title: 'Routine 50k mi Inspection', urgency: 'Medium', date: 'Jan 25, 2025', type: 'Scheduled' },
+    { id: 3, title: 'Tire Rotation', urgency: 'Low', date: 'Feb 10, 2025', type: 'Maintenance' },
+  ]);
+
+  const [history, setHistory] = useState([
+    { date: '2024-12-15', service: 'Oil Change & Filter', cost: '$450.00', status: 'Completed' },
+    { date: '2024-11-02', service: 'Transmission Flush', cost: '$820.00', status: 'Completed' },
+  ]);
+
+  const handleSchedule = (id: number) => {
+    const alert = alerts.find(a => a.id === id);
+    if (!alert) return;
+    
+    setAlerts(prev => prev.filter(a => a.id !== id));
+    setHistory(prev => [{
+      date: new Date().toISOString().split('T')[0],
+      service: alert.title,
+      cost: 'Pending',
+      status: 'Scheduled'
+    }, ...prev]);
+  };
+
   return (
     <div className="p-10 max-w-7xl mx-auto bg-[#050505]">
       <div className="flex justify-between items-start mb-12">
@@ -43,7 +67,7 @@ const Maintenance: React.FC = () => {
           </div>
           <div>
             <div className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest italic">Health Score</div>
-            <div className="text-2xl font-black text-white">98/100</div>
+            <div className="text-2xl font-black text-white">{alerts.length > 0 ? 98 - (alerts.length * 2) : 100}/100</div>
           </div>
         </div>
       </div>
@@ -57,30 +81,60 @@ const Maintenance: React.FC = () => {
         <StatusItem label="Coolant Level" value="Full" percentage={100} color="bg-[#D4AF37]" icon={Droplets} />
       </div>
 
-      <div className="bg-[#0a0a0a] border border-zinc-900 rounded-[2.5rem] p-8 shadow-lg">
-        <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-white italic uppercase tracking-tighter">
-          <AlertCircle className="w-6 h-6 text-[#D4AF37]" />
-          Service Alerts
-        </h2>
-        <div className="space-y-4">
-          {[
-            { title: 'Brake Pad Replacement Required', urgency: 'High', date: 'Within 500 mi', type: 'Repair' },
-            { title: 'Routine 50k mi Inspection', urgency: 'Medium', date: 'Jan 25, 2025', type: 'Scheduled' },
-            { title: 'Tire Rotation', urgency: 'Low', date: 'Feb 10, 2025', type: 'Maintenance' },
-          ].map((alert, i) => (
-            <div key={i} className="flex items-center justify-between p-6 bg-zinc-900/30 rounded-2xl border border-zinc-800 hover:border-[#D4AF37]/40 transition-all group">
-              <div className="flex items-center gap-4">
-                <div className={`w-2 h-2 rounded-full ${alert.urgency === 'High' ? 'bg-rose-500 animate-pulse' : 'bg-[#D4AF37]'}`} />
-                <div>
-                  <div className="text-sm font-bold text-zinc-100 group-hover:text-[#D4AF37] transition-colors">{alert.title}</div>
-                  <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest italic">{alert.type} • {alert.date}</div>
-                </div>
-              </div>
-              <button className="px-6 py-2.5 bg-zinc-900 hover:bg-[#D4AF37] border border-zinc-800 hover:border-[#D4AF37] text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-zinc-500 hover:text-black shadow-lg">
-                Schedule
-              </button>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-[#0a0a0a] border border-zinc-900 rounded-[2.5rem] p-8 shadow-lg">
+          <h2 className="text-xl font-bold mb-8 flex items-center justify-between text-white italic uppercase tracking-tighter">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-6 h-6 text-[#D4AF37]" />
+              Service Alerts
             </div>
-          ))}
+            <span className="text-xs font-black text-zinc-600">{alerts.length} Active</span>
+          </h2>
+          <div className="space-y-4">
+            {alerts.length === 0 ? (
+              <div className="p-10 text-center border border-dashed border-zinc-800 rounded-2xl">
+                <CheckCircle2 className="w-10 h-10 text-[#D4AF37] mx-auto mb-3 opacity-20" />
+                <p className="text-zinc-500 font-bold uppercase text-xs tracking-widest">All systems operational</p>
+              </div>
+            ) : alerts.map((alert) => (
+              <div key={alert.id} className="flex items-center justify-between p-6 bg-zinc-900/30 rounded-2xl border border-zinc-800 hover:border-[#D4AF37]/40 transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className={`w-2 h-2 rounded-full ${alert.urgency === 'High' ? 'bg-rose-500 animate-pulse' : 'bg-[#D4AF37]'}`} />
+                  <div>
+                    <div className="text-sm font-bold text-zinc-100 group-hover:text-[#D4AF37] transition-colors">{alert.title}</div>
+                    <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest italic">{alert.type} • {alert.date}</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleSchedule(alert.id)}
+                  className="px-6 py-2.5 bg-zinc-900 hover:bg-[#D4AF37] border border-zinc-800 hover:border-[#D4AF37] text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-zinc-500 hover:text-black shadow-lg"
+                >
+                  Schedule
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-[#0a0a0a] border border-zinc-900 rounded-[2.5rem] p-8 shadow-lg">
+          <h2 className="text-xl font-bold mb-8 flex items-center gap-3 text-white italic uppercase tracking-tighter">
+            <History className="w-6 h-6 text-[#D4AF37]" />
+            Service History
+          </h2>
+          <div className="space-y-4">
+            {history.map((item, i) => (
+              <div key={i} className="flex items-center justify-between p-5 bg-zinc-900/10 rounded-2xl border border-zinc-900">
+                <div className="flex items-center gap-4">
+                  <div className="text-zinc-600 font-mono text-[10px] uppercase">{item.date}</div>
+                  <div>
+                    <div className="text-sm font-bold text-zinc-300">{item.service}</div>
+                    <div className={`text-[9px] font-black uppercase tracking-widest ${item.status === 'Completed' ? 'text-emerald-500' : 'text-[#D4AF37]'}`}>{item.status}</div>
+                  </div>
+                </div>
+                <div className="text-sm font-black text-white italic">{item.cost}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

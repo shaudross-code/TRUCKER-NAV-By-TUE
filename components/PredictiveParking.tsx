@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   ShowerHead, 
   Wifi, 
@@ -8,8 +8,10 @@ import {
   Coffee, 
   WashingMachine, 
   MapPin, 
-  Clock 
+  Loader2
 } from 'lucide-react';
+import { fetchTruckStops } from '../services/geminiService';
+import { AppContext } from '../App';
 
 const AmenityIcon: React.FC<{ name: string }> = ({ name }) => {
   const map: Record<string, any> = {
@@ -33,15 +35,17 @@ const AmenityIcon: React.FC<{ name: string }> = ({ name }) => {
   );
 };
 
-const ParkingCard: React.FC<{ 
-  name: string, 
-  location: string, 
-  distance: string, 
-  status: 'LIKELY OPEN' | 'FULL SOON' | 'FILLING UP', 
-  available: number, 
-  total: number, 
-  amenities: string[] 
-}> = ({ name, location, distance, status, available, total, amenities }) => {
+interface ParkingData {
+  name: string;
+  location: string;
+  distance: string;
+  status: 'LIKELY OPEN' | 'FULL SOON' | 'FILLING UP';
+  available: number;
+  total: number;
+  amenities: string[];
+}
+
+const ParkingCard: React.FC<ParkingData> = ({ name, location, distance, status, available, total, amenities }) => {
   const progress = (available / total) * 100;
   
   const statusConfig = {
@@ -65,7 +69,7 @@ const ParkingCard: React.FC<{
     }
   };
 
-  const config = statusConfig[status];
+  const config = statusConfig[status] || statusConfig['FILLING UP'];
 
   return (
     <div className="bg-[#0a0a0a] border border-zinc-900 rounded-[1.5rem] p-7 transition-all hover:border-[#D4AF37]/30 group">
@@ -109,21 +113,57 @@ const ParkingCard: React.FC<{
 };
 
 const PredictiveParking: React.FC = () => {
+  const context = useContext(AppContext);
+  const userLocation = context?.userLocation;
+  const [stops, setStops] = useState<ParkingData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function getStops() {
+      if (!userLocation) return;
+      try {
+        setLoading(true);
+        const data = await fetchTruckStops(userLocation[0], userLocation[1]);
+        setStops(data);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    getStops();
+  }, [userLocation]);
+
   return (
     <div className="p-10 max-w-[1400px] mx-auto bg-[#050505]">
-      <div className="mb-12">
-        <h1 className="text-4xl font-black tracking-tight text-white mb-2 uppercase italic tracking-tighter">
-          Predictive Parking<span className="text-lg align-top ml-0.5 text-[#D4AF37]">™</span>
-        </h1>
-        <p className="text-zinc-500 font-medium text-lg uppercase tracking-widest italic opacity-50">Real-time availability forecast for the next 2 hours.</p>
+      <div className="mb-12 flex justify-between items-end">
+        <div>
+          <h1 className="text-4xl font-black tracking-tight text-white mb-2 uppercase italic tracking-tighter">
+            Predictive Parking<span className="text-lg align-top ml-0.5 text-[#D4AF37]">™</span>
+          </h1>
+          <p className="text-zinc-500 font-medium text-lg uppercase tracking-widest italic opacity-50">Real-time availability forecast for the next 2 hours.</p>
+        </div>
+        {loading && (
+          <div className="flex items-center gap-3 text-[#D4AF37] font-black uppercase text-xs tracking-widest italic animate-pulse">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Scanning Radius...
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <ParkingCard name="Petro Stopping Center" location="Exit 24, I-95" distance="12.5 mi" status="LIKELY OPEN" available={42} total={150} amenities={['Showers', 'WiFi', 'Restaurant', 'Scale']} />
-        <ParkingCard name="Love's Travel Stop" location="Exit 32, I-95" distance="28.4 mi" status="FULL SOON" available={3} total={85} amenities={['Showers', 'Tire Care', 'Arby\'s']} />
-        <ParkingCard name="Pilot Travel Center" location="Exit 45, I-95" distance="45.2 mi" status="LIKELY OPEN" available={85} total={200} amenities={['Showers', 'WiFi', 'Subway', 'Lounge']} />
-        <ParkingCard name="Mom & Pop Truck Plaza" location="Exit 12, I-80" distance="5.2 mi" status="FILLING UP" available={12} total={40} amenities={['Diner', 'Laundry']} />
-      </div>
+      {loading && stops.length === 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-[#0a0a0a] border border-zinc-900 rounded-[1.5rem] p-7 h-64 animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {stops.map((stop, i) => (
+            <ParkingCard key={i} {...stop} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

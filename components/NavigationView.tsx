@@ -8,22 +8,32 @@ import {
   Loader2,
   Play,
   RotateCcw,
-  ShieldCheck,
-  Signal,
-  Navigation,
   Wind,
   CloudSun,
+  Cloud,
+  CloudRain,
+  CloudSnow,
+  CloudLightning,
+  Sun,
   Eye,
   ArrowUp,
   AlertTriangle,
   Zap,
-  TriangleAlert,
   Globe,
   Map as MapIcon,
-  Layers
+  Layers,
+  ArrowLeft,
+  ArrowRight,
+
+  Undo2,
+  GitMerge,
+  CornerUpLeft,
+  CornerUpRight,
+  CornerDownLeft,
+  CornerDownRight
 } from 'lucide-react';
-import { AppContext } from '../App.tsx';
-import { textToSpeech } from '../services/geminiService.ts';
+import { AppContext } from '../App';
+import { textToSpeech } from '../services/geminiService';
 
 interface NavigationViewProps {
   initialTarget?: string | null;
@@ -52,13 +62,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
   const [eta, setEta] = useState('--:-- --');
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [isOverviewMode, setIsOverviewMode] = useState(false);
+  const [isFollowMode, setIsFollowMode] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapStyle, setMapStyle] = useState<MapStyle>('NORMAL');
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
   
-  const [nextInstruction, setNextInstruction] = useState({ text: 'Ready for Route', distance: '0.0' });
-  const [weather, setWeather] = useState({ temp: '42°', condition: 'Clear', wind: '12 MPH NW', visibility: '10 MI' });
-  const [lanes, setLanes] = useState([true, true, false, false]);
-  const [activeWarnings, setActiveWarnings] = useState([
+  const [nextInstruction, setNextInstruction] = useState({ text: 'Ready for Route', distance: '0.0', icon: ArrowUp as React.ElementType });
+  const [weather, setWeather] = useState({ 
+    temp: '--°', 
+    condition: 'Loading...', 
+    wind: '-- MPH', 
+    visibility: '-- MI',
+    icon: CloudSun,
+    forecast: [] as { day: string, max: number, min: number, icon: any }[]
+  });
+  const [lanes] = useState([true, true, false, false]);
+  const [activeWarnings] = useState([
     { id: 1, type: 'HAZARD', message: 'LOW CLEARANCE 13\'6"', icon: AlertTriangle, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/10' },
     { id: 2, type: 'WEATHER', message: 'HIGH WIND ADVISORY', icon: Wind, color: 'text-[#FFD700]', bg: 'bg-[#FFD700]/10' }
   ]);
@@ -77,6 +97,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
     }
   }, [mapStyle]);
 
+  useEffect(() => {
+    if (searchQuery.trim().length < 3) {
+      setSuggestions([]);
+      return;
+    }
+    const handler = setTimeout(async () => {
+      try {
+        const [lat, lon] = userLocationRef.current;
+        const d = 0.5; // Bounding box size
+        const viewbox = [lon - d, lat - d, lon + d, lat + d].join(',');
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&limit=5&addressdetails=1&viewbox=${viewbox}&bounded=1`, { headers: { 'Accept-Language': 'en' } });
+        const data = await res.json();
+        setSuggestions(data || []);
+      } catch (error) {
+        console.error('Failed to fetch suggestions', error);
+      }
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   const lastSpokenRef = useRef('');
   useEffect(() => {
     if (isDriving && nextInstruction.text !== 'Ready for Route' && nextInstruction.text !== lastSpokenRef.current) {
@@ -86,16 +126,106 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
     }
   }, [nextInstruction.text, isDriving]);
 
+  const lastWeatherFetchPos = useRef<[number, number] | null>(null);
+  const userLocationRef = useRef(userLocation);
+
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
+
+  useEffect(() => {
+    const fetchWeather = async (force = false) => {
+      const loc = userLocationRef.current;
+      if (!loc) return;
+      const [lat, lon] = loc;
+      
+      if (!force && lastWeatherFetchPos.current) {
+        const [lastLat, lastLon] = lastWeatherFetchPos.current;
+        const dist = Math.sqrt(Math.pow(lat - lastLat, 2) + Math.pow(lon - lastLon, 2));
+        if (dist < 0.08) return;
+      }
+      
+      try {
+        const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`);
+        const data = await res.json();
+        
+        if (data && data.current) {
+          lastWeatherFetchPos.current = [lat, lon];
+          const current = data.current;
+          
+          const getWeatherDetails = (code: number) => {
+            if (code === 0) return { condition: 'Clear', icon: Sun };
+            if (code >= 1 && code <= 3) return { condition: 'Cloudy', icon: Cloud };
+            if (code === 45 || code === 48) return { condition: 'Fog', icon: Cloud };
+            if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return { condition: 'Rain', icon: CloudRain };
+            if ((code >= 71 && code <= 77) || code === 85 || code === 86) return { condition: 'Snow', icon: CloudSnow };
+            if (code >= 95 && code <= 99) return { condition: 'Storm', icon: CloudLightning };
+            return { condition: 'Clear', icon: Sun };
+          };
+
+          const currentDetails = getWeatherDetails(current.weather_code);
+          
+          const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+          const dirIdx = Math.round(current.wind_direction_10m / 22.5) % 16;
+          const windDir = dirs[dirIdx];
+          
+          const visMiles = (current.visibility / 1609.34).toFixed(1);
+          
+          const forecast = [];
+          if (data.daily) {
+            for (let i = 1; i <= 3; i++) {
+              const dateStr = data.daily.time[i];
+              const date = new Date(dateStr + 'T12:00:00');
+              const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+              forecast.push({
+                day: dayName,
+                max: Math.round(data.daily.temperature_2m_max[i]),
+                min: Math.round(data.daily.temperature_2m_min[i]),
+                icon: getWeatherDetails(data.daily.weather_code[i]).icon
+              });
+            }
+          }
+          
+          setWeather({
+            temp: `${Math.round(current.temperature_2m)}°`,
+            condition: currentDetails.condition,
+            wind: `${Math.round(current.wind_speed_10m)} MPH ${windDir}`,
+            visibility: `${visMiles} MI`,
+            icon: currentDetails.icon,
+            forecast
+          });
+        }
+      } catch (err) {
+        console.error("Failed to fetch weather:", err);
+      }
+    };
+
+    fetchWeather();
+    
+    let ticks = 0;
+    const interval = setInterval(() => {
+      ticks++;
+      fetchWeather(ticks % 5 === 0);
+    }, 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
   const handleNavigate = async (target?: string) => {
     const query = target || searchQuery;
     if (!query || !query.trim() || isCalculating) return;
+    setSuggestions([]);
+    setIsSuggestionsVisible(false);
     const L = (window as any).L;
     if (!L) return;
     setIsCalculating(true);
     setIsSearchFocused(false);
     setIsDriving(false);
     try {
-      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`, { headers: { 'Accept-Language': 'en' } });
+      const [lat, lon] = userLocation;
+      const d = 0.5;
+      const viewbox = [lon - d, lat - d, lon + d, lat + d].join(',');
+      const geoRes = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1&viewbox=${viewbox}&bounded=1`, { headers: { 'Accept-Language': 'en' } });
       const geoData = await geoRes.json();
       if (!geoData || geoData.length === 0) { alert("Location not found."); setIsCalculating(false); return; }
       const destLat = parseFloat(geoData[0].lat);
@@ -110,12 +240,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
       const durationSec = route.duration;
       let firstManeuver = "Head towards route";
       let firstDist = "0.0";
+      let maneuverIcon: React.ElementType = ArrowUp;
       if (route.legs[0]?.steps[0]) {
         const step = route.legs[0].steps[0];
         firstManeuver = step.maneuver.instruction || "Proceed to the highlighted road";
         firstDist = (step.distance / 1609.34).toFixed(1);
+        maneuverIcon = getManeuverIcon(step.maneuver.type, step.maneuver.modifier);
       }
-      setNextInstruction({ text: firstManeuver, distance: firstDist });
+      setNextInstruction({ text: firstManeuver, distance: firstDist, icon: maneuverIcon });
       if (routeGroupRef.current) routeGroupRef.current.clearLayers();
       const destIcon = L.divIcon({
         className: 'dest-marker',
@@ -142,11 +274,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
       arrival.setSeconds(arrival.getSeconds() + durationSec);
       setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       const bounds = routeGroupRef.current.getBounds();
-      if (bounds.isValid()) { mapInstanceRef.current.flyToBounds(bounds, { padding: [120, 120], duration: 1.5 }); }
+      if (bounds.isValid()) { 
+        mapInstanceRef.current.flyTo(userLocation, 17, { animate: true, duration: 1.5 }); 
+      }
       setIsCalculating(false);
       if (context) context.setNavTarget(null);
       textToSpeech(`Route to ${destName} calculated. ${firstManeuver}.`);
       lastSpokenRef.current = firstManeuver; 
+      toggleDriving();
     } catch (err) { console.error("Routing Error:", err); setIsCalculating(false); }
   };
 
@@ -170,6 +305,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
       iconSize: [40, 40],
       iconAnchor: [20, 20]
     });
+    map.on('dragstart', () => {
+      setIsFollowMode(false);
+    });
+
     userMarkerRef.current = L.marker(initialPos, { icon: userIcon, zIndexOffset: 2000 }).addTo(map);
     setIsMapReady(true);
     if (initialTarget) { setTimeout(() => handleNavigate(initialTarget), 500); }
@@ -180,7 +319,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
   useEffect(() => {
     if (userLocation && userMarkerRef.current && !isDriving) {
       userMarkerRef.current.setLatLng(userLocation);
-      if (!isOverviewMode && mapInstanceRef.current) { mapInstanceRef.current.panTo(userLocation); }
+      if (isFollowMode && mapInstanceRef.current) { mapInstanceRef.current.panTo(userLocation); }
     }
   }, [userLocation, isDriving, isOverviewMode]);
 
@@ -202,7 +341,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
               const markerEl = userMarkerRef.current.getElement()?.querySelector('.vehicle-pointer');
               if (markerEl) markerEl.style.transform = `rotate(${angle + 90}deg)`;
             }
-            if (!isOverviewMode && mapInstanceRef.current) { mapInstanceRef.current.panTo(currentPos, { animate: true, duration: 0.5 }); }
+            if (!isOverviewMode && isFollowMode && mapInstanceRef.current) { mapInstanceRef.current.panTo(currentPos, { animate: true, duration: 0.5 }); }
           }
           return nextMiles;
         });
@@ -210,6 +349,46 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
     } else { clearInterval(simulationIntervalRef.current); }
     return () => clearInterval(simulationIntervalRef.current);
   }, [isDriving, routePoints, initialMiles, isOverviewMode]);
+
+  const getManeuverIcon = (type: string, modifier?: string): React.ElementType => {
+    if (type === 'depart') return ArrowUp;
+
+    if (modifier) {
+        if (modifier.includes('uturn')) return Undo2;
+        if (modifier.includes('sharp right')) return CornerDownRight;
+        if (modifier.includes('right')) return ArrowRight;
+        if (modifier.includes('slight right')) return CornerUpRight;
+        if (modifier.includes('straight')) return ArrowUp;
+        if (modifier.includes('slight left')) return CornerUpLeft;
+        if (modifier.includes('left')) return ArrowLeft;
+        if (modifier.includes('sharp left')) return CornerDownLeft;
+    }
+
+    if (type.includes('merge')) return GitMerge;
+    
+    return ArrowUp;
+  };
+
+  const toggleDriving = () => {
+    if (milesRemaining <= 0) return;
+
+    const newIsDriving = !isDriving;
+    setIsDriving(newIsDriving);
+
+    if (newIsDriving) {
+      // Just started driving
+      setIsOverviewMode(false); // Ensure we are in follow mode
+      if (mapInstanceRef.current && userMarkerRef.current) {
+        // The marker is at the start of the route, which is the user's location
+        const startPosition = userMarkerRef.current.getLatLng(); 
+        mapInstanceRef.current.flyTo(startPosition, 17, { // Zoom level 17 is good for driving
+          animate: true,
+          duration: 1.5 
+        });
+      }
+      setIsFollowMode(true);
+    }
+  };
 
   return (
     <div className="h-full w-full relative bg-[#050505] overflow-hidden font-sans">
@@ -221,7 +400,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-10">
               <div className="bg-[#D4AF37] p-6 rounded-[2rem] shadow-2xl shadow-[#D4AF37]/30">
-                <ArrowUp className="w-14 h-14 text-black" strokeWidth={4} />
+                <nextInstruction.icon className="w-14 h-14 text-black" strokeWidth={4} />
               </div>
               <div className="flex flex-col">
                 <div className="flex items-baseline gap-3">
@@ -302,11 +481,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
       {/* Weather Overlay */}
       <div className="absolute top-48 left-10 z-[2000] flex flex-col gap-4">
         <div className="bg-black/80 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-[2.5rem] p-6 shadow-2xl w-64 transition-all">
-          <div className="flex items-center justify-between mb-8">
-             <CloudSun className="w-8 h-8 text-[#D4AF37]" />
-             <span className="text-4xl font-[1000] text-white tracking-tighter">{weather.temp}</span>
+          <div className="flex items-center justify-between mb-6">
+             <weather.icon className="w-8 h-8 text-[#D4AF37]" />
+             <div className="flex flex-col items-end">
+               <span className="text-4xl font-[1000] text-white tracking-tighter leading-none">{weather.temp}</span>
+               <span className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mt-1">{weather.condition}</span>
+             </div>
           </div>
-          <div className="space-y-6">
+          <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3 text-zinc-500">
                 <Wind className="w-4 h-4" />
@@ -322,27 +504,68 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
               <span className="text-sm font-black text-white uppercase italic">{weather.visibility}</span>
             </div>
           </div>
+          
+          {weather.forecast && weather.forecast.length > 0 && (
+            <div className="pt-4 border-t border-white/10 flex justify-between">
+              {weather.forecast.map((day, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-2">
+                  <span className="text-[9px] font-black text-zinc-500 uppercase">{day.day}</span>
+                  <day.icon className="w-4 h-4 text-white/70" />
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-bold text-white">{day.max}°</span>
+                    <span className="text-[10px] font-bold text-zinc-500">{day.min}°</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Search HUD - Gold Bordered */}
       <div className={`absolute transition-all duration-700 z-[2005] left-1/2 -translate-x-1/2 w-full max-w-[550px] px-6 ${milesRemaining > 0 ? 'top-[440px]' : 'top-8'}`}>
-        <div className={`w-full bg-black/90 backdrop-blur-3xl rounded-[2.5rem] border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_0_50px_rgba(212,175,55,0.3)]' : 'border-[#D4AF37]/20 shadow-2xl'}`}>
+        <div className={`w-full bg-black/90 backdrop-blur-3xl ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-[2.5rem]' : 'rounded-[2.5rem]'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_0_50px_rgba(212,175,55,0.3)]' : 'border-[#D4AF37]/20 shadow-2xl'}`}>
           <div className="flex items-center p-2 pl-7">
             <Search className={`w-5 h-5 mr-5 transition-colors ${isSearchFocused ? 'text-[#D4AF37]' : 'text-zinc-700'}`} />
-            <input type="text" placeholder={!isMapReady ? "System Booting..." : isCalculating ? "Mapping Path..." : "Enter Professional Destination..."} className="flex-1 bg-transparent border-none outline-none text-white text-lg font-black placeholder:text-zinc-800 tracking-tight py-4" value={searchQuery} disabled={isCalculating || !isMapReady} onChange={(e) => setSearchQuery(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)} onKeyDown={(e) => e.key === 'Enter' && handleNavigate()} />
+            <input 
+              type="text" 
+              placeholder={!isMapReady ? "System Booting..." : isCalculating ? "Mapping Path..." : "Enter Professional Destination..."} 
+              className="flex-1 bg-transparent border-none outline-none text-white text-lg font-black placeholder:text-zinc-800 tracking-tight py-4" 
+              value={searchQuery} 
+              disabled={isCalculating || !isMapReady} 
+              onChange={(e) => setSearchQuery(e.target.value)} 
+              onFocus={() => { setIsSearchFocused(true); setIsSuggestionsVisible(true); }} 
+              onBlur={() => setTimeout(() => { setIsSuggestionsVisible(false); setIsSearchFocused(false); }, 400)} 
+              onKeyDown={(e) => e.key === 'Enter' && handleNavigate()} 
+            />
             <button onClick={() => handleNavigate()} disabled={!isMapReady} className={`flex items-center gap-3 px-8 py-3.5 rounded-full transition-all active:scale-95 mr-1 ${searchQuery.trim() && !isCalculating ? 'bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20' : 'bg-zinc-900 text-zinc-700'}`}>
               {isCalculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <NavIcon className="w-4 h-4" />}
               <span className="text-[12px] font-black uppercase tracking-widest italic">{isCalculating ? 'Mapping' : 'Route'}</span>
             </button>
           </div>
         </div>
+        {isSuggestionsVisible && suggestions.length > 0 && (
+          <div className="w-full bg-black/90 backdrop-blur-3xl rounded-b-[2.5rem] border-x border-b border-[#D4AF37]/20 shadow-2xl animate-in fade-in duration-200">
+            <ul>
+              {suggestions.map((s) => (
+                <li key={s.place_id}>
+                  <button 
+                    className="w-full text-left px-8 py-4 text-white hover:bg-[#D4AF37]/10 transition-colors text-sm font-bold"
+                    onMouseDown={() => handleNavigate(s.display_name)}
+                  >
+                    {s.display_name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <div className="absolute right-10 top-2/3 z-[1000] flex flex-col gap-5">
         <button onClick={() => mapInstanceRef.current?.zoomIn()} className="p-6 bg-black/95 backdrop-blur-3xl border border-[#D4AF37]/20 rounded-[2rem] text-[#D4AF37] shadow-xl hover:bg-zinc-900 active:scale-90 transition-all"><Plus strokeWidth={4} /></button>
         <button onClick={() => mapInstanceRef.current?.zoomOut()} className="p-6 bg-black/95 backdrop-blur-3xl border border-[#D4AF37]/20 rounded-[2rem] text-[#D4AF37] shadow-xl hover:bg-zinc-900 active:scale-90 transition-all"><Minus strokeWidth={4} /></button>
-        <button onClick={() => { if (userLocation && mapInstanceRef.current) { mapInstanceRef.current.setView(userLocation, 17, { animate: true }); setIsOverviewMode(false); } }} className="p-6 bg-black/95 backdrop-blur-3xl border border-[#D4AF37]/20 rounded-[2rem] text-[#D4AF37] shadow-xl hover:text-[#FFD700] active:scale-90 transition-all"><RotateCcw strokeWidth={4} /></button>
+        <button onClick={() => { if (userLocation && mapInstanceRef.current) { mapInstanceRef.current.setView(userLocation, 17, { animate: true }); setIsFollowMode(true); } }} className={`p-6 bg-black/95 backdrop-blur-3xl border rounded-[2rem] text-[#D4AF37] shadow-xl hover:text-[#FFD700] active:scale-90 transition-all ${!isFollowMode ? 'border-red-500/50 animate-pulse' : 'border-[#D4AF37]/20'}`}><RotateCcw strokeWidth={4} /></button>
       </div>
 
       {/* Arrival HUD */}
@@ -370,7 +593,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget }) => {
             </div>
           </div>
 
-          <button onClick={() => milesRemaining > 0 ? setIsDriving(!isDriving) : {}} className={`p-10 rounded-[3rem] transition-all active:scale-95 shadow-2xl ${milesRemaining > 0 ? 'bg-[#D4AF37] text-black shadow-[#D4AF37]/30' : 'bg-zinc-900 text-zinc-800 cursor-not-allowed'}`}>
+          <button onClick={toggleDriving} className={`p-10 rounded-[3rem] transition-all active:scale-95 shadow-2xl ${milesRemaining > 0 ? 'bg-[#D4AF37] text-black shadow-[#D4AF37]/30' : 'bg-zinc-900 text-zinc-800 cursor-not-allowed'}`}>
             {isDriving ? <X className="w-12 h-12" strokeWidth={4} /> : <Play className={`w-12 h-12 fill-black translate-x-1`} strokeWidth={4} />}
           </button>
         </div>

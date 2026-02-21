@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { AppContext } from '../App.tsx';
-import { ViewType } from '../types.ts';
+import { AppContext } from '../App';
+import { ViewType } from '../types';
 
 const LoadCard: React.FC<{
   origin: string;
@@ -75,6 +75,42 @@ const LoadCard: React.FC<{
 
 const LoadBoard: React.FC = () => {
   const context = useContext(AppContext);
+  const [loads, setLoads] = useState([
+    { origin: "Chicago, IL", originTime: "READY", destination: "Dallas, TX", distance: "928 mi", commodity: "ELECTRO", rate: "$3.45", total: "$3,200", match: 98, progress: 100 },
+    { origin: "Joliet, IL", originTime: "FRI 08:00", destination: "Atlanta, GA", distance: "724 mi", commodity: "PAPER", rate: "$2.90", total: "$2,100", match: 85, progress: 65 },
+    { origin: "Gary, IN", originTime: "READY", destination: "Miami, FL", distance: "1322 mi", commodity: "REEFER", rate: "$3.10", total: "$4,100", match: 92, progress: 92 },
+    { origin: "Chicago, IL", originTime: "ASAP", destination: "Detroit, MI", distance: "285 mi", commodity: "AUTO", rate: "$4.20", total: "$1,200", match: 74, progress: 78 },
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (Math.random() > 0.7) {
+        const cities = ["Nashville, TN", "Phoenix, AZ", "Seattle, WA", "Denver, CO", "Austin, TX"];
+        const commodities = ["FOOD", "MACHINERY", "TEXTILES", "HAZMAT", "PRODUCE"];
+        const newCity = cities[Math.floor(Math.random() * cities.length)];
+        const newComm = commodities[Math.floor(Math.random() * commodities.length)];
+        const dist = Math.floor(Math.random() * 1500) + 200;
+        const rate = (Math.random() * 2 + 2.5).toFixed(2);
+        
+        setLoads(prev => [
+          {
+            origin: "Chicago, IL",
+            originTime: "NEW",
+            destination: newCity,
+            distance: `${dist} mi`,
+            commodity: newComm,
+            rate: `$${rate}`,
+            total: `$${(dist * parseFloat(rate)).toLocaleString()}`,
+            match: Math.floor(Math.random() * 30) + 70,
+            progress: 100
+          },
+          ...prev.slice(0, 5)
+        ]);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleBook = (destination: string) => {
     if (context) {
       context.setNavTarget(destination);
@@ -104,10 +140,9 @@ const LoadBoard: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        <LoadCard origin="Chicago, IL" originTime="READY" destination="Dallas, TX" distance="928 mi" commodity="ELECTRO" rate="$3.45" total="$3,200" match={98} progress={100} onBook={() => handleBook("Dallas, TX")} />
-        <LoadCard origin="Joliet, IL" originTime="FRI 08:00" destination="Atlanta, GA" distance="724 mi" commodity="PAPER" rate="$2.90" total="$2,100" match={85} progress={65} onBook={() => handleBook("Atlanta, GA")} />
-        <LoadCard origin="Gary, IN" originTime="READY" destination="Miami, FL" distance="1322 mi" commodity="REEFER" rate="$3.10" total="$4,100" match={92} progress={92} onBook={() => handleBook("Miami, FL")} />
-        <LoadCard origin="Chicago, IL" originTime="ASAP" destination="Detroit, MI" distance="285 mi" commodity="AUTO" rate="$4.20" total="$1,200" match={74} progress={78} onBook={() => handleBook("Detroit, MI")} />
+        {loads.map((load, i) => (
+          <LoadCard key={i} {...load} onBook={() => handleBook(load.destination)} />
+        ))}
       </div>
     </div>
   );

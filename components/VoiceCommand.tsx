@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Send, Volume2, AudioLines } from 'lucide-react';
-import { processVoiceCommand, textToSpeech } from '../services/geminiService.ts';
+import { processVoiceCommand, textToSpeech } from '../services/geminiService';
 
 interface VoiceCommandProps {
   onClose: () => void;
@@ -34,17 +34,56 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose }) => {
       setMessages(prev => [...prev, { role: 'ai', text: aiResponse, isSpeaking: true }]);
       await textToSpeech(aiResponse);
       setMessages(prev => prev.map(m => m.text === aiResponse ? { ...m, isSpeaking: false } : m));
-    } catch (err) {
+    } catch (error) {
+      console.error("Voice command error:", error);
       setMessages(prev => [...prev, { role: 'ai', text: 'Connection lost. Check signal.' }]);
     } finally { setIsProcessing(false); }
   };
 
   const toggleListen = () => {
-    if (isListening) { setIsListening(false); } 
-    else {
-      setIsListening(true);
-      setTimeout(() => { setIsListening(false); setInput('Check my fuel status'); }, 2000);
+    if (isListening) {
+      setIsListening(false);
+      return;
     }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice recognition not supported in this browser.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInput(transcript);
+      setIsListening(false);
+      // Automatically submit after a short delay to feel natural
+      setTimeout(() => {
+        if (transcript) {
+          const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+          handleSubmit(fakeEvent);
+        }
+      }, 500);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   return (

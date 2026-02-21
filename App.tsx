@@ -1,14 +1,15 @@
+
 import React, { useState, useEffect, createContext } from 'react';
-import Sidebar from './components/Sidebar.tsx';
-import Dashboard from './components/Dashboard.tsx';
-import PredictiveParking from './components/PredictiveParking.tsx';
-import LoadBoard from './components/LoadBoard.tsx';
-import Maintenance from './components/Maintenance.tsx';
-import NavigationView from './components/NavigationView.tsx';
-import VoiceCommand from './components/VoiceCommand.tsx';
-import SettingsView from './components/SettingsView.tsx';
-import TruckProfile from './components/TruckProfile.tsx';
-import { ViewType } from './types.ts';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
+import PredictiveParking from './components/PredictiveParking';
+import LoadBoard from './components/LoadBoard';
+import Maintenance from './components/Maintenance';
+import NavigationView from './components/NavigationView';
+import VoiceCommand from './components/VoiceCommand';
+import SettingsView from './components/SettingsView';
+
+import { ViewType } from './types';
 
 interface AppContextType {
   activeView: ViewType;
@@ -62,10 +63,9 @@ const App: React.FC = () => {
         return <Maintenance />;
       case ViewType.NAVIGATION:
         return <NavigationView initialTarget={navTarget} />;
+
       case ViewType.SETTINGS:
         return <SettingsView />;
-      case ViewType.TRUCK_PROFILE:
-        return <TruckProfile />;
       default:
         return <Dashboard />;
     }
@@ -82,7 +82,7 @@ const App: React.FC = () => {
       <div className="flex h-screen w-screen bg-[#050505] text-white overflow-hidden">
         <Sidebar activeView={activeView} onViewChange={setActiveView} onVoiceToggle={() => setIsVoiceOpen(true)} />
         
-        <main className="flex-1 relative overflow-y-auto custom-scrollbar bg-[#050505]">
+        <main className="flex-1 relative overflow-y-auto custom-scrollbar bg-[#050505] pb-20 lg:pb-0">
           {renderContent()}
         </main>
 

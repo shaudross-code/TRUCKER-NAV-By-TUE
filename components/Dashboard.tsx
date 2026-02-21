@@ -18,7 +18,8 @@ import {
   Navigation
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
-import { AppContext } from '../App.tsx';
+import { AppContext } from '../App';
+
 
 const chartData = [
   { name: 'Mon', value: 850 },
@@ -117,7 +118,7 @@ const WeatherAnalyticsCard: React.FC = () => {
         const geoData = await geoRes.json();
         const city = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.suburb || "Unknown Site";
 
-        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${userLocation[0]}&longitude=${userLocation[1]}&current_weather=true`);
+        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${userLocation[0]}&longitude=${userLocation[1]}&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph`);
         const weatherData = await weatherRes.json();
         
         const current = weatherData.current_weather;
@@ -173,7 +174,7 @@ const WeatherAnalyticsCard: React.FC = () => {
               <div className="h-10 w-32 bg-zinc-900 rounded animate-pulse mb-1" />
             ) : (
               <div className="text-3xl font-bold text-white tracking-tight flex items-baseline gap-2">
-                {weather?.temp}°C
+                {weather?.temp}°F
                 <span className="text-zinc-600 font-black text-xs uppercase tracking-tighter italic">
                   {weather?.condition}
                 </span>
@@ -191,7 +192,7 @@ const WeatherAnalyticsCard: React.FC = () => {
             <div>
               <div className="text-[9px] font-black text-zinc-600 uppercase">Wind</div>
               <div className="text-xs font-bold text-white">
-                {loading ? "..." : `${weather?.windSpeed} km/h ${weather?.windDir}`}
+                {loading ? "..." : `${weather?.windSpeed} mph ${weather?.windDir}`}
               </div>
             </div>
           </div>
@@ -232,6 +233,30 @@ const Dashboard: React.FC = () => {
   const [fuelCost, setFuelCost] = useState(1240.50);
   const [showFuelInput, setShowFuelInput] = useState(false);
   const [newFuelEntry, setNewFuelEntry] = useState('');
+
+  // ELD Dynamic Timers
+  const [timers, setTimers] = useState([
+    { label: 'Until Break', seconds: 5400, total: 28800, color: 'bg-rose-500' }, // 1h 30m
+    { label: 'Drive Time', seconds: 16200, total: 39600, color: 'bg-[#D4AF37]' }, // 4h 30m
+    { label: 'On-Duty Shift', seconds: 20700, total: 50400, color: 'bg-zinc-700' }, // 5h 45m
+    { label: '70h Cycle', seconds: 99000, total: 252000, color: 'bg-[#B8860B]' }, // 27h 30m
+  ]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimers(prev => prev.map(t => ({
+        ...t,
+        seconds: Math.max(0, t.seconds - 1)
+      })));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    return `${h}h ${m}m`;
+  };
 
   const handleAdjustEarnings = (mode: 'add' | 'subtract') => {
     const amount = parseFloat(newEntryValue);
@@ -412,22 +437,17 @@ const Dashboard: React.FC = () => {
           </div>
 
           <div className="space-y-10 flex-1">
-            {[
-              { label: 'Until Break', time: '1h 30m', pct: 25, color: 'bg-rose-500' },
-              { label: 'Drive Time', time: '4h 30m', pct: 60, color: 'bg-[#D4AF37]' },
-              { label: 'On-Duty Shift', time: '5h 45m', pct: 45, color: 'bg-zinc-700' },
-              { label: '70h Cycle', time: '27h 30m', pct: 40, color: 'bg-[#B8860B]' },
-            ].map((timer) => (
+            {timers.map((timer) => (
               <div key={timer.label} className="relative">
                 <div className="flex justify-between items-end mb-3">
                   <span className="text-[11px] font-bold uppercase tracking-widest text-zinc-500">{timer.label}</span>
                   <div className="flex items-baseline gap-1.5">
-                    <span className={`text-2xl font-bold ${timer.label === 'Until Break' ? 'text-[#D4AF37]' : 'text-zinc-100'}`}>{timer.time}</span>
+                    <span className={`text-2xl font-bold ${timer.label === 'Until Break' ? 'text-[#D4AF37]' : 'text-zinc-100'}`}>{formatTime(timer.seconds)}</span>
                     <span className="text-[10px] font-bold text-zinc-600 uppercase">REM</span>
                   </div>
                 </div>
                 <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
-                  <div className={`h-full ${timer.color} rounded-full transition-all duration-1000`} style={{ width: `${timer.pct}%` }} />
+                  <div className={`h-full ${timer.color} rounded-full transition-all duration-1000`} style={{ width: `${(timer.seconds / timer.total) * 100}%` }} />
                 </div>
               </div>
             ))}

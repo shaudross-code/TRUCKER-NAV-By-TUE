@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export enum ViewType {
@@ -6,14 +7,14 @@ export enum ViewType {
   LOAD_BOARD = 'LOAD_BOARD',
   TRUCK_STOPS = 'TRUCK_STOPS',
   MAINTENANCE = 'MAINTENANCE',
-  SETTINGS = 'SETTINGS',
-  TRUCK_PROFILE = 'TRUCK_PROFILE'
+  SETTINGS = 'SETTINGS'
 }
 
 export interface MetricCardProps {
   label: string;
   value: string;
   subValue?: string;
+  // Fix: use React.ReactNode after importing React
   icon: React.ReactNode;
   trend?: {
     value: string;
