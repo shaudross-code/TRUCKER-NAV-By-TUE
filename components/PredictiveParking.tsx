@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { fetchTruckStops } from '../services/geminiService';
 import { AppContext } from '../App';
+import { ViewType } from '../types';
 
 const AmenityIcon: React.FC<{ name: string }> = ({ name }) => {
   const map: Record<string, any> = {
@@ -45,7 +46,7 @@ interface ParkingData {
   amenities: string[];
 }
 
-const ParkingCard: React.FC<ParkingData> = ({ name, location, distance, status, available, total, amenities }) => {
+const ParkingCard: React.FC<ParkingData & { onClick?: () => void }> = ({ name, location, distance, status, available, total, amenities, onClick }) => {
   const progress = (available / total) * 100;
   
   const statusConfig = {
@@ -72,7 +73,10 @@ const ParkingCard: React.FC<ParkingData> = ({ name, location, distance, status, 
   const config = statusConfig[status] || statusConfig['FILLING UP'];
 
   return (
-    <div className="bg-[#0a0a0a] border border-zinc-900 rounded-[1.5rem] p-7 transition-all hover:border-[#D4AF37]/30 group">
+    <div 
+      className="bg-[#0a0a0a] border border-zinc-900 rounded-[1.5rem] p-7 transition-all hover:border-[#D4AF37]/30 group cursor-pointer"
+      onClick={onClick}
+    >
       <div className="flex justify-between items-start mb-6">
         <div>
           <h3 className="text-xl font-bold text-white mb-1.5 group-hover:text-[#D4AF37] transition-colors">{name}</h3>
@@ -117,6 +121,7 @@ const PredictiveParking: React.FC = () => {
   const userLocation = context?.userLocation;
   const [stops, setStops] = useState<ParkingData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function getStops() {
@@ -127,12 +132,20 @@ const PredictiveParking: React.FC = () => {
         setStops(data);
       } catch (err) {
         console.error(err);
+        setError('Failed to load parking data. Please try again later.');
       } finally {
         setLoading(false);
       }
     }
-    getStops();
+    getStops().catch(err => console.error("Fetch stops failed:", err));
   }, [userLocation]);
+
+  const handleCardClick = (stop: ParkingData) => {
+    if (context) {
+      context.setNavTarget(`${stop.name}, ${stop.location}`);
+      context.setActiveView(ViewType.NAVIGATION);
+    }
+  };
 
   return (
     <div className="p-10 max-w-[1400px] mx-auto bg-[#050505]">
@@ -160,8 +173,13 @@ const PredictiveParking: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {stops.map((stop, i) => (
-            <ParkingCard key={i} {...stop} />
+            <ParkingCard key={i} {...stop} onClick={() => handleCardClick(stop)} />
           ))}
+        </div>
+      )}
+      {error && (
+        <div className="text-center py-20">
+          <p className="text-rose-500 font-bold">{error}</p>
         </div>
       )}
     </div>

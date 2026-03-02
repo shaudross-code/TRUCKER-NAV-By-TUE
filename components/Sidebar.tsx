@@ -7,17 +7,29 @@ import {
   Wrench, 
   Settings,
   Mic,
-  Truck
+  Truck,
+  Volume2,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { ViewType } from '../types';
+import { speak } from '../services/speechService';
 
 interface SidebarProps {
   activeView: ViewType;
   onViewChange: (view: ViewType) => void;
   onVoiceToggle: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, onVoiceToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ 
+  activeView, 
+  onViewChange, 
+  onVoiceToggle,
+  isCollapsed = false,
+  onToggleCollapse
+}) => {
   const menuItems = [
     { id: ViewType.DASHBOARD, icon: LayoutGrid, label: 'Dashboard' },
     { id: ViewType.NAVIGATION, icon: Navigation, label: 'Navigation' },
@@ -30,20 +42,33 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, onVoiceTogg
   return (
     <>
       {/* Desktop Sidebar */}
-      <div className="hidden lg:flex w-64 bg-black border-r border-zinc-900 flex-col h-full z-50 relative">
+      <div className={`hidden md:flex ${isCollapsed ? 'w-20' : 'w-64'} bg-black border-r border-zinc-900 flex-col h-full z-50 relative transition-all duration-300 ease-in-out`}>
         {/* Brand Header: Gold Semi-Truck Emblem */}
-        <div className="px-6 py-10 flex items-center gap-4">
-          <div className="bg-gradient-to-br from-[#D4AF37] via-[#FFD700] to-[#B8860B] p-2.5 rounded-[1.2rem] shadow-[0_0_20px_rgba(212,175,55,0.4)] flex items-center justify-center border border-white/20">
+        <div className={`px-6 py-10 flex items-center gap-4 ${isCollapsed ? 'justify-center' : ''}`}>
+          <div className="bg-gradient-to-br from-[#D4AF37] via-[#FFD700] to-[#B8860B] p-2.5 rounded-[1.2rem] shadow-[0_0_20px_rgba(212,175,55,0.4)] flex items-center justify-center border border-white/20 shrink-0">
             <Truck className="w-8 h-8 text-black fill-current" strokeWidth={2.5} />
           </div>
-          <div className="flex flex-col">
-            <h1 className="text-[18px] font-[900] tracking-[-0.02em] leading-none text-white font-sans uppercase">Truckers Nav</h1>
-            <p className="text-[10px] text-[#D4AF37] font-[800] tracking-[0.3em] uppercase mt-2">By Tue</p>
-          </div>
+          {!isCollapsed && (
+            <div className="flex flex-col animate-in fade-in duration-300">
+              <h1 className="text-[18px] font-[900] tracking-[-0.02em] leading-none text-white font-sans uppercase">Truckers Nav</h1>
+              <p className="text-[10px] text-[#D4AF37] font-[800] tracking-[0.3em] uppercase mt-2">By Tue</p>
+            </div>
+          )}
         </div>
 
+        {/* Swipe Away Toggle Button - Only in Navigation View or always? User said "In navigation view" */}
+        {activeView === ViewType.NAVIGATION && onToggleCollapse && (
+          <button 
+            onClick={onToggleCollapse}
+            className={`absolute -right-4 top-1/2 -translate-y-1/2 z-[60] bg-[#D4AF37] text-black p-1.5 rounded-full shadow-xl hover:scale-110 transition-transform border-2 border-black`}
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        )}
+
         {/* Nav Items */}
-        <nav className="flex-1 mt-2 px-3 space-y-1">
+        <nav className="flex-1 mt-2 px-3 space-y-1 overflow-hidden">
           {menuItems.map((item) => {
             const isActive = activeView === item.id;
             return (
@@ -54,38 +79,50 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onViewChange, onVoiceTogg
                   isActive 
                     ? 'bg-[#D4AF37]/10 text-white border border-[#D4AF37]/20' 
                     : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/40'
-                }`}
+                } ${isCollapsed ? 'justify-center' : ''}`}
               >
                 {/* Active Indicator Bar - Now Gold */}
                 {isActive && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-[#D4AF37] rounded-r-full shadow-[2px_0_15px_rgba(212,175,55,0.6)]" />
                 )}
                 
-                <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-[#D4AF37]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
-                <span className={`text-[14px] font-semibold tracking-tight ${isActive ? 'text-zinc-100' : ''}`}>
-                  {item.label}
-                </span>
+                <item.icon className={`w-5 h-5 transition-colors shrink-0 ${isActive ? 'text-[#D4AF37]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                {!isCollapsed && (
+                  <span className={`text-[14px] font-semibold tracking-tight animate-in fade-in duration-300 ${isActive ? 'text-zinc-100' : ''}`}>
+                    {item.label}
+                  </span>
+                )}
               </button>
             );
           })}
         </nav>
 
         {/* Voice Command Button */}
-        <div className="p-6">
+        <div className={`p-6 space-y-3 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          <button 
+            onClick={() => speak("Voice guidance is active.")}
+            className={`w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-4 rounded-2xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
+          >
+            <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-[#D4AF37]/10 shrink-0">
+              <Volume2 className="w-4 h-4 text-zinc-400 group-hover:text-[#D4AF37]" />
+            </div>
+            {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Test Voice</span>}
+          </button>
+
           <button 
             onClick={onVoiceToggle}
-            className="w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-4 rounded-2xl flex items-center gap-3 transition-all group"
+            className={`w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-4 rounded-2xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
           >
-            <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-[#D4AF37]/10">
+            <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-[#D4AF37]/10 shrink-0">
               <Mic className="w-4 h-4 text-zinc-400 group-hover:text-[#D4AF37]" />
             </div>
-            <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200">Voice Command</span>
+            {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Voice Command</span>}
           </button>
         </div>
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-900 px-2 py-2 flex items-center justify-around z-[100] pb-safe">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-900 px-2 py-2 flex items-center justify-around z-[100] pb-safe">
         {menuItems.slice(0, 5).map((item) => {
           const isActive = activeView === item.id;
           return (

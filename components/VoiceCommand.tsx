@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Send, Volume2, AudioLines } from 'lucide-react';
-import { processVoiceCommand, textToSpeech } from '../services/geminiService';
+import { processVoiceCommand } from '../services/geminiService';
+import { speak } from '../services/speechService';
+import { ViewType } from '../types';
 
 interface VoiceCommandProps {
   onClose: () => void;
+  setActiveView: (view: ViewType) => void;
+  setNavTarget: (target: string | null) => void;
 }
 
-const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose }) => {
+const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose, setActiveView, setNavTarget }) => {
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [messages, setMessages] = useState<{role: 'user' | 'ai', text: string, isSpeaking?: boolean}[]>([
@@ -21,6 +25,11 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose }) => {
     }
   }, [messages]);
 
+  useEffect(() => {
+    // Initial greeting
+    speak("TRUCKERS NAV System Online. How can I assist your route today?");
+  }, []);
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!input.trim() || isProcessing) return;
@@ -30,9 +39,29 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose }) => {
     setIsProcessing(true);
     try {
       const response = await processVoiceCommand(userText);
-      const aiResponse = response || 'I missed that. Come again?';
+      const aiResponse = response.text || 'I missed that. Come again?';
+      
       setMessages(prev => [...prev, { role: 'ai', text: aiResponse, isSpeaking: true }]);
-      await textToSpeech(aiResponse);
+      
+      // Handle function calls
+      if (response.functionCalls) {
+        for (const call of response.functionCalls) {
+          if (call.name === 'navigate_to') {
+            const dest = (call.args as any).destination;
+            setNavTarget(dest);
+            setActiveView(ViewType.NAVIGATION);
+            setTimeout(onClose, 2000);
+          } else if (call.name === 'switch_view') {
+            const viewStr = (call.args as any).view.toUpperCase();
+            if (ViewType[viewStr as keyof typeof ViewType]) {
+              setActiveView(ViewType[viewStr as keyof typeof ViewType]);
+              setTimeout(onClose, 2000);
+            }
+          }
+        }
+      }
+
+      speak(aiResponse);
       setMessages(prev => prev.map(m => m.text === aiResponse ? { ...m, isSpeaking: false } : m));
     } catch (error) {
       console.error("Voice command error:", error);
@@ -69,7 +98,7 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose }) => {
       setTimeout(() => {
         if (transcript) {
           const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-          handleSubmit(fakeEvent);
+          handleSubmit(fakeEvent).catch(err => console.error("Voice submit failed:", err));
         }
       }, 500);
     };

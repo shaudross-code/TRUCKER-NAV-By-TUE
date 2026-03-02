@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { 
   Map, 
   Shield, 
@@ -11,15 +11,23 @@ import {
   Scale,
   RotateCcw
 } from 'lucide-react';
+import { AppContext } from '../App';
 
 interface ToggleProps {
   label: string;
   description: string;
   initialValue?: boolean;
+  onChange?: (val: boolean) => void;
 }
 
-const Toggle: React.FC<ToggleProps> = ({ label, description, initialValue = false }) => {
+const Toggle: React.FC<ToggleProps> = ({ label, description, initialValue = false, onChange }) => {
   const [enabled, setEnabled] = useState(initialValue);
+  
+  const handleToggle = () => {
+    const next = !enabled;
+    setEnabled(next);
+    if (onChange) onChange(next);
+  };
   
   return (
     <div className="bg-[#0a0a0a] border border-zinc-900 p-5 rounded-2xl flex items-center justify-between group transition-all hover:border-[#D4AF37]/30">
@@ -28,7 +36,7 @@ const Toggle: React.FC<ToggleProps> = ({ label, description, initialValue = fals
         <p className="text-[12px] text-zinc-500 font-medium">{description}</p>
       </div>
       <button 
-        onClick={() => setEnabled(!enabled)}
+        onClick={handleToggle}
         className={`w-11 h-6 rounded-full transition-all duration-300 relative ${
           enabled ? 'bg-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-zinc-800'
         }`}
@@ -41,7 +49,7 @@ const Toggle: React.FC<ToggleProps> = ({ label, description, initialValue = fals
   );
 };
 
-const ProfileField: React.FC<{ label: string, value: string, icon: any }> = ({ label, value, icon: Icon }) => (
+const ProfileField: React.FC<{ label: string, value: string, icon: any, onEdit?: () => void }> = ({ label, value, icon: Icon, onEdit }) => (
   <div className="bg-[#0a0a0a] border border-zinc-900 p-5 rounded-2xl flex items-center justify-between group transition-all hover:border-[#D4AF37]/30">
     <div className="flex items-center gap-4">
       <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800/50 group-hover:bg-[#D4AF37]/10 group-hover:border-[#D4AF37]/30 transition-all">
@@ -52,11 +60,31 @@ const ProfileField: React.FC<{ label: string, value: string, icon: any }> = ({ l
         <p className="text-[12px] text-zinc-500 font-medium italic">{value}</p>
       </div>
     </div>
-    <button className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest hover:underline px-3 py-1 italic">Edit</button>
+    <button onClick={onEdit} className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest hover:underline px-3 py-1 italic">Edit</button>
   </div>
 );
 
 const SettingsView: React.FC = () => {
+  const context = useContext(AppContext);
+  if (!context) return null;
+
+  const { truckProfile, setTruckProfile } = context;
+
+  const handleEdit = (field: keyof typeof truckProfile) => {
+    const current = truckProfile[field];
+    const newValue = prompt(`Enter new ${field}:`, current.toString());
+    if (newValue !== null) {
+      if (field === 'hazmat') {
+        setTruckProfile(prev => ({ ...prev, [field]: newValue.toLowerCase() === 'true' }));
+      } else {
+        const num = parseFloat(newValue);
+        if (!isNaN(num)) {
+          setTruckProfile(prev => ({ ...prev, [field]: num }));
+        }
+      }
+    }
+  };
+
   return (
     <div className="p-10 max-w-[1400px] mx-auto bg-[#050505] min-h-screen pb-24">
       <div className="mb-12">
@@ -76,7 +104,12 @@ const SettingsView: React.FC = () => {
             <Toggle label="Avoid U-Turns" description="Only suggest turns safe for semi-truck dimensions" initialValue={true} />
             <Toggle label="Weight Limit Compliance" description="Route away from roads with strict weight restrictions" initialValue={true} />
             <Toggle label="Strict Truck Routing" description="Enforce STAA and designated truck route adherence" initialValue={true} />
-            <Toggle label="Hazmat Routing" description="Enforce hazardous material restrictions based on load" initialValue={false} />
+            <Toggle 
+              label="Hazmat Routing" 
+              description="Enforce hazardous material restrictions based on load" 
+              initialValue={truckProfile.hazmat} 
+              onChange={(val) => setTruckProfile(prev => ({ ...prev, hazmat: val }))}
+            />
             <Toggle label="Avoid Tolls" description="Prefer free routes when available" />
             <Toggle label="Avoid Ferries" description="Exclude water crossings from route" initialValue={true} />
           </div>
@@ -89,9 +122,24 @@ const SettingsView: React.FC = () => {
             <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">Truck Specifications</h2>
           </div>
           <div className="space-y-3">
-            <ProfileField label="Current Height" value="13' 6&quot; (Standard High Cube)" icon={ArrowUpCircle} />
-            <ProfileField label="Gross Weight" value="78,500 lbs (Class 8 Loaded)" icon={Scale} />
-            <ProfileField label="Trailer Length" value="53' (Single Semi-Trailer)" icon={RotateCcw} />
+            <ProfileField 
+              label="Current Height" 
+              value={`${truckProfile.height}' (Truck Height)`} 
+              icon={ArrowUpCircle} 
+              onEdit={() => handleEdit('height')}
+            />
+            <ProfileField 
+              label="Gross Weight" 
+              value={`${truckProfile.weight.toLocaleString()} lbs (GVW)`} 
+              icon={Scale} 
+              onEdit={() => handleEdit('weight')}
+            />
+            <ProfileField 
+              label="Trailer Length" 
+              value={`${truckProfile.length}' (Trailer Length)`} 
+              icon={RotateCcw} 
+              onEdit={() => handleEdit('length')}
+            />
             <div className="mt-6 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-2xl">
               <p className="text-[10px] text-[#D4AF37] font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                 <Shield className="w-3 h-3" />

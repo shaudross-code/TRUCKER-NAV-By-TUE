@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { AppContext } from '../App';
 import { ViewType } from '../types';
