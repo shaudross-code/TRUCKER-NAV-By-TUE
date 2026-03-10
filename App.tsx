@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, createContext, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import PredictiveParking from './components/PredictiveParking';
@@ -8,48 +8,10 @@ import Maintenance from './components/Maintenance';
 import NavigationView from './components/NavigationView';
 import VoiceCommand from './components/VoiceCommand';
 import SettingsView from './components/SettingsView';
+import RouteHistory from './components/RouteHistory';
+import PaySummary from './components/PaySummary';
 
-import { ViewType } from './types';
-
-interface AppContextType {
-  activeView: ViewType;
-  setActiveView: (view: ViewType) => void;
-  userLocation: [number, number] | null;
-  navTarget: string | null;
-  setNavTarget: (target: string | null) => void;
-  isDriving: boolean;
-  setIsDriving: (val: boolean) => void;
-  speed: number;
-  setSpeed: (val: number) => void;
-  idleSeconds: number;
-  breakSuggestion: boolean;
-  setBreakSuggestion: (val: boolean) => void;
-  hasViolation: boolean;
-  truckProfile: {
-    height: number; // in feet
-    weight: number; // in lbs
-    length: number; // in feet
-    hazmat: boolean;
-  };
-  setTruckProfile: React.Dispatch<React.SetStateAction<{
-    height: number;
-    weight: number;
-    length: number;
-    hazmat: boolean;
-  }>>;
-  eldStatus: {
-    status: 'OFF' | 'SB' | 'ON' | 'DRIVE';
-    timers: { label: string; seconds: number; total: number; color: string }[];
-    resetSeconds: number;
-  };
-  setEldStatus: React.Dispatch<React.SetStateAction<{
-    status: 'OFF' | 'SB' | 'ON' | 'DRIVE';
-    timers: { label: string; seconds: number; total: number; color: string }[];
-    resetSeconds: number;
-  }>>;
-}
-
-export const AppContext = createContext<AppContextType | undefined>(undefined);
+import { ViewType, AppContext } from './types';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
@@ -57,13 +19,112 @@ const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [navTarget, setNavTarget] = useState<string | null>(null);
+  const [autoReroute, setAutoReroute] = useState(() => {
+    const saved = localStorage.getItem('trucker_auto_reroute');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const [truckProfile, setTruckProfile] = useState(() => {
+    const saved = localStorage.getItem('trucker_profile');
+    return saved ? JSON.parse(saved) : {
+      height: 13.5,
+      weight: 78500,
+      length: 53,
+      width: 8.5,
+      hazmat: false,
+      hazmatClasses: [],
+      tunnelCategory: 'NONE',
+      axleCount: 5,
+      axleWeight: 12000,
+      trailerCount: 1
+    };
+  });
+
+  const [eldStatus, setEldStatus] = useState(() => {
+    const saved = localStorage.getItem('trucker_eld_status');
+    return saved ? JSON.parse(saved) : {
+      status: 'OFF' as 'OFF' | 'SB' | 'ON' | 'DRIVE',
+      resetSeconds: 36000,
+      timers: [
+        { label: 'Until Break', seconds: 28800, total: 28800, color: 'bg-rose-500' }, 
+        { label: 'Drive Time', seconds: 39600, total: 39600, color: 'bg-[#D4AF37]' }, 
+        { label: 'On-Duty Shift', seconds: 50400, total: 50400, color: 'bg-zinc-700' }, 
+        { label: '70h Cycle', seconds: 252000, total: 252000, color: 'bg-[#B8860B]' }, 
+      ]
+    };
+  });
+
+  const [weeklyEarnings, setWeeklyEarnings] = useState(() => {
+    const saved = localStorage.getItem('trucker_weekly_earnings');
+    return saved ? JSON.parse(saved) : 4980.00;
+  });
+  const [milesThisWeek, setMilesThisWeek] = useState(() => {
+    const saved = localStorage.getItem('trucker_miles_this_week');
+    return saved ? JSON.parse(saved) : 2845;
+  });
+  const [fuelCost, setFuelCost] = useState(() => {
+    const saved = localStorage.getItem('trucker_fuel_cost');
+    return saved ? JSON.parse(saved) : 1240.50;
+  });
+  const [truckCost, setTruckCost] = useState(() => {
+    const saved = localStorage.getItem('trucker_truck_cost');
+    return saved ? JSON.parse(saved) : 500.00;
+  });
+  const [weekDeductions, setWeekDeductions] = useState(() => {
+    const saved = localStorage.getItem('trucker_week_deductions');
+    return saved ? JSON.parse(saved) : 0;
+  });
+  const [takeHomePercentage, setTakeHomePercentage] = useState(() => {
+    const saved = localStorage.getItem('trucker_take_home_percentage');
+    return saved ? JSON.parse(saved) : 100;
+  });
+
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem('trucker_profile', JSON.stringify(truckProfile));
+  }, [truckProfile]);
+  
+  useEffect(() => {
+    localStorage.setItem('trucker_take_home_percentage', JSON.stringify(takeHomePercentage));
+  }, [takeHomePercentage]);
 
   useEffect(() => {
-    // Initial view set to Dashboard
-    setActiveView(ViewType.DASHBOARD);
-  }, []);
+    localStorage.setItem('trucker_eld_status', JSON.stringify(eldStatus));
+  }, [eldStatus]);
+
+  useEffect(() => {
+    localStorage.setItem('trucker_weekly_earnings', JSON.stringify(weeklyEarnings));
+  }, [weeklyEarnings]);
+
+  useEffect(() => {
+    localStorage.setItem('trucker_miles_this_week', JSON.stringify(milesThisWeek));
+  }, [milesThisWeek]);
+
+  useEffect(() => {
+    localStorage.setItem('trucker_fuel_cost', JSON.stringify(fuelCost));
+  }, [fuelCost]);
+
+  useEffect(() => {
+    localStorage.setItem('trucker_truck_cost', JSON.stringify(truckCost));
+  }, [truckCost]);
+
+  useEffect(() => {
+    localStorage.setItem('trucker_week_deductions', JSON.stringify(weekDeductions));
+  }, [weekDeductions]);
+
+  useEffect(() => {
+    localStorage.setItem('trucker_auto_reroute', JSON.stringify(autoReroute));
+  }, [autoReroute]);
+
+  useEffect(() => {
+    if (userLocation) {
+      localStorage.setItem('trucker_last_location', JSON.stringify(userLocation));
+    }
+  }, [userLocation]);
+
   const [isDriving, setIsDriving] = useState(false);
   const [speed, setSpeed] = useState(0);
+  const [heading, setHeading] = useState(0);
   const speedRef = useRef(0);
   useEffect(() => {
     speedRef.current = speed;
@@ -72,23 +133,10 @@ const App: React.FC = () => {
   const [idleSeconds, setIdleSeconds] = useState(0);
   const [breakSuggestion, setBreakSuggestion] = useState(false);
 
-  const [truckProfile, setTruckProfile] = useState({
-    height: 13.5, // 13' 6"
-    weight: 78500,
-    length: 53,
-    hazmat: false
-  });
-
-  const [eldStatus, setEldStatus] = useState({
-    status: 'OFF' as 'OFF' | 'SB' | 'ON' | 'DRIVE',
-    resetSeconds: 36000, // 10 Hours
-    timers: [
-      { label: 'Until Break', seconds: 28800, total: 28800, color: 'bg-rose-500' }, 
-      { label: 'Drive Time', seconds: 39600, total: 39600, color: 'bg-[#D4AF37]' }, 
-      { label: 'On-Duty Shift', seconds: 50400, total: 50400, color: 'bg-zinc-700' }, 
-      { label: '70h Cycle', seconds: 252000, total: 252000, color: 'bg-[#B8860B]' }, 
-    ]
-  });
+  useEffect(() => {
+    // Initial view set to Dashboard
+    setActiveView(ViewType.DASHBOARD);
+  }, []);
 
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
   useEffect(() => {
@@ -207,13 +255,14 @@ const App: React.FC = () => {
   // Global High-Accuracy Geolocation Tracking
   useEffect(() => {
     if (!("geolocation" in navigator)) {
-      setUserLocation(prev => prev || [41.8781, -87.6298]);
+      const saved = localStorage.getItem('trucker_last_location');
+      setUserLocation(prev => prev || (saved ? JSON.parse(saved) : [41.8781, -87.6298]));
       return;
     }
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
-        const { latitude, longitude, speed: geoSpeed } = position.coords;
+        const { latitude, longitude, speed: geoSpeed, heading: geoHeading } = position.coords;
         if (isNaN(latitude) || isNaN(longitude)) {
           console.warn("Received NaN coordinates from GPS");
           return;
@@ -227,11 +276,20 @@ const App: React.FC = () => {
           // Convert m/s to mph
           const mph = Math.round(geoSpeed * 2.23694);
           setSpeed(mph);
+        } else {
+          setSpeed(0);
+        }
+
+        if (geoHeading !== null && !isNaN(geoHeading)) {
+          setHeading(geoHeading);
         }
       },
       (error) => {
         console.warn("GPS Signal Issue:", error.message);
-        if (!userLocation) setUserLocation([41.8781, -87.6298]);
+        if (!userLocation) {
+          const saved = localStorage.getItem('trucker_last_location');
+          setUserLocation(saved ? JSON.parse(saved) : [41.8781, -87.6298]);
+        }
       },
       { 
         enableHighAccuracy: true, 
@@ -256,6 +314,10 @@ const App: React.FC = () => {
         return null; // Handled separately to keep it mounted
       case ViewType.SETTINGS:
         return <SettingsView />;
+      case ViewType.ROUTE_HISTORY:
+        return <RouteHistory />;
+      case ViewType.PAY_SUMMARY:
+        return <PaySummary />;
       default:
         return <Dashboard />;
     }
@@ -266,20 +328,37 @@ const App: React.FC = () => {
       activeView, 
       setActiveView, 
       userLocation, 
+      setUserLocation,
       navTarget, 
       setNavTarget,
       isDriving,
       setIsDriving,
       speed,
       setSpeed,
+      heading,
+      setHeading,
       idleSeconds,
       breakSuggestion,
       setBreakSuggestion,
       hasViolation,
+      autoReroute,
+      setAutoReroute,
       truckProfile,
       setTruckProfile,
       eldStatus,
-      setEldStatus
+      setEldStatus,
+      weeklyEarnings,
+      setWeeklyEarnings,
+      milesThisWeek,
+      setMilesThisWeek,
+      fuelCost,
+      setFuelCost,
+      truckCost,
+      setTruckCost,
+      weekDeductions,
+      setWeekDeductions,
+      takeHomePercentage,
+      setTakeHomePercentage
     }}>
       <div className="flex h-screen w-screen bg-[#050505] text-white overflow-hidden">
         {apiKeyMissing && (

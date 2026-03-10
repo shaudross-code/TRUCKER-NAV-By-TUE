@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { CheckCircle2 } from 'lucide-react';
-import { AppContext } from '../App';
+import { AppContext } from '../types';
 import { ViewType } from '../types';
 
 const LoadCard: React.FC<{

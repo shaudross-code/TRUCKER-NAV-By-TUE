@@ -1,6 +1,6 @@
 {
   "name": "TRUCKERS NAV By TUE",
-  "description": "A comprehensive trucking fleet management dashboard featuring predictive parking, real-time navigation, and advanced analytics.",
+  "description": "Static locations and very accurate precise location on map providing undeniable certainty of correct route to locations.",
   "requestFramePermissions": [
     "microphone",
     "geolocation"

@@ -11,7 +11,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { fetchTruckStops } from '../services/geminiService';
-import { AppContext } from '../App';
+import { AppContext } from '../types';
 import { ViewType } from '../types';
 
 const AmenityIcon: React.FC<{ name: string }> = ({ name }) => {

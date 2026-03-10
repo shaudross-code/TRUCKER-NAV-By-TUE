@@ -9,9 +9,11 @@ import {
   Truck,
   ArrowUpCircle,
   Scale,
-  RotateCcw
+  RotateCcw,
+  Download,
+  CheckCircle2
 } from 'lucide-react';
-import { AppContext } from '../App';
+import { AppContext } from '../types';
 
 interface ToggleProps {
   label: string;
@@ -64,23 +66,102 @@ const ProfileField: React.FC<{ label: string, value: string, icon: any, onEdit?:
   </div>
 );
 
+const MapDownloadItem: React.FC<{ region: string, size: string, isDownloaded: boolean, onDownload: () => void }> = ({ region, size, isDownloaded, onDownload }) => {
+  const [downloading, setDownloading] = useState(false);
+  const [progress, setProgress] = useState(0);
+
+  const handleDownload = () => {
+    if (isDownloaded || downloading) return;
+    setDownloading(true);
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += Math.random() * 15;
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        setProgress(100);
+        setTimeout(() => {
+          setDownloading(false);
+          onDownload();
+        }, 500);
+      } else {
+        setProgress(currentProgress);
+      }
+    }, 200);
+  };
+
+  return (
+    <div className="bg-[#0a0a0a] border border-zinc-900 p-4 rounded-2xl flex items-center justify-between group transition-all hover:border-[#D4AF37]/30 relative overflow-hidden">
+      {downloading && (
+        <div 
+          className="absolute left-0 top-0 bottom-0 bg-[#D4AF37]/10 transition-all duration-200"
+          style={{ width: `${progress}%` }}
+        />
+      )}
+      <div className="flex items-center gap-4 relative z-10">
+        <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800/50 group-hover:bg-[#D4AF37]/10 transition-all">
+          <Map className="w-5 h-5 text-[#D4AF37]" />
+        </div>
+        <div>
+          <h4 className="text-[15px] font-bold text-white mb-0.5 group-hover:text-[#D4AF37] transition-colors">{region}</h4>
+          <p className="text-[12px] text-zinc-500 font-medium italic">{size}</p>
+        </div>
+      </div>
+      <div className="relative z-10">
+        {isDownloaded ? (
+          <div className="flex items-center gap-2 text-[#D4AF37]">
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="text-[11px] font-black uppercase tracking-widest italic hidden sm:inline">Downloaded</span>
+          </div>
+        ) : downloading ? (
+          <div className="text-[11px] font-black text-[#D4AF37] uppercase tracking-widest italic">
+            {Math.round(progress)}%
+          </div>
+        ) : (
+          <button 
+            onClick={handleDownload}
+            className="w-8 h-8 rounded-full bg-zinc-900 flex items-center justify-center hover:bg-[#D4AF37] hover:text-black text-zinc-400 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const SettingsView: React.FC = () => {
   const context = useContext(AppContext);
+  const [downloadedMaps, setDownloadedMaps] = useState<string[]>(['California']);
+
   if (!context) return null;
 
   const { truckProfile, setTruckProfile } = context;
 
   const handleEdit = (field: keyof typeof truckProfile) => {
     const current = truckProfile[field];
-    const newValue = prompt(`Enter new ${field}:`, current.toString());
+    let promptMsg = `Enter new ${field}:`;
+    
+    if (field === 'hazmatClasses') promptMsg = "Enter Hazmat Classes (comma separated, e.g. explosive,gas,flammable):";
+    if (field === 'tunnelCategory') promptMsg = "Enter Tunnel Category (A, B, C, D, E, or NONE):";
+
+    const newValue = prompt(promptMsg, Array.isArray(current) ? current.join(',') : current.toString());
+    
     if (newValue !== null) {
       if (field === 'hazmat') {
         setTruckProfile(prev => ({ ...prev, [field]: newValue.toLowerCase() === 'true' }));
-      } else {
+      } else if (field === 'hazmatClasses') {
+        const classes = newValue.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+        setTruckProfile(prev => ({ ...prev, [field]: classes }));
+      } else if (field === 'tunnelCategory') {
+        const cat = newValue.toUpperCase().trim();
+        setTruckProfile(prev => ({ ...prev, [field]: cat }));
+      } else if (typeof current === 'number') {
         const num = parseFloat(newValue);
         if (!isNaN(num)) {
           setTruckProfile(prev => ({ ...prev, [field]: num }));
         }
+      } else {
+        setTruckProfile(prev => ({ ...prev, [field]: newValue }));
       }
     }
   };
@@ -112,6 +193,12 @@ const SettingsView: React.FC = () => {
             />
             <Toggle label="Avoid Tolls" description="Prefer free routes when available" />
             <Toggle label="Avoid Ferries" description="Exclude water crossings from route" initialValue={true} />
+            <Toggle 
+              label="Auto-Recalculate Route" 
+              description="Automatically reroute when off-track" 
+              initialValue={context.autoReroute} 
+              onChange={context.setAutoReroute}
+            />
           </div>
         </section>
 
@@ -140,6 +227,44 @@ const SettingsView: React.FC = () => {
               icon={RotateCcw} 
               onEdit={() => handleEdit('length')}
             />
+            <ProfileField 
+              label="Truck Width" 
+              value={`${truckProfile.width}' (Width)`} 
+              icon={ArrowUpCircle} 
+              onEdit={() => handleEdit('width')}
+            />
+            <ProfileField 
+              label="Axle Count" 
+              value={`${truckProfile.axleCount} Axles`} 
+              icon={Scale} 
+              onEdit={() => handleEdit('axleCount')}
+            />
+            <ProfileField 
+              label="Axle Weight" 
+              value={`${truckProfile.axleWeight.toLocaleString()} lbs (Per Axle)`} 
+              icon={Scale} 
+              onEdit={() => handleEdit('axleWeight')}
+            />
+            <ProfileField 
+              label="Trailer Count" 
+              value={`${truckProfile.trailerCount} Units`} 
+              icon={Truck} 
+              onEdit={() => handleEdit('trailerCount')}
+            />
+            <ProfileField 
+              label="Tunnel Category" 
+              value={`${truckProfile.tunnelCategory} (ADR)`} 
+              icon={Shield} 
+              onEdit={() => handleEdit('tunnelCategory')}
+            />
+            {truckProfile.hazmat && (
+              <ProfileField 
+                label="Hazmat Classes" 
+                value={truckProfile.hazmatClasses.length > 0 ? truckProfile.hazmatClasses.join(', ') : 'All Classes'} 
+                icon={Shield} 
+                onEdit={() => handleEdit('hazmatClasses')}
+              />
+            )}
             <div className="mt-6 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-2xl">
               <p className="text-[10px] text-[#D4AF37] font-black uppercase tracking-widest mb-2 flex items-center gap-2">
                 <Shield className="w-3 h-3" />
@@ -174,6 +299,38 @@ const SettingsView: React.FC = () => {
           <div className="space-y-3">
             <Toggle label="Voice Guidance" description="Turn-by-turn spoken instructions" initialValue={true} />
             <Toggle label="Auto Night Mode" description="Adjust display brightness based on local sunset" initialValue={true} />
+          </div>
+        </section>
+
+        {/* Map Downloads */}
+        <section className="lg:col-span-2">
+          <div className="flex items-center gap-3 mb-6">
+            <Download className="w-4 h-4 text-[#D4AF37]" />
+            <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">Offline Maps</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {[
+              { region: 'California', size: '1.2 GB' },
+              { region: 'Texas', size: '1.5 GB' },
+              { region: 'New York', size: '850 MB' },
+              { region: 'Florida', size: '920 MB' },
+              { region: 'Illinois', size: '780 MB' },
+              { region: 'Pennsylvania', size: '810 MB' },
+              { region: 'Ohio', size: '750 MB' },
+              { region: 'Georgia', size: '840 MB' },
+              { region: 'North Carolina', size: '790 MB' },
+              { region: 'Michigan', size: '720 MB' },
+              { region: 'Canada (All)', size: '4.2 GB' },
+              { region: 'Mexico (All)', size: '3.8 GB' },
+            ].map(map => (
+              <MapDownloadItem 
+                key={map.region}
+                region={map.region}
+                size={map.size}
+                isDownloaded={downloadedMaps.includes(map.region)}
+                onDownload={() => setDownloadedMaps(prev => [...prev, map.region])}
+              />
+            ))}
           </div>
         </section>
 

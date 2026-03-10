@@ -17,59 +17,77 @@ import {
   Navigation,
   Coffee,
   Truck,
-  AlertTriangle
+  AlertTriangle,
+  Wrench
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
-import { AppContext } from '../App';
+import { AppContext } from '../types';
 import { textToSpeech } from '../services/geminiService';
+import TruckProfileModal from './TruckProfileModal';
+import { ViewType } from '../types';
 
 const TruckProfileCard: React.FC = () => {
   const context = useContext(AppContext);
   const truckProfile = context?.truckProfile;
+  const setTruckProfile = context?.setTruckProfile;
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  if (!truckProfile) return null;
+  if (!truckProfile || !setTruckProfile) return null;
 
   return (
-    <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col shadow-2xl group hover:border-[#D4AF37]/30 transition-all duration-700">
-      <div className="flex justify-between items-center mb-8 md:mb-12">
-        <div className="flex items-center gap-4 md:gap-5">
-          <div className="bg-[#D4AF37] p-3 md:p-4 rounded-xl md:rounded-2xl text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-            <Truck className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
+    <>
+      <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col shadow-2xl group hover:border-[#D4AF37]/30 transition-all duration-700">
+        <div className="flex justify-between items-center mb-8 md:mb-12">
+          <div className="flex items-center gap-4 md:gap-5">
+            <div className="bg-[#D4AF37] p-3 md:p-4 rounded-xl md:rounded-2xl text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+              <Truck className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
+            </div>
+            <div>
+              <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight">Truck Profile</h2>
+              <p className="text-[8px] md:text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest">Active Unit 702</p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight">Truck Profile</h2>
-            <p className="text-[8px] md:text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest">Active Unit 702</p>
+        </div>
+        <div className="space-y-6 md:space-y-8 flex-1">
+          <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
+            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Max Height</span>
+            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.height}<span className="text-xs text-zinc-700 ml-1">FT</span></span>
+          </div>
+          <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
+            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Gross Weight</span>
+            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.weight.toLocaleString()}<span className="text-xs text-zinc-700 ml-1">LBS</span></span>
+          </div>
+          <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
+            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Total Length</span>
+            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.length}<span className="text-xs text-zinc-700 ml-1">FT</span></span>
+          </div>
+          <div className="flex justify-between items-end">
+            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Hazmat Status</span>
+            <span className={`text-lg md:text-xl font-bold uppercase tracking-widest ${truckProfile.hazmat ? 'text-rose-500' : 'text-emerald-500'}`}>
+              {truckProfile.hazmat ? 'Restricted' : 'Cleared'}
+            </span>
           </div>
         </div>
-      </div>
-      <div className="space-y-6 md:space-y-8 flex-1">
-        <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
-          <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Max Height</span>
-          <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.height}<span className="text-xs text-zinc-700 ml-1">FT</span></span>
-        </div>
-        <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
-          <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Gross Weight</span>
-          <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.weight.toLocaleString()}<span className="text-xs text-zinc-700 ml-1">LBS</span></span>
-        </div>
-        <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
-          <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Total Length</span>
-          <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.length}<span className="text-xs text-zinc-700 ml-1">FT</span></span>
-        </div>
-        <div className="flex justify-between items-end">
-          <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Hazmat Status</span>
-          <span className={`text-lg md:text-xl font-bold uppercase tracking-widest ${truckProfile.hazmat ? 'text-rose-500' : 'text-emerald-500'}`}>
-            {truckProfile.hazmat ? 'Restricted' : 'Cleared'}
-          </span>
+        <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-white/10 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-widest">System Verified</span>
+          </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 md:px-6 py-1.5 md:py-2 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-full text-[8px] md:text-[10px] font-bold text-white uppercase tracking-widest transition-all"
+          >
+            Modify
+          </button>
         </div>
       </div>
-      <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-white/10 flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-widest">System Verified</span>
-        </div>
-        <button className="px-4 md:px-6 py-1.5 md:py-2 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-full text-[8px] md:text-[10px] font-bold text-white uppercase tracking-widest transition-all">Modify</button>
-      </div>
-    </div>
+      <TruckProfileModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        profile={truckProfile} 
+        onSave={setTruckProfile} 
+      />
+    </>
   );
 };
 
@@ -308,6 +326,71 @@ const WeatherAnalyticsCard: React.FC = () => {
   );
 };
 
+const QuickActions: React.FC = () => {
+  const context = useContext(AppContext);
+  const setActiveView = context?.setActiveView;
+  const setNavTarget = context?.setNavTarget;
+  const setEldStatus = context?.setEldStatus;
+
+  const actions = [
+    { 
+      label: 'Find Fuel', 
+      icon: Fuel, 
+      color: 'text-yellow-400', 
+      bg: 'bg-yellow-400/10',
+      onClick: () => {
+        setNavTarget?.('truck stops');
+        setActiveView?.(ViewType.NAVIGATION);
+      }
+    },
+    { 
+      label: 'Start Break', 
+      icon: Coffee, 
+      color: 'text-blue-400', 
+      bg: 'bg-blue-400/10',
+      onClick: () => {
+        setEldStatus?.(prev => ({ ...prev, status: 'OFF' }));
+      }
+    },
+    { 
+      label: 'Load Board', 
+      icon: TrendingUp, 
+      color: 'text-emerald-400', 
+      bg: 'bg-emerald-400/10',
+      onClick: () => setActiveView?.(ViewType.LOAD_BOARD)
+    },
+    { 
+      label: 'Maintenance', 
+      icon: Wrench, 
+      color: 'text-rose-400', 
+      bg: 'bg-rose-400/10',
+      onClick: () => setActiveView?.(ViewType.MAINTENANCE)
+    },
+  ];
+
+  return (
+    <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl group hover:border-[#D4AF37]/30 transition-all duration-700">
+      <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight mb-8">Quick Actions</h2>
+      <div className="grid grid-cols-2 gap-4">
+        {actions.map((action, idx) => (
+          <button
+            key={idx}
+            onClick={action.onClick}
+            className="flex flex-col items-center justify-center p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-[#D4AF37]/30 hover:bg-white/10 transition-all group/btn"
+          >
+            <div className={`${action.bg} ${action.color} p-4 rounded-2xl mb-3 group-hover/btn:scale-110 transition-transform`}>
+              <action.icon className="w-6 h-6" />
+            </div>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest group-hover/btn:text-white transition-colors">
+              {action.label}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Dashboard: React.FC = () => {
   const context = useContext(AppContext);
   const eldStatus = context?.eldStatus;
@@ -318,17 +401,31 @@ const Dashboard: React.FC = () => {
   const setBreakSuggestion = context?.setBreakSuggestion || (() => {});
   const hasViolation = context?.hasViolation || false;
 
-  const [weeklyEarnings, setWeeklyEarnings] = useState(4980.00);
-  const [showEarningsInput, setShowEarningsInput] = useState(false);
+  const weeklyEarnings = context?.weeklyEarnings || 0;
+  const setWeeklyEarnings = context?.setWeeklyEarnings || (() => {});
+  const milesThisWeek = context?.milesThisWeek || 0;
+  const setMilesThisWeek = context?.setMilesThisWeek || (() => {});
+  const fuelCost = context?.fuelCost || 0;
+  const setFuelCost = context?.setFuelCost || (() => {});
+  const truckCost = context?.truckCost || 0;
+  const setTruckCost = context?.setTruckCost || (() => {});
+  const weekDeductions = context?.weekDeductions || 0;
+  const setWeekDeductions = context?.setWeekDeductions || (() => {});
+
+  const [isEarningsInputOpen, setIsEarningsInputOpen] = useState(false);
   const [newEntryValue, setNewEntryValue] = useState('');
 
-  const [milesThisWeek, setMilesThisWeek] = useState(2845);
-  const [showMilesInput, setShowMilesInput] = useState(false);
+  const [isMilesInputOpen, setIsMilesInputOpen] = useState(false);
   const [newMilesEntry, setNewMilesEntry] = useState('');
 
-  const [fuelCost, setFuelCost] = useState(1240.50);
-  const [showFuelInput, setShowFuelInput] = useState(false);
+  const [isFuelInputOpen, setIsFuelInputOpen] = useState(false);
   const [newFuelEntry, setNewFuelEntry] = useState('');
+
+  const [isTruckCostInputOpen, setIsTruckCostInputOpen] = useState(false);
+  const [newTruckCostEntry, setNewTruckCostEntry] = useState('');
+
+  const [isDeductionsInputOpen, setIsDeductionsInputOpen] = useState(false);
+  const [newDeductionsEntry, setNewDeductionsEntry] = useState('');
 
   const lastViolationRef = React.useRef(false);
   const lastSuggestionRef = React.useRef(false);
@@ -454,8 +551,36 @@ const Dashboard: React.FC = () => {
     if (!isNaN(amount) && amount > 0) {
       setFuelCost(prev => prev + amount);
       setNewFuelEntry('');
-      setShowFuelInput(false);
+      setIsFuelInputOpen(false);
     }
+  };
+
+  const handleAddTruckCost = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(newTruckCostEntry);
+    if (!isNaN(amount) && amount > 0) {
+      setTruckCost(prev => prev + amount);
+      setNewTruckCostEntry('');
+      setIsTruckCostInputOpen(false);
+    }
+  };
+
+  const handleAddDeductions = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(newDeductionsEntry);
+    if (!isNaN(amount) && amount > 0) {
+      setWeekDeductions(prev => prev + amount);
+      setNewDeductionsEntry('');
+      setIsDeductionsInputOpen(false);
+    }
+  };
+
+  const handleNewWeek = () => {
+    setWeeklyEarnings(0);
+    setMilesThisWeek(0);
+    setFuelCost(0);
+    setTruckCost(0);
+    setWeekDeductions(0);
   };
 
   const formatCurrency = (value: number) => {
@@ -535,13 +660,19 @@ const Dashboard: React.FC = () => {
 
       <div className="mb-6 md:mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-2xl md:text-[32px] font-bold tracking-tight text-white mb-1 md:mb-2 uppercase font-['Space_Grotesk']">Command Center</h1>
+          <h1 className="text-4xl font-black tracking-tight text-white mb-1 md:mb-2 uppercase italic tracking-tighter">Command Center</h1>
           <div className="flex items-center gap-2">
             <span className="text-zinc-500 text-[10px] md:text-sm font-bold uppercase tracking-widest">System Status:</span>
             <span className="text-[#D4AF37] font-bold uppercase text-[10px] md:text-sm tracking-widest animate-pulse">Online</span>
           </div>
         </div>
         <div className="flex gap-3 md:gap-4 w-full md:w-auto">
+          <button
+            onClick={handleNewWeek}
+            className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-all border border-rose-500/20"
+          >
+            New Week
+          </button>
           <div className="flex-1 md:flex-none px-4 md:px-5 py-2 md:py-2.5 bg-[#0a0a0a] border border-zinc-900 rounded-xl md:rounded-2xl flex items-center justify-center md:justify-start gap-3">
             <div className="flex flex-col items-center md:items-end">
               <span className="text-[8px] md:text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Current Speed</span>
@@ -559,23 +690,23 @@ const Dashboard: React.FC = () => {
         <div className="relative">
           <MetricCard 
             icon={DollarSign} 
-            label="Weekly Earnings" 
+            label="Weekly Gross" 
             value={formatCurrency(weeklyEarnings)} 
             trend="+12.5% vs last week" 
             iconBg="bg-[#D4AF37]/10"
             iconColor="text-[#D4AF37]"
             isInteractive={true}
             onClick={() => {
-              setShowEarningsInput(!showEarningsInput);
-              setShowMilesInput(false);
-              setShowFuelInput(false);
+              setIsEarningsInputOpen(!isEarningsInputOpen);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
             }}
           />
-          {showEarningsInput && (
+          {isEarningsInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Weekly Earnings</span>
-                <button onClick={() => setShowEarningsInput(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+                <button onClick={() => setIsEarningsInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <div className="flex gap-2">
                 <div className="relative flex-1">
@@ -601,16 +732,16 @@ const Dashboard: React.FC = () => {
             iconColor="text-[#D4AF37]"
             isInteractive={true}
             onClick={() => {
-              setShowMilesInput(!showMilesInput);
-              setShowEarningsInput(false);
-              setShowFuelInput(false);
+              setIsMilesInputOpen(!isMilesInputOpen);
+              setIsEarningsInputOpen(false);
+              setIsFuelInputOpen(false);
             }}
           />
-          {showMilesInput && (
+          {isMilesInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Manual Miles</span>
-                <button onClick={() => setShowMilesInput(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+                <button onClick={() => setIsMilesInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddMiles} className="flex gap-2">
                 <input autoFocus type="number" value={newMilesEntry} onChange={(e) => setNewMilesEntry(e.target.value)} placeholder="Enter miles" className="flex-1 bg-[#050505] border border-zinc-800 rounded-xl py-2.5 px-4 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
@@ -638,16 +769,17 @@ const Dashboard: React.FC = () => {
             iconColor="text-[#D4AF37]"
             isInteractive={true}
             onClick={() => {
-              setShowFuelInput(!showFuelInput);
-              setShowEarningsInput(false);
-              setShowMilesInput(false);
+              setIsFuelInputOpen(!isFuelInputOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsDeductionsInputOpen(false);
             }}
           />
-          {showFuelInput && (
+          {isFuelInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Fuel Expense</span>
-                <button onClick={() => setShowFuelInput(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+                <button onClick={() => setIsFuelInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddFuel} className="flex gap-2">
                 <div className="relative flex-1">
@@ -655,6 +787,71 @@ const Dashboard: React.FC = () => {
                   <input autoFocus type="number" step="0.01" value={newFuelEntry} onChange={(e) => setNewFuelEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
                 <button type="submit" className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <MetricCard 
+            icon={Truck} 
+            label="TRUCK COST" 
+            value={formatCurrency(truckCost)} 
+            iconBg="bg-blue-400/10"
+            iconColor="text-blue-400"
+            isInteractive={true}
+            onClick={() => {
+              setIsTruckCostInputOpen(!isTruckCostInputOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
+              setIsDeductionsInputOpen(false);
+            }}
+          />
+          {isTruckCostInputOpen && (
+            <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-blue-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Truck Cost</span>
+                <button onClick={() => setIsTruckCostInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <form onSubmit={handleAddTruckCost} className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
+                  <input autoFocus type="number" step="0.01" value={newTruckCostEntry} onChange={(e) => setNewTruckCostEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-blue-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                </div>
+                <button type="submit" className="bg-blue-400 hover:bg-blue-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-blue-400/20"><Plus className="w-5 h-5" /></button>
+              </form>
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <MetricCard 
+            icon={Minus} 
+            label="WEEK DEDUCTIONS" 
+            value={formatCurrency(weekDeductions)} 
+            iconBg="bg-rose-400/10"
+            iconColor="text-rose-400"
+            isInteractive={true}
+            onClick={() => {
+              setIsDeductionsInputOpen(!isDeductionsInputOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
+            }}
+          />
+          {isDeductionsInputOpen && (
+            <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-rose-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Deduction</span>
+                <button onClick={() => setIsDeductionsInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <form onSubmit={handleAddDeductions} className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
+                  <input autoFocus type="number" step="0.01" value={newDeductionsEntry} onChange={(e) => setNewDeductionsEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-rose-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                </div>
+                <button type="submit" className="bg-rose-400 hover:bg-rose-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-rose-400/20"><Plus className="w-5 h-5" /></button>
               </form>
             </div>
           )}
@@ -724,6 +921,9 @@ const Dashboard: React.FC = () => {
           </div>
           <div className="mb-6 md:mb-8">
             <WeatherAnalyticsCard />
+          </div>
+          <div className="mb-6 md:mb-8">
+            <QuickActions />
           </div>
           <TruckProfileCard />
         </div>
