@@ -1,0 +1,269 @@
+215:  const [searchQuery, setSearchQuery] = useState('');
+217:  const [showTraffic, setShowTraffic] = useState(true);
+218:  const [showWeather, setShowWeather] = useState(true);
+220:  const [isSearchFocused, setIsSearchFocused] = useState(false);
+221:  const [isCalculating, setIsCalculating] = useState(false);
+224:  const setIsDriving = context?.setIsDriving || (() => {});
+225:  const setUserLocation = locationContext?.setUserLocation || noop;
+228:  const setEldStatus = hosContext?.setEldStatus;
+231:  const [currentDestination, setCurrentDestination] = useState(() => localStorage.getItem('nav_current_destination') || 'Standby');
+232:  const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(() => {
+236:  const [milesRemaining, setMilesRemaining] = useState(0);
+237:  const [initialMiles, setInitialMiles] = useState(0);
+238:  const [eta, setEta] = useState('--:-- --');
+239:  const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+240:  const [isOverviewMode, setIsOverviewMode] = useState(false);
+241:  const [isFollowMode, setIsFollowMode] = useState(true);
+242:  const [isMapReady, setIsMapReady] = useState(false);
+243:  const [mapStyle, setMapStyle] = useState<MapStyle>('MAPTILER');
+245:  const [customTileUrl, setCustomTileUrl] = useState<string>(() => {
+248:  const [customMapShowRoads, setCustomMapShowRoads] = useState<boolean>(() => {
+251:  const [isCustomLayerModalOpen, setIsCustomLayerModalOpen] = useState(false);
+252:  const [isNorthUp, setIsNorthUp] = useState(() => localStorage.getItem('nav_north_up') === 'true');
+254:  const [avoidTolls, setAvoidTolls] = useState(() => localStorage.getItem('nav_avoid_tolls') === 'true');
+255:  const [avoidFerries, setAvoidFerries] = useState(() => localStorage.getItem('nav_avoid_ferries') === 'true');
+256:  const [avoidUnpaved, setAvoidUnpaved] = useState(() => localStorage.getItem('nav_avoid_unpaved') === 'true');
+258:  const [alternativeRoutes, setAlternativeRoutes] = useState<any[]>([]);
+259:  const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+260:  const [isCarPlayMode, setIsCarPlayMode] = useState(() => localStorage.getItem('nav_carplay_mode') === 'true');
+261:  const [isRouteSettingsOpen, setIsRouteSettingsOpen] = useState(false);
+262:  const [isRoutePreview, setIsRoutePreview] = useState(false);
+263:  const [isExploreMode, setIsExploreMode] = useState(false);
+264:  const [trafficCams, setTrafficCams] = useState<any[]>([]);
+267:  const [suggestions, setSuggestions] = useState<any[]>([]);
+268:  const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
+269:  const [pois, setPois] = useState<any[]>(() => {
+277:  const [isFetchingPois, setIsFetchingPois] = useState(false);
+282:    if (str) localStorage.setItem('truck_pois', str);
+286:  const [showPois, setShowPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
+287:  const [showHighways, setShowHighways] = useState(() => localStorage.getItem('nav_show_highways') !== 'false');
+288:  const [showRoadOverlay, setShowRoadOverlay] = useState(() => localStorage.getItem('nav_show_road_overlay') !== 'false');
+289:  const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
+296:    if (str) localStorage.setItem('poi_filters', str);
+298:  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+299:  const [error, setError] = useState<string | null>(null);
+300:  const [routeSteps, setRouteSteps] = useState<any[]>([]);
+301:  const [waypoints, setWaypoints] = useState<Waypoint[]>(() => {
+306:  const [selectedPoi, setSelectedPoi] = useState<any | null>(null);
+311:    if (str) localStorage.setItem('nav_waypoints', str);
+316:    if (str) localStorage.setItem('nav_destination_coords', str);
+320:    localStorage.setItem('nav_current_destination', currentDestination);
+341:      setIsMapReady(true);
+342:      setTimeout(() => map.invalidateSize(), 100);
+346:      setError(prevError => prevError ? prevError : `Map initialization failed: ${errorMessage}`);
+378:        mapInstanceRef.current.setView(userLocation, mapInstanceRef.current.getZoom());
+384:    localStorage.setItem('nav_map_style', mapStyle);
+388:    localStorage.setItem('nav_north_up', isNorthUp.toString());
+392:    localStorage.setItem('nav_avoid_tolls', avoidTolls.toString());
+396:    localStorage.setItem('nav_avoid_ferries', avoidFerries.toString());
+400:    localStorage.setItem('nav_avoid_unpaved', avoidUnpaved.toString());
+404:    localStorage.setItem('nav_carplay_mode', isCarPlayMode.toString());
+408:    localStorage.setItem('nav_show_pois', showPois.toString());
+412:    localStorage.setItem('nav_show_highways', showHighways.toString());
+416:    localStorage.setItem('nav_show_road_overlay', showRoadOverlay.toString());
+419:  const [nextInstruction, setNextInstruction] = useState({ 
+426:  const [weather, setWeather] = useState({ 
+434:  const [routeWeatherForecast, setRouteWeatherForecast] = useState<any[]>([]);
+435:  const [weatherAlerts, setWeatherAlerts] = useState<any[]>([]);
+437:  const [weighStationAlert, setWeighStationAlert] = useState<{ distance: number, status: 'OPEN' | 'CLOSED' | 'BYPASS' } | null>(null);
+439:  const [currentRoad, setCurrentRoad] = useState<string | null>(null);
+440:  const [currentSpeedLimit, setCurrentSpeedLimit] = useState<number | null>(null);
+462:          setCurrentRoad(data.ref || data.road);
+466:        setCurrentRoad(null);
+470:    const interval = setInterval(fetchRoadName, 10000); // Fetch every 10 seconds while driving
+507:      layer.setLatLngs(coords.map(c => [c[0], c[1]]));
+527:        .setLatLng(e.latlng)
+528:        .setContent(`
+544:      moveEndTimeout = setTimeout(() => {
+569:          setIsFetchingPois(true);
+588:                setPois(prev => {
+599:              setIsFetchingPois(false);
+698:        setSuggestions(getNearbyPois());
+700:        setSuggestions([]);
+705:    const handler = setTimeout(async () => {
+731:        setSuggestions(finalResults);
+734:        setSuggestions(getNearbyPois().slice(0, 3));
+832:  const [isOffRoute, setIsOffRoute] = useState(false);
+852:    if (str) localStorage.setItem('trucker_route_history', str);
+867:      setIsOffRoute(false);
+1011:                setIsOffRoute(true);
+1021:        if (isOffRouteRef.current) setIsOffRoute(false);
+1034:      setMilesRemaining(remainingMiles);
+1045:            setWeighStationAlert({ distance: distToWeighStation, status });
+1056:          setWeighStationAlert(null); // Clear alert after passing
+1059:        setWeighStationAlert(null); // Clear alert if filter disabled
+1090:          setCurrentRoad(roadName.replace(/\u003c/g, '<').replace(/\u003e/g, '>'));
+1091:          setNextInstruction({
+1113:            arrival.setSeconds(arrival.getSeconds() + remainingDuration);
+1114:            setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+1130:              setCurrentSpeedLimit(mph);
+1145:          if (roadName.match(/^I\s*[- ]/i)) setCurrentSpeedLimit(70);
+1146:          else if (roadName.match(/^US\s*[- ]/i)) setCurrentSpeedLimit(65);
+1147:          else if (roadName.match(/^(?:State Route|SR|CA|TX|FL|NY|IL|PA|OH|MI|GA|NC|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|SC|AL|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|ID|WV|HI|NH|ME|MT|RI|DE|SD|ND|AK|VT|WY)\s*[- ]/i)) setCurrentSpeedLimit(60);
+1148:          else setCurrentSpeedLimit(45);
+1157:        if (roadName.match(/^I\s*[- ]/i)) setCurrentSpeedLimit(70);
+1158:        else if (roadName.match(/^US\s*[- ]/i)) setCurrentSpeedLimit(65);
+1159:        else if (roadName.match(/^(?:State Route|SR|CA|TX|FL|NY|IL|PA|OH|MI|GA|NC|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|SC|AL|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|ID|WV|HI|NH|ME|MT|RI|DE|SD|ND|AK|VT|WY)\s*[- ]/i)) setCurrentSpeedLimit(60);
+1160:        else setCurrentSpeedLimit(45);
+1167:  const setUserLocationRef = useRef(setUserLocation);
+1168:  const setWaypointsRef = useRef(setWaypoints);
+1172:    setUserLocationRef.current = setUserLocation;
+1173:    setWaypointsRef.current = setWaypoints;
+1174:  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, setUserLocation, setWaypoints]);
+1243:          setWeather({
+1257:        setWeather(prev => ({ ...prev, condition: 'Unavailable' }));
+1264:    const interval = setInterval(() => {
+1287:    setWaypoints(prev => [...prev, newWaypoint]);
+1288:    setSearchQuery('');
+1289:    setSuggestions([]);
+1290:    setIsSuggestionsVisible(false);
+1291:    setIsSearchFocused(false);
+1295:    setWaypoints(prev => prev.filter(wp => wp.id !== id));
+1299:    setWaypoints(prev => {
+1315:    setWaypoints([]);
+1316:    setDestinationCoords(null);
+1317:    setCurrentDestination('Standby');
+1318:    setRoutePoints([]);
+1320:    setMilesRemaining(0);
+1321:    setEta('--:-- --');
+1322:    setWeatherAlerts([]);
+1323:    setRouteWeatherForecast([]);
+1326:    if (context) context.setNavTarget(null);
+1451:        setRouteWeatherForecast(validForecasts);
+1454:        setWeatherAlerts(allAlerts);
+1612:      setWeatherAlerts(primaryRoute.alerts.sort((a: any, b: any) => a.progress - b.progress));
+1618:      setAlternativeRoutes(processedRoutes);
+1619:      setSelectedRouteIndex(0);
+1739:    setTrafficCams(cams);
+1743:    if (context) context.setNavTarget(null);
+1744:    setError(null);
+1749:      setError("Waiting for valid GPS signal...");
+1757:    setSuggestions([]);
+1758:    setIsSuggestionsVisible(false);
+1759:    setIsCalculating(true);
+1760:    setIsOffRoute(false);
+1761:    setIsSearchFocused(false);
+1762:    setIsDriving(false);
+1767:        setIsCalculating(false);
+1777:      setDestinationCoords([destLat, destLon]);
+1778:      setCurrentDestination(destName);
+1793:      setRoutePoints(routeCoords);
+1794:      setRouteSteps(rSteps);
+1795:      setMilesRemaining(rDistMi);
+1796:      setInitialMiles(rDistMi);
+1797:      setEta(new Date(Date.now() + rDurationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+1820:      setIsCalculating(false);
+1821:      setIsDriving(true);
+1932:              setWeatherAlerts(alerts.sort((a, b) => a.progress - b.progress));
+2092:      setRouteSteps(steps);
+2103:      setNextInstruction({ text: firstManeuver, distance: firstDist, icon: maneuverIcon, lanes: steps[0]?.lanes || [] });
+2140:          routePolylineRef.current.setLatLngs(coords.map(c => [c[0], c[1]]));
+2208:      setRoutePoints(coords);
+2366:        setPois(prev => {
+2377:      setMilesRemaining(parseFloat(distMi.toFixed(1)));
+2378:      setInitialMiles(distMi);
+2380:      setCurrentDestination(destName);
+2381:      setSearchQuery('');
+2383:      arrival.setSeconds(arrival.getSeconds() + durationSec);
+2384:      setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+2396:          setTimeout(() => {
+2410:      setIsCalculating(false);
+2436:        setIsRoutePreview(true);
+2437:        setIsDriving(false);
+2453:      setError(prevError => prevError ? prevError : errorMessage);
+2454:      setIsCalculating(false); 
+2538:      setIsFetchingPois(true);
+2557:          setPois(prev => {
+2569:          setIsFetchingPois(false);
+2609:      const popup = L.popup({ offset: [0, -25] }).setContent(`
+2649:        speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
+2650:        speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
+2670:      userMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
+2685:    const etaInterval = setInterval(() => {
+2705:        mapRef.current.style.setProperty('--map-rotation', `${-heading}deg`);
+2708:        // setBearing and setPitch are not available on Leaflet map
+2712:        mapRef.current.style.setProperty('--map-rotation', `${0}deg`);
+2715:        // setBearing and setPitch are not available on Leaflet map
+2763:              setSelectedPoi(poi);
+2766:            const popup = L.popup({ offset: [0, -25] }).setContent(`
+2845:            setSelectedPoi(poi);
+2916:    setIsDriving(newIsDriving);
+2920:      setIsOverviewMode(false); // Ensure we are in follow mode
+2921:      setIsNorthUp(false); // Default to Heading Up mode
+2938:      setIsFollowMode(true);
+2942:        setEldStatus?.(prev => ({ ...prev, status: 'ON' }));
+2947:  const [mapError, setMapError] = useState<string | null>(null);
+2957:            onClick={() => setMapError(null)}
+2977:              <button onClick={() => setIsRoutePreview(false)} className="text-zinc-400 hover:text-white">
+2986:                    setSelectedRouteIndex(idx);
+2987:                    setRoutePoints(route.coords);
+2988:                    setRouteSteps(route.steps);
+2989:                    setMilesRemaining(route.distMi);
+2990:                    setInitialMiles(route.distMi);
+2991:                    setEta(new Date(Date.now() + route.durationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+3023:                setIsRoutePreview(false);
+3024:                setIsDriving(true);
+3048:                  onClick={() => setIsExploreMode(false)}
+3094:                onClick={() => setSelectedPoi(null)}
+3145:                    setSelectedPoi(null);
+3155:                    setSelectedPoi(null);
+3167:                  setSelectedPoi(null);
+3186:          <button onClick={() => setError(null)} className="text-white/50 hover:text-white">
+3473:                    <div key={idx} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setSelectedPoi(poi)}>
+3505:                  onClick={() => setWaypoints([])}
+3549:                  setError("Failed to calculate route. Please try again.");
+3570:                onChange={(e) => setSearchQuery(e.target.value)} 
+3571:                onFocus={() => { setIsSearchFocused(true); setIsSuggestionsVisible(true); }} 
+3574:                  setTimeout(() => {
+3575:                    setIsSuggestionsVisible(false); 
+3576:                    setIsSearchFocused(false); 
+3581:                  setError("Failed to calculate route. Please try again.");
+3588:                    setSelectedPoi(null);
+3606:                setError("Failed to calculate route. Please try again.");
+3638:                          setDestinationCoords([s.lat, s.lon]);
+3639:                          setCurrentDestination(s.display_name.split(',')[0]);
+3640:                          setSearchQuery(s.display_name);
+3643:                            setError("Failed to calculate route. Please try again.");
+3664:                              if (setUserLocationRef.current) {
+3665:                                setUserLocationRef.current([s.lat, s.lon]);
+3666:                                setIsSearchFocused(false);
+3667:                                setIsFollowMode(true);
+3731:                setIsDriving(false);
+3740:            onClick={() => setIsNorthUp(!isNorthUp)}
+3748:            onClick={() => setIsRouteSettingsOpen(true)}
+3757:              setIsExploreMode(!isExploreMode);
+3774:            onClick={() => setShowPois(!showPois)}
+3792:                setIsFetchingPois(true);
+3810:                    setPois(prev => {
+3822:                    setIsFetchingPois(false);
+3833:            onClick={() => setShowHighways(!showHighways)}
+3841:            onClick={() => setShowRoadOverlay(!showRoadOverlay)}
+3850:              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+3867:                      setPoiFilters(new Set(allIds));
+3874:                    onClick={() => setPoiFilters(new Set())}
+3895:                        setPoiFilters(prev => {
+3917:            onClick={() => setShowWeather(!showWeather)}
+3925:            onClick={() => setShowTraffic(!showTraffic)}
+3945:              setIsOverviewMode(!isOverviewMode);
+3947:                setIsFollowMode(false);
+3960:                setIsFollowMode(true); 
+3961:                setIsOverviewMode(false);
+3976:                    if (setUserLocationRef.current) {
+3977:                      setUserLocationRef.current([latitude, longitude]);
+3980:                        setIsFollowMode(true);
+3981:                        setIsOverviewMode(false);
+3987:                    setError("Failed to get precise location.");
+4011:                onClick={() => setIsCustomLayerModalOpen(false)}
+4026:                  onChange={(e) => setCustomTileUrl(e.target.value)}
+4040:                  onChange={(e) => setCustomMapShowRoads(e.target.checked)}
+4050:                  onClick={() => setIsCustomLayerModalOpen(false)}
+4057:                    localStorage.setItem('custom_tile_url', customTileUrl);
+4058:                    localStorage.setItem('custom_map_show_roads', customMapShowRoads.toString());
+4059:                    setMapStyle('MAPTILER');
+4060:                    setIsCustomLayerModalOpen(false);
+4082:                onClick={() => setIsRouteSettingsOpen(false)}
+4099:                    onClick={() => setAvoidTolls(!avoidTolls)}
+4112:                    onClick={() => setAvoidFerries(!avoidFerries)}
+4125:                    onClick={() => setAvoidUnpaved(!avoidUnpaved)}
+4145:                    onClick={() => setIsCarPlayMode(!isCarPlayMode)}
+4154:                onClick={() => setIsRouteSettingsOpen(false)}

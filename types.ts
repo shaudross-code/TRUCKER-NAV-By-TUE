@@ -1,5 +1,75 @@
 
 import React from 'react';
+import { User } from 'firebase/auth';
+
+export interface POI {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  type: string;
+  address?: string;
+  rating?: number;
+  isCustom?: boolean;
+  place_id?: string;
+  phone?: string;
+  website?: string;
+  openingHours?: string;
+  detailsFetched?: boolean;
+  amenities?: string[];
+  entrance?: { lat: number, lon: number };
+  exit?: { lat: number, lon: number };
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string;
+  truckProfile?: {
+    height: number;
+    weight: number;
+    length: number;
+    width: number;
+    hazmat: boolean;
+    hazmatClasses: string[];
+    tunnelCategory: string;
+    axleCount: number;
+    axleWeight: number;
+    trailerCount: number;
+    make: string;
+    model: string;
+    year: number;
+  };
+  autoReroute?: boolean;
+  weeklyEarnings?: number;
+  fuelCost?: number;
+  truckCost?: number;
+  weekDeductions?: number;
+  takeHomePercentage?: number;
+  milesThisWeek?: number;
+  role?: 'admin' | 'user';
+  currentLoad?: {
+    origin: string;
+    destination: string;
+    commodity: string;
+    rate: string;
+    total: string;
+    bookedAt: string;
+  };
+  customPois?: POI[];
+}
+
+export interface FirebaseContextType {
+  user: User | null;
+  profile: UserProfile | null;
+  loading: boolean;
+  signIn: () => Promise<void>;
+  signOut: () => Promise<void>;
+  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  authError: string | null;
+}
+
+export const FirebaseContext = React.createContext<FirebaseContextType | undefined>(undefined);
 
 export enum ViewType {
   DASHBOARD = 'DASHBOARD',
@@ -12,23 +82,28 @@ export enum ViewType {
   PAY_SUMMARY = 'PAY_SUMMARY'
 }
 
+export interface TelemetryContextType {
+  speedRef: React.MutableRefObject<number>;
+  headingRef: React.MutableRefObject<number>;
+  subscribe: (callback: () => void) => () => void;
+}
+
+export const TelemetryContext = React.createContext<TelemetryContextType | undefined>(undefined);
+
+export interface LocationContextType {
+  userLocation: [number, number] | null;
+  setUserLocation: (location: [number, number] | null) => void;
+}
+
+export const LocationContext = React.createContext<LocationContextType | undefined>(undefined);
+
 export interface AppContextType {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
-  userLocation: [number, number] | null;
-  setUserLocation: React.Dispatch<React.SetStateAction<[number, number] | null>>;
   navTarget: string | null;
   setNavTarget: (target: string | null) => void;
   isDriving: boolean;
   setIsDriving: (val: boolean) => void;
-  speed: number;
-  setSpeed: (val: number) => void;
-  heading: number;
-  setHeading: (val: number) => void;
-  idleSeconds: number;
-  breakSuggestion: boolean;
-  setBreakSuggestion: (val: boolean) => void;
-  hasViolation: boolean;
   autoReroute: boolean;
   setAutoReroute: (val: boolean) => void;
   truckProfile: {
@@ -55,16 +130,6 @@ export interface AppContextType {
     axleWeight: number;
     trailerCount: number;
   }>>;
-  eldStatus: {
-    status: 'OFF' | 'SB' | 'ON' | 'DRIVE';
-    timers: { label: string; seconds: number; total: number; color: string }[];
-    resetSeconds: number;
-  };
-  setEldStatus: React.Dispatch<React.SetStateAction<{
-    status: 'OFF' | 'SB' | 'ON' | 'DRIVE';
-    timers: { label: string; seconds: number; total: number; color: string }[];
-    resetSeconds: number;
-  }>>;
   weeklyEarnings: number;
   setWeeklyEarnings: React.Dispatch<React.SetStateAction<number>>;
   milesThisWeek: number;
@@ -79,7 +144,26 @@ export interface AppContextType {
   setTakeHomePercentage: React.Dispatch<React.SetStateAction<number>>;
 }
 
+export interface HOSContextType {
+  idleSeconds: number;
+  setIdleSeconds: React.Dispatch<React.SetStateAction<number>>;
+  breakSuggestion: boolean;
+  setBreakSuggestion: (val: boolean) => void;
+  hasViolation: boolean;
+  eldStatus: {
+    status: 'OFF' | 'SB' | 'ON' | 'DRIVE';
+    timers: { label: string; seconds: number; total: number; color: string }[];
+    resetSeconds: number;
+  };
+  setEldStatus: React.Dispatch<React.SetStateAction<{
+    status: 'OFF' | 'SB' | 'ON' | 'DRIVE';
+    timers: { label: string; seconds: number; total: number; color: string }[];
+    resetSeconds: number;
+  }>>;
+}
+
 export const AppContext = React.createContext<AppContextType | undefined>(undefined);
+export const HOSContext = React.createContext<HOSContextType | undefined>(undefined);
 
 export interface MetricCardProps {
   label: string;
@@ -110,6 +194,16 @@ export interface ELDTimerProps {
   color: string;
 }
 
+export interface MaintenanceRecord {
+  id: string;
+  title: string;
+  urgency: 'High' | 'Medium' | 'Low';
+  date: string;
+  type: 'Repair' | 'Scheduled' | 'Maintenance';
+  status: 'Active' | 'Scheduled' | 'Completed';
+  cost?: string;
+}
+
 export interface RouteHistoryItem {
   id: string;
   origin: string;
@@ -118,4 +212,15 @@ export interface RouteHistoryItem {
   duration: number; // seconds
   date: string; // ISO string
   status: 'COMPLETED' | 'CANCELLED';
+}
+
+export interface RestrictionAlert {
+  type: 'BRIDGE' | 'WEIGHT' | 'RESTRICTION';
+  message: string;
+  icon: any;
+  color: string;
+  bg: string;
+  progress: number;
+  value?: number;
+  coords?: [number, number];
 }

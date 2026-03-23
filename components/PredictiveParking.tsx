@@ -11,7 +11,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { fetchTruckStops } from '../services/geminiService';
-import { AppContext } from '../types';
+import { AppContext, LocationContext } from '../types';
 import { ViewType } from '../types';
 
 const AmenityIcon: React.FC<{ name: string }> = ({ name }) => {
@@ -118,7 +118,8 @@ const ParkingCard: React.FC<ParkingData & { onClick?: () => void }> = ({ name, l
 
 const PredictiveParking: React.FC = () => {
   const context = useContext(AppContext);
-  const userLocation = context?.userLocation;
+  const locationContext = useContext(LocationContext);
+  const userLocation = locationContext?.userLocation;
   const [stops, setStops] = useState<ParkingData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -131,14 +132,14 @@ const PredictiveParking: React.FC = () => {
         const data = await fetchTruckStops(userLocation[0], userLocation[1]);
         setStops(data);
       } catch (err) {
-        console.error(err);
+        console.error(err instanceof Error ? err.message : String(err));
         setError('Failed to load parking data. Please try again later.');
       } finally {
         setLoading(false);
       }
     }
     getStops().catch(err => console.error("Fetch stops failed:", err));
-  }, [userLocation]);
+  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   const handleCardClick = (stop: ParkingData) => {
     if (context) {

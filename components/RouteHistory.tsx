@@ -10,31 +10,57 @@ import {
   Download
 } from 'lucide-react';
 import { RouteHistoryItem } from '../types';
+import { useFirebase } from './FirebaseProvider';
+import { collection, query, orderBy, onSnapshot, deleteDoc, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
 
 const RouteHistory: React.FC = () => {
+  const { user } = useFirebase();
   const [history, setHistory] = useState<RouteHistoryItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<'ALL' | 'COMPLETED' | 'CANCELLED'>('ALL');
 
   useEffect(() => {
-    const saved = localStorage.getItem('trucker_route_history');
-    if (saved) {
-      setHistory(JSON.parse(saved).sort((a: RouteHistoryItem, b: RouteHistoryItem) => 
-        new Date(b.date).getTime() - new Date(a.date).getTime()
-      ));
-    }
-  }, []);
+    if (!user) return;
+    const historyRef = collection(db, 'users', user.uid, 'history');
+    const q = query(historyRef, orderBy('date', 'desc'));
 
-  const deleteItem = (id: string) => {
-    const updated = history.filter(item => item.id !== id);
-    setHistory(updated);
-    localStorage.setItem('trucker_route_history', JSON.stringify(updated));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as RouteHistoryItem[];
+      setHistory(items);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/history`);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const deleteItem = async (id: string) => {
+    if (!user) return;
+    try {
+      await deleteDoc(doc(db, 'users', user.uid, 'history', id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/history/${id}`);
+    }
   };
 
-  const clearHistory = () => {
+  const clearHistory = async () => {
+    if (!user) return;
     if (window.confirm('Are you sure you want to clear all route history?')) {
-      setHistory([]);
-      localStorage.removeItem('trucker_route_history');
+      try {
+        const historyRef = collection(db, 'users', user.uid, 'history');
+        const snapshot = await getDocs(historyRef);
+        const batch = writeBatch(db);
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, `users/${user.uid}/history`);
+      }
     }
   };
 

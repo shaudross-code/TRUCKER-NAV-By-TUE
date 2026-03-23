@@ -1,12 +1,26 @@
 import { Fuel, ParkingSquare, UtensilsCrossed, Wrench, Box, Droplets, Truck, Scale, LogIn, LogOut } from 'lucide-react';
 
-export const getPoiCategory = (type: string = '', name: string = ''): string => {
-  const lowerName = (name || '').toLowerCase();
-  const normalizedType = (type || '').toLowerCase().replace(/_/g, ' ');
+export const getPoiCategory = (type: any = '', name: any = ''): string => {
+  const typeStr = typeof type === 'string' ? type : '';
+  const nameStr = typeof name === 'string' ? name : '';
+  const lowerName = nameStr.toLowerCase();
+  const normalizedType = typeStr.toLowerCase().replace(/_/g, ' ');
 
-  if (lowerName.includes("love") || lowerName.includes("pilot") || lowerName.includes("flying j") || lowerName.includes("petro") || lowerName.includes("travelcenters") || lowerName.includes(" ta ") || lowerName.startsWith("ta ") || lowerName === "ta" || lowerName.includes("road ranger") || lowerName.includes("kwiktrip") || lowerName.includes("kwikstar") || lowerName.includes("buc-ee") || lowerName.includes("speedway") || lowerName.includes("casey") || lowerName.includes("wawa") || lowerName.includes("sheetz") || lowerName.includes("quiktrip") || lowerName.includes("qt") || lowerName.includes("racetrac")) {
-    return 'major_chains';
-  }
+  if (lowerName.includes("love")) return 'loves';
+  if (lowerName.includes("pilot")) return 'pilot';
+  if (lowerName.includes("flying j")) return 'flying_j';
+  if (lowerName.includes("petro")) return 'petro';
+  if (lowerName.includes("travelcenters") || lowerName.includes(" ta ") || lowerName.startsWith("ta ") || lowerName === "ta") return 'ta';
+  if (lowerName.includes("road ranger")) return 'road_ranger';
+  if (lowerName.includes("kwiktrip") || lowerName.includes("kwikstar")) return 'kwik_trip';
+  if (lowerName.includes("buc-ee")) return 'bucees';
+  if (lowerName.includes("speedway")) return 'speedway';
+  if (lowerName.includes("casey")) return 'caseys';
+  if (lowerName.includes("wawa")) return 'wawa';
+  if (lowerName.includes("sheetz")) return 'sheetz';
+  if (lowerName.includes("quiktrip") || lowerName.includes("qt")) return 'quiktrip';
+  if (lowerName.includes("racetrac")) return 'racetrac';
+  if (lowerName.includes("conoco")) return 'conoco';
 
   if (normalizedType.includes('weigh station') || normalizedType.includes('scale') || normalizedType.includes('weigh')) {
     return 'weigh_station';
@@ -59,9 +73,11 @@ export const getExitIcon = () => {
   );
 };
 
-export const getPoiIcon = (type: string = '', name: string = '') => {
-  const lowerName = (name || '').toLowerCase();
-  const normalizedType = (type || '').toLowerCase().replace(/_/g, ' ');
+export const getPoiIcon = (type: any = '', name: any = '') => {
+  const typeStr = typeof type === 'string' ? type : '';
+  const nameStr = typeof name === 'string' ? name : '';
+  const lowerName = nameStr.toLowerCase();
+  const normalizedType = typeStr.toLowerCase().replace(/_/g, ' ');
   
   if (lowerName.includes("love") || lowerName.includes("loves") || lowerName.includes("travel stop") || lowerName.includes("travelstop")) {
     return (
@@ -201,6 +217,15 @@ export const getPoiIcon = (type: string = '', name: string = '') => {
     );
   }
 
+  if (lowerName.includes("conoco")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <circle cx="20" cy="20" r="18" fill="#E31837" stroke="#FFFFFF" strokeWidth="2"/>
+        <text x="20" y="24" textAnchor="middle" fill="#FFFFFF" fontFamily="Inter, sans-serif" fontSize="7" fontWeight="900" letterSpacing="0.05em">CONOCO</text>
+      </svg>
+    );
+  }
+
   if (normalizedType.includes('weigh station') || normalizedType.includes('scale')) {
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 border-2 border-white shadow-lg">
@@ -209,7 +234,7 @@ export const getPoiIcon = (type: string = '', name: string = '') => {
     );
   }
 
-  if (normalizedType.includes('rest area') || type.toLowerCase() === 'rest_area') {
+  if (normalizedType.includes('rest area') || typeStr.toLowerCase() === 'rest_area') {
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-700 border-2 border-white shadow-lg">
         <span className="text-white font-black text-lg leading-none">R</span>
@@ -241,7 +266,7 @@ export const getPoiIcon = (type: string = '', name: string = '') => {
     );
   }
 
-  switch ((type || '').toLowerCase()) {
+  switch (typeStr.toLowerCase()) {
     case 'truck_stop':
     case 'fuel':
     case 'gas_station':

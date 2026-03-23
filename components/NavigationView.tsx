@@ -1,15 +1,14 @@
-import React, { useEffect, useRef, useState, useContext, useMemo } from 'react';
+import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
+import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
-import 'leaflet-rotate';
+import "@maptiler/leaflet-maptilersdk";
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
-import { renderToStaticMarkup } from 'react-dom/server';
 import { 
   Plus, 
-  Minus, 
-  X, 
   Search,
   Navigation as NavIcon,
   Loader2,
@@ -22,11 +21,11 @@ import {
   CloudLightning,
   Sun,
   Eye,
+  Octagon,
   ArrowUp,
   AlertTriangle,
   Zap,
   Map as MapIcon,
-  Layers,
   ArrowLeft,
   ArrowRight,
   Undo2,
@@ -35,15 +34,12 @@ import {
   CornerUpRight,
   CornerDownLeft,
   CornerDownRight,
-  Shield,
   Truck,
   CircleDollarSign,
   Trash2,
-  Filter,
-  Check,
+  List,
   Compass,
   Star,
-  RotateCw,
   TrafficCone,
   Scale,
   Fuel,
@@ -51,9 +47,11 @@ import {
   UtensilsCrossed,
   Wrench,
   Box,
-  Settings,
-  Route,
-  MapPin
+  MapPin,
+  Phone,
+  Globe,
+  Clock,
+  X
 } from 'lucide-react';
 
 interface Waypoint {
@@ -64,143 +62,144 @@ interface Waypoint {
   type: 'DEADHEAD' | 'PAID';
 }
 import { STATIC_POIS } from '../src/constants/staticPois';
-import { AppContext } from '../types';
-import { RouteHistoryItem } from '../types';
-import { fetchTruckPOIs, fetchMajorChains, searchPlaces, reverseGeocode, fetchAddressSuggestions } from '../services/geminiService';
-import { fetchHERETruckStops } from '../services/hereService';
+import { AppContext, HOSContext, LocationContext, TelemetryContext, POI } from '../types';
+import { RouteHistoryItem, RestrictionAlert } from '../types';
+import { fetchTruckPOIs, searchPlaces, fetchAddressSuggestions, lookupPlace } from '../services/geminiService';
 import { speak } from '../services/speechService';
+import { SpeedLimitSign, HighwayShield } from './MapUI';
+import { MapControls } from './MapControls';
+import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { decode } from '@here/flexpolyline';
 
+import { ViewType } from '../types';
+
 interface NavigationViewProps {
   initialTarget?: string | null;
-  isSidebarCollapsed?: boolean;
+  userLocation: [number, number] | null;
+  activeView?: ViewType;
 }
 
-type MapStyle = 'TUE_GOLD' | 'MAPTILER' | 'CUSTOM' | 'SATELLITE';
-
-const FALLBACK_LOCATION: [number, number] = [41.8781, -87.6298];
-
-const isValidLatLng = (coords: any): coords is [number, number] => {
-  if (!Array.isArray(coords) || coords.length < 2) return false;
-  return typeof coords[0] === 'number' && typeof coords[1] === 'number' && !isNaN(coords[0]) && !isNaN(coords[1]);
+const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '4D6H6eQaS6oyaQmgNGly';
+const HERE_API_KEY = process.env.HERE_API_KEY || '';
+const MAPTILER_STYLE_ID = '019cd801-e446-7ed9-b765-d542688d7f3e';
+const MAPTILER_STYLE = {
+  url: `https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
+  attribution: '&copy; <a href="https://www.maptiler.com/copyright/">MapTiler</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 };
 
-const SpeedLimitSign: React.FC<{ limit: number | null; currentSpeed?: number; compact?: boolean }> = ({ limit, currentSpeed, compact }) => {
-  if (!limit) return null;
-  const isSpeeding = currentSpeed !== undefined && currentSpeed > limit;
-  
-  if (compact) {
-    return (
-      <div className={`bg-white border ${isSpeeding ? 'border-red-600 ring-1 ring-red-600/50' : 'border-black'} rounded-sm w-7 h-9 flex flex-col items-center justify-center shadow-sm ml-2 overflow-hidden transition-colors duration-300`}>
-        <div className="w-full bg-white flex flex-col items-center pt-0.5">
-          <span className={`text-black text-[4px] font-bold uppercase tracking-tighter leading-none ${isSpeeding ? 'text-red-600' : ''}`}>Speed</span>
-          <span className={`text-black text-[4px] font-bold uppercase tracking-tighter leading-none ${isSpeeding ? 'text-red-600' : ''}`}>Limit</span>
-        </div>
-        <span className={`text-black text-[10px] font-black leading-none py-0.5 ${isSpeeding ? 'text-red-600 scale-110' : ''} transition-transform`}>{limit}</span>
-      </div>
-    );
-  }
-  return (
-    <div className={`bg-white border-[2px] md:border-[3px] ${isSpeeding ? 'border-red-600 ring-2 ring-red-600/30 animate-pulse' : 'border-black'} rounded-lg md:rounded-xl w-12 h-16 md:w-16 md:h-20 flex flex-col items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.4)] ring-1 ring-white/20 transition-all duration-300`}>
-      <div className="w-full flex flex-col items-center pt-1 md:pt-2">
-        <span className={`text-black text-[7px] md:text-[9px] font-black uppercase tracking-tighter leading-none ${isSpeeding ? 'text-red-600' : ''}`}>Speed</span>
-        <span className={`text-black text-[7px] md:text-[9px] font-black uppercase tracking-tighter leading-none mb-0.5 ${isSpeeding ? 'text-red-600' : ''}`}>Limit</span>
-      </div>
-      <span className={`text-black text-xl md:text-3xl font-black leading-none pb-1 md:pb-2 tracking-tighter ${isSpeeding ? 'text-red-600 scale-110' : ''} transition-transform`}>{limit}</span>
-    </div>
+const FALLBACK_LOCATION: [number, number] = [39.0119, -98.4842];
+const noop = () => {};
+// Removed unused HERE_API_KEY
+
+const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocation }: { mapInstance: any, currentSpeedLimit: number | null, userLocation: [number, number] | null }) => {
+  const telemetryContext = useContext(TelemetryContext);
+  const speed = React.useSyncExternalStore(
+    telemetryContext?.subscribe || (() => () => {}),
+    () => telemetryContext?.speedRef.current || 0
   );
-};
-
-const HighwayShield: React.FC<{ roadName: string | null }> = ({ roadName }) => {
-  if (!roadName) return null;
   
-  // Normalize road name for better matching
-  const normalized = roadName
-    .replace(/Interstate\s+/i, 'I-')
-    .replace(/U\.?S\.?\s*(?:Highway|Hwy|Route)?\s*/i, 'US-')
-    .replace(/(?:State\s+Route|State\s+Highway|SR|Hwy|Route)\s+/i, 'SR-')
-    .replace(/County\s+(?:Road|Hwy|Route)\s+/i, 'CR-');
-
-  const isInterstate = normalized.match(/I\s*[- ]?\s*(\d+[A-Z]?)/i);
-  const isUSHighway = normalized.match(/US\s*[- ]?\s*(\d+[A-Z]?)/i);
-  const isStateHighway = normalized.match(/(?:SR|CR|CA|TX|FL|NY|IL|PA|OH|MI|GA|NC|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|SC|AL|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|ID|WV|HI|NH|ME|MT|RI|DE|SD|ND|AK|VT|WY)\s*[- ]?\s*(\d+[A-Z]?)/i);
-
-  if (isInterstate) {
-    return (
-      <div className="relative w-12 h-12 md:w-16 md:h-16 flex items-center justify-center drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]">
-        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
-          <path d="M50 5 L90 20 L90 60 C90 80 50 95 50 95 C50 95 10 80 10 60 L10 20 Z" fill="#003f87" stroke="white" strokeWidth="4" />
-          <path d="M10 20 L90 20 L50 5 Z" fill="#cf142b" />
-          <path d="M50 5 L90 20 L90 60 C90 80 50 95 50 95 C50 95 10 80 10 60 L10 20 Z" fill="none" stroke="white" strokeWidth="2" />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center mt-1">
-          <span className="text-white text-[6px] md:text-[9px] font-black uppercase tracking-tighter leading-none mb-0.5">Interstate</span>
-          <span className="text-white text-lg md:text-2xl font-[1000] leading-none">{isInterstate[1]}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (isUSHighway) {
-    return (
-      <div className="relative w-10 h-12 md:w-14 md:h-16 flex items-center justify-center drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]">
-        <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
-          <rect x="5" y="5" width="90" height="90" fill="white" stroke="black" strokeWidth="2" />
-          <path d="M10 10 L90 10 L90 60 C90 85 50 95 50 95 C50 95 10 85 10 60 Z" fill="white" stroke="black" strokeWidth="4" />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-black text-lg md:text-2xl font-[1000] mt-1 md:mt-2">{isUSHighway[1]}</span>
-      </div>
-    );
-  }
-
-  if (isStateHighway) {
-    return (
-      <div className="relative w-10 h-10 md:w-14 md:h-14 flex items-center justify-center drop-shadow-[0_0_10px_rgba(212,175,55,0.3)]">
-        <div className="absolute inset-0 bg-white border-2 border-black rounded-full" />
-        <span className="absolute inset-0 flex items-center justify-center text-black text-base md:text-xl font-[1000]">{isStateHighway[1]}</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-black/80 backdrop-blur-md border border-[#D4AF37]/30 px-3 py-1.5 rounded-lg flex items-center gap-2 shadow-lg">
-      <Shield className="w-3 h-3 text-[#D4AF37]" />
-      <span className="text-[10px] font-black text-white uppercase tracking-tight">{roadName}</span>
-    </div>
-  );
-};
-
-const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSidebarCollapsed }) => {
-  const HERE_API_KEY = import.meta.env?.VITE_HERE_API_KEY || '7H8x56rMSf986iahRnBQnS0j0Edm2OLiscMx7JFwYO0';
-  const context = useContext(AppContext);
-
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const moveTimerRef = useRef<any>(null);
-  const routeGroupRef = useRef<any>(null);
-  const baseLayerGroupRef = useRef<any>(null);
-  const poiLayerGroupRef = useRef<any>(null);
-  const userMarkerRef = useRef<any>(null);
-  const speedLimitMarkerRef = useRef<any>(null);
+  const speedLimitMarkerRef = useRef<L.Marker | null>(null);
 
   useEffect(() => {
-    (window as any).L = L;
-  }, []);
-
-  useEffect(() => {
-    if (mapInstanceRef.current) {
-      const timer = setTimeout(() => {
-        mapInstanceRef.current?.invalidateSize();
-      }, 350);
-      return () => clearTimeout(timer);
+    if (!mapInstance || !currentSpeedLimit) {
+      if (speedLimitMarkerRef.current) {
+        mapInstance.removeLayer(speedLimitMarkerRef.current);
+        speedLimitMarkerRef.current = null;
+      }
+      return;
     }
-  }, [isSidebarCollapsed]);
-  const userLocation = context?.userLocation || FALLBACK_LOCATION; 
-  const truckProfile = context?.truckProfile || { height: 13.5, weight: 78500, length: 53, hazmat: false };
 
-  const routeCoordsRef = useRef<[number, number][]>([]);
+    const el = document.createElement('div');
+    el.className = 'speed-limit-marker';
+    el.innerHTML = `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={speed} />)}</div>`;
+
+    if (!speedLimitMarkerRef.current) {
+      if (isValidLatLng(userLocation)) {
+        speedLimitMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }) });
+        speedLimitMarkerRef.current.addTo(mapInstance);
+      }
+    } else {
+      if (isValidLatLng(userLocation)) {
+        speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
+        speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
+      }
+    }
+  }, [mapInstance, currentSpeedLimit, speed, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+
+  return null;
+});
+
+const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLocation: propUserLocation, activeView }) => {
+  console.log("NavigationView rendering, activeView:", activeView);
+  const hasValidMapTilerKey = Boolean(MAPTILER_KEY) && MAPTILER_KEY !== 'YOUR_API_KEY';
+  console.log("NavigationView: MAPTILER_KEY", MAPTILER_KEY, "hasValidMapTilerKey", hasValidMapTilerKey);
+
+  if (!hasValidMapTilerKey) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-[#050505] font-sans p-4">
+        <div className="text-center max-w-md bg-zinc-900/50 backdrop-blur-xl border border-[#D4AF37]/20 rounded-3xl p-8 shadow-2xl">
+          <div className="w-16 h-16 bg-[#D4AF37]/10 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <MapIcon className="w-8 h-8 text-[#D4AF37]" />
+          </div>
+          <h2 className="text-2xl font-black text-white mb-4 tracking-tight uppercase">MapTiler API Key Required</h2>
+          <p className="text-zinc-400 mb-8 text-sm leading-relaxed">
+            To enable high-performance truck navigation, please provide a MapTiler API key.
+          </p>
+          
+          <div className="space-y-4 text-left mb-8">
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center text-xs font-bold shrink-0">1</div>
+              <p className="text-zinc-300 text-sm">Get a free key at <a href="https://www.maptiler.com/cloud/" target="_blank" rel="noopener" className="text-[#D4AF37] hover:underline">maptiler.com</a></p>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center text-xs font-bold shrink-0">2</div>
+              <p className="text-zinc-300 text-sm">Open <strong>Settings</strong> (⚙️ top-right) → <strong>Secrets</strong></p>
+            </div>
+            <div className="flex gap-3">
+              <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] flex items-center justify-center text-xs font-bold shrink-0">3</div>
+              <p className="text-zinc-300 text-sm">Add <code>MAPTILER_API_KEY</code> and paste your key</p>
+            </div>
+          </div>
+
+          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 text-xs text-center">
+            The app will rebuild automatically once the key is saved.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  console.log("NavigationView: Rendering", { initialTarget: !!initialTarget, propUserLocation: !!propUserLocation });
+  const context = useContext(AppContext);
+  const locationContext = useContext(LocationContext);
+  const telemetryContext = useContext(TelemetryContext);
+
+  const mapInstanceRef = useRef<any>(null);
+  const markerClusterGroupRef = useRef<any>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userMarkerElRef = useRef<HTMLElement | null>(null);
+  const mapLayersRef = useRef<Record<string, L.Polyline>>({});
+  const poiMarkersRef = useRef<L.Marker[]>([]);
+  const userLocation = useMemo(() => {
+    console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
+    return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
+  }, [propUserLocation, locationContext?.userLocation]); 
+  const truckProfile = context?.truckProfile || { 
+    height: 13.5, 
+    weight: 78500, 
+    length: 53, 
+    width: 8.5, 
+    hazmat: false, 
+    hazmatClasses: [], 
+    tunnelCategory: 'NONE', 
+    axleCount: 5, 
+    axleWeight: 12000, 
+    trailerCount: 1 
+  };
   const routeDistancesRef = useRef<number[]>([]);
+  const routeCoordsRef = useRef<[number, number][]>([]);
   const routeLineRef = useRef<any>(null);
   const currentSegmentLineRef = useRef<any>(null);
   const totalRouteDistanceRef = useRef(0);
@@ -210,20 +209,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [showTraffic, setShowTraffic] = useState(true);
-  const [showWeather, setShowWeather] = useState(true);
-  const trafficLayerGroupRef = useRef<any>(null);
-  const weatherLayerGroupRef = useRef<any>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>(userLocation);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   
   const isDriving = context?.isDriving || false;
   const setIsDriving = context?.setIsDriving || (() => {});
-  const setUserLocation = context?.setUserLocation || (() => {});
-  const eldStatus = context?.eldStatus;
-  const setEldStatus = context?.setEldStatus;
-  const hasViolation = context?.hasViolation || false;
+  const setUserLocation = locationContext?.setUserLocation || noop;
+  const hosContext = useContext(HOSContext);
+  const eldStatus = hosContext?.eldStatus;
+  const setEldStatus = hosContext?.setEldStatus;
+  const hasViolation = hosContext?.hasViolation || false;
 
   const [currentDestination, setCurrentDestination] = useState(() => localStorage.getItem('nav_current_destination') || 'Standby');
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(() => {
@@ -237,16 +233,66 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   const [isOverviewMode, setIsOverviewMode] = useState(false);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [mapStyle, setMapStyle] = useState<MapStyle>('MAPTILER');
-  const [customTileUrl, setCustomTileUrl] = useState<string>(() => {
-    return localStorage.getItem('custom_tile_url') || 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  });
-  const [customMapShowRoads, setCustomMapShowRoads] = useState<boolean>(() => {
-    return localStorage.getItem('custom_map_show_roads') !== 'false';
-  });
-  const [isCustomLayerModalOpen, setIsCustomLayerModalOpen] = useState(false);
+
   const [isNorthUp, setIsNorthUp] = useState(() => localStorage.getItem('nav_north_up') === 'true');
-  const [mapBearing, setMapBearing] = useState(0);
+  const manualRotationRef = useRef(0);
+  const [manualRotation, setManualRotation] = useState(0);
+
+  useEffect(() => {
+    manualRotationRef.current = manualRotation;
+  }, [manualRotation]);
+
+  const isRotatingRef = useRef(false);
+  const initialAngleRef = useRef(0);
+  const initialRotationRef = useRef(0);
+
+  useEffect(() => {
+    const mapEl = mapRef.current;
+    if (!mapEl) return;
+
+    const getAngle = (touches: TouchList) => {
+      const dx = touches[1].clientX - touches[0].clientX;
+      const dy = touches[1].clientY - touches[0].clientY;
+      return Math.atan2(dy, dx) * 180 / Math.PI;
+    };
+
+    const handleTouchStart = (e: TouchEvent) => {
+      console.log("Touch start", e.touches.length);
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        isRotatingRef.current = true;
+        initialAngleRef.current = getAngle(e.touches);
+        initialRotationRef.current = manualRotationRef.current;
+        console.log("Rotation started, initial angle:", initialAngleRef.current);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isRotatingRef.current && e.touches.length === 2) {
+        e.preventDefault();
+        const currentAngle = getAngle(e.touches);
+        const deltaAngle = currentAngle - initialAngleRef.current;
+        console.log("Rotating, delta angle:", deltaAngle);
+        setManualRotation(initialRotationRef.current + deltaAngle);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      console.log("Touch end");
+      isRotatingRef.current = false;
+    };
+
+    mapEl.addEventListener('touchstart', handleTouchStart, { passive: false, capture: true });
+    mapEl.addEventListener('touchmove', handleTouchMove, { passive: false, capture: true });
+    mapEl.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+
+    return () => {
+      mapEl.removeEventListener('touchstart', handleTouchStart);
+      mapEl.removeEventListener('touchmove', handleTouchMove);
+      mapEl.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, []);
+  const [showTruckRestrictions, setShowTruckRestrictions] = useState(() => localStorage.getItem('nav_show_truck_restrictions') === 'true');
   
   const [avoidTolls, setAvoidTolls] = useState(() => localStorage.getItem('nav_avoid_tolls') === 'true');
   const [avoidFerries, setAvoidFerries] = useState(() => localStorage.getItem('nav_avoid_ferries') === 'true');
@@ -258,55 +304,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   const [isRouteSettingsOpen, setIsRouteSettingsOpen] = useState(false);
   const [isRoutePreview, setIsRoutePreview] = useState(false);
   const [isExploreMode, setIsExploreMode] = useState(false);
-
-  const bearingAnimationRef = useRef<number | null>(null);
-
-  // Animate map bearing
-  const animateBearing = useCallback((targetBearing: number) => {
-    if (!mapInstanceRef.current) return;
-    
-    if (bearingAnimationRef.current !== null) {
-      cancelAnimationFrame(bearingAnimationRef.current);
-      bearingAnimationRef.current = null;
-    }
-    
-    const map = mapInstanceRef.current as any;
-    const currentBearing = map.getBearing() || 0;
-    
-    // Calculate shortest path
-    let diff = targetBearing - currentBearing;
-    diff = ((diff + 180) % 360) - 180;
-    
-    // If difference is very small, just set it
-    if (Math.abs(diff) < 1) {
-      map.setBearing(targetBearing);
-      return;
-    }
-    
-    const duration = 500; // ms
-    const startTime = performance.now();
-    
-    const animate = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Ease out cubic
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      
-      const newBearing = currentBearing + (diff * easeProgress);
-      map.setBearing(newBearing);
-      
-      if (progress < 1) {
-        bearingAnimationRef.current = requestAnimationFrame(animate);
-      } else {
-        bearingAnimationRef.current = null;
-      }
-    };
-    
-    bearingAnimationRef.current = requestAnimationFrame(animate);
-  }, []);
   const [trafficCams, setTrafficCams] = useState<any[]>([]);
-  const [zoom, setZoom] = useState(15);
 
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
@@ -318,41 +316,52 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       .map((p: any) => ({ ...p, lat: Number(p.lat), lon: Number(p.lon) }));
     return [...STATIC_POIS, ...dynamicPois];
   });
-  const [isFetchingPois, setIsFetchingPois] = useState(false);
+
+  const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
 
   useEffect(() => {
     const dynamicPois = pois.filter(p => !STATIC_POIS.some(sp => sp.id === p.id));
-    localStorage.setItem('truck_pois', JSON.stringify(dynamicPois));
+    const str = safeStringify(dynamicPois);
+    if (str) localStorage.setItem('truck_pois', str);
   }, [pois]);
   const isFetchingPoisRef = useRef(false);
   const lastPoiFetchRef = useRef<{ time: number, lat: number, lon: number } | null>(null);
-  const [showPois, setShowPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
-  const [showHighways, setShowHighways] = useState(() => localStorage.getItem('nav_show_highways') !== 'false');
-  const [showRoadOverlay, setShowRoadOverlay] = useState(() => localStorage.getItem('nav_show_road_overlay') !== 'false');
+  const smoothedHeadingRef = useRef(0);
+  const [showPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('poi_filters');
-    return saved ? new Set(JSON.parse(saved)) : new Set(['major_chains', 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'other']);
+    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
+    return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'other']);
   });
 
   useEffect(() => {
-    localStorage.setItem('poi_filters', JSON.stringify(Array.from(poiFilters)));
+    const str = safeStringify(Array.from(poiFilters));
+    if (str) localStorage.setItem('poi_filters', str);
   }, [poiFilters]);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (error) console.log("NavigationView: error state updated", error);
+  }, [error]);
+  const [showSteps, setShowSteps] = useState(false);
   const [routeSteps, setRouteSteps] = useState<any[]>([]);
   const [waypoints, setWaypoints] = useState<Waypoint[]>(() => {
     const saved = localStorage.getItem('nav_waypoints');
     return saved ? JSON.parse(saved) : [];
   });
-  const [selectedPoi, setSelectedPoi] = useState<any | null>(null);
+  console.log("NavigationView rendering");
+  const lastPoiUpdateLocationRef = useRef<[number, number] | null>(null);
+  const [upcomingPois, setUpcomingPois] = useState<any[]>([]);
 
   // Persistence Effects
   useEffect(() => {
-    localStorage.setItem('nav_waypoints', JSON.stringify(waypoints));
+    const str = safeStringify(waypoints);
+    if (str) localStorage.setItem('nav_waypoints', str);
   }, [waypoints]);
 
   useEffect(() => {
-    localStorage.setItem('nav_destination_coords', JSON.stringify(destinationCoords));
+    const str = safeStringify(destinationCoords);
+    if (str) localStorage.setItem('nav_destination_coords', str);
   }, [destinationCoords]);
 
   useEffect(() => {
@@ -360,47 +369,180 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   }, [currentDestination]);
 
   useEffect(() => {
-    localStorage.setItem('nav_map_style', mapStyle);
-  }, [mapStyle]);
+    console.log("NavigationView: activeView changed to", activeView);
+    if (activeView === ViewType.NAVIGATION) {
+      if (!mapInstanceRef.current) {
+        initializeMap();
+      } else {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }
+  }, [activeView]);
+
+  useLayoutEffect(() => {
+    console.log("NavigationView: mapRef.current changed to", mapRef.current);
+  }, [mapRef.current]);
+
+  const initializeMap = () => {
+    console.log("NavigationView: initializeMap called");
+    try {
+      if (!mapRef.current) {
+        console.log("NavigationView: mapRef.current is null");
+        return;
+      }
+      if (mapInstanceRef.current) {
+        console.log("NavigationView: mapInstanceRef.current already exists");
+        return;
+      }
+
+      // Ensure container has dimensions
+      const width = mapRef.current.clientWidth;
+      const height = mapRef.current.clientHeight;
+      console.log("NavigationView: map container dimensions", { width, height });
+
+      if (width > 0 && height > 0) {
+        console.log("NavigationView: container has dimensions", { width, height });
+        let timeoutId: any;
+        try {
+          console.log("NavigationView: starting map initialization");
+          // Add a timeout to trigger error if map takes too long to load
+          timeoutId = setTimeout(() => {
+            if (!isMapReady) {
+              console.error("Map initialization timed out after 30 seconds");
+              setError("Map initialization timed out. Please check your connection or API key.");
+            }
+          }, 30000); // 30 seconds timeout
+
+          const L_obj = (window as any).L || L;
+          console.log("NavigationView: L_obj", L_obj);
+          if (!L_obj || typeof L_obj.map !== 'function') {
+            console.error("Leaflet library is not properly loaded. L_obj:", L_obj);
+            throw new Error("Leaflet library is not properly loaded.");
+          }
+
+          console.log("NavigationView: mapRef.current", mapRef.current);
+          if ((mapRef.current as any)._leaflet_id) {
+            console.log("NavigationView: deleting _leaflet_id");
+            delete (mapRef.current as any)._leaflet_id;
+          }
+
+          console.log("NavigationView: mapRef.current before map initialization", mapRef.current);
+          console.log("NavigationView: L_obj before map initialization", L_obj);
+          console.log("NavigationView: initializing map with center", isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION);
+          let map;
+          try {
+            console.log("NavigationView: calling L.map");
+            map = L.map(mapRef.current!, {
+              center: isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION,
+              zoom: 13,
+              maxZoom: 20,
+              zoomControl: false
+            });
+            console.log("NavigationView: map initialized successfully");
+          } catch (e) {
+            console.error("NavigationView: L.map() failed", e);
+            throw e;
+          }
+          console.log("NavigationView: map initialized, setting up event listeners");
+          
+          map.on('dragstart', () => {
+            setIsFollowMode(false);
+          });
+          map.on('moveend', () => {
+            const center = map.getCenter();
+            setMapCenter([center.lat, center.lng]);
+          });
+          console.log("Map created successfully");
+
+          mapInstanceRef.current = map;
+          
+          // Add rotation class to the main pane
+          map.getPane('mapPane')?.classList.add('leaflet-rotate-pane');
+
+          // Log layers
+          map.eachLayer((_layer) => {
+            // console.log("Layer:", layer);
+          });
+
+          const L_any = L_obj as any;
+          console.log("NavigationView: checking markerClusterGroup");
+          try {
+            if (typeof L_any.markerClusterGroup === 'function') {
+              console.log("NavigationView: L_any.markerClusterGroup is a function");
+              markerClusterGroupRef.current = L_any.markerClusterGroup();
+              console.log("NavigationView: markerClusterGroup created");
+              map.addLayer(markerClusterGroupRef.current);
+              console.log("NavigationView: markerClusterGroup added to map");
+            } else if (typeof (window as any).L?.markerClusterGroup === 'function') {
+              console.log("NavigationView: window.L.markerClusterGroup is a function");
+              markerClusterGroupRef.current = (window as any).L.markerClusterGroup();
+              console.log("NavigationView: markerClusterGroup created from window.L");
+              map.addLayer(markerClusterGroupRef.current);
+              console.log("NavigationView: markerClusterGroup added to map from window.L");
+            } else {
+              console.warn("markerClusterGroup is not available");
+            }
+          } catch (e) {
+            console.error("NavigationView: markerClusterGroup initialization failed", e);
+          }
+          console.log("NavigationView: markerClusterGroup check complete");
+
+          clearTimeout(timeoutId);
+          console.log("NavigationView: timeout cleared");
+          setIsMapReady(true);
+          console.log("NavigationView: isMapReady set to true");
+          setTimeout(() => {
+            console.log("Invalidating map size after initialization");
+            map.invalidateSize();
+          }, 100);
+        } catch (error) {
+          console.error("Map initialization caught error:", error);
+          setError(`Map initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      } else {
+        console.log("NavigationView: container dimensions are 0, retrying...");
+        setTimeout(initializeMap, 500);
+      }
+    } catch (e) {
+      console.error("NavigationView: initializeMap failed unexpectedly", e);
+    }
+  };
+
+
+  useEffect(() => {
+    if (!mapRef.current || !mapInstanceRef.current) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      console.log("Resize observer triggered");
+      mapInstanceRef.current?.invalidateSize();
+    });
+
+    resizeObserver.observe(mapRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [isMapReady]);
+
+
 
   useEffect(() => {
     localStorage.setItem('nav_north_up', isNorthUp.toString());
-  }, [isNorthUp]);
-
-  useEffect(() => {
     localStorage.setItem('nav_avoid_tolls', avoidTolls.toString());
-  }, [avoidTolls]);
-
-  useEffect(() => {
     localStorage.setItem('nav_avoid_ferries', avoidFerries.toString());
-  }, [avoidFerries]);
-
-  useEffect(() => {
     localStorage.setItem('nav_avoid_unpaved', avoidUnpaved.toString());
-  }, [avoidUnpaved]);
-
-  useEffect(() => {
     localStorage.setItem('nav_carplay_mode', isCarPlayMode.toString());
-  }, [isCarPlayMode]);
-
-  useEffect(() => {
     localStorage.setItem('nav_show_pois', showPois.toString());
-  }, [showPois]);
-
-  useEffect(() => {
-    localStorage.setItem('nav_show_highways', showHighways.toString());
-  }, [showHighways]);
-
-  useEffect(() => {
-    localStorage.setItem('nav_show_road_overlay', showRoadOverlay.toString());
-  }, [showRoadOverlay]);
+    localStorage.setItem('nav_show_truck_restrictions', showTruckRestrictions.toString());
+  }, [isNorthUp, avoidTolls, avoidFerries, avoidUnpaved, isCarPlayMode, showPois, showTruckRestrictions]);
   
   const [nextInstruction, setNextInstruction] = useState({ 
     text: 'Ready for Route', 
     distance: '0.0', 
     icon: ArrowUp as React.ElementType, 
     lanes: [] as any[],
-    maneuver: null as any
+    maneuver: null as any,
+    followingStep: null as { text: string, icon: React.ElementType } | null
   });
   const [weather, setWeather] = useState({ 
     temp: '--°', 
@@ -412,7 +554,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   });
   const [routeWeatherForecast, setRouteWeatherForecast] = useState<any[]>([]);
   const [weatherAlerts, setWeatherAlerts] = useState<any[]>([]);
-  const weatherAlertGroupRef = useRef<any>(null);
+  const [restrictionAlerts, setRestrictionAlerts] = useState<RestrictionAlert[]>([]);
+  const [trafficAlerts, setTrafficAlerts] = useState<any[]>([]);
+  const restrictionAlertMarkersRef = useRef<L.Marker[]>([]);
+  const trafficAlertMarkersRef = useRef<L.Marker[]>([]);
+  const weatherAlertMarkersRef = useRef<L.Marker[]>([]);
   const [weighStationAlert, setWeighStationAlert] = useState<{ distance: number, status: 'OPEN' | 'CLOSED' | 'BYPASS' } | null>(null);
   
   const [currentRoad, setCurrentRoad] = useState<string | null>(null);
@@ -423,31 +569,41 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   const playedAlertsRef = useRef<Record<string, Set<number>>>({});
 
   useEffect(() => {
+    if (selectedPoi && (selectedPoi.place_id || selectedPoi.id) && !selectedPoi.detailsFetched) {
+      const id = selectedPoi.place_id || selectedPoi.id;
+      // Only lookup if it looks like a HERE ID (not a local UUID or static ID)
+      if (id && id.length > 10) {
+        lookupPlace(id).then(details => {
+          if (details) {
+            setSelectedPoi(prev => {
+              if (!prev || (prev.place_id || prev.id) !== id) return prev;
+              return {
+                ...prev,
+                detailsFetched: true,
+                phone: details.contacts?.[0]?.phone?.[0]?.value,
+                website: details.contacts?.[0]?.www?.[0]?.value,
+                openingHours: details.openingHours?.[0]?.text,
+                rating: details.rating,
+                address: details.address?.label || prev.address,
+                amenities: details.categories?.map((c: any) => c.name) || prev.amenities
+              };
+            });
+          }
+        }).catch(err => {
+          console.warn("Failed to lookup place details:", err);
+        });
+      }
+    }
+  }, [selectedPoi]);
+
+  useEffect(() => {
     if (hasViolation && !lastViolationRef.current) {
       speak("Attention: Hours of Service violation detected. Immediate stop required.");
     }
     lastViolationRef.current = hasViolation;
   }, [hasViolation]);
 
-  useEffect(() => {
-    const fetchRoadName = async () => {
-      if (!isDriving || !userLocation) return;
 
-      try {
-        const [lat, lon] = userLocation;
-        const data = await reverseGeocode(lat, lon);
-        if (data) {
-          setCurrentRoad(data.ref || data.road);
-        }
-      } catch (error) {
-        console.warn('Could not fetch road name:', error);
-        setCurrentRoad(null);
-      }
-    };
-
-    const interval = setInterval(fetchRoadName, 10000); // Fetch every 10 seconds while driving
-    return () => clearInterval(interval);
-  }, [isDriving, userLocation]);
 
   useEffect(() => {
     if (!eldStatus || eldStatus.status === 'OFF' || eldStatus.status === 'SB') {
@@ -477,98 +633,327 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     });
   }, [eldStatus]);
 
-  useEffect(() => {
-    if (!mapInstanceRef.current || !baseLayerGroupRef.current) return;
-    baseLayerGroupRef.current.clearLayers();
+  const lastPoiRenderCenterRef = useRef<[number, number] | null>(null);
+  const poiIconsCacheRef = useRef<Record<string, string>>({});
+  const weatherIconsCacheRef = useRef<Record<string, string>>({});
+
+  const getCachedPoiIcon = (type: any, name: any) => {
+    const category = getPoiCategory(type, name);
+    if (poiIconsCacheRef.current[category]) return poiIconsCacheRef.current[category];
     
-    const tileOptions = {
-      tileSize: 256,
-      maxZoom: 20,
-      updateWhenIdle: true,
-      updateWhenZooming: false,
-      keepBuffer: 4
+    const iconElement = getPoiIcon(type, name);
+    if (!iconElement) return null;
+    
+    const html = renderToStaticMarkup(iconElement);
+    poiIconsCacheRef.current[category] = html;
+    return html;
+  };
+
+  const updateMapLine = (map: L.Map, id: string, coords: [number, number][], color: string, width: number) => {
+    const layer = mapLayersRef.current[id];
+    if (layer) {
+      layer.setLatLngs(coords);
+      return;
+    }
+    
+    const polyline = L.polyline(coords, {
+      color: color,
+      weight: width
+    });
+    polyline.addTo(map);
+    mapLayersRef.current[id] = polyline;
+  };
+
+  useEffect(() => {
+    if (!isMapReady || !mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    map.on('contextmenu', (e: L.LeafletMouseEvent) => {
+      console.log('contextmenu:', e);
+      const { lat, lng } = e.latlng;
+      L.popup()
+        .setLatLng(e.latlng)
+        .setContent(`
+          <div class="flex flex-col gap-2 p-1">
+            <button class="set-location-btn bg-[#D4AF37] text-black px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider" data-lat="${lat}" data-lng="${lng}">
+              Set as Current Location
+            </button>
+            <button class="add-waypoint-btn bg-zinc-800 text-white px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider border border-zinc-700" data-lat="${lat}" data-lng="${lng}">
+              Add as Stop
+            </button>
+          </div>
+        `)
+        .openOn(map);
+    });
+
+    let moveEndTimeout: any = null;
+    map.on('moveend', () => {
+      if (moveEndTimeout) clearTimeout(moveEndTimeout);
+      moveEndTimeout = setTimeout(() => {
+        if (!mapInstanceRef.current) return;
+        const center = mapInstanceRef.current.getCenter();
+        const lat = center.lat;
+        const lon = center.lng;
+        
+        const shouldUpdateCenter = (lat: number, lon: number) => {
+          if (!mapCenter) return true;
+          const distance = calcDistMi(lat, lon, mapCenter[0], mapCenter[1]);
+          return distance >= 1.0; // Only update state if moved > 1 mile
+        };
+
+        if (shouldUpdateCenter(lat, lon)) {
+          setMapCenter([lat, lon]);
+        }
+        
+        const shouldFetchPois = (lat: number, lon: number) => {
+          if (!lastPoiFetchRef.current) return true;
+          const { time, lat: lastLat, lon: lastLon } = lastPoiFetchRef.current;
+          const now = Date.now();
+          if (now - time > 15 * 60 * 1000) return true; // 15 minutes
+          
+          const distance = calcDistMi(lat, lon, lastLat, lastLon);
+          return distance >= 10;
+        };
+
+        if (!isFetchingPoisRef.current && shouldFetchPois(center.lat, center.lng)) {
+          isFetchingPoisRef.current = true;
+          lastPoiFetchRef.current = { time: Date.now(), lat: center.lat, lon: center.lng };
+          
+          fetchTruckPOIs(center.lat, center.lng)
+            .then((poiData) => {
+              const combinedRaw = [...poiData];
+              const seenInBatch = new Set();
+              const combined = combinedRaw.filter(p => {
+                const id = `${p.lat}-${p.lon}-${p.name}`;
+                if (seenInBatch.has(id)) return false;
+                seenInBatch.add(id);
+                return true;
+              });
+
+              if (combined.length > 0) {
+                setPois(prev => {
+                  const existingIds = new Set();
+                  // Only check against a subset of recent POIs if the list is too large
+                  // or just keep it simple but add a hard limit
+                  prev.forEach(p => existingIds.add(`${p.lat}-${p.lon}-${p.name}`));
+                  
+                  const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
+                  if (newPois.length === 0) return prev;
+                  
+                  const updated = [...prev, ...newPois];
+                  // Keep only the 1000 most recent POIs to prevent performance degradation
+                  if (updated.length > 1000) {
+                    return updated.slice(updated.length - 1000);
+                  }
+                  return updated;
+                });
+              }
+            })
+            .catch(err => console.error("Moveend POI fetch failed:", err instanceof Error ? err.message : String(err)))
+            .finally(() => {
+              isFetchingPoisRef.current = false;
+            });
+        }
+      }, 1000);
+    });
+
+    return () => {
+      map.off('contextmenu');
+      map.off('moveend');
+      Object.values(mapLayersRef.current).forEach(layer => layer.remove());
+      mapLayersRef.current = {};
+    };
+  }, [isMapReady]);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !isMapReady || !userLocation) return;
+
+    // Remove old marker
+    if (userMarkerRef.current) {
+        mapInstanceRef.current.removeLayer(userMarkerRef.current);
+    }
+    
+    const el = document.createElement('div');
+    el.className = 'user-marker-wrapper';
+    el.innerHTML = renderToStaticMarkup(
+      <div className="relative flex items-center justify-center w-16 h-16">
+        {/* GPS Pulse Effect */}
+        <div className="absolute inset-0 bg-[#D4AF37]/20 rounded-full animate-ping" />
+        
+        {/* Vehicle Container */}
+        <div className="vehicle-pointer relative flex items-center justify-center w-12 h-12 transition-transform duration-300 ease-out" style={{ transform: 'rotate(var(--vehicle-rotation, 0deg))' }}>
+          {/* Shadow */}
+          <div className="absolute top-1 left-1 w-10 h-10 bg-black/40 rounded-full blur-sm" />
+          
+          {/* Main Body */}
+          <div className="relative w-10 h-10 bg-gradient-to-b from-[#D4AF37] to-[#B8860B] rounded-xl flex items-center justify-center border-2 border-white/30 shadow-2xl overflow-hidden">
+            <Truck className="w-6 h-6 text-black fill-current" strokeWidth={2.5} />
+            
+            {/* Glossy Overlay */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
+          </div>
+          
+          {/* Direction Indicator */}
+          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-white drop-shadow-md" />
+        </div>
+      </div>
+    );
+    
+    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [64, 64], iconAnchor: [32, 32] }) }).addTo(mapInstanceRef.current);
+    userMarkerElRef.current = el.querySelector('.vehicle-pointer') as HTMLElement;
+
+    // POI fetch logic
+    if (isFetchingPoisRef.current) return;
+
+    const [lat, lon] = userLocation;
+    
+    const shouldFetchPois = (lat: number, lon: number) => {
+      if (!lastPoiFetchRef.current) return true;
+      const { time, lat: lastLat, lon: lastLon } = lastPoiFetchRef.current;
+      const now = Date.now();
+      if (now - time > 15 * 60 * 1000) return true; // 15 minutes
+      
+      const distance = calcDistMi(lat, lon, lastLat, lastLon);
+      return distance >= 10;
     };
 
-    let fallbackTriggered = false;
+    if (shouldFetchPois(lat, lon)) {
+      isFetchingPoisRef.current = true;
+      lastPoiFetchRef.current = { time: Date.now(), lat, lon };
+      
+      fetchTruckPOIs(lat, lon)
+        .then((poiData) => {
+          const combinedRaw = [...poiData];
+          const seenInBatch = new Set();
+          const combined = combinedRaw.filter(p => {
+            const id = `${p.lat}-${p.lon}-${p.name}`;
+            if (seenInBatch.has(id)) return false;
+            seenInBatch.add(id);
+            return true;
+          });
 
-    if (mapStyle === 'TUE_GOLD') {
-      // Use the custom HERE style HRN provided by the user
-      const customStyleHrn = 'hrn:here:data::org675124033:03a188-df4d962e9';
-      
-      const layer = L.tileLayer(`https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?apiKey=${HERE_API_KEY}&style=${customStyleHrn}`, {
-        ...tileOptions,
-        attribution: '&copy; <a href="https://legal.here.com/en-gb/privacy">HERE</a>'
-      }).addTo(baseLayerGroupRef.current);
-      
-      layer.on('tileerror', () => {
-        if (!fallbackTriggered && baseLayerGroupRef.current) {
-          fallbackTriggered = true;
-          baseLayerGroupRef.current.clearLayers();
-          L.tileLayer('https://{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { 
-            maxZoom: 22,
-            maxNativeZoom: 20,
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-          }).addTo(baseLayerGroupRef.current);
-        }
-      });
-    } else if (mapStyle === 'MAPTILER') {
-      const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '4D6H6eQaS6oyaQmgNGly';
-      // Use the user's specific MapTiler style
-      const layer = L.tileLayer(`https://api.maptiler.com/maps/019cd5fd-dec5-7287-b677-66a58dc4ff50/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
-        ...tileOptions,
-        attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(baseLayerGroupRef.current);
-      
-      layer.on('tileerror', () => {
-        if (!fallbackTriggered && baseLayerGroupRef.current) {
-          fallbackTriggered = true;
-          baseLayerGroupRef.current.clearLayers();
-          L.tileLayer('https://{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { 
-            maxZoom: 22,
-            maxNativeZoom: 20,
-            subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-          }).addTo(baseLayerGroupRef.current);
-        }
-      });
-    } else if (mapStyle === 'CUSTOM') {
-      if (customTileUrl) {
-        L.tileLayer(customTileUrl, {
-          ...tileOptions,
-          attribution: 'Custom Layer'
-        }).addTo(baseLayerGroupRef.current);
-      }
-      
-      if (customMapShowRoads) {
-        L.tileLayer(`https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?features=truck_restrictions&apiKey=${HERE_API_KEY}`, {
-          ...tileOptions,
-          opacity: 0.6,
-          className: 'glow-overlay'
-        }).addTo(baseLayerGroupRef.current);
-      }
-    } else if (mapStyle === 'SATELLITE') {
-      L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&hl=en&x={x}&y={y}&z={z}', { 
-        maxZoom: 22,
-        maxNativeZoom: 20,
-        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-        attribution: '&copy; Google Maps'
-      }).addTo(baseLayerGroupRef.current);
+          if (combined.length > 0) {
+            setPois(prev => {
+              const existingIds = new Set();
+              prev.forEach(p => existingIds.add(`${p.lat}-${p.lon}-${p.name}`));
+              
+              const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
+              if (newPois.length === 0) return prev;
+              
+              const updated = [...prev, ...newPois];
+              if (updated.length > 1000) {
+                return updated.slice(updated.length - 1000);
+              }
+              return updated;
+            });
+          }
+        })
+        .catch(err => console.error("User location POI fetch failed:", err instanceof Error ? err.message : String(err)))
+        .finally(() => {
+          isFetchingPoisRef.current = false;
+        });
     }
-  }, [mapStyle, customTileUrl, customMapShowRoads, showHighways, isMapReady]);
+  }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || !isMapReady) return;
+    
+    const map = mapInstanceRef.current;
+    
+    // Remove existing tile layers
+    map.eachLayer((layer) => {
+      if (layer instanceof L.TileLayer || (layer as any).options?.style) {
+        map.removeLayer(layer);
+      }
+    });
+
+    // Reset filter
+    (map.getContainer() as HTMLElement).style.filter = 'none';
+    console.log("NavigationView: map container style", (map.getContainer() as HTMLElement).style.cssText);
+    console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
+
+    if (showTruckRestrictions && HERE_API_KEY) {
+      console.log("Adding HERE Truck Restrictions layer");
+      // Use HERE Map Tile API v2 with truck.day scheme for reliable truck restrictions
+      const hereUrl = `https://{s}.base.maps.ls.hereapi.com/maptile/2.1/maptile/newest/truck.day/{z}/{x}/{y}/256/png8?apiKey=${HERE_API_KEY}`;
+      L.tileLayer(hereUrl, {
+        subdomains: '1234',
+        attribution: '&copy; HERE 2024',
+        maxZoom: 20
+      }).addTo(map);
+    } else {
+      // Use MapTiler Leaflet SDK for high-performance vector tiles
+      console.log("Adding MapTiler layer", MAPTILER_STYLE.url);
+      console.log("L.maptiler:", (L as any).maptiler);
+      try {
+        const _mtLayer = new (L as any).maptiler.maptilerLayer({
+          apiKey: MAPTILER_KEY,
+          style: MAPTILER_STYLE_ID,
+        }).addTo(map);
+        console.log("MapTiler layer added successfully");
+      } catch (e) {
+        console.error("Failed to add MapTiler layer, falling back to raster", e);
+        // Fallback logic...
+        const styleRasterUrl = `https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+        const fallbackRasterUrl = `https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
+        const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+        
+        console.log("NavigationView: falling back to raster");
+        L.tileLayer(styleRasterUrl, { 
+          attribution: MAPTILER_STYLE.attribution,
+          maxZoom: 20
+        }).addTo(map).on('tileerror', () => {
+          console.warn("MapTiler custom raster failed, falling back to streets-v2");
+          L.tileLayer(fallbackRasterUrl, {
+            attribution: MAPTILER_STYLE.attribution,
+            maxZoom: 20
+          }).addTo(map).on('tileerror', (err) => {
+            console.warn("MapTiler fallback raster failed, falling back to OSM", err);
+            L.tileLayer(osmUrl, {
+              attribution: '&copy; OpenStreetMap contributors',
+              maxZoom: 19
+            }).addTo(map);
+          });
+        });
+      }
+    }
+    map.invalidateSize();
+  }, [isMapReady, showTruckRestrictions]);
+
+  useEffect(() => {
+    if (!mapRef.current || !mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    
+    const observer = new ResizeObserver(() => {
+      console.log("Map container resized, invalidating size");
+      map.invalidateSize();
+    });
+    
+    observer.observe(mapRef.current);
+    return () => observer.disconnect();
+  }, [isMapReady]);
 
   useEffect(() => {
     if (!mapRef.current) return;
-    const mapContainer = mapRef.current;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const mapPane = map.getPane('mapPane');
+    if (!mapPane) return;
 
     if (!isNorthUp) {
-      mapContainer.classList.add('map-heading-up');
+      mapPane.classList.add('map-heading-up');
     } else {
-      mapContainer.classList.remove('map-heading-up');
+      mapPane.classList.remove('map-heading-up');
     }
+    map.invalidateSize();
   }, [isNorthUp]);
+
+  const poiFiltersString = useMemo(() => Array.from(poiFilters).join(','), [poiFilters]);
 
   useEffect(() => {
     const getNearbyPois = () => {
-      if (!pois || pois.length === 0) return [];
+      if (!pois || pois.length === 0 || !userLocation || !isValidLatLng(userLocation)) return [];
       const seen = new Set();
       return pois
         .filter(poi => {
@@ -581,7 +966,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
           const dist = Math.pow(p.lat - userLocation[0], 2) + Math.pow(p.lon - userLocation[1], 2);
           return { ...p, dist };
         })
-        .sort((a, b) => a.dist - b.dist)
+        .sort((a, b) => {
+          const distA = a.dist;
+          const distB = b.dist;
+          const threshold = 0.0001; // ~10 meters
+          if (distA < threshold && distB >= threshold) return -1;
+          if (distB < threshold && distA >= threshold) return 1;
+          return distA - distB;
+        })
         .filter(p => {
           const id = `${p.lat}-${p.lon}-${p.name}`;
           if (seen.has(id)) return false;
@@ -613,7 +1005,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         
         // Optimization: Remove Gemini search from live suggestions to reduce latency and cost.
         // HERE autosuggest is much faster for typing.
-        const hereSuggestions = HERE_API_KEY ? await fetchAddressSuggestions(searchQuery, lat, lon, HERE_API_KEY) : [];
+        console.log(`Fetching suggestions for "${searchQuery}" at ${lat}, ${lon}`);
+        const hereSuggestions = await fetchAddressSuggestions(searchQuery, lat, lon);
+        console.log(`Received ${hereSuggestions.length} suggestions from HERE`);
         
         // Combine and deduplicate
         const combined = [...hereSuggestions];
@@ -621,6 +1015,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         
         // Add nearby POIs as recommendations at the top
         const nearby = getNearbyPois().slice(0, 3);
+        console.log(`Found ${nearby.length} nearby POIs`);
         nearby.forEach(p => {
           seen.add(`${p.lat.toFixed(4)}-${p.lon.toFixed(4)}`);
         });
@@ -633,14 +1028,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         });
         
         const finalResults = [...nearby, ...uniqueResults.slice(0, 10)];
+        console.log(`Setting ${finalResults.length} final suggestions`);
         setSuggestions(finalResults);
       } catch (error) {
-        console.error('Failed to fetch suggestions', error);
+        console.error('Failed to fetch suggestions', error instanceof Error ? error.message : String(error));
         setSuggestions(getNearbyPois().slice(0, 3));
       }
     }, 300); // Reduced debounce for snappier feel
     return () => clearTimeout(handler);
-  }, [searchQuery, userLocation, isSearchFocused, pois, poiFilters]);
+  }, [searchQuery, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, isSearchFocused, pois.length, poiFiltersString]);
 
   const getManeuverIcon = (type: string, modifier?: string): React.ElementType => {
     if (type === 'depart') return ArrowUp;
@@ -689,8 +1085,41 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     };
   };
 
+  const getLaneGuidancePhrase = (lanes: any[]) => {
+    if (!lanes || lanes.length === 0) return '';
+    
+    const recommendedLanes = lanes.filter(l => l.matches.includes('selected') || l.active);
+    if (recommendedLanes.length === 0) return '';
+    if (recommendedLanes.length === lanes.length) return ''; // All lanes are fine
+
+    const totalLanes = lanes.length;
+    const recommendedCount = recommendedLanes.length;
+    
+    // Find if they are contiguous and where they are
+    let firstIdx = -1;
+    let lastIdx = -1;
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i].matches.includes('selected') || lanes[i].active) {
+        if (firstIdx === -1) firstIdx = i;
+        lastIdx = i;
+      }
+    }
+
+    const isLeft = firstIdx === 0;
+    const isRight = lastIdx === totalLanes - 1;
+    
+    const position = isLeft ? 'left' : isRight ? 'right' : 'middle';
+    if (isLeft && isRight) return ''; // Should not happen if recommendedCount < totalLanes
+
+    const laneWord = recommendedCount === 1 ? 'lane' : 'lanes';
+    const countWord = recommendedCount === 1 ? 'the' : `the ${recommendedCount}`;
+    
+    return `Use ${countWord} ${position} ${laneWord}.`;
+  };
+
   const lastSpokenRef = useRef('');
   const spokenDistancesRef = useRef<Set<string>>(new Set());
+  const lastLaneSpokenRef = useRef('');
 
   useEffect(() => {
     if (!isDriving || nextInstruction.text === 'Ready for Route') return;
@@ -700,15 +1129,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     let shouldSpeak = false;
     let phrase = "";
 
+    const lanePhrase = getLaneGuidancePhrase(nextInstruction.lanes || []);
+
     if (nextInstruction.text !== lastSpokenRef.current) {
       lastSpokenRef.current = nextInstruction.text;
       spokenDistancesRef.current.clear();
+      lastLaneSpokenRef.current = '';
       
       shouldSpeak = true;
       if (dist > 2) {
-        phrase = `Continue for ${dist} miles, then ${nextInstruction.text}`;
+        phrase = `Continue for ${dist} miles, then ${nextInstruction.text}. ${lanePhrase}`;
       } else {
-        phrase = `In ${dist} miles, ${nextInstruction.text}`;
+        phrase = `In ${dist} miles, ${nextInstruction.text}. ${lanePhrase}`;
         if (dist <= 2) spokenDistancesRef.current.add('2');
         if (dist <= 1) spokenDistancesRef.current.add('1');
         if (dist <= 0.2) spokenDistancesRef.current.add('0.2');
@@ -717,26 +1149,51 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
 
     if (dist <= 2.0 && dist > 1.9 && !spokenDistancesRef.current.has('2')) {
       shouldSpeak = true;
-      phrase = `In 2 miles, ${nextInstruction.text}`;
+      phrase = `In 2 miles, ${nextInstruction.text}. ${lanePhrase}`;
       spokenDistancesRef.current.add('2');
     } else if (dist <= 1.0 && dist > 0.9 && !spokenDistancesRef.current.has('1')) {
       shouldSpeak = true;
-      phrase = `In 1 mile, ${nextInstruction.text}`;
+      phrase = `In 1 mile, ${nextInstruction.text}. ${lanePhrase}`;
       spokenDistancesRef.current.add('1');
+    } else if (dist <= 0.5 && dist > 0.4 && lanePhrase && lastLaneSpokenRef.current !== lanePhrase) {
+      // Speak lane guidance specifically at 0.5 miles if not already spoken recently
+      shouldSpeak = true;
+      phrase = lanePhrase;
+      lastLaneSpokenRef.current = lanePhrase;
     } else if (dist <= 0.2 && !spokenDistancesRef.current.has('0.2')) {
       shouldSpeak = true;
-      phrase = `Now, ${nextInstruction.text}`;
+      phrase = `Now, ${nextInstruction.text}. ${lanePhrase}`;
       spokenDistancesRef.current.add('0.2');
     }
 
     if (shouldSpeak && phrase) {
       speak(phrase);
     }
-  }, [nextInstruction.distance, nextInstruction.text, isDriving]);
+  }, [nextInstruction.distance, nextInstruction.text, nextInstruction.lanes, isDriving]);
 
   const [isOffRoute, setIsOffRoute] = useState(false);
   const offRouteCountRef = useRef(0);
   const lastRerouteTimeRef = useRef(0);
+
+  const saveRouteToHistory = useCallback((status: 'COMPLETED' | 'CANCELLED') => {
+    if (currentDestination === 'Standby' || routeSavedRef.current) return;
+
+    const historyItem: RouteHistoryItem = {
+      id: Math.random().toString(36).substr(2, 9),
+      origin: waypoints.length > 0 ? waypoints[0].address : 'Current Location',
+      destination: currentDestination,
+      distance: totalRouteDistanceRef.current / 1609.34,
+      duration: routeDurationRef.current,
+      date: new Date().toISOString(),
+      status
+    };
+
+    const saved = localStorage.getItem('trucker_route_history');
+    const history = saved ? JSON.parse(saved) : [];
+    const str = safeStringify([historyItem, ...history]);
+    if (str) localStorage.setItem('trucker_route_history', str);
+    routeSavedRef.current = true;
+  }, [currentDestination, waypoints]);
 
   const handleReroute = async () => {
     const now = Date.now();
@@ -751,246 +1208,340 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       await handleNavigate();
       setIsOffRoute(false);
     } catch (e) {
-      console.error("Reroute failed:", e);
+      console.error("Reroute failed:", e instanceof Error ? e.message : String(e));
     }
   };
 
-  const updateNavigationState = async (currentLocation: [number, number]) => {
-    if (!currentLocation || isNaN(currentLocation[0]) || isNaN(currentLocation[1])) return;
-    if (!routeSteps.length || !routeCoordsRef.current || routeCoordsRef.current.length < 2) return;
+  const lastUpdateLocationRef = useRef<[number, number] | null>(null);
+  const lastUpdateRef = useRef<number>(0);
+  const lastPanRef = useRef<number>(0);
+  const isUpdatingRef = useRef<boolean>(false);
 
-    // Manual distance calculation to avoid turf.js overhead
-    const R = 6371e3; // Earth radius in meters
-    const toRad = (val: number) => val * Math.PI / 180;
-    const calcDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-      const phi1 = toRad(lat1);
-      const phi2 = toRad(lat2);
-      const deltaPhi = toRad(lat2 - lat1);
-      const deltaLambda = toRad(lon2 - lon1);
-      const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-                Math.cos(phi1) * Math.cos(phi2) *
-                Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c;
-    };
+  const routeStepsRef = useRef(routeSteps);
+  const poiFiltersRef = useRef(poiFilters);
+  const isOffRouteRef = useRef(isOffRoute);
+  const isCalculatingRef = useRef(isCalculating);
+  const autoRerouteRef = useRef(context?.autoReroute);
+  const weighStationAlertRef = useRef(weighStationAlert);
+  const initialMilesRef = useRef(initialMiles);
+  const handleRerouteRef = useRef(handleReroute);
 
-    // Find nearest point on route line manually
-    let minDistance = Infinity;
-    let nearestIndex = 0;
-    let distOnSegment = 0;
+  useEffect(() => {
+    routeStepsRef.current = routeSteps;
+    poiFiltersRef.current = poiFilters;
+    isOffRouteRef.current = isOffRoute;
+    isCalculatingRef.current = isCalculating;
+    autoRerouteRef.current = context?.autoReroute;
+    weighStationAlertRef.current = weighStationAlert;
+    initialMilesRef.current = initialMiles;
+    handleRerouteRef.current = handleReroute;
+  }, [routeSteps, poiFilters, isOffRoute, isCalculating, context?.autoReroute, weighStationAlert, initialMiles, handleReroute]);
 
-    // Optimization: only search a window around the last known index to improve performance
-    let startIndex = 0;
-    let endIndex = routeCoordsRef.current.length - 1;
-    if (lastSimIdxRef.current !== -1) {
-      startIndex = Math.max(0, lastSimIdxRef.current - 50);
-      endIndex = Math.min(routeCoordsRef.current.length - 1, lastSimIdxRef.current + 200);
-    }
+  const updateNavigationState = useCallback(async (currentLocation: [number, number]) => {
+    if (isUpdatingRef.current) return;
+    isUpdatingRef.current = true;
+    try {
+      const now = Date.now();
+      if (now - lastUpdateRef.current < 1000) return; // Throttle to 1000ms
+      lastUpdateRef.current = now;
 
-    for (let i = startIndex; i < endIndex; i++) {
-      const p1 = routeCoordsRef.current[i];
-      const p2 = routeCoordsRef.current[i+1];
-      if (!p1 || !p2) continue;
+      if (lastUpdateLocationRef.current && 
+          lastUpdateLocationRef.current[0] === currentLocation[0] && 
+          lastUpdateLocationRef.current[1] === currentLocation[1]) return;
+      lastUpdateLocationRef.current = currentLocation;
       
-      // Calculate distance from point to line segment
-      const l2 = Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2);
-      let t = 0;
-      if (l2 !== 0) {
-        t = Math.max(0, Math.min(1, ((currentLocation[0] - p1[0]) * (p2[0] - p1[0]) + (currentLocation[1] - p1[1]) * (p2[1] - p1[1])) / l2));
-      }
-      const proj = [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])];
-      const dist = calcDist(currentLocation[0], currentLocation[1], proj[0], proj[1]);
+      if (!currentLocation || isNaN(currentLocation[0]) || isNaN(currentLocation[1])) return;
+      if (!routeStepsRef.current.length || !routeCoordsRef.current || routeCoordsRef.current.length < 2) return;
 
-      if (dist < minDistance) {
-        minDistance = dist;
-        nearestIndex = i;
-        distOnSegment = calcDist(p1[0], p1[1], proj[0], proj[1]);
-      }
-    }
+      // Manual distance calculation to avoid turf.js overhead
+      const R = 6371e3; // Earth radius in meters
+      const toRad = (val: number) => val * Math.PI / 180;
+      const calcDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const phi1 = toRad(lat1);
+        const phi2 = toRad(lat2);
+        const deltaPhi = toRad(lat2 - lat1);
+        const deltaLambda = toRad(lon2 - lon1);
+        const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+                  Math.cos(phi1) * Math.cos(phi2) *
+                  Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
 
-    // If we get off route, we might need to search the whole route again
-    if (minDistance > 500 && lastSimIdxRef.current !== -1) {
-      // Fallback: search the whole route if we lost track
-      for (let i = 0; i < routeCoordsRef.current.length - 1; i++) {
-        if (i >= startIndex && i < endIndex) continue; // Already checked
+      const calcEuclideanDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
+      };
+
+      // Find nearest point on route line manually
+      let minEuclideanDist = Infinity;
+      let minDistanceMeters = Infinity;
+      let nearestIndex = 0;
+      let distOnSegment = 0;
+
+      // Optimization: only search a window around the last known index to improve performance
+      let startIndex = 0;
+      let endIndex = routeCoordsRef.current.length - 1;
+      if (lastSimIdxRef.current !== -1) {
+        startIndex = Math.max(0, lastSimIdxRef.current - 50);
+        endIndex = Math.min(routeCoordsRef.current.length - 1, lastSimIdxRef.current + 200);
+      }
+
+      console.time("updateNavigationState-loop");
+      for (let i = startIndex; i < endIndex; i++) {
         const p1 = routeCoordsRef.current[i];
         const p2 = routeCoordsRef.current[i+1];
         if (!p1 || !p2) continue;
+        
+        // Calculate distance from point to line segment
         const l2 = Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2);
         let t = 0;
         if (l2 !== 0) {
           t = Math.max(0, Math.min(1, ((currentLocation[0] - p1[0]) * (p2[0] - p1[0]) + (currentLocation[1] - p1[1]) * (p2[1] - p1[1])) / l2));
         }
         const proj = [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])];
-        const dist = calcDist(currentLocation[0], currentLocation[1], proj[0], proj[1]);
-        if (dist < minDistance) {
-          minDistance = dist;
+        const dist = calcEuclideanDist(currentLocation[0], currentLocation[1], proj[0], proj[1]);
+
+        if (dist < minEuclideanDist) {
+          minEuclideanDist = dist;
+          minDistanceMeters = calcDist(currentLocation[0], currentLocation[1], proj[0], proj[1]);
           nearestIndex = i;
           distOnSegment = calcDist(p1[0], p1[1], proj[0], proj[1]);
         }
       }
-    }
+      console.timeEnd("updateNavigationState-loop");
 
-    lastSimIdxRef.current = nearestIndex;
+      // If we get off route, we might need to search the whole route again
+      if (minDistanceMeters > 500 && lastSimIdxRef.current !== -1) {
+        // Fallback: search the whole route if we lost track
+        for (let i = 0; i < routeCoordsRef.current.length - 1; i++) {
+          if (i >= startIndex && i < endIndex) continue; // Already checked
+          const p1 = routeCoordsRef.current[i];
+          const p2 = routeCoordsRef.current[i+1];
+          if (!p1 || !p2) continue;
+          const l2 = Math.pow(p1[0] - p2[0], 2) + Math.pow(p1[1] - p2[1], 2);
+          let t = 0;
+          if (l2 !== 0) {
+            t = Math.max(0, Math.min(1, ((currentLocation[0] - p1[0]) * (p2[0] - p1[0]) + (currentLocation[1] - p1[1]) * (p2[1] - p1[1])) / l2));
+          }
+          const proj = [p1[0] + t * (p2[0] - p1[0]), p1[1] + t * (p2[1] - p1[1])];
+          const dist = calcEuclideanDist(currentLocation[0], currentLocation[1], proj[0], proj[1]);
+          if (dist < minEuclideanDist) {
+            minEuclideanDist = dist;
+            minDistanceMeters = calcDist(currentLocation[0], currentLocation[1], proj[0], proj[1]);
+            nearestIndex = i;
+            distOnSegment = calcDist(p1[0], p1[1], proj[0], proj[1]);
+          }
+        }
+      }
 
-    if (routeLineRef.current && routeCoordsRef.current.length > nearestIndex) {
-      const remainingCoords = [currentLocation, ...routeCoordsRef.current.slice(nearestIndex + 1)];
-      routeLineRef.current.setLatLngs(remainingCoords);
-    }
+      lastSimIdxRef.current = nearestIndex;
 
-    if (routeGroupRef.current && routeCoordsRef.current.length > nearestIndex + 1) {
-      const segmentCoords = [currentLocation, routeCoordsRef.current[nearestIndex + 1]];
-      if (!currentSegmentLineRef.current) {
-        currentSegmentLineRef.current = L.polyline(segmentCoords, {
-          color: '#ffffff',
-          weight: 12,
-          opacity: 0.8,
-          lineCap: 'round',
-          lineJoin: 'round',
-          className: 'animate-pulse'
-        }).addTo(routeGroupRef.current);
+      if (routeLineRef.current && routeCoordsRef.current.length > nearestIndex) {
+        const remainingCoords = [currentLocation, ...routeCoordsRef.current.slice(nearestIndex + 1)];
+        updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 8);
+      }
+
+      if (routeMarkersRef.current.length > 0 && routeCoordsRef.current.length > nearestIndex + 1) {
+        const segmentCoords = [currentLocation, routeCoordsRef.current[nearestIndex + 1]];
+        if (!currentSegmentLineRef.current) {
+          updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
+          currentSegmentLineRef.current = 'segment';
+        } else {
+          updateMapLine(mapInstanceRef.current, currentSegmentLineRef.current, segmentCoords, '#ffffff', 12);
+        }
+      }
+
+      const distanceFromRoute = minDistanceMeters;
+      
+      // Check if off-route
+      if (distanceFromRoute > 300) { // Increased from 150m to 300m to reduce recalculations
+          offRouteCountRef.current += 1;
+          if (offRouteCountRef.current >= 5) { // Increased from 3 to 5 consecutive updates
+              if (!isOffRouteRef.current && !isCalculatingRef.current) {
+                  setIsOffRoute(true);
+                  speak("Off route.");
+                  if (autoRerouteRef.current) {
+                    speak("Recalculating.");
+                    handleRerouteRef.current();
+                  }
+              }
+          }
       } else {
-        currentSegmentLineRef.current.setLatLngs(segmentCoords);
+          offRouteCountRef.current = 0;
+          if (isOffRouteRef.current) setIsOffRoute(false);
       }
-    }
 
-    const distanceFromRoute = minDistance;
-    
-    // Check if off-route
-    if (distanceFromRoute > 300) { // Increased from 150m to 300m to reduce recalculations
-        offRouteCountRef.current += 1;
-        if (offRouteCountRef.current >= 5) { // Increased from 3 to 5 consecutive updates
-            if (!isOffRoute && !isCalculating) {
-                setIsOffRoute(true);
-                speak("Off route.");
-                if (context?.autoReroute) {
-                  speak("Recalculating.");
-                  handleReroute();
-                }
-            }
-        }
-    } else {
-        offRouteCountRef.current = 0;
-        if (isOffRoute) setIsOffRoute(false);
-    }
-
-    let traveledDistance = 0;
-    if (nearestIndex > 0 && routeDistancesRef.current.length > nearestIndex) {
-        traveledDistance = routeDistancesRef.current[nearestIndex];
-    }
-    
-    traveledDistance += distOnSegment;
-
-    const remainingDist = totalRouteDistanceRef.current - traveledDistance;
-    if (!isNaN(remainingDist)) {
-      const remainingMiles = remainingDist / 1609.34;
-      setMilesRemaining(remainingMiles);
+      let traveledDistance = 0;
+      if (nearestIndex > 0 && routeDistancesRef.current.length > nearestIndex) {
+          traveledDistance = routeDistancesRef.current[nearestIndex];
+      }
       
-      // Weigh Station Alert Simulation
-      if (initialMiles > 5 && poiFilters.has('weigh_station')) {
-        const weighStationPoint = initialMiles * 0.5; // Halfway point
-        const distToWeighStation = remainingMiles - weighStationPoint;
+      traveledDistance += distOnSegment;
+
+      const remainingDist = totalRouteDistanceRef.current - traveledDistance;
+      if (!isNaN(remainingDist)) {
+        const remainingMiles = remainingDist / 1609.34;
+        setMilesRemaining(remainingMiles);
         
-        if (distToWeighStation > 0 && distToWeighStation <= 2) {
-          if (!weighStationAlert || weighStationAlert.distance !== distToWeighStation) {
-            // Determine status randomly once when it first appears, or just set it to BYPASS/OPEN
-            const status = weighStationAlert?.status || (Math.random() > 0.3 ? 'BYPASS' : 'OPEN');
-            setWeighStationAlert({ distance: distToWeighStation, status });
-            
-            if (distToWeighStation <= 2 && distToWeighStation > 1.9 && !spokenDistancesRef.current.has('ws_2')) {
-              speak(`Weigh station ahead in 2 miles. Status is ${status}.`);
-              spokenDistancesRef.current.add('ws_2');
-            } else if (distToWeighStation <= 0.5 && distToWeighStation > 0.4 && !spokenDistancesRef.current.has('ws_0.5')) {
-              speak(`Weigh station in half a mile. ${status === 'BYPASS' ? 'Bypass granted.' : 'Pull in.'}`);
-              spokenDistancesRef.current.add('ws_0.5');
-            }
-          }
-        } else if (distToWeighStation <= 0 && weighStationAlert) {
-          setWeighStationAlert(null); // Clear alert after passing
-        }
-      } else if (weighStationAlert) {
-        setWeighStationAlert(null); // Clear alert if filter disabled
-      }
-
-      if (remainingMiles <= 1.0 && remainingMiles > 0.9 && !spokenDistancesRef.current.has('dest_1')) {
-        speak(`You are 1 mile away from your destination.`);
-        spokenDistancesRef.current.add('dest_1');
-      } else if (remainingMiles <= 0.1 && !spokenDistancesRef.current.has('dest_0.1')) {
-        speak(`You have arrived at your destination.`);
-        spokenDistancesRef.current.add('dest_0.1');
-        saveRouteToHistory('COMPLETED');
-      }
-    }
-
-    let maneuverIndex = -1;
-    let traveledForStep = 0;
-    for (let i = 0; i < routeSteps.length; i++) {
-      traveledForStep += routeSteps[i].distance;
-      if (traveledForStep > traveledDistance) {
-        maneuverIndex = i;
-        break;
-      }
-    }
-
-    if (maneuverIndex !== -1) {
-      const distanceToManeuver = traveledForStep - traveledDistance;
-      if (!isNaN(distanceToManeuver)) {
-        const currentStep = routeSteps[maneuverIndex];
-        if (currentStep && currentStep.maneuver && currentStep.maneuver.instruction) {
-          const instruction = currentStep.maneuver.instruction;
-          const roadNameMatch = instruction.match(/on (.+?) for/);
-          const roadName = roadNameMatch ? roadNameMatch[1] : (instruction.split(' on ')[1] || '');
-          setCurrentRoad(roadName.replace(/\u003c/g, '<').replace(/\u003e/g, '>'));
-          setNextInstruction({
-            text: instruction.replace(/\u003c/g, '<').replace(/\u003e/g, '>'),
-            distance: (distanceToManeuver / 1609.34).toFixed(1), // Convert to miles string
-            icon: getManeuverIcon(currentStep.maneuver.type, currentStep.maneuver.modifier),
-            lanes: currentStep.lanes || [],
-            maneuver: currentStep.maneuver
-          });
-
-          // Update ETA based on remaining steps
-          let remainingDuration = 0;
-          for (let i = maneuverIndex; i < routeSteps.length; i++) {
-            remainingDuration += routeSteps[i].duration || 0;
-          }
+        // Weigh Station Alert Simulation
+        if (initialMilesRef.current > 5 && poiFiltersRef.current.has('weigh_station')) {
+          const weighStationPoint = initialMilesRef.current * 0.5; // Halfway point
+          const distToWeighStation = remainingMiles - weighStationPoint;
           
-          // Adjust for distance already traveled in current step
-          if (currentStep && currentStep.distance > 0) {
-            const stepTraveledRatio = Math.min(1, Math.max(0, (currentStep.distance - distanceToManeuver) / currentStep.distance));
-            remainingDuration -= (currentStep.duration || 0) * stepTraveledRatio;
-          }
-
-          if (remainingDuration > 0) {
-            const arrival = new Date();
-            arrival.setSeconds(arrival.getSeconds() + remainingDuration);
-            setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
-          }
-        }
-      }
-    }
-
-    if (routeSpansRef.current && routeSpansRef.current.length > 0) {
-      let spanDist = 0;
-      let foundLimit = false;
-      for (const span of routeSpansRef.current) {
-        if (span.length) {
-          spanDist += span.length;
-          if (spanDist >= traveledDistance) {
-            if (span.speedLimit !== undefined && span.speedLimit > 0) {
-              // Convert m/s to mph
-              const mph = Math.round(span.speedLimit * 2.23694);
-              setCurrentSpeedLimit(mph);
-              foundLimit = true;
+          if (distToWeighStation > 0 && distToWeighStation <= 2) {
+            if (!weighStationAlertRef.current || weighStationAlertRef.current.distance !== distToWeighStation) {
+              // Determine status randomly once when it first appears, or just set it to BYPASS/OPEN
+              const status = weighStationAlertRef.current?.status || (Math.random() > 0.3 ? 'BYPASS' : 'OPEN');
+              setWeighStationAlert({ distance: distToWeighStation, status });
+              
+              if (distToWeighStation <= 2 && distToWeighStation > 1.9 && !spokenDistancesRef.current.has('ws_2')) {
+                speak(`Weigh station ahead in 2 miles. Status is ${status}.`);
+                spokenDistancesRef.current.add('ws_2');
+              } else if (distToWeighStation <= 0.5 && distToWeighStation > 0.4 && !spokenDistancesRef.current.has('ws_0.5')) {
+                speak(`Weigh station in half a mile. ${status === 'BYPASS' ? 'Bypass granted.' : 'Pull in.'}`);
+                spokenDistancesRef.current.add('ws_0.5');
+              }
             }
-            break;
+          } else if (distToWeighStation <= 0 && weighStationAlertRef.current) {
+            setWeighStationAlert(null); // Clear alert after passing
+          }
+        } else if (weighStationAlertRef.current) {
+          setWeighStationAlert(null); // Clear alert if filter disabled
+        }
+
+        if (remainingMiles <= 1.0 && remainingMiles > 0.9 && !spokenDistancesRef.current.has('dest_1')) {
+          speak(`You are 1 mile away from your destination.`);
+          spokenDistancesRef.current.add('dest_1');
+        } else if (remainingMiles <= 0.1 && !spokenDistancesRef.current.has('dest_0.1')) {
+          speak(`You have arrived at your destination.`);
+          spokenDistancesRef.current.add('dest_0.1');
+          saveRouteToHistory('COMPLETED');
+        }
+
+        // Restriction Alerts
+        restrictionAlerts.forEach((alert, idx) => {
+          if (!alert.progress) return;
+          const alertDistMi = initialMilesRef.current * alert.progress;
+          const distToAlert = alertDistMi - (initialMilesRef.current - remainingMiles);
+          
+          if (distToAlert > 0 && distToAlert <= 1.0) {
+            const alertKey = `restriction_${alert.type}_${idx}`;
+            if (distToAlert <= 1.0 && distToAlert > 0.9 && !spokenDistancesRef.current.has(`${alertKey}_1`)) {
+              speak(`Warning: ${alert.message} ahead in 1 mile.`);
+              spokenDistancesRef.current.add(`${alertKey}_1`);
+            } else if (distToAlert <= 0.25 && distToAlert > 0.2 && !spokenDistancesRef.current.has(`${alertKey}_0.25`)) {
+              speak(`Caution: ${alert.message} in a quarter mile.`);
+              spokenDistancesRef.current.add(`${alertKey}_0.25`);
+            }
+          }
+        });
+
+        // Traffic Alerts (Traffic Lights, Stop Signs)
+        trafficAlerts.forEach((alert, idx) => {
+          if (!alert.progress) return;
+          const alertDistMi = initialMilesRef.current * alert.progress;
+          const distToAlert = alertDistMi - (initialMilesRef.current - remainingMiles);
+          
+          if (distToAlert > 0 && distToAlert <= 0.5) {
+            const alertKey = `traffic_${alert.type}_${idx}`;
+            if (distToAlert <= 0.5 && distToAlert > 0.4 && !spokenDistancesRef.current.has(`${alertKey}_0.5`)) {
+              speak(`Upcoming ${alert.message} in half a mile.`);
+              spokenDistancesRef.current.add(`${alertKey}_0.5`);
+            } else if (distToAlert <= 0.1 && distToAlert > 0.05 && !spokenDistancesRef.current.has(`${alertKey}_0.1`)) {
+              speak(`${alert.message} ahead.`);
+              spokenDistancesRef.current.add(`${alertKey}_0.1`);
+            }
+          }
+        });
+      }
+
+      let maneuverIndex = -1;
+      let traveledForStep = 0;
+      for (let i = 0; i < routeStepsRef.current.length; i++) {
+        traveledForStep += routeStepsRef.current[i].distance;
+        if (traveledForStep > traveledDistance) {
+          maneuverIndex = i;
+          break;
+        }
+      }
+
+      if (maneuverIndex !== -1) {
+        const distanceToManeuver = traveledForStep - traveledDistance;
+        if (!isNaN(distanceToManeuver)) {
+          const currentStep = routeStepsRef.current[maneuverIndex];
+          if (currentStep && currentStep.maneuver && currentStep.maneuver.instruction) {
+            const instruction = currentStep.maneuver.instruction;
+            const roadNameMatch = instruction.match(/on (.+?) for/);
+            const roadName = roadNameMatch ? roadNameMatch[1] : (instruction.split(' on ')[1] || '');
+            setCurrentRoad(roadName.replace(/\u003c/g, '<').replace(/\u003e/g, '>'));
+            
+            const followingStep = routeStepsRef.current[maneuverIndex + 1];
+            setNextInstruction({
+              text: instruction.replace(/\u003c/g, '<').replace(/\u003e/g, '>'),
+              distance: (distanceToManeuver / 1609.34).toFixed(1), // Convert to miles string
+              icon: getManeuverIcon(currentStep.maneuver.type, currentStep.maneuver.modifier),
+              lanes: currentStep.lanes || [],
+              maneuver: currentStep.maneuver,
+              followingStep: followingStep ? {
+                text: followingStep.maneuver.instruction.replace(/\u003c/g, '<').replace(/\u003e/g, '>'),
+                icon: getManeuverIcon(followingStep.maneuver.type, followingStep.maneuver.modifier)
+              } : null
+            });
+
+            // Update ETA based on remaining steps
+            let remainingDuration = 0;
+            for (let i = maneuverIndex; i < routeStepsRef.current.length; i++) {
+              remainingDuration += routeStepsRef.current[i].duration || 0;
+            }
+            
+            // Adjust for distance already traveled in current step
+            if (currentStep && currentStep.distance > 0) {
+              const stepTraveledRatio = Math.min(1, Math.max(0, (currentStep.distance - distanceToManeuver) / currentStep.distance));
+              remainingDuration -= (currentStep.duration || 0) * stepTraveledRatio;
+            }
+
+            if (remainingDuration > 0) {
+              const arrival = new Date();
+              arrival.setSeconds(arrival.getSeconds() + remainingDuration);
+              setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+            }
           }
         }
       }
-      
-      // Fallback if no speed limit in span
-      if (!foundLimit && maneuverIndex !== -1) {
-        const currentStep = routeSteps[maneuverIndex];
+
+      if (routeSpansRef.current && routeSpansRef.current.length > 0) {
+        let spanDist = 0;
+        let foundLimit = false;
+        for (const span of routeSpansRef.current) {
+          if (span.length) {
+            spanDist += span.length;
+            if (spanDist >= traveledDistance) {
+              if (span.speedLimit !== undefined && span.speedLimit > 0) {
+                // Convert m/s to mph
+                const mph = Math.round(span.speedLimit * 2.23694);
+                setCurrentSpeedLimit(mph);
+                foundLimit = true;
+              }
+              break;
+            }
+          }
+        }
+        
+        // Fallback if no speed limit in span
+        if (!foundLimit && maneuverIndex !== -1) {
+          const currentStep = routeStepsRef.current[maneuverIndex];
+          if (currentStep && currentStep.maneuver && currentStep.maneuver.instruction) {
+            const instruction = currentStep.maneuver.instruction;
+            const roadNameMatch = instruction.match(/on (.+?) for/);
+            const roadName = roadNameMatch ? roadNameMatch[1] : (instruction.split(' on ')[1] || '');
+            if (roadName.match(/^I\s*[- ]/i)) setCurrentSpeedLimit(70);
+            else if (roadName.match(/^US\s*[- ]/i)) setCurrentSpeedLimit(65);
+            else if (roadName.match(/^(?:State Route|SR|CA|TX|FL|NY|IL|PA|OH|MI|GA|NC|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|SC|AL|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|ID|WV|HI|NH|ME|MT|RI|DE|SD|ND|AK|VT|WY)\s*[- ]/i)) setCurrentSpeedLimit(60);
+            else setCurrentSpeedLimit(45);
+          }
+        }
+      } else if (maneuverIndex !== -1) {
+        const currentStep = routeStepsRef.current[maneuverIndex];
         if (currentStep && currentStep.maneuver && currentStep.maneuver.instruction) {
           const instruction = currentStep.maneuver.instruction;
           const roadNameMatch = instruction.match(/on (.+?) for/);
@@ -1001,19 +1552,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
           else setCurrentSpeedLimit(45);
         }
       }
-    } else if (maneuverIndex !== -1) {
-      const currentStep = routeSteps[maneuverIndex];
-      if (currentStep && currentStep.maneuver && currentStep.maneuver.instruction) {
-        const instruction = currentStep.maneuver.instruction;
-        const roadNameMatch = instruction.match(/on (.+?) for/);
-        const roadName = roadNameMatch ? roadNameMatch[1] : (instruction.split(' on ')[1] || '');
-        if (roadName.match(/^I\s*[- ]/i)) setCurrentSpeedLimit(70);
-        else if (roadName.match(/^US\s*[- ]/i)) setCurrentSpeedLimit(65);
-        else if (roadName.match(/^(?:State Route|SR|CA|TX|FL|NY|IL|PA|OH|MI|GA|NC|NJ|VA|WA|AZ|MA|TN|IN|MO|MD|WI|CO|MN|SC|AL|LA|KY|OR|OK|CT|UT|IA|NV|AR|MS|KS|NM|NE|ID|WV|HI|NH|ME|MT|RI|DE|SD|ND|AK|VT|WY)\s*[- ]/i)) setCurrentSpeedLimit(60);
-        else setCurrentSpeedLimit(45);
-      }
+    } finally {
+      isUpdatingRef.current = false;
     }
-  };
+  }, []);
 
   const lastWeatherFetchPos = useRef<[number, number] | null>(null);
   const userLocationRef = useRef(userLocation);
@@ -1024,11 +1566,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     userLocationRef.current = userLocation;
     setUserLocationRef.current = setUserLocation;
     setWaypointsRef.current = setWaypoints;
-  }, [userLocation, setUserLocation, setWaypoints]);
+  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, setUserLocation, setWaypoints]);
 
   useEffect(() => {
     const fetchWeather = async (force = false) => {
       const loc = userLocationRef.current;
+      console.log("NavigationView: fetchWeather, loc:", loc);
       if (!loc) return;
       const [lat, lon] = loc;
       
@@ -1106,7 +1649,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
             throw new Error("Invalid weather data format.");
         }
       } catch (err) {
-        console.error("Weather fetch failed:", err);
+        console.error("Weather fetch failed:", err instanceof Error ? err.message : String(err));
         setWeather(prev => ({ ...prev, condition: 'Unavailable' }));
       }
     };
@@ -1120,7 +1663,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     }, 60 * 1000);
     
     return () => clearInterval(interval);
-  }, [userLocation]);
+  }, []);
 
   useEffect(() => {
     if (destinationCoords && !isCalculating) {
@@ -1160,24 +1703,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     });
   };
 
-  const saveRouteToHistory = (status: 'COMPLETED' | 'CANCELLED') => {
-    if (currentDestination === 'Standby' || routeSavedRef.current) return;
 
-    const historyItem: RouteHistoryItem = {
-      id: Math.random().toString(36).substr(2, 9),
-      origin: waypoints.length > 0 ? waypoints[0].address : 'Current Location',
-      destination: currentDestination,
-      distance: totalRouteDistanceRef.current / 1609.34,
-      duration: routeDurationRef.current,
-      date: new Date().toISOString(),
-      status
-    };
-
-    const saved = localStorage.getItem('trucker_route_history');
-    const history = saved ? JSON.parse(saved) : [];
-    localStorage.setItem('trucker_route_history', JSON.stringify([historyItem, ...history]));
-    routeSavedRef.current = true;
-  };
+  const clearRouteMarkers = useCallback(() => {
+    // No-op as route markers are no longer used
+  }, []);
 
   const clearRoute = () => {
     if (currentDestination !== 'Standby') {
@@ -1192,10 +1721,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     setEta('--:-- --');
     setWeatherAlerts([]);
     setRouteWeatherForecast([]);
-    if (routeGroupRef.current) {
-      routeGroupRef.current.clearLayers();
-      currentSegmentLineRef.current = null;
-    }
+    clearRouteMarkers();
+    currentSegmentLineRef.current = null;
     if (context) context.setNavTarget(null);
   };
 
@@ -1203,11 +1730,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     try {
       if (coords.length < 10) return;
       
-      // Sample points every ~50 miles for better coverage
-      const sampleInterval = Math.max(1, Math.floor(coords.length / (distMi / 50)));
+      // Sample points every ~100 miles for better coverage, max 10 points
+      const numPoints = Math.min(10, Math.max(2, Math.floor(distMi / 100)));
+      const sampleInterval = Math.max(1, Math.floor(coords.length / numPoints));
       const sampledPoints: { lat: number, lon: number, dist: number }[] = [];
       
       for (let i = sampleInterval; i < coords.length; i += sampleInterval) {
+        if (sampledPoints.length >= 9) break; // Leave room for destination
         sampledPoints.push({
           lat: coords[i][0],
           lon: coords[i][1],
@@ -1336,7 +1865,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         }
       }
     } catch (e) {
-      console.error("Failed to fetch route weather", e);
+      console.error("Failed to fetch route weather", e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -1352,17 +1881,33 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
 
     if (query && query.trim()) {
       const [lat, lon] = userLocation;
-      const geoData = await searchPlaces(query, lat, lon, HERE_API_KEY || undefined);
+      console.log(`[geocodeDestination] Query: ${query}, User Location: ${lat}, ${lon}`);
+      
+      // Wrap searchPlaces in a timeout
+      try {
+        const geoData = await Promise.race([
+          searchPlaces(query, lat, lon),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Geocoding timed out")), 20000))
+        ]) as any;
 
-      if (!geoData || geoData.length === 0) {
-        throw new Error("Geocoding failed: Location not found.");
+        console.log(`[geocodeDestination] Received geoData:`, geoData);
+
+        if (!geoData || geoData.length === 0) {
+          console.warn(`[geocodeDestination] No results found for query: ${query}`);
+          throw new Error("Geocoding failed: Location not found.");
+        }
+
+        const result = {
+          lat: parseFloat(geoData[0].lat),
+          lon: parseFloat(geoData[0].lon),
+          name: geoData[0].display_name.split(',')[0],
+        };
+        console.log(`[geocodeDestination] Returning result:`, result);
+        return result;
+      } catch (error) {
+        console.error(`[geocodeDestination] Error:`, error);
+        throw error;
       }
-
-      return {
-        lat: parseFloat(geoData[0].lat),
-        lon: parseFloat(geoData[0].lon),
-        name: geoData[0].display_name.split(',')[0],
-      };
     }
 
     if (destinationCoords) {
@@ -1380,150 +1925,265 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   const calculateTruckRoute = async (
     destLat: number,
     destLon: number
-  ): Promise<{ coords: [number, number][]; distMi: number; durationSec: number; steps: any[] } | null> => {
-    if (!HERE_API_KEY) return null;
+  ): Promise<{ coords: [number, number][]; distMi: number; durationSec: number; steps: any[]; alerts: any[]; spans: any[] }[] | null> => {
+    if (!userLocation) return null;
 
-    const heightCm = Math.round(truckProfile.height * 30.48);
-    const weightKg = Math.round(truckProfile.weight * 0.453592);
-    const lengthCm = Math.round(truckProfile.length * 30.48);
-    const widthCm = Math.round(truckProfile.width * 30.48);
-    const axleWeightKg = Math.round(truckProfile.axleWeight * 0.453592);
-    
-    const hereUrl = new URL('https://router.hereapi.com/v8/routes');
-    hereUrl.searchParams.append('transportMode', 'truck');
-    hereUrl.searchParams.append('origin', `${userLocation[0]},${userLocation[1]}`);
-    
-    waypoints.forEach(wp => {
-      hereUrl.searchParams.append('via', `${wp.lat},${wp.lon}`);
-    });
-    
-    hereUrl.searchParams.append('destination', `${destLat},${destLon}`);
-    hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions');
-    hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,laneInfo');
-    hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
-    hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
-    hereUrl.searchParams.append('vehicle[length]', lengthCm.toString());
-    hereUrl.searchParams.append('vehicle[width]', widthCm.toString());
-    hereUrl.searchParams.append('vehicle[axleCount]', truckProfile.axleCount.toString());
-    hereUrl.searchParams.append('vehicle[weightPerAxle]', axleWeightKg.toString());
-    hereUrl.searchParams.append('vehicle[trailerCount]', truckProfile.trailerCount.toString());
-    
-    if (truckProfile.tunnelCategory && truckProfile.tunnelCategory !== 'NONE') {
-      hereUrl.searchParams.append('vehicle[tunnelCategory]', truckProfile.tunnelCategory);
-    }
-
-    if (truckProfile.hazmat) {
-      const classes = truckProfile.hazmatClasses.length > 0 
-        ? truckProfile.hazmatClasses.join(',') 
-        : 'explosive,gas,flammable,combustible,organic,poison,radioactive,corrosive,poisonousInhalation,harmfulToWater,other';
-      hereUrl.searchParams.append('shippedHazardousGoods', classes);
-    }
-
-    // Avoidance preferences
-    const avoidList: string[] = [];
-    if (avoidTolls) avoidList.push('tollRoad');
-    if (avoidFerries) avoidList.push('ferry');
-    if (avoidUnpaved) avoidList.push('dirtRoad');
-    if (avoidList.length > 0) {
-      hereUrl.searchParams.append('avoid[features]', avoidList.join(','));
-    }
-
-    // Alternative routes
-    hereUrl.searchParams.append('alternatives', '2');
-
-    hereUrl.searchParams.append('apiKey', HERE_API_KEY);
-
-    const hereRouteRes = await fetch(hereUrl.toString());
-    if (!hereRouteRes.ok) return null;
-    
-    const hereRouteData = await hereRouteRes.json();
-    if (!hereRouteData.routes || hereRouteData.routes.length === 0) return null;
-    
-    // Process all routes
-    const processedRoutes = hereRouteData.routes.map((route: any) => {
-      const summary = route.sections[0].summary;
-      if (!summary || isNaN(summary.length) || isNaN(summary.duration)) return null;
-
-      const distMi = summary.length / 1609.34;
-      const durationSec = summary.duration;
-      
-      const steps = route.sections[0].actions.map((action: any) => {
-        const instruction = (action.instruction || '').replace(/\u003c/g, '<').replace(/\u003e/g, '>');
-        const hasTrafficLight = instruction.toLowerCase().includes('traffic light');
-        return {
-          maneuver: { 
-            instruction, 
-            type: action.action, 
-            modifier: action.direction,
-            hasTrafficLight
-          },
-          distance: action.length,
-          duration: summary.length > 0 ? (action.length / summary.length) * summary.duration : 0,
-          offset: action.offset,
-          lanes: (action.lanes || []).map((lane: any) => ({
-            direction: (lane.directions || lane.indications || []).join(';'),
-            matches: (lane.isRecommended || lane.recommendation === 'recommended') ? ['selected'] : []
-          }))
-        };
+    try {
+      const body = safeStringify({
+        origin: `${userLocation[0]},${userLocation[1]}`,
+        destination: `${destLat},${destLon}`,
+        via: waypoints.map(wp => `${wp.lat},${wp.lon}`),
+        truckProfile,
+        avoidTolls,
+        avoidFerries,
+        avoidUnpaved
       });
 
-      const coords = decode(route.sections[0].polyline).map((c: any) => [c.lat, c.lng]);
+      console.log('Frontend: Sending body to /api/route', body);
 
-      const allIncidents = route.sections[0].incidents || [];
-      const alerts = allIncidents.map((incident: any) => {
-        const progress = incident.from.offset / summary.length;
-        let type = 'INFO';
-        let message = incident.description.value;
-        let icon = Zap;
-        let color = 'text-orange-400';
-        let bg = 'bg-orange-400/10';
+      if (!body) {
+        console.error("Failed to stringify route request");
+        return null;
+      }
 
-        if (incident.type === 'Congestion') {
-          type = 'TRAFFIC';
-          message = `Congestion: ${incident.description.value}`;
-          icon = Zap;
-          color = 'text-orange-400';
-          bg = 'bg-orange-400/10';
-        } else if (incident.type === 'Construction') {
-          type = 'HAZARD';
-          message = `Construction: ${incident.description.value}`;
-          icon = AlertTriangle;
-          color = 'text-yellow-400';
-          bg = 'bg-yellow-400/10';
-        } else if (incident.criticality.value === 'critical') {
-          type = 'HAZARD';
-          message = `Critical: ${incident.description.value}`;
-          icon = AlertTriangle;
-          color = 'text-red-400';
-          bg = 'bg-red-400/10';
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      const response = await fetch('/api/route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      console.log('Frontend: Received response from /api/route', response.status);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Frontend: /api/route failed', errorText);
+        return null;
+      }
+      
+      const hereRouteData = await response.json();
+      console.log('Frontend: Parsed HERE route data', hereRouteData);
+      if (!hereRouteData.routes || hereRouteData.routes.length === 0) {
+        console.warn('Frontend: No routes found in HERE response', hereRouteData);
+        return null;
+      }
+      
+      // Process all routes
+      const processedRoutes = hereRouteData.routes.map((route: any, routeIdx: number) => {
+        if (!route.sections || route.sections.length === 0) {
+          console.warn(`Frontend: Route ${routeIdx} has no sections`);
+          return null;
         }
 
-        return { type, message, icon, color, bg, id: incident.id, progress };
-      });
+        const section = route.sections[0];
+        const summary = section.summary;
+        if (!summary || isNaN(summary.length) || isNaN(summary.duration)) {
+          console.warn(`Frontend: Route ${routeIdx} section 0 has invalid summary`, summary);
+          return null;
+        }
 
-      return { coords, distMi, durationSec, steps, alerts, spans: route.sections[0].spans };
-    }).filter(Boolean);
+        const distMi = summary.length / 1609.34;
+        const durationSec = summary.duration;
+        
+        const steps = section.actions.map((action: any) => {
+          const instruction = (action.instruction || '').replace(/\u003c/g, '<').replace(/\u003e/g, '>');
+          const hasTrafficLight = instruction.toLowerCase().includes('traffic light');
+          return {
+            maneuver: { 
+              instruction, 
+              type: action.action, 
+              modifier: action.direction,
+              hasTrafficLight
+            },
+            distance: action.length,
+            duration: summary.length > 0 ? (action.length / summary.length) * summary.duration : 0,
+            offset: action.offset,
+            lanes: (action.lanes || []).map((lane: any) => ({
+              direction: (lane.directions || lane.indications || []).join(';'),
+              matches: (lane.isRecommended || lane.recommendation === 'recommended') ? ['selected'] : []
+            }))
+          };
+        });
 
-    if (processedRoutes.length === 0) return null;
+        if (!section.polyline) {
+          console.error(`Frontend: Route ${routeIdx} section 0 has no polyline`);
+          return null;
+        }
 
-    // For now, return the first one as primary, but we'll store others in state
-    const primaryRoute = processedRoutes[0];
-    setWeatherAlerts(primaryRoute.alerts.sort((a: any, b: any) => a.progress - b.progress));
-    if (primaryRoute.spans) {
-      routeSpansRef.current = primaryRoute.spans;
+        // @ts-expect-error: Polyline decoding library type definition is missing
+        const decoded = decode(section.polyline);
+        console.log(`Frontend: Decoded polyline for route ${routeIdx}`, decoded);
+        
+        if (!decoded || !decoded.polyline || decoded.polyline.length === 0) {
+          console.error(`Frontend: Decoded polyline for route ${routeIdx} is empty or invalid`);
+          return null;
+        }
+
+        const coords = decoded.polyline.map((c: any) => [c[0], c[1]]);
+        console.log(`Frontend: Processed ${coords.length} coordinates for route ${routeIdx}`);
+
+        const allIncidents = section.incidents || [];
+        const alerts = allIncidents.map((incident: any) => {
+          const progress = incident.from.offset / summary.length;
+          let type = 'INFO';
+          let message = incident.description.value;
+          let icon = Zap;
+          let color = 'text-orange-400';
+          let bg = 'bg-orange-400/10';
+
+          if (incident.type === 'Congestion') {
+            type = 'TRAFFIC';
+            message = `Congestion: ${incident.description.value}`;
+            icon = Zap;
+            color = 'text-orange-400';
+            bg = 'bg-orange-400/10';
+          } else if (incident.type === 'Construction') {
+            type = 'HAZARD';
+            message = `Construction: ${incident.description.value}`;
+            icon = AlertTriangle;
+            color = 'text-yellow-400';
+            bg = 'bg-yellow-400/10';
+          } else if (incident.criticality.value === 'critical') {
+            type = 'HAZARD';
+            message = `Critical: ${incident.description.value}`;
+            icon = AlertTriangle;
+            color = 'text-red-400';
+            bg = 'bg-red-400/10';
+          }
+
+          return { type, message, icon, color, bg, id: incident.id, progress };
+        });
+
+        const restrictions: any[] = [];
+        const trafficAlertsList: any[] = [];
+        
+        if (section.notices) {
+          section.notices.forEach((notice: any) => {
+            restrictions.push({
+              type: 'RESTRICTION',
+              message: notice.title || notice.code || 'Route Restriction',
+              icon: AlertTriangle,
+              color: 'text-red-500',
+              bg: 'bg-red-500/10',
+              progress: 0
+            });
+          });
+        }
+
+        if (section.actions) {
+          section.actions.forEach((action: any) => {
+            const instruction = (action.instruction || '').toLowerCase();
+            if (instruction.includes('stop sign') || action.action === 'stop') {
+              const progress = action.offset / summary.length;
+              trafficAlertsList.push({
+                type: 'STOP_SIGN',
+                message: 'Stop Sign',
+                icon: Octagon,
+                color: 'text-red-600',
+                bg: 'bg-red-600/10',
+                progress,
+                coords: coords[action.offset] || coords[Math.floor(action.offset * (coords.length - 1) / summary.length)]
+              });
+            }
+          });
+        }
+
+        if (section.spans) {
+          let currentPointIndex = 0;
+          const totalPoints = decoded.polyline.length;
+          
+          section.spans.forEach((span: any) => {
+            const progress = currentPointIndex / totalPoints;
+
+            if (span.streetAttributes && span.streetAttributes.includes('trafficLight')) {
+              trafficAlertsList.push({
+                type: 'TRAFFIC_LIGHT',
+                message: 'Traffic Light',
+                icon: TrafficCone,
+                color: 'text-emerald-500',
+                bg: 'bg-emerald-500/10',
+                progress,
+                coords: coords[currentPointIndex]
+              });
+            }
+
+            if (span.truckAttributes) {
+              const attrs = span.truckAttributes;
+              const progress = currentPointIndex / totalPoints;
+              
+              if (attrs.maxHeight !== undefined) {
+                const heightFt = (attrs.maxHeight / 30.48).toFixed(1);
+                // Warning if bridge is lower than truck height + 6 inches (approx 15cm)
+                if (attrs.maxHeight < (truckProfile.height * 30.48) + 15) {
+                  restrictions.push({
+                    type: 'BRIDGE',
+                    message: `Low Bridge: ${heightFt}ft`,
+                    icon: Truck,
+                    color: 'text-red-500',
+                    bg: 'bg-red-500/20',
+                    progress,
+                    value: attrs.maxHeight,
+                    coords: coords[currentPointIndex]
+                  });
+                }
+              }
+              
+              if (attrs.maxWeight !== undefined) {
+                const weightLbs = Math.round(attrs.maxWeight * 2.20462);
+                // Warning if weight limit is within 2000 lbs of truck weight
+                if (attrs.maxWeight < (truckProfile.weight * 0.453592) + 907) {
+                  restrictions.push({
+                    type: 'WEIGHT',
+                    message: `Weight Limit: ${weightLbs.toLocaleString()} lbs`,
+                    icon: Scale,
+                    color: 'text-orange-500',
+                    bg: 'bg-orange-500/20',
+                    progress,
+                    value: attrs.maxWeight,
+                    coords: coords[currentPointIndex]
+                  });
+                }
+              }
+            }
+            currentPointIndex += (span.length || 0);
+          });
+        }
+
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans };
+      }).filter(Boolean);
+
+      if (processedRoutes.length === 0) return null;
+
+      // For now, return the first one as primary, but we'll store others in state
+      const primaryRoute = processedRoutes[0];
+      setWeatherAlerts(primaryRoute.alerts.sort((a: any, b: any) => a.progress - b.progress));
+      setRestrictionAlerts(primaryRoute.restrictions.sort((a: any, b: any) => a.progress - b.progress));
+      setTrafficAlerts(primaryRoute.trafficAlerts.sort((a: any, b: any) => a.progress - b.progress));
+      if (primaryRoute.spans) {
+        routeSpansRef.current = primaryRoute.spans;
+      }
+
+      // Store alternative routes in state if needed
+      setAlternativeRoutes(processedRoutes);
+      setSelectedRouteIndex(0);
+      
+      return processedRoutes;
+    } catch (e) {
+      console.error("Routing error:", e);
+      return null;
     }
-
-    // Store alternative routes in state if needed
-    setAlternativeRoutes(processedRoutes);
-    setSelectedRouteIndex(0);
-    
-    return processedRoutes[0];
   };
 
   const calculateFallbackRoute = async (
     destLat: number,
     destLon: number
   ): Promise<{ coords: [number, number][]; distMi: number; durationSec: number; steps: any[] } | null> => {
+    if (!userLocation) return null;
     const waypointCoords = waypoints.map(wp => `${wp.lon},${wp.lat}`).join(';');
     
     // Try OSRM
@@ -1547,7 +2207,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         }
       }
     } catch (e) {
-      console.error("OSRM fallback failed", e);
+      console.error("OSRM fallback failed", e instanceof Error ? e.message : String(e));
     }
 
     // Try OpenStreetMap.de
@@ -1571,7 +2231,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       totalRouteDistanceRef.current = route.distance;
       return { coords, distMi, durationSec, steps };
     } catch (e) {
-      console.error("OSM fallback failed", e);
+      console.error("OSM fallback failed", e instanceof Error ? e.message : String(e));
     }
 
     return null;
@@ -1580,7 +2240,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
   const calculateOfflineRoute = (
     destLat: number,
     destLon: number
-  ): { coords: [number, number][]; distMi: number; durationSec: number; steps: any[] } => {
+  ): { coords: [number, number][]; distMi: number; durationSec: number; steps: any[] } | null => {
+    if (!userLocation) return null;
     const R = 6371e3; // Earth radius in meters
     const toRad = (val: number) => val * Math.PI / 180;
     const lat1 = toRad(userLocation[0]);
@@ -1632,36 +2293,67 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
     setTrafficCams(cams);
   };
 
+  const handleCancelRoute = useCallback(() => {
+    setRoutePolyline(null);
+    setRouteSteps([]);
+    setMilesRemaining(0);
+    setCurrentDestination('');
+    setDestinationCoords(null);
+    setAlternativeRoutes([]);
+    setIsOffRoute(false);
+    setIsCalculating(false);
+    setIsDriving(false);
+    setEta('--:--');
+    setNextInstruction({ 
+      text: 'Ready for Route', 
+      distance: '0.0', 
+      icon: ArrowUp as React.ElementType, 
+      lanes: [] as any[],
+      maneuver: null as any,
+      followingStep: null
+    });
+    if (context) context.setNavTarget(null);
+  }, [context]);
+
   const handleNavigate = async (target?: string, targetCoords?: { lat: number, lon: number }) => {
+    console.log(`[handleNavigate] target: ${target}, targetCoords:`, targetCoords);
     if (context) context.setNavTarget(null);
     setError(null);
     
-    if (isCalculating) return;
+    if (isCalculating) {
+      console.warn(`[handleNavigate] Already calculating, ignoring request.`);
+      return;
+    }
 
     if (!userLocation || isNaN(userLocation[0]) || isNaN(userLocation[1])) {
+      console.error(`[handleNavigate] Invalid userLocation:`, userLocation);
       setError("Waiting for valid GPS signal...");
       return;
     }
 
-    let distMi = 0;
-    let durationSec = 0;
-    let steps: any[] = [];
-    let coords: [number, number][] = [];
     setSuggestions([]);
     setIsSuggestionsVisible(false);
     setIsCalculating(true);
     setIsOffRoute(false);
     setIsSearchFocused(false);
-    setIsDriving(false);
+    
     try {
+      console.log(`[handleNavigate] Calling geocodeDestination...`);
       const destination = await geocodeDestination(target, targetCoords);
       
       if (!destination) {
+        console.warn(`[handleNavigate] geocodeDestination returned null.`);
+        if (!target && !searchQuery.trim() && !destinationCoords && waypoints.length === 0) {
+          setError("Please enter a destination or select a point on the map.");
+        } else {
+          setError("Could not find the specified location. Please try a different search.");
+        }
         setIsCalculating(false);
         return;
       }
 
       const { lat: destLat, lon: destLon, name: destName } = destination;
+      console.log(`[handleNavigate] Destination found: ${destName} at ${destLat}, ${destLon}`);
       
       if (isNaN(destLat) || isNaN(destLon)) {
         throw new Error("Invalid destination coordinates received from geocoding.");
@@ -1670,575 +2362,97 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       setDestinationCoords([destLat, destLon]);
       setCurrentDestination(destName);
       
-      let routeData = await calculateTruckRoute(destLat, destLon);
-      
-      if (!routeData) {
-        routeData = await calculateFallbackRoute(destLat, destLon);
+      console.log(`[handleNavigate] Calculating truck route...`);
+      const routes = await calculateTruckRoute(destLat, destLon);
+      let primaryRoute = routes ? routes[0] : null;
+
+      if (!primaryRoute) {
+        console.warn(`[handleNavigate] calculateTruckRoute failed, trying fallback...`);
+        primaryRoute = await calculateFallbackRoute(destLat, destLon);
       }
       
-      if (!routeData) {
-        routeData = calculateOfflineRoute(destLat, destLon);
+      if (!primaryRoute) {
+        console.warn(`[handleNavigate] calculateFallbackRoute failed, trying offline...`);
+        primaryRoute = calculateOfflineRoute(destLat, destLon);
       }
 
-      const { coords: routeCoords, distMi: rDistMi, durationSec: rDurationSec, steps: rSteps } = routeData;
+      if (!primaryRoute) {
+        throw new Error("Failed to calculate route.");
+      }
+      console.log(`[handleNavigate] Route calculated successfully.`);
+
+      if (routes && routes.length > 0) {
+        setAlternativeRoutes(routes);
+      } else {
+        setAlternativeRoutes([primaryRoute]);
+      }
+
+      const { coords, distMi, durationSec, steps } = primaryRoute;
       
-      routeCoordsRef.current = routeCoords;
-      setRoutePoints(routeCoords);
-      setRouteSteps(rSteps);
-      setMilesRemaining(rDistMi);
-      setInitialMiles(rDistMi);
-      setEta(new Date(Date.now() + rDurationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      routeCoordsRef.current = coords;
+      setRoutePoints(coords);
+      setRouteSteps(steps);
+      setMilesRemaining(distMi);
+      setInitialMiles(distMi);
+      totalRouteDistanceRef.current = distMi * 1609.34;
+      routeDurationRef.current = durationSec;
+      
+      const arrival = new Date();
+      arrival.setSeconds(arrival.getSeconds() + durationSec);
+      setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
       
       // Update map
-      if (routeGroupRef.current) {
-        routeGroupRef.current.clearLayers();
+      if (mapInstanceRef.current) {
+        // Clear existing route lines from mapLayersRef
+        if (mapLayersRef.current['route']) {
+          mapLayersRef.current['route'].remove();
+          delete mapLayersRef.current['route'];
+        }
+        if (mapLayersRef.current['segment']) {
+          mapLayersRef.current['segment'].remove();
+          delete mapLayersRef.current['segment'];
+        }
         currentSegmentLineRef.current = null;
-      }
-      
-      // ... (map update logic) ...
-      
-      setIsCalculating(false);
-      setIsDriving(true);
-
-      let isTruckRoute = false;
-
-      if (HERE_API_KEY) {
-        try {
-          const heightCm = Math.round(truckProfile.height * 30.48);
-          const weightKg = Math.round(truckProfile.weight * 0.453592);
-          const lengthCm = Math.round(truckProfile.length * 30.48);
-          const widthCm = Math.round(truckProfile.width * 30.48);
-          const axleWeightKg = Math.round(truckProfile.axleWeight * 0.453592);
-          
-          const hereUrl = new URL('https://router.hereapi.com/v8/routes');
-          hereUrl.searchParams.append('transportMode', 'truck');
-          hereUrl.searchParams.append('origin', `${userLocation[0]},${userLocation[1]}`);
-          
-          // Add waypoints as 'via' parameters
-          waypoints.forEach(wp => {
-            hereUrl.searchParams.append('via', `${wp.lat},${wp.lon}`);
-          });
-          
-          hereUrl.searchParams.append('destination', `${destLat},${destLon}`);
-          hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions');
-          hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,laneInfo');
-          hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
-          hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
-          hereUrl.searchParams.append('vehicle[length]', lengthCm.toString());
-          hereUrl.searchParams.append('vehicle[width]', widthCm.toString());
-          hereUrl.searchParams.append('vehicle[axleCount]', truckProfile.axleCount.toString());
-          hereUrl.searchParams.append('vehicle[weightPerAxle]', axleWeightKg.toString());
-          hereUrl.searchParams.append('vehicle[trailerCount]', truckProfile.trailerCount.toString());
-          
-          if (truckProfile.tunnelCategory && truckProfile.tunnelCategory !== 'NONE') {
-            hereUrl.searchParams.append('vehicle[tunnelCategory]', truckProfile.tunnelCategory);
-          }
-
-          if (truckProfile.hazmat) {
-            const classes = truckProfile.hazmatClasses.length > 0 
-              ? truckProfile.hazmatClasses.join(',') 
-              : 'explosive,gas,flammable,combustible,organic,poison,radioactive,corrosive,poisonousInhalation,harmfulToWater,other';
-            hereUrl.searchParams.append('shippedHazardousGoods', classes);
-          }
-          hereUrl.searchParams.append('apiKey', HERE_API_KEY);
-
-          const hereRouteRes = await fetch(hereUrl.toString());
-          if (hereRouteRes.ok) {
-            const hereRouteData = await hereRouteRes.json();
-            if (hereRouteData.routes && hereRouteData.routes.length > 0) {
-              const route = hereRouteData.routes[0];
-              const summary = route.sections[0].summary;
-              
-              if (!summary || isNaN(summary.length) || isNaN(summary.duration)) {
-                throw new Error("Invalid route summary data received.");
-              }
-              
-              distMi = summary.length / 1609.34;
-              totalRouteDistanceRef.current = summary.length;
-              durationSec = summary.duration;
-              routeDurationRef.current = durationSec;
-              routeSavedRef.current = false;
-              steps = route.sections[0].actions.map((action: any) => {
-                const instruction = (action.instruction || '').replace(/\u003c/g, '<').replace(/\u003e/g, '>');
-                const hasTrafficLight = instruction.toLowerCase().includes('traffic light');
-                return {
-                  maneuver: { 
-                    instruction, 
-                    type: action.action, 
-                    modifier: action.direction,
-                    hasTrafficLight
-                  },
-                  distance: action.length,
-                  duration: summary.length > 0 ? (action.length / summary.length) * summary.duration : 0,
-                  offset: action.offset,
-                  lanes: (action.lanes || []).map((lane: any) => ({
-                    direction: (lane.directions || lane.indications || []).join(';'),
-                    matches: (lane.isRecommended || lane.recommendation === 'recommended') ? ['selected'] : []
-                  }))
-                };
-              });
-
-              const allIncidents = route.sections[0].incidents || [];
-              const alerts = allIncidents.map((incident: any) => {
-                const progress = incident.from.offset / summary.length;
-                let type = 'INFO';
-                let message = incident.description.value;
-                let icon = Zap;
-                let color = 'text-orange-400';
-                let bg = 'bg-orange-400/10';
-
-                if (incident.type === 'Congestion') {
-                  type = 'TRAFFIC';
-                  message = `Congestion: ${incident.description.value}`;
-                  icon = Zap;
-                  color = 'text-orange-400';
-                  bg = 'bg-orange-400/10';
-                } else if (incident.type === 'Construction') {
-                  type = 'HAZARD';
-                  message = `Construction: ${incident.description.value}`;
-                  icon = AlertTriangle;
-                  color = 'text-yellow-400';
-                  bg = 'bg-yellow-400/10';
-                } else if (incident.criticality.value === 'critical') {
-                  type = 'HAZARD';
-                  message = `Critical: ${incident.description.value}`;
-                  icon = AlertTriangle;
-                  color = 'text-red-400';
-                  bg = 'bg-red-400/10';
-                }
-
-                return { type, message, icon, color, bg, id: incident.id, progress };
-              });
-              setWeatherAlerts(alerts.sort((a, b) => a.progress - b.progress));
-
-              // Store spans for speed limits
-              if (route.sections[0].spans) {
-                routeSpansRef.current = route.sections[0].spans;
-              }
-
-              // Decode polyline
-              if (route.sections[0].polyline) {
-                const decoded = decode(route.sections[0].polyline);
-                coords = decoded.polyline.map((p: any) => [p[0], p[1]]);
-                routeCoordsRef.current = coords;
-              }
-
-              isTruckRoute = true;
-            }
-          }
-        } catch (e) {
-          console.warn("HERE API truck routing failed, falling back to OSRM.", e);
-        }
-      }
-
-      if (!isTruckRoute) {
-        // Fallback 1: Project OSRM
-        try {
-          const waypointCoords = waypoints.map(wp => `${wp.lon},${wp.lat}`).join(';');
-          const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${userLocation[1]},${userLocation[0]};${waypointCoords ? waypointCoords + ';' : ''}${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
-          
-          const routeRes = await fetch(osrmUrl);
-          if (routeRes.ok) {
-            const routeData = await routeRes.json();
-            if (routeData.routes && routeData.routes.length > 0) {
-              const route = routeData.routes[0];
-              coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]]);
-              routeCoordsRef.current = coords;
-              
-              if (!isNaN(route.distance) && !isNaN(route.duration)) {
-                distMi = route.distance / 1609.34;
-                totalRouteDistanceRef.current = route.distance;
-                durationSec = route.duration;
-                steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => {
-                  const maneuverModifier = step.maneuver.modifier || '';
-                  const osrmLanes = step.intersections?.[0]?.lanes || [];
-                  
-                  const hereLanes = osrmLanes.map((lane: any) => {
-                      const direction = lane.indications.join(';');
-                      const isSelected = lane.valid && lane.indications.some((indication: string) => maneuverModifier.includes(indication));
-                      return {
-                          direction: direction,
-                          matches: isSelected ? ['selected'] : [],
-                      };
-                  });
-
-                  return {
-                      maneuver: step.maneuver,
-                      distance: step.distance,
-                      duration: step.duration,
-                      lanes: hereLanes,
-                  };
-                });
-                isTruckRoute = true;
-              }
-            }
-          }
-        } catch (e) {
-          console.warn("Project OSRM routing failed, trying OpenStreetMap.de fallback.", e);
-        }
-      }
-
-      if (!isTruckRoute) {
-        // Fallback 2: OpenStreetMap.de OSRM
-        try {
-          const waypointCoords = waypoints.map(wp => `${wp.lon},${wp.lat}`).join(';');
-          const osrmUrl = `https://routing.openstreetmap.de/routed-car/route/v1/driving/${userLocation[1]},${userLocation[0]};${waypointCoords ? waypointCoords + ';' : ''}${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
-          
-          const routeRes = await fetch(osrmUrl);
-          if (!routeRes.ok) throw new Error(`Routing failed: ${routeRes.status}`);
-          
-          const routeData = await routeRes.json();
-          if (!routeData.routes || routeData.routes.length === 0) { 
-            throw new Error("No route found in OpenStreetMap.de fallback.");
-          }
-          
-          const route = routeData.routes[0];
-          coords = route.geometry.coordinates.map((c: any) => [c[1], c[0]]);
-          routeCoordsRef.current = coords;
-          
-          if (isNaN(route.distance) || isNaN(route.duration)) {
-            throw new Error("Invalid route data from OpenStreetMap.de fallback.");
-          }
-          
-          distMi = route.distance / 1609.34;
-          totalRouteDistanceRef.current = route.distance;
-          durationSec = route.duration;
-          steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => {
-            const maneuverModifier = step.maneuver.modifier || '';
-            const osrmLanes = step.intersections?.[0]?.lanes || [];
-            
-            const hereLanes = osrmLanes.map((lane: any) => {
-                const direction = lane.indications.join(';');
-                const isSelected = lane.valid && lane.indications.some((indication: string) => maneuverModifier.includes(indication));
-                return {
-                    direction: direction,
-                    matches: isSelected ? ['selected'] : [],
-                };
-            });
-
-            return {
-                maneuver: step.maneuver,
-                distance: step.distance,
-                lanes: hereLanes,
-            };
-          });
-          isTruckRoute = true;
-        } catch (e) {
-          console.error("All routing fallbacks failed:", e);
-          
-          // Offline Fallback: Straight line routing
-          console.warn("Attempting offline straight-line routing fallback.");
-          const R = 6371e3; // Earth radius in meters
-          const toRad = (val: number) => val * Math.PI / 180;
-          const lat1 = toRad(userLocation[0]);
-          const lon1 = toRad(userLocation[1]);
-          const lat2 = toRad(destLat);
-          const lon2 = toRad(destLon);
-          
-          const deltaPhi = lat2 - lat1;
-          const deltaLambda = lon2 - lon1;
-          
-          const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-                    Math.cos(lat1) * Math.cos(lat2) *
-                    Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-          const distanceMeters = R * c;
-          
-          distMi = distanceMeters / 1609.34;
-          totalRouteDistanceRef.current = distanceMeters;
-          durationSec = (distMi / 60) * 3600; // Assume 60mph
-          
-          coords = [userLocation, [destLat, destLon]];
-          routeCoordsRef.current = coords;
-          
-          steps = [{
-            maneuver: { instruction: `Head straight to destination (Offline Mode)`, type: 'straight', modifier: '' },
-            distance: distanceMeters,
-            duration: durationSec,
-            lanes: []
-          }];
-          
-          isTruckRoute = true;
-          speak("Network unavailable. Using offline straight-line routing.");
-        }
-      }
-
-      steps = steps.map((s: any) => {
-        if (s.maneuver && s.maneuver.instruction) {
-          s.maneuver.instruction = s.maneuver.instruction.replace(/<[^>]*>?/gm, '');
-        }
-        return s;
-      });
-      setRouteSteps(steps);
-
-      let firstManeuver = "Head towards route";
-      let firstDist = "0.0";
-      let maneuverIcon: React.ElementType = ArrowUp;
-      if (steps[0]) {
-        const step = steps[0];
-        firstManeuver = step.maneuver.instruction || "Proceed to the highlighted road";
-        firstDist = (step.distance / 1609.34).toFixed(1);
-        maneuverIcon = getManeuverIcon(step.maneuver.type, step.maneuver.modifier);
-      }
-      setNextInstruction({ text: firstManeuver, distance: firstDist, icon: maneuverIcon, lanes: steps[0]?.lanes || [] });
-      if (routeGroupRef.current) {
-        routeGroupRef.current.clearLayers();
-        currentSegmentLineRef.current = null;
-      }
-      const destIcon = L.divIcon({
-        className: 'dest-marker',
-        html: `<div class="counter-rotate flex flex-col items-center">
-            <div class="bg-black text-[#D4AF37] px-3 py-1.5 rounded-xl shadow-2xl border border-[#D4AF37]/30 mb-2 whitespace-nowrap">
-               <span class="text-[10px] font-black uppercase tracking-tighter">${destName}</span>
-            </div>
-            <div class="w-10 h-10 bg-[#D4AF37] rounded-full shadow-[0_0_30px_rgba(212,175,55,0.5)] flex items-center justify-center border-[3px] border-black animate-bounce">
-              <svg viewBox="0 0 24 24" width="20" height="20" stroke="black" stroke-width="4" fill="none"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg>
-            </div>
-          </div>`,
-        iconSize: [120, 80],
-        iconAnchor: [60, 80]
-      });
-      L.marker([destLat, destLon], { icon: destIcon }).addTo(routeGroupRef.current);
-
-      // Add waypoint markers
-      waypoints.forEach((wp, index) => {
-        const wpIcon = L.divIcon({
-          className: 'waypoint-marker',
-          html: `<div class="counter-rotate flex flex-col items-center">
-              <div class="bg-black text-white px-2 py-1 rounded-lg border border-white/20 mb-1 whitespace-nowrap">
-                 <span class="text-[8px] font-black uppercase tracking-tighter">${wp.type} ${index + 1}</span>
-              </div>
-              <div class="w-6 h-6 ${wp.type === 'PAID' ? 'bg-[#D4AF37]' : 'bg-zinc-700'} rounded-full shadow-lg flex items-center justify-center border-2 border-black">
-                ${wp.type === 'PAID' ? '<svg viewBox="0 0 24 24" width="12" height="12" stroke="black" stroke-width="4" fill="none"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>' : '<svg viewBox="0 0 24 24" width="12" height="12" stroke="white" stroke-width="4" fill="none"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>'}
-              </div>
-            </div>`,
-          iconSize: [80, 50],
-          iconAnchor: [40, 50]
-        });
-        L.marker([wp.lat, wp.lon], { icon: wpIcon }).addTo(routeGroupRef.current);
-      });
-
-      L.polyline(coords, { color: 'black', weight: 18, opacity: 0.8, lineCap: 'round', lineJoin: 'round' }).addTo(routeGroupRef.current);
-      const mainRouteLine = L.polyline(coords, { color: '#D4AF37', weight: 12, opacity: 1, lineCap: 'round', lineJoin: 'round', className: 'route-line-glow' }).addTo(routeGroupRef.current);
-      routeLineRef.current = mainRouteLine;
-      
-      // Add direction arrows along the route
-      if (coords.length > 1 && routeDistancesRef.current.length > 0) {
-        const totalDist = routeDistancesRef.current[routeDistancesRef.current.length - 1];
-        // Place arrows every 300 meters
-        const arrowInterval = 300; 
-        for (let d = arrowInterval; d < totalDist; d += arrowInterval) {
-          // Find the point at distance d
-          const idx = routeDistancesRef.current.findIndex(dist => dist >= d);
-          if (idx > 0) {
-            const p1 = coords[idx - 1];
-            const p2 = coords[idx];
-            
-            // Calculate angle (heading) from North
-            const angle = Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) * 180 / Math.PI;
-            
-            const arrowIcon = L.divIcon({
-              className: 'route-arrow-marker',
-              html: `<div style="transform: rotate(${angle}deg)">
-                      <svg viewBox="0 0 24 24" width="20" height="20" fill="#2a2205" stroke="#D4AF37" stroke-width="1.5">
-                        <path d="M12 3l7 14-7-3-7 3z" />
-                      </svg>
-                    </div>`,
-              iconSize: [20, 20],
-              iconAnchor: [10, 10]
-            });
-            L.marker(p2, { 
-              icon: arrowIcon, 
-              interactive: false,
-              zIndexOffset: 500
-            }).addTo(routeGroupRef.current);
-          }
-        }
-      }
-      
-      // Add markers for traffic lights, roundabouts, and road names
-      steps.forEach((step: any) => {
-        if (step.offset !== undefined && coords[step.offset]) {
-          const coord = coords[step.offset];
-          
-          // Road Name Markers
-          const instruction = step.maneuver.instruction || '';
-          const roadNameMatch = instruction.match(/on (.+?) for/);
-          const roadName = roadNameMatch ? roadNameMatch[1] : (instruction.split(' on ')[1] || '');
-          
-          if (roadName && step.distance > 8000) { // Only for steps > 5 miles
-            const roadIcon = L.divIcon({
-              className: 'road-name-marker',
-              html: renderToStaticMarkup(<HighwayShield roadName={roadName} />),
-              iconSize: [64, 64],
-              iconAnchor: [32, 32]
-            });
-            L.marker(coord, { icon: roadIcon, zIndexOffset: 400 }).addTo(routeGroupRef.current);
-          }
-
-          if (step.maneuver.hasTrafficLight) {
-            const tlIcon = L.divIcon({
-              className: 'traffic-light-marker',
-              html: `<div class="w-4 h-4 bg-black rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-                      <div class="w-2 h-2 bg-rose-500 rounded-full animate-pulse"></div>
-                     </div>`,
-              iconSize: [16, 16],
-              iconAnchor: [8, 8]
-            });
-            L.marker(coord, { icon: tlIcon }).addTo(routeGroupRef.current);
-          } else if (step.maneuver.instruction.toLowerCase().includes('roundabout')) {
-            const raIcon = L.divIcon({
-              className: 'roundabout-marker',
-              html: `<div class="w-5 h-5 bg-black rounded-full border-2 border-[#D4AF37] flex items-center justify-center shadow-lg">
-                      <svg viewBox="0 0 24 24" width="12" height="12" stroke="#D4AF37" stroke-width="3" fill="none"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
-                     </div>`,
-              iconSize: [20, 20],
-              iconAnchor: [10, 10]
-            });
-            L.marker(coord, { icon: raIcon }).addTo(routeGroupRef.current);
-          }
-        }
-      });
-
-      setRoutePoints(coords);
-      
-      if (coords.length > 0) {
-        const distances = [0];
-        let currentDist = 0;
-        const R = 6371e3; // Earth radius in meters
-        for (let i = 1; i < coords.length; i++) {
-          const lat1 = coords[i-1][0];
-          const lon1 = coords[i-1][1];
-          const lat2 = coords[i][0];
-          const lon2 = coords[i][1];
-          
-          const phi1 = lat1 * Math.PI / 180;
-          const phi2 = lat2 * Math.PI / 180;
-          const deltaPhi = (lat2 - lat1) * Math.PI / 180;
-          const deltaLambda = (lon2 - lon1) * Math.PI / 180;
-
-          const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-                    Math.cos(phi1) * Math.cos(phi2) *
-                    Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-          currentDist += R * c;
-          distances.push(currentDist);
-        }
-        routeDistancesRef.current = distances;
-      } else {
-        routeDistancesRef.current = [];
-      }
-
-      routeLineRef.current = null; // Reset pre-calculated line
-      currentSegmentLineRef.current = null;
-      lastSimIdxRef.current = -1;
-
-      // Add road labels and highway shields along the route
-      if (coords.length > 0 && routeDistancesRef.current.length > 0) {
-        let lastRoadName = '';
-        let lastLabelDist = -10000; // meters
-
-        // Use spans if available for better precision, otherwise fallback to steps
-        const sourceData = (routeSpansRef.current && routeSpansRef.current.length > 0)
-          ? routeSpansRef.current
-          : steps.map((s: any) => ({
-              name: s.maneuver?.instruction?.match(/on (.+?) for/i)?.[1] || s.maneuver?.instruction?.match(/onto (.+?)(?:$|\s)/i)?.[1],
-              offset: s.offset,
-              length: s.distance
-            }));
-
-        let accumulatedDist = 0;
-        sourceData.forEach((item: any) => {
-          const roadName = (item.name || '').replace(/<[^>]*>?/gm, '').trim();
-          const offset = item.offset !== undefined ? item.offset : -1;
-
-          if (roadName && offset !== -1 && coords[offset]) {
-            const currentDist = routeDistancesRef.current[offset] || accumulatedDist;
-            const distSinceLast = currentDist - lastLabelDist;
-
-            // Place label if road name changed OR every 10km (approx 6 miles)
-            if (roadName !== lastRoadName || distSinceLast > 10000) {
-              const shieldMarkup = renderToStaticMarkup(<HighwayShield roadName={roadName} />);
-              const labelIcon = L.divIcon({
-                className: 'route-label-marker',
-                html: `<div class="counter-rotate flex items-center justify-center scale-50 md:scale-75 hover:scale-100 transition-transform duration-300 drop-shadow-2xl">
-                        ${shieldMarkup}
-                      </div>`,
-                iconSize: [100, 40],
-                iconAnchor: [50, 20]
-              });
-              L.marker(coords[offset], {
-                icon: labelIcon,
-                zIndexOffset: 1000,
-                interactive: false
-              }).addTo(routeGroupRef.current);
-
-              lastRoadName = roadName;
-              lastLabelDist = currentDist;
-            }
-          }
-          accumulatedDist += (item.length || 0);
-        });
-      }
-      
-      // Fetch POIs along the route
-      const fetchRoutePOIs = async (points: [number, number][], totalDistMi: number) => {
-        if (points.length < 2) return;
         
-        const allRoutePois: any[] = [];
+        // Draw route polyline using updateMapLine for consistency
+        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 8);
+        routeLineRef.current = { id: 'route', color: '#D4AF37' };
+        
+        // Fit map to route
+        const bounds = L.latLngBounds(coords.map(c => [c[0], c[1]]));
+        mapInstanceRef.current.fitBounds(bounds, { 
+          padding: [100, 100], 
+          animate: true, 
+          duration: 1.5 
+        });
 
-        if (HERE_API_KEY) {
+        // After a short delay, zoom into the starting position
+        setTimeout(() => {
           try {
-            // Sample every ~50 miles for HERE API to get dense coverage along the route
-            const hereSampledPoints: [number, number][] = [];
-            hereSampledPoints.push(points[0]);
-            if (totalDistMi > 50) {
-              const numSamples = Math.floor(totalDistMi / 50);
-              for (let i = 1; i <= numSamples; i++) {
-                const idx = Math.floor((i / (numSamples + 1)) * (points.length - 1));
-                hereSampledPoints.push(points[idx]);
-              }
-            } else if (points.length > 20) {
-              hereSampledPoints.push(points[Math.floor(points.length / 2)]);
+            if (isValidLatLng(userLocation) && mapInstanceRef.current) {
+              mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17, {
+                duration: 1.5
+              }); 
             }
-            hereSampledPoints.push(points[points.length - 1]);
-
-            // Fetch in batches of 5
-            for (let i = 0; i < hereSampledPoints.length; i += 5) {
-              const batch = hereSampledPoints.slice(i, i + 5);
-              const promises = batch.map(async (p) => {
-                // Categories: 700-7600-0116 (Truck Stop), 700-7600-0115 (Weigh Station), 700-7600-0224 (Rest Area)
-                const url = `https://browse.search.hereapi.com/v1/browse?at=${p[0]},${p[1]}&categories=700-7600-0116,700-7600-0115,700-7600-0224&limit=50&apiKey=${HERE_API_KEY}`;
-                const res = await fetch(url);
-                if (!res.ok) return [];
-                const data = await res.json();
-                return data.items.map((item: any) => {
-                  let type = 'Truck Stop';
-                  if (item.categories?.some((c: any) => c.id === '700-7600-0115')) type = 'Weigh Station';
-                  else if (item.categories?.some((c: any) => c.id === '700-7600-0224')) type = 'Rest Area';
-                  return {
-                    name: item.title,
-                    lat: item.position.lat,
-                    lon: item.position.lng,
-                    type
-                  };
-                });
-              });
-              const results = await Promise.all(promises);
-              allRoutePois.push(...results.flat());
-            }
-          } catch (e) {
-            console.warn("HERE API POI fetch failed, falling back to Gemini", e);
+          } catch (error) {
+            console.error(`[handleNavigate] FlyTo error:`, error);
           }
-        }
+        }, 2000);
+      }
+    } catch (error) {
+        console.error(`[handleNavigate] Error:`, error);
+        setError("Failed to calculate route. Please try again.");
+        setIsCalculating(false);
+      }
 
-        if (allRoutePois.length === 0) {
-          // Fallback to Gemini
+      try {
+        // Fetch extra data in background
+      const fetchRoutePOIs = async (points: [number, number][], totalDistMi: number) => {
+        const allRoutePois: any[] = [];
+        if (points.length > 0) {
           const sampledPoints: [number, number][] = [];
           sampledPoints.push(points[0]); // Start
           
-          // Sample every ~100 miles along the entire route
           if (totalDistMi > 100) {
             const numSamples = Math.floor(totalDistMi / 100);
             for (let i = 1; i <= numSamples; i++) {
@@ -2251,64 +2465,29 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
           
           sampledPoints.push(points[points.length - 1]); // End
           
-          // Fetch in batches of 3 to avoid rate limits while remaining fast
           for (let i = 0; i < sampledPoints.length; i += 3) {
             const batch = sampledPoints.slice(i, i + 3);
-            const promises = batch.map(p => fetchTruckPOIs(p[0], p[1]).catch(e => {
-              console.warn("Failed to fetch POIs for route point", p, e);
-              return [];
-            }));
+            const promises = batch.map(p => fetchTruckPOIs(p[0], p[1]).catch(() => []));
             const results = await Promise.all(promises);
             allRoutePois.push(...results.flat());
           }
         }
         
-        // Filter duplicates by name and location
         const uniquePois = Array.from(new Map(allRoutePois.map(item => [item.name + item.lat + item.lon, item])).values());
         setPois(prev => {
           const combined = [...prev, ...uniquePois];
-          return Array.from(new Map(combined.map(item => [item.name + item.lat + item.lon, item])).values());
+          const next = Array.from(new Map(combined.map(item => [item.name + item.lat + item.lon, item])).values());
+          if (next.length > 1000) return next.slice(next.length - 1000);
+          return next;
         });
       };
       
       fetchRoutePOIs(coords, distMi).catch(err => console.error("Fetch route POIs failed:", err));
       fetchRouteWeather(coords, distMi).catch(err => console.error("Fetch route weather failed:", err));
-
-      setMilesRemaining(parseFloat(distMi.toFixed(1)));
-      setInitialMiles(distMi);
       fetchTrafficCams(coords, distMi);
-      setCurrentDestination(destName);
+      
       setSearchQuery('');
-      const arrival = new Date();
-      arrival.setSeconds(arrival.getSeconds() + durationSec);
-      setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
-      const bounds = routeGroupRef.current.getBounds();
-      if (bounds.isValid()) { 
-        try {
-          // First, provide a smooth overview of the entire route
-          mapInstanceRef.current.fitBounds(bounds, { 
-            padding: [100, 100], 
-            animate: true, 
-            duration: 1.5 
-          });
-
-          // After a short delay to appreciate the route, zoom into the starting position
-          setTimeout(() => {
-            if (isValidLatLng(userLocation) && mapInstanceRef.current) {
-              const center = L.latLng(userLocation[0], userLocation[1]);
-              mapInstanceRef.current.flyTo(center, 17, { 
-                animate: true, 
-                duration: 1.5,
-                easeLinearity: 0.25
-              }); 
-            }
-          }, 2000);
-        } catch (e) {
-          console.error("Map transition error in handleNavigate:", e);
-        }
-      }
-      setIsCalculating(false);
-
+      
       const firstManeuverText = steps[0] ? (steps[0].maneuver.instruction || "Proceed to the highlighted road") : "Head towards route";
       const firstDistNum = steps[0] ? parseFloat((steps[0].distance / 1609.34).toFixed(1)) : 0;
 
@@ -2325,7 +2504,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       
       speak(initialPhrase);
       
-      // Prevent the useEffect from speaking this again
       lastSpokenRef.current = firstManeuverText;
       spokenDistancesRef.current.clear();
       if (firstDistNum <= 2) spokenDistancesRef.current.add('2');
@@ -2338,338 +2516,31 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       } else if (!isDriving) {
         toggleDriving();
       }
-            } catch (err: any) { 
-      console.error("Routing Error:", err); 
-      let errorMessage = 'Failed to calculate route. Please check destination or network.';
-      const errMessage = (err && typeof err === 'object' && 'message' in err) ? (err as any).message : '';
       
-      if (errMessage.includes('Geocoding failed')) {
-        errorMessage = 'Could not find the specified location. Please try a different search term.';
-      } else if (errMessage.includes('Routing failed')) {
-        errorMessage = 'Could not find a route to the specified location.';
-      } else if (errMessage.includes('No route found')) {
-        errorMessage = 'No route found to the destination.';
-      }
-      setError(errorMessage);
-      setIsCalculating(false); 
+      setIsDriving(true);
+    } catch (err) { 
+      console.error("Routing Error:", err); 
+      setError(err instanceof Error ? err.message : "Failed to calculate route.");
+    } finally {
+      setIsCalculating(false);
     }
   };
 
+  const handledTargetRef = useRef<string | null>(null);
+  const resumeAttemptedRef = useRef<boolean>(false);
+
   useEffect(() => {
     if (isMapReady) {
-      if (initialTarget) {
+      if (initialTarget && initialTarget !== handledTargetRef.current) {
+        handledTargetRef.current = initialTarget;
         handleNavigate(initialTarget).catch(err => console.error("Initial navigation failed:", err));
-      } else if (destinationCoords && routePoints.length === 0 && !isCalculating) {
+      } else if (!initialTarget && destinationCoords && routePoints.length === 0 && !isCalculating && !resumeAttemptedRef.current) {
         // Resume navigation if we have a persisted destination but no active route
+        resumeAttemptedRef.current = true;
         handleNavigate().catch(err => console.error("Resuming navigation failed:", err));
       }
     }
-  }, [initialTarget, isMapReady]);
-
-  useEffect(() => {
-    if (!mapRef.current || mapInstanceRef.current) return;
-    
-    try {
-      const initialPos = userLocation || FALLBACK_LOCATION;
-      const map = L.map(mapRef.current, { 
-        center: initialPos, 
-        zoom: 15, 
-        rotate: true,
-        bearing: 0,
-        zoomControl: false, 
-        attributionControl: false,
-        preferCanvas: true,
-        wheelPxPerZoomLevel: 120,
-        zoomAnimation: true,
-        fadeAnimation: true,
-        markerZoomAnimation: true
-      } as any);
-      mapInstanceRef.current = map;
-      map.on('moveend', () => {
-        if (moveTimerRef.current) clearTimeout(moveTimerRef.current);
-        moveTimerRef.current = setTimeout(() => {
-          const center = map.getCenter();
-          setMapCenter([center.lat, center.lng]);
-        }, 300);
-      });
-      map.on('zoomend', () => setZoom(map.getZoom()));
-      baseLayerGroupRef.current = L.layerGroup().addTo(map);
-      trafficLayerGroupRef.current = L.layerGroup().addTo(map);
-      weatherLayerGroupRef.current = L.layerGroup().addTo(map);
-      const tileOptions = {
-        tileSize: 256,
-        maxZoom: 20,
-        updateWhenIdle: true,
-        updateWhenZooming: false,
-        keepBuffer: 4
-      };
-
-      if (mapStyle === 'SATELLITE') {
-        L.tileLayer('https://{s}.google.com/vt/lyrs=s,h&hl=en&x={x}&y={y}&z={z}', { 
-          maxZoom: 22,
-          maxNativeZoom: 20,
-          subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-          attribution: '&copy; Google Maps'
-        }).addTo(baseLayerGroupRef.current);
-      } else if (mapStyle === 'MAPTILER') {
-        const MAPTILER_KEY = import.meta.env.VITE_MAPTILER_API_KEY || '4D6H6eQaS6oyaQmgNGly';
-        const layer = L.tileLayer(`https://api.maptiler.com/maps/019cd5fd-dec5-7287-b677-66a58dc4ff50/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
-          maxZoom: 22,
-          maxNativeZoom: 20,
-          attribution: '&copy; <a href="https://www.maptiler.com/">MapTiler</a> &copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(baseLayerGroupRef.current);
-        
-        let initialFallbackTriggered = false;
-        layer.on('tileerror', () => {
-          if (!initialFallbackTriggered && baseLayerGroupRef.current) {
-            initialFallbackTriggered = true;
-            baseLayerGroupRef.current.clearLayers();
-            L.tileLayer('https://{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { 
-              maxZoom: 22,
-              maxNativeZoom: 20,
-              subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-            }).addTo(baseLayerGroupRef.current);
-          }
-        });
-      } else if (HERE_API_KEY) {
-        let initialFallbackTriggered = false;
-        const customStyleHrn = 'hrn:here:data::org675124033:03a188-df4d962e9';
-        const hereBase = L.tileLayer(`https://maps.hereapi.com/v3/base/mc/{z}/{x}/{y}/png8?apiKey=${HERE_API_KEY}&style=${customStyleHrn}`, {
-          ...tileOptions
-        }).addTo(baseLayerGroupRef.current);
-        
-        // Fallback to Google Maps if HERE API key is invalid or fails
-        hereBase.on('tileerror', () => {
-          if (!initialFallbackTriggered && baseLayerGroupRef.current) {
-            initialFallbackTriggered = true;
-            baseLayerGroupRef.current.clearLayers();
-            L.tileLayer('https://{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { 
-              maxZoom: 22,
-              maxNativeZoom: 20,
-              subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-            }).addTo(baseLayerGroupRef.current);
-          }
-        });
-      } else {
-        L.tileLayer('https://{s}.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}', { 
-          maxZoom: 22,
-          maxNativeZoom: 20,
-          subdomains: ['mt0', 'mt1', 'mt2', 'mt3']
-        }).addTo(baseLayerGroupRef.current);
-      }
-      routeGroupRef.current = L.featureGroup().addTo(map);
-      weatherAlertGroupRef.current = L.featureGroup().addTo(map);
-      poiLayerGroupRef.current = L.layerGroup().addTo(map);
-      
-      const userIcon = L.divIcon({
-        className: 'user-marker transition-transform duration-500 ease-linear',
-        html: `<div class="relative flex items-center justify-center w-full h-full">
-            <div class="absolute w-14 h-14 bg-[#D4AF37]/10 rounded-full animate-ping"></div>
-            <div class="absolute w-10 h-10 bg-[#D4AF37]/20 rounded-full animate-pulse"></div>
-            <div class="w-10 h-10 bg-black rounded-full shadow-[0_0_25px_rgba(212,175,55,0.8)] flex items-center justify-center border-[2.5px] border-[#D4AF37] z-10 overflow-visible">
-              <div class="relative w-full h-full flex items-center justify-center vehicle-pointer transition-transform duration-300">
-                <svg viewBox="0 0 24 24" width="24" height="24" fill="#D4AF37" class="drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">
-                  <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-                </svg>
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#D4AF37]/30 blur-md rounded-full"></div>
-              </div>
-            </div>
-          </div>`,
-        iconSize: [60, 60],
-        iconAnchor: [30, 30]
-      });
-      
-      map.on('dragstart', () => {
-        setIsFollowMode(false);
-      });
-      
-      map.on('rotatestart', () => {
-        setIsFollowMode(false);
-      });
-      
-      map.on('rotate', () => {
-        setMapBearing((map as any).getBearing() || 0);
-      });
-
-      map.on('click', () => {
-        setIsNorthUp(prev => !prev);
-      });
-
-      map.on('contextmenu', (e: any) => {
-        const { lat, lng } = e.latlng;
-        L.popup()
-          .setLatLng(e.latlng)
-          .setContent(`
-            <div class="flex flex-col gap-2 p-1">
-              <button class="set-location-btn bg-[#D4AF37] text-black px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider" data-lat="${lat}" data-lng="${lng}">
-                Set as Current Location
-              </button>
-              <button class="add-waypoint-btn bg-zinc-800 text-white px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider border border-zinc-700" data-lat="${lat}" data-lng="${lng}">
-                Add as Stop
-              </button>
-            </div>
-          `)
-          .openOn(map);
-      });
-
-      const handleMapPopupClick = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (target.classList.contains('set-location-btn')) {
-          const lat = parseFloat(target.getAttribute('data-lat') || '0');
-          const lng = parseFloat(target.getAttribute('data-lng') || '0');
-          if (setUserLocationRef.current) {
-            setUserLocationRef.current([lat, lng]);
-            map.closePopup();
-            setIsFollowMode(true);
-          }
-        }
-        if (target.classList.contains('add-waypoint-btn')) {
-          const lat = parseFloat(target.getAttribute('data-lat') || '0');
-          const lng = parseFloat(target.getAttribute('data-lng') || '0');
-          const newWaypoint = {
-            id: `wp-${Date.now()}`,
-            address: `Custom Location (${lat.toFixed(4)}, ${lng.toFixed(4)})`,
-            lat,
-            lon: lng,
-            type: 'PAID' as const
-          };
-          if (setWaypointsRef.current) {
-            setWaypointsRef.current(prev => [...prev, newWaypoint]);
-            map.closePopup();
-          }
-        }
-      };
-      
-      document.addEventListener('click', handleMapPopupClick);
-
-      let moveEndTimeout: any = null;
-      map.on('moveend', () => {
-        if (moveEndTimeout) clearTimeout(moveEndTimeout);
-        moveEndTimeout = setTimeout(() => {
-          if (!mapInstanceRef.current) return;
-          const center = mapInstanceRef.current.getCenter();
-          
-          const shouldFetchPois = (lat: number, lon: number) => {
-            if (!lastPoiFetchRef.current) return true;
-            const { time, lat: lastLat, lon: lastLon } = lastPoiFetchRef.current;
-            const now = Date.now();
-            if (now - time > 15 * 60 * 1000) return true; // 15 minutes
-            
-            // Calculate distance
-            const R = 3958.8; // miles
-            const dLat = (lat - lastLat) * Math.PI / 180;
-            const dLon = (lon - lastLon) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lastLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            const distance = R * c;
-            
-            return distance >= 10;
-          };
-
-          if (!isFetchingPoisRef.current && shouldFetchPois(center.lat, center.lng)) {
-            isFetchingPoisRef.current = true;
-            setIsFetchingPois(true);
-            lastPoiFetchRef.current = { time: Date.now(), lat: center.lat, lon: center.lng };
-            
-            Promise.all([
-              fetchTruckPOIs(center.lat, center.lng),
-              fetchMajorChains(center.lat, center.lng),
-              fetchHERETruckStops(center.lat, center.lng)
-            ])
-              .then(([poiData, chainData, hereData]) => {
-                const combinedRaw = [...poiData, ...chainData, ...hereData];
-                const seenInBatch = new Set();
-                const combined = combinedRaw.filter(p => {
-                  const id = `${p.lat}-${p.lon}-${p.name}`;
-                  if (seenInBatch.has(id)) return false;
-                  seenInBatch.add(id);
-                  return true;
-                });
-
-                if (combined.length > 0) {
-                  setPois(prev => {
-                    const existingIds = new Set(prev.map(p => `${p.lat}-${p.lon}-${p.name}`));
-                    const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
-                    return [...prev, ...newPois];
-                  });
-                }
-              })
-              .catch(err => console.error("Moveend POI fetch failed:", err))
-              .finally(() => {
-                isFetchingPoisRef.current = false;
-                setIsFetchingPois(false);
-              });
-          }
-        }, 1000);
-      });
-
-      userMarkerRef.current = L.marker(initialPos, { icon: userIcon, zIndexOffset: 5000 }).addTo(map);
-      setIsMapReady(true);
-
-      const interval = setInterval(() => {
-        if (mapInstanceRef.current) mapInstanceRef.current.invalidateSize();
-      }, 3000);
-      
-      return () => { 
-        clearInterval(interval); 
-        document.removeEventListener('click', handleMapPopupClick);
-        if (moveEndTimeout) clearTimeout(moveEndTimeout);
-        if (mapInstanceRef.current) { 
-          mapInstanceRef.current.remove(); 
-          mapInstanceRef.current = null; 
-        }
-      };
-    } catch (err) {
-      console.error("Map initialization failed:", err);
-      setError("Failed to initialize map. Please refresh.");
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!trafficLayerGroupRef.current) return;
-    
-    trafficLayerGroupRef.current.clearLayers();
-    if (showTraffic && HERE_API_KEY) {
-      L.tileLayer(`https://traffic.maps.hereapi.com/v3/flow/mc/{z}/{x}/{y}/png8?apiKey=${HERE_API_KEY}`, {
-        tileSize: 256,
-        maxZoom: 20,
-        updateWhenIdle: true,
-        updateWhenZooming: false,
-        keepBuffer: 4,
-        subdomains: ['1', '2', '3', '4']
-      }).addTo(trafficLayerGroupRef.current);
-    }
-  }, [showTraffic]);
-
-  useEffect(() => {
-    if (!weatherLayerGroupRef.current) return;
-    
-    weatherLayerGroupRef.current.clearLayers();
-    if (showWeather && zoom >= 5) {
-      // Fetch latest radar timestamp from RainViewer
-      fetch('https://api.rainviewer.com/public/weather-maps.json')
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-          return res.json();
-        })
-        .then(data => {
-          if (data && data.radar && data.radar.past && data.radar.past.length > 0) {
-            const latestTimestamp = data.radar.past[data.radar.past.length - 1].time;
-            L.tileLayer(`https://tilecache.rainviewer.com/v2/radar/${latestTimestamp}/256/{z}/{x}/{y}/2/1_1.png`, {
-              tileSize: 256,
-              opacity: 0.7,
-              transparent: true,
-              attribution: 'RainViewer',
-              maxZoom: 20,
-              zIndex: 100
-            }).addTo(weatherLayerGroupRef.current);
-          }
-        })
-        .catch(err => console.error("Failed to load weather radar:", err));
-    }
-  }, [showWeather, zoom]);
+  }, [isMapReady, initialTarget, destinationCoords]);
 
   useEffect(() => {
     if (isMapReady && userLocation) {
@@ -2679,33 +2550,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         const now = Date.now();
         if (now - time > 5 * 60 * 1000) return true; // 5 minutes
         
-        // Calculate distance
-        const R = 3958.8; // miles
-        const dLat = (lat - lastLat) * Math.PI / 180;
-        const dLon = (lon - lastLon) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lastLat * Math.PI / 180) * Math.cos(lat * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
-        
+        const distance = calcDistMi(lat, lon, lastLat, lastLon);
         return distance >= 5; // 5 miles
       };
 
-      if (!shouldFetchPois(userLocation[0], userLocation[1]) || isFetchingPoisRef.current) return;
+      if (!userLocation || !shouldFetchPois(userLocation[0], userLocation[1]) || isFetchingPoisRef.current) return;
 
       console.log("Fetching initial POIs for location:", userLocation);
       isFetchingPoisRef.current = true;
-      setIsFetchingPois(true);
       lastPoiFetchRef.current = { time: Date.now(), lat: userLocation[0], lon: userLocation[1] };
       
-      Promise.all([
-        fetchTruckPOIs(userLocation[0], userLocation[1]),
-        fetchMajorChains(userLocation[0], userLocation[1]),
-        fetchHERETruckStops(userLocation[0], userLocation[1])
-      ])
-        .then(([poiData, chainData, hereData]) => {
-          const combinedRaw = [...poiData, ...chainData, ...hereData];
+      fetchTruckPOIs(userLocation[0], userLocation[1])
+        .then((poiData) => {
+          const combinedRaw = [...poiData];
           const seenInBatch = new Set();
           const combined = combinedRaw.filter(p => {
             const id = `${p.lat}-${p.lon}-${p.name}`;
@@ -2716,30 +2573,150 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
 
           console.log(`Fetched ${combined.length} POIs total (Gemini + HERE)`);
           setPois(prev => {
-            const existingIds = new Set(prev.map(p => `${p.lat}-${p.lon}-${p.name}`));
+            const existingIds = new Set();
+            prev.forEach(p => existingIds.add(`${p.lat}-${p.lon}-${p.name}`));
             const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
-            return [...prev, ...newPois];
+            if (newPois.length === 0) return prev;
+            const updated = [...prev, ...newPois];
+            if (updated.length > 1000) return updated.slice(updated.length - 1000);
+            return updated;
           });
         })
         .catch(err => {
-          console.error("Failed to fetch POIs:", err);
+          console.error("Failed to fetch POIs:", err instanceof Error ? err.message : String(err));
         })
         .finally(() => {
           isFetchingPoisRef.current = false;
-          setIsFetchingPois(false);
         });
     }
-  }, [isMapReady, userLocation]);
+  }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   useEffect(() => {
-    if (!weatherAlertGroupRef.current || !isMapReady) return;
+    if (!isMapReady) return;
 
-    weatherAlertGroupRef.current.clearLayers();
+    restrictionAlertMarkersRef.current.forEach(m => m.remove());
+    restrictionAlertMarkersRef.current = [];
+
+    restrictionAlerts.forEach((alert) => {
+      if (!alert.coords) return;
+
+      const iconHtml = renderToStaticMarkup(
+        <div className="flex flex-col items-center group">
+          <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
+            alert.type === 'BRIDGE' ? 'bg-red-600 border-red-400 text-white' : 'bg-orange-500 border-orange-300 text-white'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              {alert.type === 'BRIDGE' ? <Truck className="w-3 h-3" /> : <Scale className="w-3 h-3" />}
+              <span className="text-[8px] font-black uppercase tracking-tighter">{alert.message}</span>
+            </div>
+          </div>
+          <div className={`w-6 h-6 rounded-full shadow-lg flex items-center justify-center border-2 border-black transition-all group-hover:scale-110 ${
+            alert.type === 'BRIDGE' ? 'bg-red-600' : 'bg-orange-500'
+          }`}>
+            {alert.type === 'BRIDGE' ? <AlertTriangle className="w-3 h-3 text-white" /> : <Scale className="w-3 h-3 text-white" />}
+          </div>
+        </div>
+      );
+      
+      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
+        icon: L.divIcon({ 
+          html: iconHtml, 
+          className: 'restriction-marker', 
+          iconAnchor: [12, 24] 
+        }) 
+      });
+
+      if (mapInstanceRef.current) {
+        marker.addTo(mapInstanceRef.current);
+      }
+      
+      const popup = L.popup({ offset: [0, -25] }).setContent(`
+          <div class="p-3 min-w-[150px]">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="p-1.5 rounded-lg ${alert.type === 'BRIDGE' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              </div>
+              <div class="font-black text-zinc-900 text-sm uppercase tracking-tight">${alert.type === 'BRIDGE' ? 'Low Bridge' : 'Weight Limit'}</div>
+            </div>
+            <div class="p-2 bg-zinc-50 rounded-xl border border-zinc-100 mb-3">
+              <div class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Restriction</div>
+              <div class="text-xs font-bold text-zinc-900">${alert.message}</div>
+            </div>
+          </div>
+        `);
+      marker.bindPopup(popup);
+      restrictionAlertMarkersRef.current.push(marker);
+    });
+  }, [restrictionAlerts, isMapReady]);
+
+  useEffect(() => {
+    if (!isMapReady) return;
+
+    trafficAlertMarkersRef.current.forEach(m => m.remove());
+    trafficAlertMarkersRef.current = [];
+
+    trafficAlerts.forEach((alert) => {
+      if (!alert.coords) return;
+
+      const iconHtml = renderToStaticMarkup(
+        <div className="flex flex-col items-center group">
+          <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
+            alert.type === 'STOP_SIGN' ? 'bg-red-700 border-red-500 text-white' : 'bg-emerald-600 border-emerald-400 text-white'
+          }`}>
+            <div className="flex items-center gap-1.5">
+              {alert.type === 'STOP_SIGN' ? <Octagon className="w-3 h-3" /> : <TrafficCone className="w-3 h-3" />}
+              <span className="text-[8px] font-black uppercase tracking-tighter">{alert.message}</span>
+            </div>
+          </div>
+          <div className={`w-6 h-6 rounded-full shadow-lg flex items-center justify-center border-2 border-black transition-all group-hover:scale-110 ${
+            alert.type === 'STOP_SIGN' ? 'bg-red-700' : 'bg-emerald-600'
+          }`}>
+            {alert.type === 'STOP_SIGN' ? <Octagon className="w-3 h-3 text-white" /> : <TrafficCone className="w-3 h-3 text-white" />}
+          </div>
+        </div>
+      );
+      
+      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
+        icon: L.divIcon({ 
+          html: iconHtml, 
+          className: 'traffic-marker', 
+          iconAnchor: [12, 24] 
+        }) 
+      });
+
+      if (mapInstanceRef.current) {
+        marker.addTo(mapInstanceRef.current);
+      }
+      
+      const popup = L.popup({ offset: [0, -25] }).setContent(`
+          <div class="p-3 min-w-[150px]">
+            <div class="flex items-center gap-2 mb-2">
+              <div class="p-1.5 rounded-lg ${alert.type === 'STOP_SIGN' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}">
+                ${alert.type === 'STOP_SIGN' ? '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><path d="M9.47 20.28l-6.75-6.75a2.5 2.5 0 0 1 0-3.54l6.75-6.75a2.5 2.5 0 0 1 3.54 0l6.75 6.75a2.5 2.5 0 0 1 0 3.54l-6.75 6.75a2.5 2.5 0 0 1-3.54 0z"></path></svg>'}
+              </div>
+              <div class="font-black text-zinc-900 text-sm uppercase tracking-tight">${alert.type === 'STOP_SIGN' ? 'Stop Sign' : 'Traffic Light'}</div>
+            </div>
+            <div class="p-2 bg-zinc-50 rounded-xl border border-zinc-100 mb-3">
+              <div class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Alert</div>
+              <div class="text-xs font-bold text-zinc-900">${alert.message}</div>
+            </div>
+          </div>
+        `);
+      marker.bindPopup(popup);
+      trafficAlertMarkersRef.current.push(marker);
+    });
+  }, [trafficAlerts, isMapReady]);
+
+  useEffect(() => {
+    if (!isMapReady) return;
+
+    weatherAlertMarkersRef.current.forEach(m => m.remove());
+    weatherAlertMarkersRef.current = [];
 
     weatherAlerts.forEach((alert) => {
-      const alertIcon = L.divIcon({
-        className: 'weather-alert-marker',
-        html: renderToStaticMarkup(
+      const cacheKey = `${alert.type}-${alert.severity}`;
+      if (!weatherIconsCacheRef.current[cacheKey]) {
+        weatherIconsCacheRef.current[cacheKey] = renderToStaticMarkup(
           <div className="flex flex-col items-center group">
             <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
               alert.severity === 'SEVERE' ? 'bg-red-600 border-red-400 text-white' : 'bg-amber-500 border-amber-300 text-black'
@@ -2758,13 +2735,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                <AlertTriangle className="w-3 h-3 text-white" />}
             </div>
           </div>
-        ),
-        iconSize: [100, 60],
-        iconAnchor: [50, 60]
-      });
-
-      L.marker([alert.lat, alert.lon], { icon: alertIcon })
-        .bindPopup(`
+        );
+      }
+      
+      const marker = L.marker([alert.lat, alert.lon], { icon: L.divIcon({ html: weatherIconsCacheRef.current[cacheKey], className: 'alert-marker', iconAnchor: [12, 24] }) });
+      if (mapInstanceRef.current) {
+        marker.addTo(mapInstanceRef.current);
+      }
+      
+      const popup = L.popup({ offset: [0, -25] }).setContent(`
           <div class="p-3 min-w-[150px]">
             <div class="flex items-center gap-2 mb-2">
               <div class="p-1.5 rounded-lg ${alert.severity === 'SEVERE' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}">
@@ -2778,161 +2757,184 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
               <div class="text-xs font-bold text-zinc-900">${alert.condition} - ${alert.value}</div>
             </div>
           </div>
-        `)
-        .addTo(weatherAlertGroupRef.current);
+        `);
+      marker.bindPopup(popup);
+      weatherAlertMarkersRef.current.push(marker);
     });
   }, [weatherAlerts, isMapReady]);
 
-  useEffect(() => {
-    if (!mapInstanceRef.current || !currentSpeedLimit) {
-      if (speedLimitMarkerRef.current) {
-        mapInstanceRef.current.removeLayer(speedLimitMarkerRef.current);
-        speedLimitMarkerRef.current = null;
-      }
-      return;
-    }
 
-    const icon = L.divIcon({
-      className: 'speed-limit-marker',
-      html: `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={context?.speed || 0} />)}</div>`,
-      iconSize: [48, 64],
-      iconAnchor: [24, 32]
-    });
-
-    if (!speedLimitMarkerRef.current) {
-      if (isValidLatLng(userLocation)) {
-        speedLimitMarkerRef.current = L.marker(userLocation, { icon }).addTo(mapInstanceRef.current);
-      }
-    } else {
-      if (isValidLatLng(userLocation)) {
-        speedLimitMarkerRef.current.setLatLng(userLocation);
-        speedLimitMarkerRef.current.setIcon(icon);
-      }
-    }
-  }, [currentSpeedLimit, context?.speed, userLocation]);
 
   useEffect(() => {
-    if (isOverviewMode && mapInstanceRef.current && routeGroupRef.current) {
-      const bounds = routeGroupRef.current.getBounds();
-      if (bounds.isValid()) {
-        mapInstanceRef.current.flyToBounds(bounds, {
+    if (isOverviewMode && mapInstanceRef.current) {
+      const bounds = routeCoordsRef.current.length > 0 ? L.latLngBounds(routeCoordsRef.current.map(c => [c[0], c[1]])) : null;
+      if (bounds) {
+        mapInstanceRef.current.fitBounds(bounds, {
           padding: [50, 50],
-          duration: 1.5,
-          easeLinearity: 0.25
+          animate: true,
+          duration: 1.5
         });
       }
     }
   }, [isOverviewMode]);
 
+  // Periodic ETA update even when stationary
+  useEffect(() => {
+    if (!isDriving) return;
+    
+    const etaInterval = setInterval(() => {
+      if (userLocationRef.current) {
+        console.log("Calling updateNavigationState (periodic)", userLocationRef.current);
+        updateNavigationState(userLocationRef.current).catch(err => console.error("Navigation periodic update failed:", err));
+      }
+    }, 30000); // Every 30 seconds
+    
+    return () => clearInterval(etaInterval);
+  }, [isDriving, updateNavigationState]);
+
   useEffect(() => {
     if (isValidLatLng(userLocation) && userMarkerRef.current) {
-      userMarkerRef.current.setLatLng(userLocation);
-      if (isFollowMode && mapInstanceRef.current) { 
-        try {
-          mapInstanceRef.current.panTo(userLocation, { animate: true, duration: 0.5, easeLinearity: 0.25 }); 
-        } catch (e) {
-          console.error("PanTo error:", e);
-        }
-      }
+      userMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
     }
     if (isDriving && userLocation) {
       updateNavigationState(userLocation).catch(err => console.error("Navigation update failed:", err));
     }
-
-    // Periodic ETA update even when stationary
-    const etaInterval = setInterval(() => {
-      if (isDriving && userLocation) {
-        updateNavigationState(userLocation).catch(err => console.error("Navigation periodic update failed:", err));
-      }
-    }, 30000); // Every 30 seconds
-
-    let targetHeading = context?.heading || 0;
-    
-    if (isDriving && userLocation && routeCoordsRef.current.length > 0) {
-      const currentIdx = lastSimIdxRef.current;
-      if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
-        const p1 = routeCoordsRef.current[currentIdx];
-        const p2 = routeCoordsRef.current[currentIdx + 1];
-        const dy = p2[0] - p1[0];
-        const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
-        const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-        targetHeading = (90 - angle + 360) % 360;
-      }
-    }
-
-    if (mapRef.current) {
-      let currentBearing = 0;
-      if (isOverviewMode || isNorthUp) {
-        if (mapInstanceRef.current) {
-          animateBearing(0);
-          currentBearing = 0;
-        }
-      } else if (isFollowMode) {
-        if (mapInstanceRef.current) {
-          animateBearing(targetHeading);
-          currentBearing = targetHeading;
-        }
-      } else {
-        if (mapInstanceRef.current) {
-          currentBearing = (mapInstanceRef.current as any).getBearing() || 0;
-        }
-      }
-      
-      mapRef.current.style.setProperty('--map-rotation', `0deg`);
-      
-      // The marker stays upright relative to the screen by default.
-      // To point to targetHeading relative to the map, we rotate it by targetHeading - currentBearing.
-      let vehicleRotation = targetHeading - currentBearing;
-      // Normalize to 0-360
-      vehicleRotation = (vehicleRotation % 360 + 360) % 360;
-      
-      mapRef.current.style.setProperty('--vehicle-rotation', `${vehicleRotation}deg`);
-    }
-
-    return () => clearInterval(etaInterval);
-  }, [userLocation, isDriving, isOverviewMode, isFollowMode, isNorthUp, context?.heading]);
+  }, [isDriving, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, updateNavigationState]);
 
   useEffect(() => {
-    console.log("Current POIs:", pois.length, pois);
-    if (!poiLayerGroupRef.current) return;
+    if (!telemetryContext || !userMarkerElRef.current || !isValidLatLng(userLocationRef.current)) return;
 
-    poiLayerGroupRef.current.clearLayers();
+    const updateRotationAndPan = () => {
+      const currentLoc = userLocationRef.current;
+      if (!currentLoc) return;
 
-    if (showPois) {
-      const markers: L.Marker[] = [];
-      let validPoisCount = 0;
-      pois.forEach(poi => {
-        const category = getPoiCategory(poi.type, poi.name);
-        if (!poiFilters.has(category)) return;
+      let rawHeading = telemetryContext.headingRef.current || 0;
+      const speed = telemetryContext.speedRef.current || 0;
 
-        try {
-          if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) {
-            console.warn("Invalid POI coordinates:", poi);
-            return;
+      // If simulating, calculate heading from route
+      if (isDriving && !telemetryContext.headingRef.current) {
+        const currentIdx = lastSimIdxRef.current;
+        if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
+          const p1 = routeCoordsRef.current[currentIdx];
+          const p2 = routeCoordsRef.current[currentIdx + 1];
+          const dy = p2[0] - p1[0];
+          const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          rawHeading = (90 - angle + 360) % 360;
+        }
+      }
+
+      // Smooth the heading and lock at low speeds
+      if (speed > 2) { // Only update if speed > 2 m/s (~4.5 mph)
+        smoothedHeadingRef.current = 0.9 * smoothedHeadingRef.current + 0.1 * rawHeading;
+      }
+
+      const currentHeading = smoothedHeadingRef.current;
+
+      if (userMarkerElRef.current) {
+        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${currentHeading}deg`);
+      }
+
+      // Update map rotation if in follow mode
+      const mapPane = mapInstanceRef.current?.getPane('mapPane');
+      if (mapPane) {
+        if (isFollowMode && !isNorthUp) {
+          mapPane.style.setProperty('--map-rotation', `${-currentHeading + manualRotation}deg`);
+        } else {
+          mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
+        }
+      }
+
+      if (isFollowMode && mapInstanceRef.current) { 
+        const now = Date.now();
+        if (now - lastPanRef.current > 500) { // Further reduced throttle for even smoother tracking
+          lastPanRef.current = now;
+          try {
+            // In Heading Up mode, we offset the center slightly to see more ahead
+            let center: [number, number] = [currentLoc[0], currentLoc[1]];
+            
+            if (!isNorthUp) {
+              const zoom = mapInstanceRef.current.getZoom();
+              const offsetPixels = window.innerHeight * 0.2; // Offset by 20% of screen height
+              const point = mapInstanceRef.current.project(center, zoom);
+              
+              const offsetPoint = point.add(L.point(0, -offsetPixels).rotate(currentHeading * Math.PI / 180));
+              const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
+              center = [unprojected.lat, unprojected.lng];
+            }
+            
+            mapInstanceRef.current.panTo(center, { animate: true, duration: 0.8, easeLinearity: 0.25 }); 
+          } catch (e) {
+            console.error("PanTo error:", e instanceof Error ? e.message : String(e));
           }
+        }
+      }
+    };
 
-          // Filter by 250 miles
-          const distMeters = L.latLng(mapCenter[0], mapCenter[1]).distanceTo(L.latLng(poi.lat, poi.lon));
-          if (distMeters > 250 * 1609.34) return;
+    // Initial update
+    updateRotationAndPan();
 
+    // Subscribe to telemetry changes
+    return telemetryContext.subscribe(updateRotationAndPan);
+  }, [telemetryContext, isDriving, isFollowMode, isNorthUp, manualRotation]);
+
+
+  useEffect(() => {
+    if (!isMapReady || !mapInstanceRef.current) return;
+
+    if (!showPois) {
+      markerClusterGroupRef.current?.clearLayers();
+      poiMarkersRef.current = [];
+      lastPoiRenderCenterRef.current = null;
+      return;
+    }
+
+    // Throttling: only re-render if map moved > 1 mile or if it's the first render
+    if (lastPoiRenderCenterRef.current) {
+      const distMoved = calcDistMi(mapCenter[0], mapCenter[1], lastPoiRenderCenterRef.current[0], lastPoiRenderCenterRef.current[1]);
+      if (distMoved < 1.0) return;
+    }
+    lastPoiRenderCenterRef.current = mapCenter;
+
+    console.log(`Rendering POIs for center: ${mapCenter[0]}, ${mapCenter[1]}`);
+    markerClusterGroupRef.current?.clearLayers();
+    poiMarkersRef.current = [];
+
+    let validPoisCount = 0;
+    // Pre-filter POIs to only those within 100 miles of map center to avoid heavy iteration
+    const nearbyPois = pois.filter(poi => {
+      if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
+      const category = getPoiCategory(poi.type, poi.name);
+      const isFiltered = poiFilters.has(category);
+      if (!isFiltered) {
+        console.log(`POI ${poi.name} filtered out. Category: ${category}`);
+        return false;
+      }
+      
+      const distance = calcDistMi(mapCenter[0], mapCenter[1], poi.lat, poi.lon);
+      return distance <= 100;
+    });
+
+    console.log(`POIs filtered: ${nearbyPois.length} out of ${pois.length} total. Active filters: ${Array.from(poiFilters).join(', ')}`);
+    console.log('Total POIs:', pois.length);
+
+    nearbyPois.forEach(poi => {
+        try {
           validPoisCount++;
-          const iconElement = getPoiIcon(poi.type, poi.name);
-          if (iconElement) {
-            const iconHtml = renderToStaticMarkup(iconElement);
-            const icon = L.divIcon({
-              className: 'custom-poi-icon',
-              html: `<div class="counter-rotate">${iconHtml}</div>`,
-              iconSize: [32, 32],
-              iconAnchor: [16, 32],
-              popupAnchor: [0, -32]
-            });
-            const marker = L.marker([poi.lat, poi.lon], { icon });
+          const iconHtml = getCachedPoiIcon(poi.type, poi.name);
+          if (iconHtml) {
+            const marker = L.marker([poi.lat, poi.lon], { icon: L.divIcon({ html: `<div class="custom-poi-icon"><div class="counter-rotate">${iconHtml}</div></div>`, className: 'poi-marker', iconAnchor: [12, 24] }) });
+            if (markerClusterGroupRef.current) {
+              marker.addTo(markerClusterGroupRef.current);
+            } else {
+              marker.addTo(mapInstanceRef.current!);
+            }
             
             marker.on('click', () => {
               setSelectedPoi(poi);
             });
 
-            marker.bindPopup(`
+            const popup = L.popup({ offset: [0, -25] }).setContent(`
               <div class="p-3 min-w-[180px]">
                 <div class="font-black text-zinc-900 text-sm mb-1">${poi.name}</div>
                 <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">${poi.type}</div>
@@ -2960,46 +2962,48 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                 </div>
               </div>
             `);
-            markers.push(marker);
+            marker.bindPopup(popup);
+            poiMarkersRef.current.push(marker);
 
             // Add Entrance Marker if available
             if (poi.entrance) {
-              const entranceIcon = L.divIcon({
-                className: 'custom-entrance-icon',
-                html: renderToStaticMarkup(getEntranceIcon()),
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-              });
-              const entranceMarker = L.marker([poi.entrance.lat, poi.entrance.lon], { 
-                icon: entranceIcon,
-                title: `${poi.name} Entrance`
-              });
+              if (!poiIconsCacheRef.current['entrance']) {
+                poiIconsCacheRef.current['entrance'] = renderToStaticMarkup(getEntranceIcon());
+              }
+              const entranceMarker = L.marker([poi.entrance.lat, poi.entrance.lon], { icon: L.divIcon({ html: `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, className: 'entrance-marker', iconAnchor: [12, 12] }) });
+              if (markerClusterGroupRef.current) {
+                entranceMarker.addTo(markerClusterGroupRef.current);
+              } else {
+                entranceMarker.addTo(mapInstanceRef.current!);
+              }
               entranceMarker.bindPopup(`<div class="p-2 font-bold text-xs">${poi.name} Entrance</div>`);
-              markers.push(entranceMarker);
+              poiMarkersRef.current.push(entranceMarker);
             }
 
             // Add Exit Marker if available
             if (poi.exit) {
-              const exitIcon = L.divIcon({
-                className: 'custom-exit-icon',
-                html: renderToStaticMarkup(getExitIcon()),
-                iconSize: [24, 24],
-                iconAnchor: [12, 12]
-              });
-              const exitMarker = L.marker([poi.exit.lat, poi.exit.lon], { 
-                icon: exitIcon,
-                title: `${poi.name} Exit`
-              });
+              if (!poiIconsCacheRef.current['exit']) {
+                poiIconsCacheRef.current['exit'] = renderToStaticMarkup(getExitIcon());
+              }
+              const exitMarker = L.marker([poi.exit.lat, poi.exit.lon], { icon: L.divIcon({ html: `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, className: 'exit-marker', iconAnchor: [12, 12] }) });
+              if (markerClusterGroupRef.current) {
+                exitMarker.addTo(markerClusterGroupRef.current);
+              } else {
+                exitMarker.addTo(mapInstanceRef.current!);
+              }
               exitMarker.bindPopup(`<div class="p-2 font-bold text-xs">${poi.name} Exit</div>`);
-              markers.push(exitMarker);
+              poiMarkersRef.current.push(exitMarker);
             }
           }
         } catch (err) {
-          console.error("Failed to render POI icon:", err, poi);
+          console.error("Failed to render POI icon:", err instanceof Error ? err.message : String(err), poi.id);
         }
       });
 
-      console.log(`Rendering ${markers.length} POI markers out of ${validPoisCount} valid POIs within range`);
+      console.log(`Rendering ${poiMarkersRef.current.length} POI markers out of ${validPoisCount} valid POIs within range`);
+      console.log("Show POIs:", showPois);
+      console.log("POI Filters:", Array.from(poiFilters).join(', '));
+      console.log("Marker Cluster Group:", markerClusterGroupRef.current);
 
       // Add event delegation for the "Add as Stop" button in popups
       const handlePopupClick = (e: MouseEvent) => {
@@ -3023,36 +3027,58 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
       };
 
       document.addEventListener('click', handlePopupClick);
-      markers.forEach(marker => marker.addTo(poiLayerGroupRef.current));
       
       return () => document.removeEventListener('click', handlePopupClick);
+  }, [pois, showPois, poiFilters, mapCenter, isMapReady]);
+
+  useEffect(() => {
+    if (!isDriving || pois.length === 0 || routePoints.length === 0 || !userLocation) {
+      if (upcomingPois.length > 0) setUpcomingPois([]);
+      return;
     }
-  }, [pois, showPois, poiFilters, mapCenter]);
 
-  const upcomingPois = useMemo(() => {
-    if (!isDriving || pois.length === 0 || routePoints.length === 0 || !userLocation) return [];
+    if (lastPoiUpdateLocationRef.current) {
+      const distMoved = calcDistMi(userLocation[0], userLocation[1], lastPoiUpdateLocationRef.current[0], lastPoiUpdateLocationRef.current[1]);
+      if (distMoved < 0.5) return;
+    }
 
-    // Find user's closest point on route
-    let userMinDist = Infinity;
-    let userRouteIdx = 0;
-    for (let i = 0; i < routePoints.length; i++) {
-      const d = Math.pow(routePoints[i][0] - userLocation[0], 2) + Math.pow(routePoints[i][1] - userLocation[1], 2);
-      if (d < userMinDist) {
-        userMinDist = d;
-        userRouteIdx = i;
+    lastPoiUpdateLocationRef.current = userLocation;
+
+    // Find user's closest point on route - use lastSimIdxRef for optimization
+    let userRouteIdx = lastSimIdxRef.current;
+    if (userRouteIdx === -1) {
+      let userMinDist = Infinity;
+      for (let i = 0; i < routePoints.length; i++) {
+        const d = Math.pow(routePoints[i][0] - userLocation[0], 2) + Math.pow(routePoints[i][1] - userLocation[1], 2);
+        if (d < userMinDist) {
+          userMinDist = d;
+          userRouteIdx = i;
+        }
       }
     }
 
     const upcoming = pois
       .filter(poi => {
         if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
+        
+        // Pre-filter: only POIs within 50 miles
+        const distToUser = calcDistMi(userLocation[0], userLocation[1], poi.lat, poi.lon);
+        if (distToUser > 50) return false;
+
         const category = getPoiCategory(poi.type, poi.name);
         return poiFilters.has(category);
       })
+      .slice(0, 50) // Limit to first 50 POIs within range to avoid heavy calculation
       .map(poi => {
+        // Find POI's closest point on route
         let poiMinDist = Infinity;
         let poiRouteIdx = 0;
-        for (let i = 0; i < routePoints.length; i++) {
+        
+        // Optimization: search only a window ahead of the user (approx 100 miles / 1500 points)
+        const searchStart = Math.max(0, userRouteIdx - 10);
+        const searchEnd = Math.min(routePoints.length, userRouteIdx + 1500);
+        
+        for (let i = searchStart; i < searchEnd; i++) {
           const d = Math.pow(routePoints[i][0] - poi.lat, 2) + Math.pow(routePoints[i][1] - poi.lon, 2);
           if (d < poiMinDist) {
             poiMinDist = d;
@@ -3060,15 +3086,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
           }
         }
         
-        // Rough distance from user to POI in miles
-        const R = 3959; // Earth's radius in miles
-        const dLat = (poi.lat - userLocation[0]) * Math.PI / 180;
-        const dLon = (poi.lon - userLocation[1]) * Math.PI / 180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(userLocation[0] * Math.PI / 180) * Math.cos(poi.lat * Math.PI / 180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const distance = R * c;
+        const distance = calcDistMi(userLocation[0], userLocation[1], poi.lat, poi.lon);
 
         return {
           ...poi,
@@ -3076,12 +3094,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
           distance
         };
       })
-      .filter(poi => poi.routeIdx >= userRouteIdx - 5 && poi.distance > 0.5) // Allow slightly behind, but filter out very close ones
+      .filter(poi => poi.routeIdx >= userRouteIdx - 5 && poi.distance > 0.5)
       .sort((a, b) => a.distance - b.distance)
-      .slice(0, 4); // Show top 4 upcoming
+      .slice(0, 4);
 
-    return upcoming;
-  }, [isDriving, pois, routePoints, userLocation, poiFilters]);
+    setUpcomingPois(upcoming);
+  }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(',')]);
 
 
   const toggleDriving = () => {
@@ -3099,12 +3117,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         const startPosition = userMarkerRef.current.getLatLng(); 
         if (startPosition && !isNaN(startPosition.lat) && !isNaN(startPosition.lng)) {
           try {
-            mapInstanceRef.current.flyTo(startPosition, 17, { // Zoom level 17 is good for driving
+            mapInstanceRef.current.flyTo([startPosition.lat, startPosition.lng], 17, {
               animate: true,
               duration: 1.5 
             });
           } catch (e) {
-            console.error("FlyTo error in toggleDriving:", e);
+            console.error("FlyTo error in toggleDriving:", e instanceof Error ? e.message : String(e));
           }
         }
       }
@@ -3119,22 +3137,45 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
 
   return (
     <div className="h-full w-full relative bg-[#050505] overflow-hidden font-sans">
+      {error && (
+        <div className="absolute inset-0 z-[9999] flex items-center justify-center bg-red-950/95 p-4">
+          <div className="bg-red-900 border-2 border-red-500 rounded-3xl p-8 shadow-2xl max-w-md w-full text-center">
+            <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-tight">Map Error</h3>
+            <p className="text-red-100 text-sm mb-6 whitespace-pre-wrap break-words">{error}</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-full bg-white text-red-900 font-bold py-3 rounded-xl hover:bg-red-50 transition-colors"
+            >
+              Reload Application
+            </button>
+          </div>
+        </div>
+      )}
       <style>{`
         .glow-overlay {
           filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.8));
         }
       `}</style>
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax] pointer-events-none z-0">
-        <div 
-          id="nav-map-container" 
-          ref={mapRef} 
-          className={`h-full w-full transition-all duration-500 ease-linear pointer-events-auto ${isOverviewMode ? 'opacity-90' : 'opacity-100'} ${mapStyle === 'TUE_GOLD' ? 'tue-gold-black-tiles-v2' : 'white-gold-map-tiles'}`} 
-          style={{ transform: 'rotate(var(--map-rotation, 0deg))' }}
-        />
+      <div className="absolute inset-0 z-0 h-full w-full bg-zinc-950" ref={mapRef}>
+        <SpeedLimitMarker mapInstance={isMapReady ? mapInstanceRef.current : null} currentSpeedLimit={currentSpeedLimit} userLocation={userLocation} />
       </div>
+      {error && (
+        <div className="absolute inset-0 z-40 w-full h-full">
+          <img
+            src={`https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/static/${userLocation[1]},${userLocation[0]},12/800x600.webp?key=${MAPTILER_KEY}`}
+            alt="Map Fallback"
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] p-1 rounded">
+            <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">&copy; MapTiler</a> <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">&copy; OpenStreetMap contributors</a>
+          </div>
+        </div>
+      )}
+      {!isMapReady && !error && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black text-white">Loading Map...</div>}
 
       {/* Route Comparison Overlay */}
-      {isRoutePreview && alternativeRoutes.length > 1 ? (
+      {isRoutePreview && alternativeRoutes.length > 1 && (
         <div className="absolute top-20 left-4 right-4 z-[2000] flex flex-col gap-3 pointer-events-auto">
           <div className="bg-zinc-900/95 backdrop-blur-md border border-[#D4AF37]/30 rounded-2xl p-4 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
@@ -3155,18 +3196,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                     setInitialMiles(route.distMi);
                     setEta(new Date(Date.now() + route.durationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
                     
-                    if (routeGroupRef.current && mapInstanceRef.current) {
-                      routeGroupRef.current.clearLayers();
+                    if (mapInstanceRef.current) {
+                      clearRouteMarkers();
                       currentSegmentLineRef.current = null;
-                      const polyline = L.polyline(route.coords, {
-                        color: idx === selectedRouteIndex ? '#D4AF37' : '#555',
-                        weight: 8,
-                        opacity: 0.9,
-                        lineJoin: 'round',
-                        lineCap: 'round',
-                        className: 'route-line-glow'
-                      }).addTo(routeGroupRef.current);
-                      routeLineRef.current = polyline;
+                      updateMapLine(mapInstanceRef.current, 'route', route.coords, idx === selectedRouteIndex ? '#D4AF37' : '#555', 8);
+                      routeLineRef.current = { id: 'route', color: idx === selectedRouteIndex ? '#D4AF37' : '#555' };
                     }
                   }}
                   className={`flex-shrink-0 w-48 p-4 rounded-xl border-2 transition-all ${
@@ -3202,7 +3236,94 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
             </button>
           </div>
         </div>
-      ) : null}
+      )}
+
+      {/* Route Steps Modal */}
+      {showSteps && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-zinc-900 border border-[#D4AF37]/30 rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] animate-in zoom-in duration-300">
+            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-zinc-900/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-[#D4AF37]/20 rounded-xl">
+                  <List className="w-6 h-6 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-white italic uppercase tracking-tight">Turn-by-Turn</h2>
+                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{routeSteps.length} Steps to Destination</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowSteps(false)}
+                className="p-2 hover:bg-white/10 rounded-xl transition-colors text-zinc-400 hover:text-white"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
+              {routeSteps.map((step, idx) => {
+                const Icon = getManeuverIcon(step.maneuver.type, step.maneuver.modifier);
+                const isCurrent = idx === maneuverIndex;
+                
+                return (
+                  <div 
+                    key={idx} 
+                    className={`p-4 rounded-2xl border transition-all duration-300 ${isCurrent ? 'bg-[#D4AF37]/10 border-[#D4AF37] shadow-[0_0_20px_rgba(212,175,55,0.1)]' : 'bg-white/5 border-white/5 hover:border-white/10'}`}
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className={`p-3 rounded-xl shrink-0 ${isCurrent ? 'bg-[#D4AF37] text-black' : 'bg-zinc-800 text-[#D4AF37]'}`}>
+                        <Icon className="w-6 h-6" strokeWidth={3} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs font-black uppercase tracking-widest ${isCurrent ? 'text-[#D4AF37]' : 'text-zinc-500'}`}>
+                            Step {idx + 1}
+                          </span>
+                          <span className="text-sm font-bold text-white italic">
+                            {(step.distance / 1609.34).toFixed(1)} mi
+                          </span>
+                        </div>
+                        <p className="text-base font-bold text-white leading-tight mb-2 uppercase italic tracking-tight">
+                          {step.maneuver.instruction}
+                        </p>
+                        
+                        {/* Lane Guidance in Step */}
+                        {step.lanes && step.lanes.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-white/5 flex flex-wrap gap-1.5">
+                            {step.lanes.map((lane: any, lIdx: number) => {
+                              const { rotation, active } = parseLane(lane);
+                              return (
+                                <div 
+                                  key={lIdx} 
+                                  className={`p-1.5 rounded-lg border flex items-center justify-center ${active ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white' : 'bg-white/5 border-white/5 text-white/20'}`}
+                                  title={lane.direction}
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" strokeWidth={active ? 4 : 2} style={{ transform: `rotate(${rotation}deg)` }} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="p-4 bg-zinc-900/80 border-t border-white/10 flex justify-center">
+              <button 
+                onClick={() => setShowSteps(false)}
+                className="px-8 py-3 bg-[#D4AF37] text-black font-black uppercase italic tracking-widest rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[#D4AF37]/20"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
 
       {/* Explore Mode Overlay */}
       {isExploreMode && (
@@ -3310,6 +3431,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                 </div>
               )}
 
+              {/* Contact & Hours */}
+              {(selectedPoi.phone || selectedPoi.website || selectedPoi.openingHours) && (
+                <div className="grid grid-cols-1 gap-3">
+                  {selectedPoi.phone && (
+                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                      <Phone className="w-4 h-4 text-[#D4AF37]" />
+                      <a href={`tel:${selectedPoi.phone}`} className="text-xs font-bold text-zinc-300 hover:text-white transition-colors">{selectedPoi.phone}</a>
+                    </div>
+                  )}
+                  {selectedPoi.website && (
+                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                      <Globe className="w-4 h-4 text-[#D4AF37]" />
+                      <a href={selectedPoi.website} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-zinc-300 hover:text-white transition-colors truncate">{selectedPoi.website}</a>
+                    </div>
+                  )}
+                  {selectedPoi.openingHours && (
+                    <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                      <Clock className="w-4 h-4 text-[#D4AF37]" />
+                      <span className="text-xs font-bold text-zinc-300">{selectedPoi.openingHours}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 md:gap-4 landscape:gap-2">
                 <button 
                   onClick={() => {
@@ -3402,68 +3547,55 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         </div>
       )}
 
-      {/* Turn Instruction Header - Now Gold Themed */}
-      {!isExploreMode && (
-        <div className={`absolute top-0 left-0 right-0 z-[2100] transition-all duration-700 ease-in-out ${milesRemaining > 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
-          <div className="bg-gradient-to-b from-black/95 to-black/60 backdrop-blur-3xl border-b border-[#D4AF37]/20 p-2 md:p-6 landscape:p-2 landscape:md:p-4 pt-[calc(0.5rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] landscape:pt-[calc(0.25rem+env(safe-area-inset-top))] shadow-2xl">
-            <div className="flex flex-col md:flex-row landscape:flex-row items-start md:items-center landscape:items-center justify-between gap-2 md:gap-4 landscape:gap-2">
-              <div className="flex items-center gap-2 md:gap-10 landscape:gap-4 w-full md:w-auto landscape:w-auto">
-                <div className="bg-[#D4AF37] p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[2rem] landscape:rounded-2xl shadow-2xl shadow-[#D4AF37]/30 shrink-0">
-                  <nextInstruction.icon className="w-6 h-6 md:w-14 md:h-14 landscape:w-8 landscape:h-8 text-black" strokeWidth={4} />
+      {/* Modern Navigation HUD */}
+      {!isExploreMode && milesRemaining > 0 && (
+        <div className="absolute top-4 left-4 right-4 md:left-8 md:right-auto md:w-[450px] z-[2100] flex flex-col gap-3 pointer-events-none">
+          {/* Main Instruction Card */}
+          <div className="bg-black/80 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-[2rem] p-4 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] pointer-events-auto animate-in fade-in slide-in-from-top-4 duration-700">
+            <div className="flex items-center gap-4 md:gap-6">
+              <div className="bg-[#D4AF37] p-3 md:p-5 rounded-2xl md:rounded-[1.5rem] shadow-[0_10px_30px_rgba(212,175,55,0.3)] shrink-0">
+                <nextInstruction.icon className="w-8 h-8 md:w-12 md:h-12 text-black" strokeWidth={4} />
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-4xl md:text-6xl font-[1000] text-white tracking-tighter leading-none">{nextInstruction.distance}</span>
+                  <span className="text-lg md:text-2xl font-black text-[#D4AF37] uppercase">mi</span>
                 </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-black text-zinc-500 uppercase tracking-[0.3em] mb-0.5 md:mb-1 landscape:mb-0">Next Turn</span>
-                  <div className="flex items-baseline gap-1 md:gap-3 landscape:gap-1.5">
-                    <span className="text-3xl md:text-7xl landscape:text-4xl font-[1000] text-white tracking-tighter leading-none">{nextInstruction.distance}</span>
-                    <span className="text-base md:text-3xl landscape:text-xl font-black text-[#D4AF37] uppercase">mi</span>
-                    {nextInstruction.maneuver?.hasTrafficLight && (
-                      <div className="ml-2 md:ml-6 bg-rose-500/20 p-1.5 md:p-3 rounded-xl border border-rose-500/30 flex items-center gap-2 animate-pulse">
-                        <TrafficCone className="w-3 h-3 md:w-6 md:h-6 text-rose-500" />
-                        <span className="text-[8px] md:text-[12px] font-black text-rose-500 uppercase tracking-wider">Traffic Light</span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-sm md:text-2xl landscape:text-lg font-black text-white italic uppercase tracking-tight mt-0.5 md:mt-1 landscape:mt-0 flex items-center gap-1 md:gap-3 landscape:gap-1.5 truncate max-w-full md:max-w-[500px] landscape:max-w-[300px]">
-                    {(() => {
+                <div className="flex items-center gap-2 mt-1 truncate">
+                   {(() => {
                       const highwayMatch = nextInstruction.text.match(/(I-|US-|SR-|Hwy|Route|State Route)\s*(\d+[A-Z]?)/i);
-                      if (highwayMatch) {
+                      const exitMatch = nextInstruction.text.match(/exit\s+(\d+[A-Z]?)/i);
+                      
+                      if (highwayMatch || exitMatch) {
                         return (
-                          <div className="scale-50 md:scale-75 origin-left shrink-0">
-                            <HighwayShield roadName={highwayMatch[0]} />
+                          <div className="flex gap-2 scale-75 origin-left shrink-0">
+                            {highwayMatch && <HighwayShield roadName={highwayMatch[0]} />}
+                            {exitMatch && (
+                              <div className="bg-[#D4AF37] text-black font-black px-2 py-1 rounded-lg text-sm md:text-base uppercase tracking-tight shrink-0">
+                                Exit {exitMatch[1]}
+                              </div>
+                            )}
                           </div>
                         );
                       }
                       return null;
                     })()}
-                    <span className="truncate">{nextInstruction.text}</span>
+                  <span className="text-lg md:text-xl font-black text-white italic uppercase tracking-tight truncate">
+                    {nextInstruction.text}
                   </span>
-                </div>
-              </div>
-              
-              <div className="flex flex-row md:flex-col landscape:flex-row items-center md:items-end landscape:items-center justify-between w-full md:w-auto landscape:w-auto mt-1 md:mt-0 landscape:mt-0">
-                <div className="flex flex-col items-end landscape:items-end landscape:ml-4">
-                  <div className="flex items-center gap-1 md:gap-3 landscape:gap-2 mb-0 md:mb-4 landscape:mb-0">
-                    <div className="flex flex-col items-end mr-1 md:mr-4 landscape:mr-2">
-                      <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-black text-zinc-500 uppercase tracking-widest">ETA</span>
-                      <span className="text-base md:text-2xl landscape:text-xl font-[1000] text-white tracking-tighter italic">{eta}</span>
-                    </div>
-                  </div>
-                  <span className="text-[8px] md:text-[12px] landscape:text-[9px] font-black text-zinc-500 uppercase tracking-[0.4em] mb-0.5 md:mb-2 landscape:mb-0 hidden md:block landscape:hidden">Truck Route</span>
-                  <span className="text-xl md:text-4xl landscape:text-2xl font-[1000] text-[#D4AF37] tracking-tighter uppercase italic hidden md:block landscape:hidden">{currentDestination}</span>
                 </div>
               </div>
             </div>
 
-            {/* Prominent Lane Guidance Bar */}
+            {/* Lane Guidance Integrated */}
             {nextInstruction.lanes && nextInstruction.lanes.length > 0 && (
-              <div className="mt-3 md:mt-6 landscape:mt-3 pt-3 md:pt-6 landscape:pt-3 border-t border-white/10 flex flex-col items-center overflow-hidden">
-                <span className="text-[8px] md:text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-2">Lane Guidance</span>
-                <div className="flex gap-2 md:gap-4 landscape:gap-3 bg-black/50 p-2 md:p-4 landscape:p-2.5 rounded-2xl md:rounded-[2rem] landscape:rounded-2xl border border-white/5 overflow-x-auto no-scrollbar max-w-full">
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                   {nextInstruction.lanes.map((lane, idx) => {
                     const { rotation, active } = parseLane(lane);
                     return (
-                      <div key={idx} className={`p-2 md:p-4 landscape:p-2.5 rounded-xl md:rounded-2xl landscape:rounded-xl border-2 transition-all duration-500 shrink-0 flex items-center justify-center ${active ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-[0_0_20px_rgba(212,175,55,0.4)] scale-110' : 'bg-white/5 border-white/10 text-white/20'}`}>
-                        <ArrowUp className="w-5 h-5 md:w-10 md:h-10 landscape:w-6 landscape:h-6" strokeWidth={active ? 4 : 3} style={{ transform: `rotate(${rotation}deg)` }} />
+                      <div key={idx} className={`p-2 rounded-xl border-2 transition-all duration-500 shrink-0 flex items-center justify-center ${active ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-[0_0_15px_rgba(212,175,55,0.3)]' : 'bg-white/5 border-white/10 text-white/20'}`}>
+                        <ArrowUp className="w-5 h-5" strokeWidth={active ? 4 : 3} style={{ transform: `rotate(${rotation}deg)` }} />
                       </div>
                     );
                   })}
@@ -3471,14 +3603,143 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
               </div>
             )}
           </div>
+
+          {/* Following Instruction Card (Secondary) */}
+          {nextInstruction.followingStep && (
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-3 md:p-4 shadow-xl ml-4 md:ml-8 w-fit max-w-[300px] pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-1000 delay-300">
+              <div className="flex items-center gap-3">
+                <div className="bg-zinc-800 p-2 rounded-lg shrink-0">
+                  <nextInstruction.followingStep.icon className="w-4 h-4 md:w-5 md:h-5 text-[#D4AF37]" strokeWidth={3} />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Then</span>
+                  <span className="text-[10px] md:text-xs font-bold text-white/80 uppercase truncate">
+                    {nextInstruction.followingStep.text}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Trip Progress HUD */}
+      {!isExploreMode && milesRemaining > 0 && (
+        <div className="absolute bottom-24 left-4 right-4 md:left-auto md:right-8 md:w-80 z-[2100] pointer-events-none">
+          <div className="bg-black/80 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-3xl p-4 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Destination</span>
+                <span className="text-xl font-[1000] text-[#D4AF37] tracking-tighter uppercase italic truncate max-w-[150px]">
+                  {currentDestination}
+                </span>
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">ETA</span>
+                <span className="text-2xl font-[1000] text-white tracking-tighter italic">{eta}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-end">
+                <span className="text-3xl font-[1000] text-white tracking-tighter leading-none">
+                  {milesRemaining.toFixed(1)}
+                  <span className="text-sm font-black text-[#D4AF37] ml-1 uppercase">mi</span>
+                </span>
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Remaining</span>
+              </div>
+              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#D4AF37] to-amber-500 transition-all duration-1000"
+                  style={{ width: `${Math.min(100, Math.max(0, (1 - milesRemaining / initialMiles) * 100))}%` }}
+                />
+              </div>
+            </div>
+
+            <button 
+              onClick={handleCancelRoute}
+              className="mt-4 w-full py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-rose-500/30 flex items-center justify-center gap-2 pointer-events-auto"
+            >
+              <X className="w-3 h-3" strokeWidth={4} />
+              Cancel Route
+            </button>
+          </div>
         </div>
       )}
 
       {/* Map Controls consolidated in nav-map-controls below */}
 
-      {/* Weather Overlay */}
+      {/* Weather & Restriction Overlay */}
       {!selectedPoi && !isExploreMode && (
         <div id="nav-weather-overlay" className={`absolute left-2 md:left-4 z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 -translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'} scale-90 md:scale-100 origin-left`}>
+          {restrictionAlerts.length > 0 && (
+            <div className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
+              <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-orange-500/20 pb-1.5">
+                <div className="p-1 md:p-1.5 bg-orange-500 rounded-lg">
+                  <Truck className="w-3 h-3 md:w-4 md:h-4 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] md:text-[10px] font-black text-orange-500 uppercase tracking-wider">Truck Restrictions ({restrictionAlerts.length})</span>
+                  <span className="text-[6px] md:text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Safety Critical Alerts</span>
+                </div>
+              </div>
+              <div className="space-y-1.5 max-h-32 md:max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                {restrictionAlerts.map((alert, idx) => {
+                  const Icon = alert.type === 'BRIDGE' ? Truck : Scale;
+                  return (
+                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                      alert.type === 'BRIDGE' ? 'bg-red-500/10 border-red-500/20' : 'bg-orange-500/10 border-orange-500/20'
+                    }`}>
+                      <div className={`p-1 rounded-md ${alert.type === 'BRIDGE' ? 'bg-red-500/20 text-red-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                        <Icon className="w-3 h-3 md:w-4 md:h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] md:text-[10px] font-black text-white uppercase truncate">{alert.type === 'BRIDGE' ? 'Low Bridge' : 'Weight Limit'}</span>
+                          <span className="text-[7px] md:text-[9px] font-bold text-[#D4AF37] uppercase tracking-tighter">{alert.message}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {trafficAlerts.length > 0 && (
+            <div className="bg-black/90 backdrop-blur-2xl border border-emerald-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
+              <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-emerald-500/20 pb-1.5">
+                <div className="p-1 md:p-1.5 bg-emerald-500 rounded-lg">
+                  <TrafficCone className="w-3 h-3 md:w-4 md:h-4 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] md:text-[10px] font-black text-emerald-500 uppercase tracking-wider">Traffic Alerts ({trafficAlerts.length})</span>
+                  <span className="text-[6px] md:text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Road Features</span>
+                </div>
+              </div>
+              <div className="space-y-1.5 max-h-32 md:max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                {trafficAlerts.map((alert, idx) => {
+                  const Icon = alert.type === 'STOP_SIGN' ? Octagon : TrafficCone;
+                  return (
+                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                      alert.type === 'STOP_SIGN' ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
+                    }`}>
+                      <div className={`p-1 rounded-md ${alert.type === 'STOP_SIGN' ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                        <Icon className="w-3 h-3 md:w-4 md:h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] md:text-[10px] font-black text-white uppercase truncate">{alert.type === 'STOP_SIGN' ? 'Stop Sign' : 'Traffic Light'}</span>
+                          <span className="text-[7px] md:text-[9px] font-bold text-zinc-400 uppercase tracking-tighter">Upcoming</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {weatherAlerts.length > 0 && (
             <div className="bg-black/90 backdrop-blur-2xl border border-red-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64 animate-pulse">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-red-500/20 pb-1.5">
@@ -3520,31 +3781,35 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
           )}
 
           <div className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-xl md:rounded-2xl p-2 md:p-4 shadow-2xl w-36 md:w-56 transition-all">
-            <div className="flex items-center justify-between mb-1.5 md:mb-3">
-               <weather.icon className="w-4 h-4 md:w-6 md:h-6 text-[#D4AF37]" />
-               <div className="flex flex-col items-end">
-                 <span className="text-xl md:text-3xl font-bold text-white tracking-tight leading-none">{weather.temp}</span>
-                 <span className="text-[7px] md:text-[9px] font-bold text-[#D4AF37] uppercase tracking-widest leading-none mt-0.5">{weather.condition}</span>
-               </div>
-            </div>
-            <div className="space-y-1 md:space-y-2 mb-1.5 md:mb-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 md:gap-2 text-zinc-500">
-                  <Wind className="w-2.5 h-2.5 md:w-3.5 md:h-3.5" />
-                  <span className="text-[7px] md:text-[9px] font-bold uppercase tracking-widest">Wind</span>
+            {weather && (
+              <>
+                <div className="flex items-center justify-between mb-1.5 md:mb-3">
+                  <weather.icon className="w-4 h-4 md:w-6 md:h-6 text-[#D4AF37]" />
+                  <div className="flex flex-col items-end">
+                    <span className="text-xl md:text-3xl font-bold text-white tracking-tight leading-none">{weather.temp}</span>
+                    <span className="text-[7px] md:text-[9px] font-bold text-[#D4AF37] uppercase tracking-widest leading-none mt-0.5">{weather.condition}</span>
+                  </div>
                 </div>
-                <span className="text-[8px] md:text-[11px] font-bold text-white uppercase">{weather.wind}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1 md:gap-2 text-zinc-500">
-                  <Eye className="w-2.5 h-2.5 md:w-3.5 md:h-3.5" />
-                  <span className="text-[7px] md:text-[9px] font-bold uppercase tracking-widest">Vis</span>
+                <div className="space-y-1 md:space-y-2 mb-1.5 md:mb-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 md:gap-2 text-zinc-500">
+                      <Wind className="w-2.5 h-2.5 md:w-3.5 md:h-3.5" />
+                      <span className="text-[7px] md:text-[9px] font-bold uppercase tracking-widest">Wind</span>
+                    </div>
+                    <span className="text-[8px] md:text-[11px] font-bold text-white uppercase">{weather.wind}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 md:gap-2 text-zinc-500">
+                      <Eye className="w-2.5 h-2.5 md:w-3.5 md:h-3.5" />
+                      <span className="text-[7px] md:text-[9px] font-bold uppercase tracking-widest">Vis</span>
+                    </div>
+                    <span className="text-[8px] md:text-[11px] font-bold text-white uppercase">{weather.visibility}</span>
+                  </div>
                 </div>
-                <span className="text-[8px] md:text-[11px] font-bold text-white uppercase">{weather.visibility}</span>
-              </div>
-            </div>
+              </>
+            )}
             
-            {isDriving && routeWeatherForecast.length > 0 ? (
+            {routeWeatherForecast.length > 0 ? (
               <div className="pt-2 border-t border-white/10 flex justify-between">
                 {routeWeatherForecast.slice(0, 3).map((point, idx) => (
                   <div key={idx} className="flex flex-col items-center gap-1">
@@ -3554,7 +3819,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                   </div>
                 ))}
               </div>
-            ) : weather.forecast && weather.forecast.length > 0 && (
+            ) : weather && weather.forecast && weather.forecast.length > 0 && (
               <div className="pt-2 border-t border-white/10 flex justify-between">
                 {weather.forecast.slice(0, 3).map((day, idx) => (
                   <div key={idx} className="flex flex-col items-center gap-1">
@@ -3620,7 +3885,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                   let Icon = MapIcon;
                   let iconColor = "text-zinc-400";
                   
-                  if (category === 'fuel' || category === 'major_chains') { Icon = Fuel; iconColor = "text-yellow-400"; }
+                  const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
+                  if (category === 'fuel' || brandIds.includes(category)) { Icon = Fuel; iconColor = "text-yellow-400"; }
                   else if (category === 'parking') { Icon = ParkingSquare; iconColor = "text-blue-400"; }
                   else if (category === 'food') { Icon = UtensilsCrossed; iconColor = "text-green-400"; }
                   else if (category === 'service') { Icon = Wrench; iconColor = "text-red-400"; }
@@ -3660,85 +3926,97 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
               <div className="flex items-center justify-between px-2 mb-0.5 md:mb-1 landscape:mb-0.5">
                 <span className="text-[9px] md:text-[10px] landscape:text-[8px] font-black text-[#D4AF37] uppercase tracking-[0.3em]">Active Stops ({waypoints.length})</span>
                 <button 
-                  onClick={() => setWaypoints([])}
+                  onClick={clearRoute}
                   className="text-[8px] md:text-[9px] landscape:text-[7px] font-black text-zinc-500 hover:text-white uppercase tracking-widest transition-colors"
                 >
                   Clear All
                 </button>
               </div>
               {waypoints.map((wp, index) => (
-                <div key={wp.id} className="bg-black/90 backdrop-blur-xl border border-[#D4AF37]/30 rounded-xl md:rounded-2xl landscape:rounded-xl p-2 md:p-4 landscape:p-2 flex items-center justify-between shadow-xl">
-                  <div className="flex items-center gap-2 md:gap-4 landscape:gap-2">
-                    <div className="flex flex-col gap-0.5 md:gap-1 landscape:gap-0.5 mr-1 md:mr-2 landscape:mr-1">
+                <div key={wp.id} className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-col gap-1">
                       <button 
                         onClick={(e) => { e.stopPropagation(); moveWaypoint(index, 'up'); }}
                         disabled={index === 0}
-                        className="p-0.5 md:p-1 landscape:p-0.5 rounded-md md:rounded-lg landscape:rounded-md bg-white/5 text-zinc-500 hover:text-[#D4AF37] disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors"
+                        className="p-1 rounded-lg bg-white/5 text-zinc-500 hover:text-[#D4AF37] disabled:opacity-30 transition-colors"
                       >
-                        <ArrowUp className="w-2.5 h-2.5 md:w-3 md:h-3 landscape:w-2 landscape:h-2" />
+                        <ArrowUp className="w-3 h-3" />
                       </button>
                       <button 
                         onClick={(e) => { e.stopPropagation(); moveWaypoint(index, 'down'); }}
                         disabled={index === waypoints.length - 1}
-                        className="p-0.5 md:p-1 landscape:p-0.5 rounded-md md:rounded-lg landscape:rounded-md bg-white/5 text-zinc-500 hover:text-[#D4AF37] disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors"
+                        className="p-1 rounded-lg bg-white/5 text-zinc-500 hover:text-[#D4AF37] disabled:opacity-30 transition-colors"
                       >
-                        <ArrowUp className="w-2.5 h-2.5 md:w-3 md:h-3 landscape:w-2 landscape:h-2 rotate-180" />
+                        <ArrowUp className="w-3 h-3 rotate-180" />
                       </button>
                     </div>
-                    <div className={`p-1.5 md:p-2.5 landscape:p-1.5 rounded-lg md:rounded-xl landscape:rounded-lg ${wp.type === 'PAID' ? 'bg-emerald-500/20 text-emerald-500' : 'bg-zinc-500/20 text-zinc-500'}`}>
-                      {wp.type === 'PAID' ? <CircleDollarSign className="w-3.5 h-3.5 md:w-5 md:h-5 landscape:w-4 landscape:h-4" /> : <Truck className="w-3.5 h-3.5 md:w-5 md:h-5 landscape:w-4 landscape:h-4" />}
+                    <div className={`p-3 rounded-xl ${wp.type === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
+                      {wp.type === 'PAID' ? <CircleDollarSign className="w-5 h-5" /> : <Truck className="w-5 h-5" />}
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-0.5">{wp.type} STOP {index + 1}</span>
-                      <span className="text-[10px] md:text-sm landscape:text-[10px] font-bold text-white truncate max-w-[150px] md:max-w-[300px] landscape:max-w-[200px]">{wp.address}</span>
+                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-0.5">{wp.type} STOP {index + 1}</span>
+                      <span className="text-sm font-bold text-white truncate max-w-[250px]">{wp.address}</span>
                     </div>
                   </div>
                   <button 
                     onClick={() => removeWaypoint(wp.id)} 
-                    className="p-1.5 md:p-2.5 landscape:p-1.5 rounded-lg md:rounded-xl landscape:rounded-lg bg-white/5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90 ml-1 md:ml-2 landscape:ml-1"
+                    className="p-2 rounded-xl bg-white/5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90"
                   >
-                    <Trash2 className="w-3 h-3 md:w-4 md:h-4 landscape:w-3 landscape:h-3" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}
               <button 
                 onClick={() => handleNavigate().catch(err => {
-                  console.error("Navigation failed from start route button:", err);
+                  console.error("Navigation failed from start route button:", err instanceof Error ? err.message : String(err));
                   setError("Failed to calculate route. Please try again.");
                 })}
                 disabled={isCalculating || !isMapReady}
-                className="w-full py-2 md:py-4 landscape:py-2 bg-[#D4AF37] hover:bg-[#B8860B] text-black rounded-xl md:rounded-2xl landscape:rounded-xl text-[10px] md:text-sm landscape:text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#D4AF37]/20 flex items-center justify-center gap-2 md:gap-3 landscape:gap-2 mt-1 md:mt-2 landscape:mt-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-4 bg-[#D4AF37] hover:bg-[#B8860B] text-black rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg shadow-[#D4AF37]/20 flex items-center justify-center gap-3 mt-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isCalculating ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 landscape:w-4 landscape:h-4 animate-spin" /> : <NavIcon className="w-4 h-4 md:w-5 md:h-5 landscape:w-4 landscape:h-4" />}
+                {isCalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <NavIcon className="w-5 h-5" />}
                 <span>Start Route</span>
               </button>
             </div>
           )}
 
-          <div className={`w-full bg-black/95 backdrop-blur-3xl ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-[1.5rem] md:rounded-t-[2.5rem] landscape:rounded-t-2xl' : 'rounded-[1.5rem] md:rounded-[2.5rem] landscape:rounded-2xl'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_0_80px_rgba(212,175,55,0.4)] scale-[1.02]' : 'border-[#D4AF37]/20 shadow-2xl'}`}>
-            <div className="flex items-center p-1.5 md:p-2 landscape:p-1.5 pl-4 md:pl-7 landscape:pl-4">
-              <Search className={`w-4 h-4 md:w-6 md:h-6 landscape:w-4 landscape:h-4 mr-2 md:mr-5 landscape:mr-2 transition-colors ${isSearchFocused ? 'text-[#D4AF37]' : 'text-zinc-700'}`} />
+          <div className={`w-full bg-black/95 backdrop-blur-3xl ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-3xl' : 'rounded-3xl'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_0_40px_rgba(212,175,55,0.2)] scale-[1.01]' : 'border-white/10 shadow-2xl'}`}>
+            <div className="flex items-center p-2 pl-6">
+              <Search className={`w-5 h-5 mr-4 transition-colors ${isSearchFocused ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
               <input 
                 id="nav-search-input"
                 type="text" 
                 placeholder={!isMapReady ? "System Booting..." : isCalculating ? "Mapping Path..." : "Search Address or POI..."} 
-                className="flex-1 bg-transparent border-none outline-none text-white text-sm md:text-xl landscape:text-sm font-black placeholder:text-zinc-800 tracking-tight py-2 md:py-5 landscape:py-2" 
+                className="flex-1 bg-transparent border-none outline-none text-white text-lg font-medium placeholder:text-zinc-700 tracking-tight py-4" 
                 value={searchQuery} 
                 disabled={isCalculating || !isMapReady} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
-                onFocus={() => { setIsSearchFocused(true); setIsSuggestionsVisible(true); }} 
+                onFocus={() => { 
+                  console.log('Search bar focused');
+                  setIsSearchFocused(true); 
+                  setIsSuggestionsVisible(true); 
+                }} 
                 onBlur={() => { 
-                  // Small delay to allow onMouseDown on suggestions to fire
+                  console.log('Search bar blurred');
                   setTimeout(() => {
                     setIsSuggestionsVisible(false); 
                     setIsSearchFocused(false); 
-                  }, 200);
+                  }, 100);
                 }} 
                 onKeyDown={(e) => e.key === 'Enter' && handleNavigate().catch(err => {
-                  console.error("Navigation failed from enter key:", err);
+                  console.error("Navigation failed from enter key:", err instanceof Error ? err.message : String(err));
                   setError("Failed to calculate route. Please try again.");
                 })}  
               />
+              {isSearchFocused && (
+                <button 
+                  onClick={() => { setIsSearchFocused(false); setIsSuggestionsVisible(false); }}
+                  className="p-2 text-zinc-500 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
               <button
                 onClick={() => {
                   if (selectedPoi) {
@@ -3754,17 +4032,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                   }
                 }}
                 disabled={!isMapReady}
-                className="p-2 md:p-3 landscape:p-2 rounded-full bg-white/5 text-[#D4AF37] hover:bg-white/10 transition-all active:scale-95 mr-1 md:mr-2 landscape:mr-1 flex-shrink-0"
+                className="p-3 rounded-full bg-white/5 text-[#D4AF37] hover:bg-white/10 transition-all active:scale-95 mr-2 flex-shrink-0"
                 title="Add current view or POI as waypoint"
               >
-                <Plus className="w-4 h-4 md:w-5 md:h-5 landscape:w-4 landscape:h-4" />
+                <Plus className="w-5 h-5" />
               </button>
-              <button id="nav-search-button" onClick={() => handleNavigate().catch(err => {
-                console.error("Navigation failed from search button:", err);
-                setError("Failed to calculate route. Please try again.");
-              })} disabled={!isMapReady} className={`flex items-center gap-1.5 md:gap-3 landscape:gap-1.5 px-4 py-2 md:px-10 md:py-4 landscape:px-4 landscape:py-2 rounded-full transition-all active:scale-95 mr-0.5 md:mr-1 landscape:mr-0.5 ${searchQuery.trim() && !isCalculating ? 'bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20' : 'bg-zinc-900 text-zinc-700'}`}>
-                {isCalculating ? <Loader2 className="w-3 h-3 md:w-5 md:h-5 landscape:w-3 landscape:h-3 animate-spin" /> : <NavIcon className="w-3 h-3 md:w-5 md:h-5 landscape:w-3 landscape:h-3" />}
-                <span className="text-[10px] md:text-[14px] landscape:text-[10px] font-black uppercase tracking-widest italic">{isCalculating ? 'Mapping' : 'Route'}</span>
+              <button id="nav-search-button" onClick={() => {
+                setIsSearchFocused(false);
+                setIsSuggestionsVisible(false);
+                handleNavigate().catch(err => {
+                  console.error("Navigation failed from search button:", err instanceof Error ? err.message : String(err));
+                  setError("Failed to calculate route. Please try again.");
+                });
+              }} disabled={!isMapReady} className={`flex items-center gap-3 px-8 py-4 rounded-2xl transition-all active:scale-95 ${searchQuery.trim() && !isCalculating ? 'bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20' : 'bg-zinc-900 text-zinc-700'}`}>
+                {isCalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <NavIcon className="w-5 h-5" />}
+                <span className="font-black uppercase tracking-widest italic">{isCalculating ? 'Mapping' : 'Route'}</span>
               </button>
             </div>
           </div>
@@ -3792,12 +4074,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
                       <div 
                         className="w-full text-left px-4 md:px-8 landscape:px-4 py-3 md:py-5 landscape:py-2 text-white hover:bg-[#D4AF37]/20 transition-all group flex items-start gap-3 md:gap-5 landscape:gap-3 border-b border-white/5 last:border-none cursor-pointer"
                         onMouseDown={() => {
+                          setIsSearchFocused(false);
+                          setIsSuggestionsVisible(false);
                           // Optimization: Use coordinates from suggestion directly to avoid redundant search
                           setDestinationCoords([s.lat, s.lon]);
                           setCurrentDestination(s.display_name.split(',')[0]);
                           setSearchQuery(s.display_name);
-                          handleNavigate().catch(err => {
-                            console.error("Navigation failed from suggestion:", err);
+                          handleNavigate(s.display_name, { lat: s.lat, lon: s.lon }).catch(err => {
+                            console.error("Navigation failed from suggestion:", err instanceof Error ? err.message : String(err));
                             setError("Failed to calculate route. Please try again.");
                           });
                         }}
@@ -3856,7 +4140,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         </div>
       )}
 
-      {/* Current Road Banner */}
       {isDriving && currentRoad && !isExploreMode && (
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[2005] pointer-events-none transition-all duration-500 animate-in slide-in-from-bottom-4">
           <div className="bg-black/80 backdrop-blur-md border border-[#D4AF37]/30 rounded-2xl px-6 py-2 shadow-2xl flex items-center gap-3">
@@ -3866,471 +4149,47 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, isSideba
         </div>
       )}
 
-      {!isExploreMode && (
-      <div id="nav-map-controls" className={`absolute right-2 md:right-4 z-[2010] flex flex-col items-end gap-1 md:gap-2 transition-all duration-700 -translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'} scale-90 md:scale-100 origin-right`}>
-        {/* Rotating Compass - Now integrated at the top of the column */}
-        {!isNorthUp && (
-          <div className="bg-black/90 backdrop-blur-3xl border border-[#D4AF37]/30 rounded-full p-2 md:p-3 shadow-2xl transition-all animate-in fade-in zoom-in mb-1">
-            <div 
-              className="transition-transform duration-300"
-              style={{ transform: `rotate(${-mapBearing}deg)` }}
-            >
-              <Compass className="w-5 h-5 md:w-7 md:h-7 text-[#D4AF37]" />
-            </div>
-          </div>
-        )}
+      <MapControls
+        mapInstanceRef={mapInstanceRef}
+        isFetchingPoisRef={isFetchingPoisRef}
+        fetchTruckPOIs={fetchTruckPOIs}
+        setPois={setPois}
+        isFilterMenuOpen={isFilterMenuOpen}
+        setIsFilterMenuOpen={setIsFilterMenuOpen}
+        poiFilters={poiFilters}
+        setPoiFilters={setPoiFilters}
+        isOverviewMode={isOverviewMode}
+        setIsOverviewMode={setIsOverviewMode}
+        setIsFollowMode={setIsFollowMode}
+        showTruckRestrictions={showTruckRestrictions}
+        setShowTruckRestrictions={setShowTruckRestrictions}
+        HERE_API_KEY={HERE_API_KEY}
+        setError={setError}
+        isValidLatLng={isValidLatLng}
+        userLocation={userLocation}
+        isFollowMode={isFollowMode}
+        isNorthUp={isNorthUp}
+        setIsNorthUp={setIsNorthUp}
+        setShowSteps={setShowSteps}
+        showSteps={showSteps}
+        className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
+      />
+              <RouteSettingsModal
+        isOpen={isRouteSettingsOpen}
+        onClose={() => setIsRouteSettingsOpen(false)}
+        avoidTolls={avoidTolls}
+        setAvoidTolls={setAvoidTolls}
+        avoidFerries={avoidFerries}
+        setAvoidFerries={setAvoidFerries}
+        avoidUnpaved={avoidUnpaved}
+        setAvoidUnpaved={setAvoidUnpaved}
+        isCarPlayMode={isCarPlayMode}
+        setIsCarPlayMode={setIsCarPlayMode}
+      />
 
-        {/* Navigation Mode Controls */}
-        <div className="bg-black/90 backdrop-blur-3xl border border-[#D4AF37]/30 rounded-xl md:rounded-[2rem] p-1 md:p-1.5 shadow-2xl transition-all flex flex-col gap-1">
-          {isDriving && (
-            <button 
-              onClick={() => {
-                clearRoute();
-                setIsDriving(false);
-              }}
-              className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white transition-all border border-red-500/30"
-              title="Stop Navigation"
-            >
-              <X className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-            </button>
-          )}
-          <button 
-            onClick={() => {
-              setIsNorthUp(!isNorthUp);
-              if (!isNorthUp) {
-                // When switching to North Up, reset bearing
-                if (mapInstanceRef.current) animateBearing(0);
-              }
-            }}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${!isNorthUp ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title={isNorthUp ? "Switch to Heading Up" : "Switch to North Up"}
-          >
-            <Compass 
-              className="w-3.5 h-3.5 md:w-4.5 md:h-4.5 transition-transform duration-300" 
-              style={{ transform: `rotate(${-mapBearing}deg)` }}
-            />
-          </button>
-          
-          <button 
-            onClick={() => setIsRouteSettingsOpen(true)}
-            className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10 transition-all"
-            title="Route Settings"
-          >
-            <Settings className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-
-          <button 
-            onClick={() => {
-              setIsExploreMode(!isExploreMode);
-              if (!isExploreMode) {
-                speak("Explore mode active. Showing real-time traffic and points of interest.");
-              }
-            }}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${isExploreMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title="Explore Mode"
-          >
-            <Compass className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${isExploreMode ? 'animate-pulse' : ''}`} />
-          </button>
-        </div>
-
-        {/* Map Style Selection - Removed */}
-
-        {/* POI & Utility Controls */}
-        <div className="flex flex-col gap-1 md:gap-1.5 bg-black/90 backdrop-blur-3xl border border-[#D4AF37]/20 rounded-xl md:rounded-[2rem] p-1 md:p-1.5 shadow-2xl">
-          <button
-            onClick={() => setShowPois(!showPois)}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${showPois ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'}`}
-            title="Toggle POIs"
-          >
-            {isFetchingPois ? (
-              <Loader2 className="w-3.5 h-3.5 md:w-4.5 md:h-4.5 animate-spin" />
-            ) : (
-              <Layers className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-            )}
-            {isFetchingPois && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-            )}
-          </button>
-
-          <button
-            onClick={() => {
-              if (userLocation) {
-                isFetchingPoisRef.current = true;
-                setIsFetchingPois(true);
-                lastPoiFetchRef.current = { time: Date.now(), lat: userLocation[0], lon: userLocation[1] };
-                
-                Promise.all([
-                  fetchTruckPOIs(userLocation[0], userLocation[1]),
-                  fetchMajorChains(userLocation[0], userLocation[1]),
-                  fetchHERETruckStops(userLocation[0], userLocation[1])
-                ])
-                  .then(([poiData, chainData, hereData]) => {
-                    const combinedRaw = [...poiData, ...chainData, ...hereData];
-                    const seenInBatch = new Set();
-                    const combined = combinedRaw.filter(p => {
-                      const id = `${p.lat}-${p.lon}-${p.name}`;
-                      if (seenInBatch.has(id)) return false;
-                      seenInBatch.add(id);
-                      return true;
-                    });
-
-                    setPois(prev => {
-                      const existingIds = new Set(prev.map(p => `${p.lat}-${p.lon}-${p.name}`));
-                      const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
-                      return [...prev, ...newPois];
-                    });
-                  })
-                  .catch(err => {
-                    console.error("Failed to fetch POIs:", err);
-                  })
-                  .finally(() => {
-                    isFetchingPoisRef.current = false;
-                    setIsFetchingPois(false);
-                  });
-              }
-            }}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all bg-white/5 text-[#D4AF37] hover:bg-white/10`}
-            title="Refresh POIs"
-          >
-            <RotateCcw className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-
-          <button
-            onClick={() => setShowHighways(!showHighways)}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${showHighways ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'}`}
-            title="Toggle Highway Overlay"
-          >
-            <Route className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-          
-          <button
-            onClick={() => setShowRoadOverlay(!showRoadOverlay)}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${showRoadOverlay ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'}`}
-            title="Toggle Road Name Overlay"
-          >
-            <Shield className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-          
-          <div className="relative">
-            <button 
-              onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
-              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${isFilterMenuOpen ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'}`}
-              title="Filter POIs"
-            >
-              <Filter strokeWidth={3} className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-            </button>
-            
-            {isFilterMenuOpen && (
-              <div className="absolute right-full mr-2 md:mr-4 top-0 bg-black/95 backdrop-blur-3xl border border-[#D4AF37]/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-40 md:w-56 flex flex-col gap-1.5 md:gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
-                <h3 className="text-[#D4AF37] font-black text-[8px] md:text-[10px] uppercase tracking-widest border-b border-[#D4AF37]/20 pb-1 mb-0.5">Filters</h3>
-                <div className="flex flex-col gap-0.5 md:gap-1">
-                  {[
-                    { id: 'major_chains', label: 'Major Chains' },
-                    { id: 'fuel', label: 'Fuel' },
-                    { id: 'parking', label: 'Parking' },
-                    { id: 'rest_area', label: 'Rest Areas' },
-                    { id: 'weigh_station', label: 'Scales' },
-                    { id: 'food', label: 'Food' },
-                    { id: 'service', label: 'Service' },
-                    { id: 'distribution', label: 'Distribution' },
-                    { id: 'other', label: 'Other' }
-                  ].map(filter => (
-                    <button
-                      key={filter.id}
-                      onClick={() => {
-                        setPoiFilters(prev => {
-                          const next = new Set(prev);
-                          if (next.has(filter.id)) next.delete(filter.id);
-                          else next.add(filter.id);
-                          return next;
-                        });
-                      }}
-                      className="flex items-center justify-between text-left group py-0.5"
-                    >
-                      <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-tight transition-colors ${poiFilters.has(filter.id) ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{filter.label}</span>
-                      <div className={`w-2.5 h-2.5 md:w-4 md:h-4 rounded border flex items-center justify-center transition-all ${poiFilters.has(filter.id) ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-700 group-hover:border-zinc-500'}`}>
-                        {poiFilters.has(filter.id) && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={5} />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <div className="h-px bg-[#D4AF37]/10 mx-1" />
-          
-          <button 
-            onClick={() => setMapStyle(prev => prev === 'TUE_GOLD' ? 'MAPTILER' : prev === 'MAPTILER' ? 'SATELLITE' : 'TUE_GOLD')}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${mapStyle === 'MAPTILER' || mapStyle === 'SATELLITE' ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title="Toggle Map Style"
-          >
-            <MapIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-          
-          <button 
-            onClick={() => setShowWeather(!showWeather)}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${showWeather ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
-            title="Weather"
-          >
-            <CloudRain className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-          
-          <button 
-            onClick={() => setShowTraffic(!showTraffic)}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${showTraffic ? 'bg-red-600 text-white' : 'bg-white/5 text-white/40 hover:bg-white/10'}`}
-            title="Traffic"
-          >
-            <svg className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-          </button>
-          
-          <div className="h-px bg-[#D4AF37]/10 mx-1" />
-          
-          <button onClick={() => mapInstanceRef.current?.zoomIn()} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10">
-            <Plus className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-          </button>
-          <button onClick={() => mapInstanceRef.current?.zoomOut()} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10">
-            <Minus className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-          </button>
-          
-          <button 
-            onClick={() => { 
-              setIsOverviewMode(!isOverviewMode);
-              if (!isOverviewMode) {
-                setIsFollowMode(false);
-              }
-            }} 
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${isOverviewMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
-            title="Toggle Route Overview"
-          >
-            <MapIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-          </button>
-
-          <button 
-            onClick={() => { 
-              if (isValidLatLng(userLocation) && mapInstanceRef.current) { 
-                mapInstanceRef.current.flyTo(userLocation, 17, { duration: 1.5, easeLinearity: 0.25 }); 
-                setIsFollowMode(true); 
-                setIsOverviewMode(false);
-              } 
-            }} 
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${!isFollowMode || isOverviewMode ? 'bg-red-600/20 text-red-500 border border-red-500/50 animate-pulse' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title="Follow User"
-          >
-            <RotateCcw className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-          </button>
-
-          <button 
-            onClick={() => {
-              if ("geolocation" in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                  (position) => {
-                    const { latitude, longitude } = position.coords;
-                    if (setUserLocationRef.current) {
-                      setUserLocationRef.current([latitude, longitude]);
-                      if (mapInstanceRef.current) {
-                        mapInstanceRef.current.flyTo([latitude, longitude], 17, { duration: 1.5, easeLinearity: 0.25 });
-                        setIsFollowMode(true);
-                        setIsOverviewMode(false);
-                      }
-                    }
-                  },
-                  (error) => {
-                    console.warn("GPS Signal Issue:", error.message);
-                    setError("Failed to get precise location.");
-                  },
-                  { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-                );
-              }
-            }} 
-            className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-blue-600/20 text-blue-500 border border-blue-500/50 hover:bg-blue-600 hover:text-white transition-all"
-            title="Force GPS Update"
-          >
-            <MapPin className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-          </button>
-        </div>
-
-        {/* TUE Branding Watermark */}
-        <div className="mt-1 opacity-30 pointer-events-none flex flex-col items-end whitespace-nowrap pr-1">
-          <div className="flex items-center gap-1">
-            <Truck className="w-2.5 h-2.5 text-[#D4AF37]" />
-            <span className="text-[7px] font-black text-white uppercase tracking-[0.2em]">Truckers Nav</span>
-          </div>
-          <span className="text-[5px] font-black text-[#D4AF37] uppercase tracking-[0.4em]">By Tue</span>
-        </div>
-      </div>
-    )}
-
-    {/* Custom Layer Modal */}
-      {isCustomLayerModalOpen && (
-        <div className="absolute inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[#D4AF37] font-bold text-lg uppercase tracking-wider">Custom Map Layer</h3>
-              <button 
-                onClick={() => setIsCustomLayerModalOpen(false)}
-                className="text-zinc-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">
-                  Tile URL Template
-                </label>
-                <input
-                  type="text"
-                  value={customTileUrl}
-                  onChange={(e) => setCustomTileUrl(e.target.value)}
-                  placeholder="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  className="w-full bg-black/50 border border-zinc-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#D4AF37] transition-colors font-mono text-sm"
-                />
-                <p className="text-xs text-zinc-500 mt-2">
-                  Use {'{s}'}, {'{z}'}, {'{x}'}, and {'{y}'} placeholders.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3 py-2">
-                <input
-                  type="checkbox"
-                  id="customMapShowRoads"
-                  checked={customMapShowRoads}
-                  onChange={(e) => setCustomMapShowRoads(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-700 text-[#D4AF37] focus:ring-[#D4AF37] bg-black/50"
-                />
-                <label htmlFor="customMapShowRoads" className="text-sm text-zinc-300 font-medium">
-                  Show up-to-date roads and highways overlay
-                </label>
-              </div>
-              
-              <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setIsCustomLayerModalOpen(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-700 text-zinc-300 hover:bg-zinc-800 transition-colors font-medium text-sm uppercase tracking-wider"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    localStorage.setItem('custom_tile_url', customTileUrl);
-                    localStorage.setItem('custom_map_show_roads', customMapShowRoads.toString());
-                    setMapStyle('CUSTOM');
-                    setIsCustomLayerModalOpen(false);
-                  }}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-[#D4AF37] text-black hover:bg-[#F3E5AB] transition-colors font-bold text-sm uppercase tracking-wider"
-                >
-                  Apply Layer
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Route Settings Modal */}
-      {isRouteSettingsOpen && (
-        <div className="absolute inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-3">
-                <Settings className="w-5 h-5 text-[#D4AF37]" />
-                <h3 className="text-[#D4AF37] font-bold text-lg uppercase tracking-wider">Route Preferences</h3>
-              </div>
-              <button 
-                onClick={() => setIsRouteSettingsOpen(false)}
-                className="text-zinc-400 hover:text-white transition-colors p-1"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-2">Avoidance Options</h4>
-                
-                <div className="flex items-center justify-between p-4 bg-black/30 rounded-xl border border-zinc-800 hover:border-[#D4AF37]/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <CircleDollarSign className="w-5 h-5 text-zinc-400" />
-                    <span className="text-sm font-bold text-white">Avoid Toll Roads</span>
-                  </div>
-                  <button 
-                    onClick={() => setAvoidTolls(!avoidTolls)}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${avoidTolls ? 'bg-[#D4AF37]' : 'bg-zinc-700'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${avoidTolls ? 'left-7' : 'left-1'}`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-black/30 rounded-xl border border-zinc-800 hover:border-[#D4AF37]/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <Wind className="w-5 h-5 text-zinc-400" />
-                    <span className="text-sm font-bold text-white">Avoid Ferries</span>
-                  </div>
-                  <button 
-                    onClick={() => setAvoidFerries(!avoidFerries)}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${avoidFerries ? 'bg-[#D4AF37]' : 'bg-zinc-700'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${avoidFerries ? 'left-7' : 'left-1'}`} />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-black/30 rounded-xl border border-zinc-800 hover:border-[#D4AF37]/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <TrafficCone className="w-5 h-5 text-zinc-400" />
-                    <span className="text-sm font-bold text-white">Avoid Unpaved Roads</span>
-                  </div>
-                  <button 
-                    onClick={() => setAvoidUnpaved(!avoidUnpaved)}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${avoidUnpaved ? 'bg-[#D4AF37]' : 'bg-zinc-700'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${avoidUnpaved ? 'left-7' : 'left-1'}`} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="space-y-3 pt-4 border-t border-zinc-800">
-                <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-2">Display Mode</h4>
-                
-                <div className="flex items-center justify-between p-4 bg-black/30 rounded-xl border border-zinc-800 hover:border-[#D4AF37]/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <NavIcon className="w-5 h-5 text-zinc-400" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-white">CarPlay Mode</span>
-                      <span className="text-[10px] text-zinc-500">Simplified high-contrast UI</span>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => setIsCarPlayMode(!isCarPlayMode)}
-                    className={`w-12 h-6 rounded-full transition-colors relative ${isCarPlayMode ? 'bg-[#D4AF37]' : 'bg-zinc-700'}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${isCarPlayMode ? 'left-7' : 'left-1'}`} />
-                  </button>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => setIsRouteSettingsOpen(false)}
-                className="w-full bg-[#D4AF37] text-black font-black py-4 rounded-xl hover:bg-[#D4AF37]/90 transition-all uppercase tracking-[0.2em] text-xs shadow-lg shadow-[#D4AF37]/20 active:scale-95"
-              >
-                Save Preferences
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* CarPlay Mode Overlay */}
-      {isCarPlayMode && (
-        <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-          {/* CarPlay Content */}
-        </div>
-      )}
+    
     </div>
   );
 };
 
-export default NavigationView;
+export default React.memo(NavigationView);

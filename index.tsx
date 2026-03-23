@@ -1,13 +1,20 @@
 
+console.log("index.tsx loaded");
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import { registerSW } from 'virtual:pwa-register';
 
-if ('serviceWorker' in navigator) {
-  registerSW({ immediate: true });
-}
+// Global error handling
+window.onerror = (message, source, lineno, colno, error) => {
+  console.log("!!! GLOBAL ERROR DETECTED !!!");
+  console.error("Global Error:", { message, source, lineno, colno, error });
+};
+
+window.onunhandledrejection = (event) => {
+  console.log("!!! UNHANDLED PROMISE REJECTION DETECTED !!!");
+  console.error("Unhandled Promise Rejection:", event.reason);
+};
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -15,8 +22,7 @@ if (!rootElement) {
 }
 
 const root = ReactDOM.createRoot(rootElement);
+console.log("Rendering App");
 root.render(
-  <React.StrictMode>
     <App />
-  </React.StrictMode>
 );

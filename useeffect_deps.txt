@@ -1,0 +1,167 @@
+192-    return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
+193:  }, [propUserLocation, locationContext?.userLocation]); 
+194-  const truckProfile = context?.truckProfile || { 
+--
+282-    if (str) localStorage.setItem('truck_pois', str);
+283:  }, [pois]);
+284-  const isFetchingPoisRef = useRef(false);
+--
+296-    if (str) localStorage.setItem('poi_filters', str);
+297:  }, [poiFilters]);
+298-  const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+--
+311-    if (str) localStorage.setItem('nav_waypoints', str);
+312:  }, [waypoints]);
+313-
+--
+316-    if (str) localStorage.setItem('nav_destination_coords', str);
+317:  }, [destinationCoords]);
+318-
+--
+320-    localStorage.setItem('nav_current_destination', currentDestination);
+321:  }, [currentDestination]);
+322-
+--
+354-    };
+355:  }, []); // Initialize only once
+356-
+--
+368-    };
+369:  }, [isMapReady]);
+370-
+--
+380-    }
+381:  }, [userLocation[0], userLocation[1]]);
+382-
+--
+384-    localStorage.setItem('nav_map_style', mapStyle);
+385:  }, [mapStyle]);
+386-
+--
+388-    localStorage.setItem('nav_north_up', isNorthUp.toString());
+389:  }, [isNorthUp]);
+390-
+--
+392-    localStorage.setItem('nav_avoid_tolls', avoidTolls.toString());
+393:  }, [avoidTolls]);
+394-
+--
+396-    localStorage.setItem('nav_avoid_ferries', avoidFerries.toString());
+397:  }, [avoidFerries]);
+398-
+--
+400-    localStorage.setItem('nav_avoid_unpaved', avoidUnpaved.toString());
+401:  }, [avoidUnpaved]);
+402-
+--
+404-    localStorage.setItem('nav_carplay_mode', isCarPlayMode.toString());
+405:  }, [isCarPlayMode]);
+406-
+--
+408-    localStorage.setItem('nav_show_pois', showPois.toString());
+409:  }, [showPois]);
+410-
+--
+412-    localStorage.setItem('nav_show_highways', showHighways.toString());
+413:  }, [showHighways]);
+414-
+--
+416-    localStorage.setItem('nav_show_road_overlay', showRoadOverlay.toString());
+417:  }, [showRoadOverlay]);
+418-  
+--
+450-    lastViolationRef.current = hasViolation;
+451:  }, [hasViolation]);
+452-
+--
+480-    });
+481:  }, [eldStatus]);
+482-
+--
+591-    };
+592:  }, [isMapReady]);
+593-
+--
+606-    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker' }) }).addTo(mapInstanceRef.current);
+607:  }, [isMapReady, userLocation[0], userLocation[1]]);
+608-
+--
+629-    map.invalidateSize();
+630:  }, [isMapReady]);
+631-
+--
+640-    }
+641:  }, [isNorthUp]);
+642-
+--
+718-    return () => clearTimeout(handler);
+719:  }, [searchQuery, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, isSearchFocused, pois.length, poiFiltersString]);
+720-
+--
+810-    }
+811:  }, [nextInstruction.distance, nextInstruction.text, isDriving]);
+812-
+--
+834-    routeSavedRef.current = true;
+835:  }, [currentDestination, waypoints]);
+836-
+--
+874-    handleRerouteRef.current = handleReroute;
+875:  }, [routeSteps, poiFilters, isOffRoute, isCalculating, context?.autoReroute, weighStationAlert, initialMiles, handleReroute]);
+876-
+--
+1143-    }
+1144:  }, []);
+1145-
+--
+1154-    setWaypointsRef.current = setWaypoints;
+1155:  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, setUserLocation, setWaypoints]);
+1156-
+--
+1250-    return () => clearInterval(interval);
+1251:  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+1252-
+--
+1257-    }
+1258:  }, [waypoints]);
+1259-
+--
+2452-    }
+2453:  }, [isMapReady, initialTarget, destinationCoords, routePoints.length, isCalculating]);
+2454-
+--
+2457-    if (!map || !isMapReady) return;
+2458:  }, [showTraffic, isMapReady]);
+2459-
+--
+2491-    }
+2492:  }, [showWeather, zoom, isMapReady]);
+2493-
+--
+2552-    }
+2553:  }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+2554-
+--
+2607-    });
+2608:  }, [weatherAlerts, isMapReady]);
+2609-
+--
+2633-    }
+2634:  }, [currentSpeedLimit, speed, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+2635-
+--
+2646-    }
+2647:  }, [isOverviewMode]);
+2648-
+--
+2698-    }
+2699:  }, [isDriving, userLocation, updateNavigationState]);
+2700-
+--
+2835-    }
+2836:  }, [pois, showPois, poiFilters, mapCenter]);
+2837-
+--
+2889-    return upcoming;
+2890:  }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(',')]);
+2891-

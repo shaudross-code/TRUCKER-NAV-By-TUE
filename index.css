@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
 
 #nav-map-container::after {
   content: '';
@@ -21,17 +22,27 @@
 
 
 .leaflet-rotate-pane {
-  transition: transform 0.5s linear;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center !important;
+}
+
+.map-heading-up .leaflet-rotate-pane {
+  transform: rotate(var(--map-rotation, 0deg));
+}
+
+.user-marker-container {
+  transition: transform 0.3s ease-out;
+  z-index: 1000 !important;
 }
 
 .vehicle-pointer {
   transform: rotate(var(--vehicle-rotation, 0deg));
-  transition: transform 0.5s linear;
+  transition: transform 0.3s ease-out;
 }
 
 .counter-rotate {
   transform: rotate(calc(var(--map-rotation, 0deg) * -1));
-  transition: transform 0.5s linear;
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .map-interaction-disabled {
@@ -116,4 +127,8 @@
 .map-3d-perspective .route-arrow-marker > div {
   /* Do not rotate back, so it lies flat on the map */
   transform-origin: center center !important;
+}
+
+.map-dark-theme {
+  filter: invert(90%) hue-rotate(180deg) brightness(0.8) contrast(1.2);
 }

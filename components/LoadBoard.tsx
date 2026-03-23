@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { CheckCircle2 } from 'lucide-react';
-import { AppContext } from '../types';
-import { ViewType } from '../types';
+import React, { useState, useEffect, useContext, useMemo } from 'react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
+import { AppContext, LocationContext, ViewType } from '../types';
+import { useFirebase } from './FirebaseProvider';
 
 const LoadCard: React.FC<{
   origin: string;
@@ -14,7 +14,8 @@ const LoadCard: React.FC<{
   match: number;
   progress: number;
   onBook: () => void;
-}> = ({ origin, originTime, destination, distance, commodity, rate, total, match, progress, onBook }) => (
+  isBooking?: boolean;
+}> = ({ origin, originTime, destination, distance, commodity, rate, total, match, progress, onBook, isBooking }) => (
   <div className="bg-[#0a0a0a] border border-zinc-900 rounded-[1.25rem] overflow-hidden mb-4 group hover:border-[#D4AF37]/40 transition-all">
     <div className="p-6 flex items-center justify-between gap-8">
       {/* Route Info */}
@@ -60,10 +61,20 @@ const LoadCard: React.FC<{
         </div>
         <button 
           onClick={onBook}
-          className="w-full bg-[#D4AF37] hover:bg-[#FFD700] text-black py-3.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-[#D4AF37]/20"
+          disabled={isBooking}
+          className="w-full bg-[#D4AF37] hover:bg-[#FFD700] disabled:bg-zinc-800 disabled:text-zinc-500 text-black py-3.5 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-[#D4AF37]/20"
         >
-          Book Now
-          <CheckCircle2 className="w-4 h-4" />
+          {isBooking ? (
+            <>
+              Booking...
+              <Loader2 className="w-4 h-4 animate-spin" />
+            </>
+          ) : (
+            <>
+              Book Now
+              <CheckCircle2 className="w-4 h-4" />
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -75,12 +86,52 @@ const LoadCard: React.FC<{
 
 const LoadBoard: React.FC = () => {
   const context = useContext(AppContext);
+  const { userLocation } = useContext(LocationContext) || { userLocation: null };
+  const { updateProfile } = useFirebase();
+  const [bookingId, setBookingId] = useState<number | null>(null);
   const [loads, setLoads] = useState([
     { origin: "Chicago, IL", originTime: "READY", destination: "Dallas, TX", distance: "928 mi", commodity: "ELECTRO", rate: "$3.45", total: "$3,200", match: 98, progress: 100 },
     { origin: "Joliet, IL", originTime: "FRI 08:00", destination: "Atlanta, GA", distance: "724 mi", commodity: "PAPER", rate: "$2.90", total: "$2,100", match: 85, progress: 65 },
     { origin: "Gary, IN", originTime: "READY", destination: "Miami, FL", distance: "1322 mi", commodity: "REEFER", rate: "$3.10", total: "$4,100", match: 92, progress: 92 },
     { origin: "Chicago, IL", originTime: "ASAP", destination: "Detroit, MI", distance: "285 mi", commodity: "AUTO", rate: "$4.20", total: "$1,200", match: 74, progress: 78 },
   ]);
+
+  const filteredLoads = useMemo(() => {
+    if (!userLocation) return loads;
+
+    const CITY_COORDS: Record<string, [number, number]> = {
+      "Chicago, IL": [41.8781, -87.6298],
+      "Joliet, IL": [41.5250, -88.0817],
+      "Gary, IN": [41.5934, -87.3464],
+      "Dallas, TX": [32.7767, -96.7970],
+      "Atlanta, GA": [33.7490, -84.3880],
+      "Miami, FL": [25.7617, -80.1918],
+      "Detroit, MI": [42.3314, -83.0458],
+      "Nashville, TN": [36.1627, -86.7816],
+      "Phoenix, AZ": [33.4484, -112.0740],
+      "Seattle, WA": [47.6062, -122.3321],
+      "Denver, CO": [39.7392, -104.9903],
+      "Austin, TX": [30.2672, -97.7431]
+    };
+
+    const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const R = 3958.8; // Radius of the earth in miles
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    };
+
+    return loads.filter(load => {
+      const coords = CITY_COORDS[load.origin];
+      if (!coords) return true; // If we don't know the coords, show it
+      const distance = getDistance(userLocation[0], userLocation[1], coords[0], coords[1]);
+      return distance < 100; // Show loads within 100 miles
+    });
+  }, [loads, userLocation]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -111,10 +162,29 @@ const LoadBoard: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleBook = (destination: string) => {
-    if (context) {
-      context.setNavTarget(destination);
-      context.setActiveView(ViewType.NAVIGATION);
+  const handleBook = async (load: any, index: number) => {
+    setBookingId(index);
+    try {
+      // Save to Firestore
+      await updateProfile({
+        currentLoad: {
+          origin: load.origin,
+          destination: load.destination,
+          commodity: load.commodity,
+          rate: load.rate,
+          total: load.total,
+          bookedAt: new Date().toISOString()
+        }
+      });
+
+      if (context) {
+        context.setNavTarget(load.destination);
+        context.setActiveView(ViewType.NAVIGATION);
+      }
+    } catch (error) {
+      console.error("Booking error:", error);
+    } finally {
+      setBookingId(null);
     }
   };
 
@@ -140,8 +210,13 @@ const LoadBoard: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {loads.map((load, i) => (
-          <LoadCard key={i} {...load} onBook={() => handleBook(load.destination)} />
+        {filteredLoads.map((load, i) => (
+          <LoadCard 
+            key={i} 
+            {...load} 
+            onBook={() => handleBook(load, i)} 
+            isBooking={bookingId === i}
+          />
         ))}
       </div>
     </div>

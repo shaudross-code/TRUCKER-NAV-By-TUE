@@ -1,0 +1,119 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile including truck specifications and preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "truckProfile": { "$ref": "TruckProfile" },
+        "autoReroute": { "type": "boolean" },
+        "weeklyEarnings": { "type": "number" },
+        "fuelCost": { "type": "number" },
+        "truckCost": { "type": "number" },
+        "weekDeductions": { "type": "number" },
+        "takeHomePercentage": { "type": "number" },
+        "milesThisWeek": { "type": "number" },
+        "customPois": {
+          "type": "array",
+          "items": { "$ref": "POI" }
+        }
+      },
+      "required": ["uid", "email"]
+    },
+    "POI": {
+      "title": "Point of Interest",
+      "description": "A custom point of interest saved by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "lat": { "type": "number" },
+        "lon": { "type": "number" },
+        "type": { "type": "string" },
+        "address": { "type": "string" },
+        "rating": { "type": "number" },
+        "isCustom": { "type": "boolean" }
+      },
+      "required": ["id", "name", "lat", "lon", "type"]
+    },
+    "TruckProfile": {
+      "title": "Truck Profile",
+      "description": "Physical specifications of the truck for routing",
+      "type": "object",
+      "properties": {
+        "height": { "type": "number" },
+        "weight": { "type": "number" },
+        "length": { "type": "number" },
+        "width": { "type": "number" },
+        "axleCount": { "type": "number" },
+        "axleWeight": { "type": "number" },
+        "trailerCount": { "type": "number" },
+        "hazmat": { "type": "boolean" },
+        "hazmatClasses": { "type": "array", "items": { "type": "string" } },
+        "tunnelCategory": { "type": "string", "enum": ["A", "B", "C", "D", "E", "NONE"] }
+      }
+    },
+    "HOSStatus": {
+      "title": "HOS Status",
+      "description": "Hours of Service status and timers",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["DRIVING", "ON_DUTY", "OFF_DUTY", "SLEEPER"] },
+        "driveTime": { "type": "number" },
+        "dutyTime": { "type": "number" },
+        "cycleTime": { "type": "number" },
+        "breakTime": { "type": "number" },
+        "lastUpdate": { "type": "string", "format": "date-time" }
+      }
+    },
+    "RouteHistory": {
+      "title": "Route History",
+      "description": "Historical navigation routes",
+      "type": "object",
+      "properties": {
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "distance": { "type": "string" },
+        "duration": { "type": "string" },
+        "fuelUsed": { "type": "number" },
+        "cost": { "type": "number" },
+        "status": { "type": "string", "enum": ["COMPLETED", "CANCELLED"] }
+      }
+    },
+    "MaintenanceAlert": {
+      "title": "Maintenance Alert",
+      "description": "Vehicle maintenance alerts and history",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "urgency": { "type": "string", "enum": ["High", "Medium", "Low"] },
+        "date": { "type": "string" },
+        "type": { "type": "string", "enum": ["Repair", "Scheduled", "Maintenance"] },
+        "status": { "type": "string", "enum": ["Active", "Scheduled", "Completed"] },
+        "cost": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile and settings"
+    },
+    "/users/{userId}/hos": {
+      "schema": "HOSStatus",
+      "description": "Current HOS status for the user"
+    },
+    "/users/{userId}/history": {
+      "schema": "RouteHistory",
+      "description": "Route history for the user"
+    },
+    "/users/{userId}/maintenance": {
+      "schema": "MaintenanceAlert",
+      "description": "Maintenance alerts and history for the user"
+    }
+  }
+}

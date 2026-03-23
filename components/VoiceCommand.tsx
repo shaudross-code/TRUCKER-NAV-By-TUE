@@ -44,7 +44,7 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose, setActiveView, set
       setMessages(prev => [...prev, { role: 'ai', text: aiResponse, isSpeaking: true }]);
       
       // Handle function calls
-      if (response.functionCalls) {
+      if ('functionCalls' in response && response.functionCalls) {
         for (const call of response.functionCalls) {
           if (call.name === 'navigate_to') {
             const dest = (call.args as any).destination;
@@ -57,6 +57,12 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose, setActiveView, set
               setActiveView(ViewType[viewStr as keyof typeof ViewType]);
               setTimeout(onClose, 2000);
             }
+          } else if (call.name === 'find_truck_stops') {
+            setActiveView(ViewType.TRUCK_STOPS);
+            setTimeout(onClose, 2000);
+          } else if (call.name === 'get_load_info') {
+            setActiveView(ViewType.LOAD_BOARD);
+            setTimeout(onClose, 2000);
           }
         }
       }
@@ -64,7 +70,7 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose, setActiveView, set
       speak(aiResponse);
       setMessages(prev => prev.map(m => m.text === aiResponse ? { ...m, isSpeaking: false } : m));
     } catch (error) {
-      console.error("Voice command error:", error);
+      console.error("Voice command error:", error instanceof Error ? error.message : String(error));
       setMessages(prev => [...prev, { role: 'ai', text: 'Connection lost. Check signal.' }]);
     } finally { setIsProcessing(false); }
   };
@@ -104,7 +110,7 @@ const VoiceCommand: React.FC<VoiceCommandProps> = ({ onClose, setActiveView, set
     };
 
     recognition.onerror = (event: any) => {
-      console.error("Speech recognition error", event.error);
+      console.error("Speech recognition error", String(event.error));
       setIsListening(false);
     };
 

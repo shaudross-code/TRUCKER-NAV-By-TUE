@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   ChevronRight,
   History,
-  DollarSign
+  DollarSign,
+  LogOut
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { speak } from '../services/speechService';
@@ -24,6 +25,7 @@ interface SidebarProps {
   onVoiceToggle: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  onSignOut?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
@@ -31,7 +33,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onViewChange, 
   onVoiceToggle,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  onSignOut
 }) => {
   const menuItems = [
     { id: ViewType.DASHBOARD, icon: LayoutGrid, label: 'Dashboard' },
@@ -65,8 +68,8 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {!isCollapsed && (
               <div className="flex flex-col animate-in fade-in duration-300">
-                <h1 className="text-[18px] font-[900] tracking-[-0.02em] leading-none text-white font-sans uppercase">Truckers Nav</h1>
-                <p className="text-[10px] text-[#D4AF37] font-[800] tracking-[0.3em] uppercase mt-2">By Tue</p>
+                <h1 className="text-[18px] font-[900] tracking-[-0.02em] leading-none text-white font-sans uppercase">TRUCKERS NAV</h1>
+                <p className="text-[10px] text-[#D4AF37] font-[800] tracking-[0.3em] uppercase mt-2">By TUE</p>
               </div>
             )}
           </div>
@@ -122,6 +125,18 @@ const Sidebar: React.FC<SidebarProps> = ({
               </div>
               {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Voice Command</span>}
             </button>
+
+            {onSignOut && (
+              <button 
+                onClick={onSignOut}
+                className={`w-full bg-black border border-zinc-900 hover:border-rose-500/30 p-4 rounded-2xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
+              >
+                <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-rose-500/10 shrink-0">
+                  <LogOut className="w-4 h-4 text-zinc-400 group-hover:text-rose-500" />
+                </div>
+                {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Sign Out</span>}
+              </button>
+            )}
           </div>
 
           {/* Swipe Away Toggle Button - Only in Navigation View or always? User said "In navigation view" */}
@@ -169,4 +184,4 @@ const Sidebar: React.FC<SidebarProps> = ({
   );
 };
 
-export default Sidebar;
+export default React.memo(Sidebar);

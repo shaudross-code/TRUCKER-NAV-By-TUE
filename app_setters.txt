@@ -1,0 +1,47 @@
+19:  const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
+20:  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+21:  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+22:  const [userLocation, setUserLocation] = useState<[number, number] | null>(() => {
+26:  const [navTarget, setNavTarget] = useState<string | null>(null);
+27:  const [autoReroute, setAutoReroute] = useState(() => {
+37:  const [truckProfile, setTruckProfile] = useState(() => {
+69:  const [weeklyEarnings, setWeeklyEarnings] = useState(() => {
+78:  const [milesThisWeek, setMilesThisWeek] = useState(() => {
+87:  const [fuelCost, setFuelCost] = useState(() => {
+96:  const [truckCost, setTruckCost] = useState(() => {
+105:  const [weekDeductions, setWeekDeductions] = useState(() => {
+114:  const [takeHomePercentage, setTakeHomePercentage] = useState(() => {
+127:    if (str) localStorage.setItem('trucker_profile', str);
+132:    if (str) localStorage.setItem('trucker_take_home_percentage', str);
+137:    if (str) localStorage.setItem('trucker_weekly_earnings', str);
+142:    if (str) localStorage.setItem('trucker_miles_this_week', str);
+147:    if (str) localStorage.setItem('trucker_fuel_cost', str);
+152:    if (str) localStorage.setItem('trucker_truck_cost', str);
+157:    if (str) localStorage.setItem('trucker_week_deductions', str);
+162:    if (str) localStorage.setItem('trucker_auto_reroute', str);
+168:      if (str) localStorage.setItem('trucker_last_location', str);
+172:  const [isDriving, setIsDriving] = useState(false);
+173:  const [apiKeyMissing, setApiKeyMissing] = useState(false);
+176:    setActiveView(ViewType.DASHBOARD);
+178:      setApiKeyMissing(true);
+212:      setUserLocation(prev => prev || (saved ? JSON.parse(saved) : [41.8781, -87.6298]));
+223:        setUserLocation(prev => {
+232:        setUserLocation(prev => {
+277:      setActiveView, 
+279:      setNavTarget,
+281:      setIsDriving,
+283:      setAutoReroute,
+285:      setTruckProfile,
+287:      setWeeklyEarnings,
+289:      setMilesThisWeek,
+291:      setFuelCost,
+293:      setTruckCost,
+295:      setWeekDeductions,
+297:      setTakeHomePercentage
+314:    setUserLocation
+329:              onViewChange={setActiveView} 
+330:              onVoiceToggle={() => setIsVoiceOpen(true)} 
+332:              onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+352:                onClose={() => setIsVoiceOpen(false)} 
+353:                setActiveView={setActiveView}
+354:                setNavTarget={setNavTarget}

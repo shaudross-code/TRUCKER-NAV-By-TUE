@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Droplets, Gauge, AlertCircle, CheckCircle2, History } from 'lucide-react';
+import { useFirebase } from './FirebaseProvider';
+import { collection, onSnapshot, query, orderBy, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../firebase';
+import { MaintenanceRecord } from '../types';
 
 const StatusItem: React.FC<{ label: string, value: string, percentage: number, color: string, icon: any }> = ({ label, value, percentage, color, icon: Icon }) => (
   <div className="bg-[#0a0a0a] border border-zinc-900 p-6 rounded-[2rem] hover:border-[#D4AF37]/30 transition-all group">
@@ -30,29 +34,79 @@ const StatusItem: React.FC<{ label: string, value: string, percentage: number, c
 );
 
 const Maintenance: React.FC = () => {
-  const [alerts, setAlerts] = useState([
-    { id: 1, title: 'Brake Pad Replacement Required', urgency: 'High', date: 'Within 500 mi', type: 'Repair' },
-    { id: 2, title: 'Routine 50k mi Inspection', urgency: 'Medium', date: 'Jan 25, 2025', type: 'Scheduled' },
-    { id: 3, title: 'Tire Rotation', urgency: 'Low', date: 'Feb 10, 2025', type: 'Maintenance' },
-  ]);
+  const { user } = useFirebase();
+  const [records, setRecords] = useState<MaintenanceRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [history, setHistory] = useState([
-    { date: '2024-12-15', service: 'Oil Change & Filter', cost: '$450.00', status: 'Completed' },
-    { date: '2024-11-02', service: 'Transmission Flush', cost: '$820.00', status: 'Completed' },
-  ]);
+  useEffect(() => {
+    if (!user) return;
 
-  const handleSchedule = (id: number) => {
-    const alert = alerts.find(a => a.id === id);
-    if (!alert) return;
-    
-    setAlerts(prev => prev.filter(a => a.id !== id));
-    setHistory(prev => [{
-      date: new Date().toISOString().split('T')[0],
-      service: alert.title,
-      cost: 'Pending',
-      status: 'Scheduled'
-    }, ...prev]);
+    const maintenanceRef = collection(db, 'users', user.uid, 'maintenance');
+    const q = query(maintenanceRef, orderBy('date', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newRecords = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as MaintenanceRecord[];
+      setRecords(newRecords);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/maintenance`);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  const alerts = records.filter(r => r.status !== 'Completed');
+  const history = records.filter(r => r.status === 'Completed');
+
+  const handleSchedule = async (id: string) => {
+    if (!user) return;
+    const recordRef = doc(db, 'users', user.uid, 'maintenance', id);
+    try {
+      await updateDoc(recordRef, {
+        status: 'Scheduled',
+        date: new Date().toISOString().split('T')[0]
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/maintenance/${id}`);
+    }
   };
+
+  const handleComplete = async (id: string) => {
+    if (!user) return;
+    const recordRef = doc(db, 'users', user.uid, 'maintenance', id);
+    try {
+      await updateDoc(recordRef, {
+        status: 'Completed',
+        cost: `$${(Math.random() * 500 + 100).toFixed(2)}`
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}/maintenance/${id}`);
+    }
+  };
+
+  // Initial data seeding if empty
+  useEffect(() => {
+    if (!user || loading || records.length > 0) return;
+
+    const seedData = async () => {
+      const maintenanceRef = collection(db, 'users', user.uid, 'maintenance');
+      const initialAlerts = [
+        { title: 'Brake Pad Replacement Required', urgency: 'High', date: 'Within 500 mi', type: 'Repair', status: 'Active' },
+        { title: 'Routine 50k mi Inspection', urgency: 'Medium', date: '2025-01-25', type: 'Scheduled', status: 'Scheduled' },
+        { title: 'Tire Rotation', urgency: 'Low', date: '2025-02-10', type: 'Maintenance', status: 'Active' },
+      ];
+
+      for (const alert of initialAlerts) {
+        await addDoc(maintenanceRef, alert);
+      }
+    };
+
+    seedData();
+  }, [user, loading, records.length]);
 
   return (
     <div className="p-10 max-w-7xl mx-auto bg-[#050505]">
@@ -105,12 +159,23 @@ const Maintenance: React.FC = () => {
                     <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest italic">{alert.type} • {alert.date}</div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => handleSchedule(alert.id)}
-                  className="px-6 py-2.5 bg-zinc-900 hover:bg-[#D4AF37] border border-zinc-800 hover:border-[#D4AF37] text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-zinc-500 hover:text-black shadow-lg"
-                >
-                  Schedule
-                </button>
+                <div className="flex gap-2">
+                  {alert.status === 'Active' ? (
+                    <button 
+                      onClick={() => handleSchedule(alert.id)}
+                      className="px-6 py-2.5 bg-zinc-900 hover:bg-[#D4AF37] border border-zinc-800 hover:border-[#D4AF37] text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-zinc-500 hover:text-black shadow-lg"
+                    >
+                      Schedule
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleComplete(alert.id)}
+                      className="px-6 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 border border-emerald-500/20 hover:border-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-emerald-500 hover:text-black shadow-lg"
+                    >
+                      Complete
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -122,12 +187,17 @@ const Maintenance: React.FC = () => {
             Service History
           </h2>
           <div className="space-y-4">
-            {history.map((item, i) => (
+            {history.length === 0 ? (
+              <div className="p-10 text-center border border-dashed border-zinc-800 rounded-2xl">
+                <History className="w-10 h-10 text-zinc-800 mx-auto mb-3" />
+                <p className="text-zinc-600 font-bold uppercase text-xs tracking-widest">No service history yet</p>
+              </div>
+            ) : history.map((item, i) => (
               <div key={i} className="flex items-center justify-between p-5 bg-zinc-900/10 rounded-2xl border border-zinc-900">
                 <div className="flex items-center gap-4">
                   <div className="text-zinc-600 font-mono text-[10px] uppercase">{item.date}</div>
                   <div>
-                    <div className="text-sm font-bold text-zinc-300">{item.service}</div>
+                    <div className="text-sm font-bold text-zinc-300">{item.service || item.title}</div>
                     <div className={`text-[9px] font-black uppercase tracking-widest ${item.status === 'Completed' ? 'text-emerald-500' : 'text-[#D4AF37]'}`}>{item.status}</div>
                   </div>
                 </div>

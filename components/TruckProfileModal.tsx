@@ -5,7 +5,16 @@ interface TruckProfile {
   height: number;
   weight: number;
   length: number;
+  width: number;
   hazmat: boolean;
+  hazmatClasses: string[];
+  tunnelCategory: string;
+  axleCount: number;
+  axleWeight: number;
+  trailerCount: number;
+  model: string;
+  year: number;
+  make: string;
 }
 
 interface TruckProfileModalProps {
@@ -49,6 +58,48 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
           <div className="space-y-4">
             <div>
               <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Truck className="w-3 h-3" />
+                Truck Make
+              </label>
+              <input 
+                type="text" 
+                value={formData.make || ''}
+                onChange={(e) => setFormData({...formData, make: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Truck className="w-3 h-3" />
+                Truck Model
+              </label>
+              <input 
+                type="text" 
+                value={formData.model || ''}
+                onChange={(e) => setFormData({...formData, model: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Truck className="w-3 h-3" />
+                Truck Year
+              </label>
+              <input 
+                type="number" 
+                value={formData.year || ''}
+                onChange={(e) => setFormData({...formData, year: parseInt(e.target.value) || 0})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
                 <ArrowUpCircle className="w-3 h-3" />
                 Max Height (ft)
               </label>
@@ -89,6 +140,81 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
+            </div>
+            
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <ArrowUpCircle className="w-3 h-3" />
+                Width (ft)
+              </label>
+              <input 
+                type="number" 
+                step="0.1"
+                value={formData.width}
+                onChange={(e) => setFormData({...formData, width: parseFloat(e.target.value) || 0})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Scale className="w-3 h-3" />
+                Axle Count
+              </label>
+              <input 
+                type="number" 
+                value={formData.axleCount}
+                onChange={(e) => setFormData({...formData, axleCount: parseInt(e.target.value) || 0})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Scale className="w-3 h-3" />
+                Axle Weight (lbs)
+              </label>
+              <input 
+                type="number" 
+                value={formData.axleWeight}
+                onChange={(e) => setFormData({...formData, axleWeight: parseInt(e.target.value) || 0})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Truck className="w-3 h-3" />
+                Trailer Count
+              </label>
+              <input 
+                type="number" 
+                value={formData.trailerCount}
+                onChange={(e) => setFormData({...formData, trailerCount: parseInt(e.target.value) || 0})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                <Shield className="w-3 h-3" />
+                Tunnel Category
+              </label>
+              <select
+                value={formData.tunnelCategory}
+                onChange={(e) => setFormData({...formData, tunnelCategory: e.target.value})}
+                className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
+              >
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+              </select>
             </div>
             
             <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">

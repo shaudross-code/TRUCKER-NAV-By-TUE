@@ -1,4 +1,5 @@
 import { GoogleGenAI, Modality, Type } from "@google/genai";
+import { safeStringify } from '../utils';
 
 let ai: GoogleGenAI | null = null;
 
@@ -39,16 +40,20 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 5, delay = 2000): Pr
   try {
     return await fn();
   } catch (error: any) {
-    const errorStr = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+    const errorStr = error?.message || (typeof error === 'object' ? (error?.toString() || String(error)) : String(error));
     const isBusy = 
       error?.status === 503 || 
       error?.code === 503 || 
+      error?.status === 429 ||
+      error?.code === 429 ||
       errorStr.includes('503') || 
+      errorStr.includes('429') ||
       errorStr.includes('high demand') ||
-      errorStr.includes('UNAVAILABLE');
+      errorStr.includes('UNAVAILABLE') ||
+      errorStr.includes('RESOURCE_EXHAUSTED');
 
     if (retries > 0 && isBusy) {
-      console.warn(`Gemini API busy (503), retrying in ${delay}ms... (${retries} retries left)`);
+      console.warn(`Gemini API busy or rate limited, retrying in ${delay}ms... (${retries} retries left)`);
       await sleep(delay);
       return withRetry(fn, retries - 1, Math.min(delay * 2, 10000));
     }
@@ -68,7 +73,7 @@ export async function processVoiceCommand(text: string) {
       CRITICAL: Always use miles for distances, never meters.
       Keep it concise and safety-focused.`,
       config: {
-        systemInstruction: "You are the TRUCKERS NAV Voice Assistant. Your goal is to help truck drivers manage their routes, fuel, and parking safety. Respond succinctly as if through a radio. Always use miles for distances.",
+        systemInstruction: "You are the TRUCKERS NAV Voice Assistant. Your goal is to help truck drivers manage their routes, fuel, and parking safety. Respond succinctly as if through a radio. Always use miles for distances. You have tools to navigate, switch views, find truck stops, and check loads.",
         tools: [{
           functionDeclarations: [
             {
@@ -88,9 +93,29 @@ export async function processVoiceCommand(text: string) {
               parameters: {
                 type: Type.OBJECT,
                 properties: {
-                  view: { type: Type.STRING, description: "The view to switch to (DASHBOARD, NAVIGATION, TRUCK_STOPS, LOAD_BOARD, MAINTENANCE, SETTINGS)" }
+                  view: { type: Type.STRING, description: "The view to switch to (DASHBOARD, NAVIGATION, TRUCK_STOPS, LOAD_BOARD, MAINTENANCE, SETTINGS, ROUTE_HISTORY)" }
                 },
                 required: ["view"]
+              }
+            },
+            {
+              name: "find_truck_stops",
+              description: "Find truck stops near the current location or a specific place",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  location: { type: Type.STRING, description: "Optional location to search near" }
+                }
+              }
+            },
+            {
+              name: "get_load_info",
+              description: "Get information about the current active load or earnings",
+              parameters: {
+                type: Type.OBJECT,
+                properties: {
+                  query: { type: Type.STRING, description: "What the user wants to know about their loads" }
+                }
               }
             }
           ]
@@ -100,7 +125,7 @@ export async function processVoiceCommand(text: string) {
 
     return response;
   } catch (error) {
-    console.error("Voice command processing failed:", error);
+    console.error("Voice command processing failed:", error instanceof Error ? error.message : String(error));
     return { text: "I'm having trouble processing that right now." };
   }
 }
@@ -111,9 +136,9 @@ export async function fetchTruckStops(lat: number, lon: number) {
     if (!ai) return [];
     const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Find 4 real truck stops or travel centers near coordinates ${lat}, ${lon}. 
-      For each, provide: name, location (address or exit), distance from these coordinates in miles, current estimated availability (as a percentage), and a list of 3-4 amenities.
-      Also provide specific entrance and exit coordinates (entranceLat, entranceLon, exitLat, exitLon) if they can be accurately estimated.
+      contents: `Find 5 real truck stops or travel centers near coordinates ${lat}, ${lon}. 
+      For each, provide: name, location (address or exit), distance from these coordinates in miles, current estimated availability (as a percentage), and a list of 4-5 key amenities (e.g., showers, diesel, parking, food).
+      Also provide specific entrance and exit coordinates (entranceLat, entranceLon, exitLat, exitLon) for the truck-specific access points.
       Return the data in a clean JSON array format.`,
       config: {
         responseMimeType: "application/json",
@@ -143,7 +168,6 @@ export async function fetchTruckStops(lat: number, lon: number) {
 
     if (!response.text) return [];
     
-    // Sometimes the model returns markdown code blocks, strip them
     let jsonStr = response.text.trim();
     if (jsonStr.startsWith('```json')) {
       jsonStr = jsonStr.replace(/^```json\n/, '').replace(/\n```$/, '');
@@ -151,35 +175,32 @@ export async function fetchTruckStops(lat: number, lon: number) {
       jsonStr = jsonStr.replace(/^```\n/, '').replace(/\n```$/, '');
     }
     
-    return JSON.parse(jsonStr).map((stop: any) => ({
+    const data = JSON.parse(jsonStr);
+    return data.map((stop: any) => ({
       ...stop,
-      entrance: stop.entranceLat ? { lat: stop.entranceLat, lon: stop.entranceLon } : undefined,
-      exit: stop.exitLat ? { lat: stop.exitLat, lon: stop.exitLon } : undefined
+      entrance: stop.entranceLat && stop.entranceLon ? { lat: Number(stop.entranceLat), lon: Number(stop.entranceLon) } : undefined,
+      exit: stop.exitLat && stop.exitLon ? { lat: Number(stop.exitLat), lon: Number(stop.exitLon) } : undefined
     }));
   } catch (e) {
-    console.warn("Using fallback data for truck stops due to API error.", e);
-    // Fallback data
+    console.warn("Using fallback data for truck stops due to API error.", e instanceof Error ? e.message : String(e));
     return [
       {
         name: "Love's Travel Stop",
         location: "Exit 42",
         distance: 2.5,
         availability: 85,
-        amenities: ["Showers", "Diesel", "Subway", "CAT Scale"]
+        amenities: ["Showers", "Diesel", "Subway", "CAT Scale", "Parking"],
+        entrance: { lat: lat + 0.001, lon: lon + 0.001 },
+        exit: { lat: lat + 0.0015, lon: lon + 0.0015 }
       },
       {
         name: "Pilot Travel Center",
         location: "Exit 45",
         distance: 5.1,
         availability: 40,
-        amenities: ["Showers", "Diesel", "Wendy's", "Parking"]
-      },
-      {
-        name: "TA Travel Center",
-        location: "Exit 50",
-        distance: 10.2,
-        availability: 90,
-        amenities: ["Showers", "Diesel", "Country Pride", "Service Center"]
+        amenities: ["Showers", "Diesel", "Wendy's", "Parking", "ATM"],
+        entrance: { lat: lat - 0.001, lon: lon - 0.001 },
+        exit: { lat: lat - 0.0015, lon: lon - 0.0015 }
       }
     ];
   }
@@ -208,6 +229,7 @@ export async function fetchMajorChains(lat: number, lon: number) {
       - Sheetz
       - QuikTrip
       - RaceTrac
+      - Conoco
       
       Return a JSON array of objects with: name, type, lat, lon, and amenities.`,
       config: {
@@ -248,7 +270,7 @@ export async function fetchMajorChains(lat: number, lon: number) {
       lon: Number(poi.lon)
     }));
   } catch (err) {
-    console.warn("Using fallback data for major chains due to API error.", err);
+    console.warn("Using fallback data for major chains due to API error.", err instanceof Error ? err.message : String(err));
     // Fallback data
     return [
       { name: "Love's Travel Stop", type: "major_chains", lat: lat + 0.001, lon: lon + 0.001, amenities: ["Showers", "Diesel", "Subway"] },
@@ -266,7 +288,7 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
     if (!ai) throw new Error("AI not initialized");
     const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Find 150 real truck-related points of interest within a 1000-mile radius of coordinates ${lat}, ${lon}. 
+      contents: `Find 150 real truck-related points of interest within a 250-mile radius of coordinates ${lat}, ${lon}. 
       This is for a professional worldwide trucking application. Ensure high reliability and accurate coordinates.
       CRITICAL: You MUST perform a thorough search for these specific brands and include as many as possible: 
       - Love's Travel Stops
@@ -277,10 +299,12 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       - Road Ranger
       - KwikTrip / KwikStar
       - TA Express
+      - Conoco
+      - Casey's
       
       Also include weigh stations, rest areas, truck washes (like Blue Beacon), and major truck service centers.
-      For each facility, provide the main coordinates (lat, lon) AND specific entrance and exit coordinates (entranceLat, entranceLon, exitLat, exitLon) if they are known or can be accurately estimated (e.g., slightly offset from the main location towards the nearest road).
-      Return a JSON array of objects with: name, type, lat, lon, entranceLat, entranceLon, exitLat, exitLon, and amenities (a list of 3-4 key features or services).`,
+      For each facility, provide the main coordinates (lat, lon) AND specific entrance and exit coordinates (entranceLat, entranceLon, exitLat, exitLon) for truck-specific access points.
+      Return a JSON array of objects with: name, type, lat, lon, entranceLat, entranceLon, exitLat, exitLon, and amenities (a list of 4-5 key features or services).`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -309,7 +333,6 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
 
     if (!response.text) throw new Error("Empty response from AI");
     
-    // Sometimes the model returns markdown code blocks, strip them
     let jsonStr = response.text.trim();
     if (jsonStr.startsWith('```json')) {
       jsonStr = jsonStr.replace(/^```json\n/, '').replace(/\n```$/, '');
@@ -321,18 +344,16 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       ...poi,
       lat: Number(poi.lat),
       lon: Number(poi.lon),
-      entrance: poi.entranceLat ? { lat: Number(poi.entranceLat), lon: Number(poi.entranceLon) } : undefined,
-      exit: poi.exitLat ? { lat: Number(poi.exitLat), lon: Number(poi.exitLon) } : undefined
+      entrance: poi.entranceLat && poi.entranceLon ? { lat: Number(poi.entranceLat), lon: Number(poi.entranceLon) } : undefined,
+      exit: poi.exitLat && poi.exitLon ? { lat: Number(poi.exitLat), lon: Number(poi.exitLon) } : undefined
     }));
   } catch (e) {
-    console.warn("Using fallback data for POIs due to API error.", e);
-    // Fallback data
+    console.warn("Using fallback data for POIs due to API error.", e instanceof Error ? e.message : String(e));
     return [
-      { name: "Love's Travel Stop", type: "major_chains", lat: lat + 0.005, lon: lon + 0.005, amenities: ["Showers", "Diesel", "Subway"] },
-      { name: "Pilot Travel Center", type: "major_chains", lat: lat - 0.005, lon: lon - 0.005, amenities: ["Showers", "Diesel", "Wendy's"] },
+      { name: "Love's Travel Stop", type: "major_chains", lat: lat + 0.005, lon: lon + 0.005, amenities: ["Showers", "Diesel", "Subway", "CAT Scale"] },
+      { name: "Pilot Travel Center", type: "major_chains", lat: lat - 0.005, lon: lon - 0.005, amenities: ["Showers", "Diesel", "Wendy's", "Parking"] },
       { name: "Rest Area", type: "rest_area", lat: lat + 0.008, lon: lon - 0.002, amenities: ["Restrooms", "Vending Machines", "Parking"] },
-      { name: "Weigh Station", type: "weigh_station", lat: lat - 0.003, lon: lon + 0.007, amenities: ["Scales", "Inspection"] },
-      { name: "Blue Beacon Truck Wash", type: "service", lat: lat + 0.01, lon: lon + 0.002, amenities: ["Truck Wash", "Trailer Washout"] }
+      { name: "Weigh Station", type: "weigh_station", lat: lat - 0.003, lon: lon + 0.007, amenities: ["Scales", "Inspection"] }
     ];
   }
 }
@@ -353,6 +374,7 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
     const ai = getAI();
     if (!ai) return false;
     console.log("Synthesizing speech:", text);
+    
     const response = await withRetry(() => ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text }] }],
@@ -366,11 +388,7 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
       },
     }));
 
-    console.log("Gemini TTS Response received");
-    
     let base64Audio: string | undefined;
-    
-    // Iterate through candidates and parts to find audio data
     if (response.candidates && response.candidates[0]?.content?.parts) {
       for (const part of response.candidates[0].content.parts) {
         if (part.inlineData?.data && part.inlineData.mimeType?.includes('audio')) {
@@ -380,79 +398,48 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
       }
     }
 
-    if (base64Audio) {
-      console.log("Received audio data, length:", base64Audio.length);
-      try {
-        const audioCtx = getAudioContext();
-        try {
-          if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
-          }
-        } catch (resumeErr) {
-          console.error("Failed to resume AudioContext:", resumeErr);
-        }
-        
-        const binaryString = atob(base64Audio);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        let audioBuffer: AudioBuffer;
-        
-        try {
-          // Try native decoding first (works for WAV, MP3, etc.)
-          audioBuffer = await audioCtx.decodeAudioData(bytes.buffer.slice(0));
-          console.log("Native decoding successful");
-        } catch (nativeErr) {
-          console.warn("Native decoding failed, attempting manual PCM decoding:", nativeErr);
-          // Fallback to manual PCM decoding (16-bit, 24kHz, mono)
-          const pcmData = bytes.length % 2 === 0 ? bytes : bytes.slice(0, -1);
-          audioBuffer = await decodeAudioData(
-            pcmData,
-            audioCtx,
-            24000,
-            1,
-          );
-        }
-        
-        const source = audioCtx.createBufferSource();
-        const gainNode = audioCtx.createGain();
-        gainNode.gain.value = 1.0;
-        
-        source.buffer = audioBuffer;
-        source.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-        
-        console.log("Starting audio playback...");
-        return new Promise<boolean>((resolve) => {
-          source.onended = () => {
-            console.log("Audio playback ended.");
-            resolve(true);
-          };
-          try {
-            source.start(0);
-          } catch (e) {
-            console.error("Failed to start audio source:", e);
-            resolve(false);
-          }
-        });
-      } catch (audioErr) {
-        console.error("Audio Playback Error:", audioErr);
-        return false;
-      }
-    } else {
+    if (!base64Audio) {
       console.warn("No audio data in response parts");
+      return false;
     }
+
+    const audioCtx = getAudioContext();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+    
+    const binaryString = atob(base64Audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    let audioBuffer: AudioBuffer;
+    try {
+      audioBuffer = await audioCtx.decodeAudioData(bytes.buffer.slice(0));
+    } catch (_error) {
+      console.warn("Native decoding failed, attempting manual PCM decoding");
+      const pcmData = bytes.length % 2 === 0 ? bytes : bytes.slice(0, -1);
+      audioBuffer = await decodeAudioData(pcmData, audioCtx, 24000, 1);
+    }
+    
+    const source = audioCtx.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioCtx.destination);
+    
+    return new Promise<boolean>((resolve) => {
+      source.onended = () => resolve(true);
+      source.onerror = () => resolve(false);
+      try {
+        source.start(0);
+      } catch (e) {
+        console.error("Failed to start audio source:", e);
+        resolve(false);
+      }
+    });
   } catch (error: any) {
-    const errorStr = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
-    if (
-      error?.code === 429 || 
-      error?.status === 'RESOURCE_EXHAUSTED' || 
-      errorStr.includes('429') || 
-      errorStr.includes('RESOURCE_EXHAUSTED') ||
-      errorStr.includes('quota')
-    ) {
+    const errorStr = String(error?.message || error);
+    if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('quota')) {
       ttsDisabled = true;
       console.warn("TTS quota exhausted, disabling TTS.");
     } else {
@@ -460,29 +447,44 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
     }
     return false;
   }
-  return false;
 }
 
 const searchCache = new Map<string, any>();
 
-export async function fetchAddressSuggestions(query: string, lat: number, lon: number, apiKey: string) {
+export async function fetchAddressSuggestions(query: string, lat: number, lon: number) {
   const cacheKey = `suggest-${query}-${lat.toFixed(2)}-${lon.toFixed(2)}`;
   if (searchCache.has(cacheKey)) return searchCache.get(cacheKey);
 
-  try {
-    // We use both autosuggest and discover for the best results
-    const [autosuggestRes, discoverRes] = await Promise.all([
-      fetch(`https://autosuggest.search.hereapi.com/v1/autosuggest?q=${encodeURIComponent(query)}&at=${lat},${lon}&apiKey=${apiKey}&limit=5`),
-      fetch(`https://discover.search.hereapi.com/v1/discover?q=${encodeURIComponent(query)}&at=${lat},${lon}&apiKey=${apiKey}&limit=5`)
-    ]);
+  console.log(`Fetching suggestions for: ${query}`);
 
-    const autosuggestData = autosuggestRes.ok ? await autosuggestRes.json() : { items: [] };
-    const discoverData = discoverRes.ok ? await discoverRes.json() : { items: [] };
+  try {
+    console.log(`Calling /api/search for query: ${query}`);
+    const response = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ query, lat, lon })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("Search API error:", response.status, errorData);
+      return [];
+    }
+
+    const data = await response.json();
+    console.log(`[fetchAddressSuggestions] Search results for ${query}:`, data.items?.length || 0, "items");
+    if (data.items) {
+      console.log(`[fetchAddressSuggestions] First item:`, safeStringify(data.items[0]));
+    }
     
-    const allItems = [...(autosuggestData.items || []), ...(discoverData.items || [])];
+    const items = data.items || [];
     
-    const results = allItems
-      .filter((item: any) => item.position || item.access?.[0]?.position)
+    const results = items
+      .filter((item: any) => {
+        const hasPos = item.position || item.access?.[0]?.position;
+        if (!hasPos) console.warn(`[fetchAddressSuggestions] Item missing position:`, item.title);
+        return hasPos;
+      })
       .map((item: any) => ({
         display_name: item.title + (item.address?.label ? `, ${item.address.label}` : ''),
         lat: item.position?.lat || item.access?.[0]?.position?.lat,
@@ -499,33 +501,179 @@ export async function fetchAddressSuggestions(query: string, lat: number, lon: n
     searchCache.set(cacheKey, results);
     return results;
   } catch (e) {
-    console.error("HERE Search failed:", e);
+    console.error("Search failed:", e instanceof Error ? e.message : String(e));
     return [];
   }
 }
 
-export async function searchPlaces(query: string, lat?: number, lon?: number, apiKey?: string) {
+export async function browsePlaces(lat: number, lon: number, categories?: string) {
+  try {
+    const response = await fetch('/api/browse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ lat, lon, categories })
+    });
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error("Browse error:", error);
+    return [];
+  }
+}
+
+export async function geocodeAddress(q: string) {
+  try {
+    const response = await fetch('/api/geocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ q })
+    });
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error("Geocode error:", error);
+    return [];
+  }
+}
+
+export async function discoverPlaces(lat: number, lon: number, q?: string) {
+  try {
+    const response = await fetch('/api/discover', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ lat, lon, q })
+    });
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error("Discover error:", error);
+    return [];
+  }
+}
+
+export async function lookupPlace(id: string) {
+  try {
+    const response = await fetch('/api/lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ id })
+    });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Lookup error:", error);
+    return null;
+  }
+}
+
+export async function reverseGeocode(lat: number, lon: number) {
+  try {
+    const response = await fetch('/api/revgeocode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ lat, lon })
+    });
+    const data = await response.json();
+    return data.items || [];
+  } catch (error) {
+    console.error("Reverse Geocode error:", error);
+    return [];
+  }
+}
+
+export async function fetchTrafficFlow(bbox: string) {
+  try {
+    const response = await fetch('/api/traffic-flow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ bbox })
+    });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Traffic Flow error:", error);
+    return null;
+  }
+}
+
+export async function fetchTrafficIncidents(bbox: string) {
+  try {
+    const response = await fetch('/api/traffic-incidents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ bbox })
+    });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Traffic Incidents error:", error);
+    return null;
+  }
+}
+
+export async function optimizeWaypointSequence(start: string, destination: string[], end?: string) {
+  try {
+    const response = await fetch('/api/waypoint-sequence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ start, end, destination })
+    });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Waypoint Sequence error:", error);
+    return null;
+  }
+}
+
+export async function searchPlaces(query: string, lat?: number, lon?: number) {
   const cacheKey = `search-${query}-${lat?.toFixed(2)}-${lon?.toFixed(2)}`;
-  if (searchCache.has(cacheKey)) return searchCache.get(cacheKey);
+  if (searchCache.has(cacheKey)) {
+    console.log(`[searchPlaces] Cache hit for: ${query}`);
+    return searchCache.get(cacheKey);
+  }
+
+  console.log(`[searchPlaces] Searching for: ${query} near ${lat}, ${lon}`);
 
   try {
     // If HERE API key is available, we prioritize HERE results for trucking accuracy
-    if (apiKey) {
-      const hereResults = await fetchAddressSuggestions(query, lat || 0, lon || 0, apiKey);
-      if (hereResults.length > 0) {
-        searchCache.set(cacheKey, hereResults);
-        return hereResults;
+    console.log(`[searchPlaces] Attempting HERE API search...`);
+    let hereResults = await fetchAddressSuggestions(query, lat || 0, lon || 0);
+    
+    // Fallback to geocode API if autosuggest returns nothing
+    if (hereResults.length === 0) {
+      console.log(`[searchPlaces] HERE autosuggest returned no results, trying geocode...`);
+      const geocodeResults = await geocodeAddress(query);
+      if (geocodeResults.length > 0) {
+        hereResults = geocodeResults.map((item: any) => ({
+          display_name: item.title || item.address?.label || 'Unknown Location',
+          lat: item.position?.lat,
+          lon: item.position?.lng,
+          place_id: item.id,
+          type: item.resultType
+        })).filter(item => item.lat && item.lon);
       }
     }
 
+    if (hereResults.length > 0) {
+      console.log(`[searchPlaces] HERE API found ${hereResults.length} results.`);
+      searchCache.set(cacheKey, hereResults);
+      return hereResults;
+    }
+    console.log(`[searchPlaces] HERE API returned no results.`);
+
     const ai = getAI();
-    if (!ai) return [];
+    if (!ai) {
+      console.warn(`[searchPlaces] AI not initialized, falling back to Nominatim.`);
+      return fallbackNominatimSearch(query, lat, lon);
+    }
     
+    console.log(`[searchPlaces] Attempting Gemini API search...`);
     const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Search for: "${query}". 
-      ${lat && lon ? `Bias results near coordinates ${lat}, ${lon}. Prioritize the CLOSEST and most RECOMMENDED locations for professional truck drivers (e.g., major truck stops, distribution centers, rest areas).` : ''}
-      Return a JSON array of up to 8 matching locations.
+      ${lat && lon ? `Bias results near coordinates ${lat}, ${lon}. Prioritize the CLOSEST and most RECOMMENDED locations for professional truck drivers (e.g., major truck stops, distribution centers, rest areas, warehouses).` : ''}
+      Return a JSON array of up to 10 matching locations.
       Format: [{"display_name": "Full Address", "lat": 0.0, "lon": 0.0, "place_id": "unique_id"}]
       Use the googleSearch tool to find the most accurate, real-time information.`,
       config: {
@@ -549,9 +697,11 @@ export async function searchPlaces(query: string, lat?: number, lon?: number, ap
     }));
 
     if (!response.text) {
-      console.warn("Gemini searchPlaces returned no text, falling back to Nominatim");
+      console.warn("[searchPlaces] Gemini searchPlaces returned no text, falling back to Nominatim");
       return fallbackNominatimSearch(query, lat, lon);
     }
+    
+    console.log(`[searchPlaces] Gemini API returned text: ${response.text.substring(0, 100)}...`);
     
     let jsonStr = response.text.trim();
     if (jsonStr.startsWith('```json')) {
@@ -562,16 +712,17 @@ export async function searchPlaces(query: string, lat?: number, lon?: number, ap
     
     try {
       const results = JSON.parse(jsonStr);
+      console.log(`[searchPlaces] Gemini API successfully parsed ${results.length} results.`);
       searchCache.set(cacheKey, results);
       return results;
-    } catch (parseErr) {
-      console.error("Failed to parse Gemini search results:", parseErr, jsonStr);
+    } catch (parseError) {
+      console.error("[searchPlaces] Failed to parse Gemini search results, falling back to Nominatim", parseError);
       const fallback = await fallbackNominatimSearch(query, lat, lon);
       searchCache.set(cacheKey, fallback);
       return fallback;
     }
   } catch (e) {
-    console.error("Google Search grounding failed, falling back to Nominatim:", e);
+    console.error("[searchPlaces] Search failed, falling back to Nominatim:", e);
     const fallback = await fallbackNominatimSearch(query, lat, lon);
     searchCache.set(cacheKey, fallback);
     return fallback;
@@ -597,30 +748,31 @@ async function fallbackNominatimSearch(query: string, lat?: number, lon?: number
       place_id: (item.place_id || Math.random()).toString()
     }));
   } catch (e) {
-    console.error("Nominatim fallback failed:", e);
+    console.error("Nominatim fallback failed:", e instanceof Error ? e.message : String(e));
     return [];
   }
 }
 
-export async function reverseGeocode(lat: number, lon: number) {
+export async function reverseGeocodeGemini(lat: number, lon: number) {
   try {
     const ai = getAI();
     if (!ai) return null;
     
     const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Identify the road/highway at coordinates ${lat}, ${lon}.`,
+      contents: `Identify the road/highway and nearest address at coordinates ${lat}, ${lon}.`,
       config: {
-        systemInstruction: "You are a professional reverse geocoding assistant for a trucking application. Identify the road or highway at the given coordinates. You MUST return ONLY a valid JSON object with 'road' and 'ref' properties. Do not include any conversational text. Use the googleSearch tool for every request to ensure accuracy.",
+        systemInstruction: "You are a professional reverse geocoding assistant for a trucking application. Identify the road or highway at the given coordinates. You MUST return ONLY a valid JSON object with 'road', 'ref', and 'address' properties. Do not include any conversational text. Use the googleSearch tool for every request to ensure accuracy.",
         tools: [{ googleSearch: {} }],
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             road: { type: Type.STRING },
-            ref: { type: Type.STRING }
+            ref: { type: Type.STRING },
+            address: { type: Type.STRING }
           },
-          required: ["road", "ref"]
+          required: ["road", "ref", "address"]
         }
       }
     }));
@@ -657,7 +809,7 @@ async function fallbackNominatimReverseGeocode(lat: number, lon: number) {
       ref: data.address?.ref || ''
     };
   } catch (e) {
-    console.error("Nominatim reverse fallback failed:", e);
+    console.error("Nominatim reverse fallback failed:", e instanceof Error ? e.message : String(e));
     return null;
   }
 }

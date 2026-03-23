@@ -1,0 +1,203 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Document ID: userId (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - email: string (required, email format)
+    //   - displayName: string (optional)
+    //   - truckProfile: map (optional, TruckProfile schema)
+    //   - autoReroute: bool (optional)
+    //   - weeklyEarnings: number (optional)
+    //   - fuelCost: number (optional)
+    //   - truckCost: number (optional)
+    //   - weekDeductions: number (optional)
+    //   - takeHomePercentage: number (optional)
+    //   - milesThisWeek: number (optional)
+    //   - role: string (optional, 'admin' | 'user')
+    //
+    // Collection: /users/{userId}/hos
+    // Document ID: 'current' (or similar)
+    // Fields:
+    //   - status: string (required, enum)
+    //   - driveTime: number (required)
+    //   - dutyTime: number (required)
+    //   - cycleTime: number (required)
+    //   - breakTime: number (required)
+    //   - lastUpdate: string (required, ISO 8601)
+    //
+    // Collection: /users/{userId}/history
+    // Document ID: auto-generated
+    // Fields:
+    //   - origin: string (required)
+    //   - destination: string (required)
+    //   - date: string (required, YYYY-MM-DD)
+    //   - distance: string (required)
+    //   - duration: string (required)
+    //   - fuelUsed: number (optional)
+    //   - cost: number (optional)
+    //   - status: string (required, enum)
+    //
+    // Collection: /users/{userId}/maintenance
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required)
+    //   - urgency: string (required, enum)
+    //   - date: string (required)
+    //   - type: string (required, enum)
+    //   - status: string (required, enum)
+    //   - cost: string (optional)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "Shaudross@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidPOI(poi) {
+      return poi.id is string && poi.id.size() > 0 &&
+             poi.name is string && poi.name.size() > 0 &&
+             poi.lat is number && poi.lon is number &&
+             poi.type is string &&
+             (!('address' in poi) || poi.address is string) &&
+             (!('rating' in poi) || poi.rating is number) &&
+             (!('isCustom' in poi) || poi.isCustom is bool);
+    }
+
+    function isValidUser(data) {
+      return data.uid is string && data.uid.size() > 0 &&
+             isValidEmail(data.email) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('role' in data) || (data.role in ['admin', 'user'])) &&
+             (!('customPois' in data) || (data.customPois is list && data.customPois.size() < 100)) &&
+             (!('currentLoad' in data) || (
+               data.currentLoad is map &&
+               data.currentLoad.keys().hasAll(['origin', 'destination', 'commodity', 'rate', 'total', 'bookedAt']) &&
+               data.currentLoad.origin is string &&
+               data.currentLoad.destination is string &&
+               data.currentLoad.commodity is string &&
+               data.currentLoad.rate is string &&
+               data.currentLoad.total is string &&
+               isValidDateString(data.currentLoad.bookedAt)
+             ));
+    }
+
+    function isValidTruckProfile(profile) {
+      return profile is map &&
+             profile.height is number && profile.height > 0 &&
+             profile.weight is number && profile.weight > 0 &&
+             profile.length is number && profile.length > 0 &&
+             profile.width is number && profile.width > 0 &&
+             profile.axleCount is number && profile.axleCount > 0 &&
+             profile.axleWeight is number && profile.axleWeight > 0 &&
+             profile.trailerCount is number && profile.trailerCount >= 0 &&
+             profile.hazmat is bool &&
+             profile.hazmatClasses is list &&
+             profile.tunnelCategory in ['A', 'B', 'C', 'D', 'E', 'NONE'];
+    }
+
+    function isValidHOS(data) {
+      return data.status in ['DRIVING', 'ON_DUTY', 'OFF_DUTY', 'SLEEPER'] &&
+             data.driveTime is number && data.driveTime >= 0 &&
+             data.dutyTime is number && data.dutyTime >= 0 &&
+             data.cycleTime is number && data.cycleTime >= 0 &&
+             data.breakTime is number && data.breakTime >= 0 &&
+             isValidDateString(data.lastUpdate);
+    }
+
+    function isValidHistory(data) {
+      return data.origin is string && data.origin.size() > 0 &&
+             data.destination is string && data.destination.size() > 0 &&
+             (data.date.matches("^\\d{4}-\\d{2}-\\d{2}$") || isValidDateString(data.date)) &&
+             data.distance is number &&
+             data.duration is number &&
+             data.status in ['COMPLETED', 'CANCELLED'];
+    }
+
+    function isValidMaintenance(data) {
+      return data.title is string && data.title.size() > 0 &&
+             data.urgency in ['High', 'Medium', 'Low'] &&
+             data.date is string &&
+             data.type in ['Repair', 'Scheduled', 'Maintenance'] &&
+             data.status in ['Active', 'Scheduled', 'Completed'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'user' || isAdmin());
+      
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
+                        request.resource.data.role == resource.data.role) || isAdmin();
+
+      match /hos/{docId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) && isValidHOS(request.resource.data);
+      }
+
+      match /history/{docId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidHistory(request.resource.data);
+        allow update: if isOwner(userId) && isValidHistory(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /maintenance/{docId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidMaintenance(request.resource.data);
+        allow update: if isOwner(userId) && isValidMaintenance(request.resource.data);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}

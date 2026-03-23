@@ -1,95 +1,31 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import { 
   DollarSign, 
   Map as MapIcon, 
   Clock, 
   Fuel, 
-  TrendingUp,
   Plus,
   Minus,
   X,
-  CloudSun,
-  Wind,
-  Droplets,
-  Cloud,
-  Sun,
-  CloudRain,
-  Navigation,
+  AlertTriangle,
   Coffee,
   Truck,
-  AlertTriangle,
-  Wrench
+  Package,
+  CheckCircle2,
+  Navigation2
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
-import { AppContext } from '../types';
-import { textToSpeech } from '../services/geminiService';
-import TruckProfileModal from './TruckProfileModal';
-import { ViewType } from '../types';
+import { speak } from '../services/speechService';
+import { TelemetryContext, AppContext, HOSContext, FirebaseContext, ViewType } from '../types';
+import { db } from '../firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
-const TruckProfileCard: React.FC = () => {
-  const context = useContext(AppContext);
-  const truckProfile = context?.truckProfile;
-  const setTruckProfile = context?.setTruckProfile;
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  if (!truckProfile || !setTruckProfile) return null;
-
-  return (
-    <>
-      <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col shadow-2xl group hover:border-[#D4AF37]/30 transition-all duration-700">
-        <div className="flex justify-between items-center mb-8 md:mb-12">
-          <div className="flex items-center gap-4 md:gap-5">
-            <div className="bg-[#D4AF37] p-3 md:p-4 rounded-xl md:rounded-2xl text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-              <Truck className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
-            </div>
-            <div>
-              <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight">Truck Profile</h2>
-              <p className="text-[8px] md:text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest">Active Unit 702</p>
-            </div>
-          </div>
-        </div>
-        <div className="space-y-6 md:space-y-8 flex-1">
-          <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
-            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Max Height</span>
-            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.height}<span className="text-xs text-zinc-700 ml-1">FT</span></span>
-          </div>
-          <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
-            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Gross Weight</span>
-            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.weight.toLocaleString()}<span className="text-xs text-zinc-700 ml-1">LBS</span></span>
-          </div>
-          <div className="flex justify-between items-end border-b border-white/5 pb-3 md:pb-4">
-            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Total Length</span>
-            <span className="text-2xl md:text-3xl font-bold text-white tracking-tight">{truckProfile.length}<span className="text-xs text-zinc-700 ml-1">FT</span></span>
-          </div>
-          <div className="flex justify-between items-end">
-            <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Hazmat Status</span>
-            <span className={`text-lg md:text-xl font-bold uppercase tracking-widest ${truckProfile.hazmat ? 'text-rose-500' : 'text-emerald-500'}`}>
-              {truckProfile.hazmat ? 'Restricted' : 'Cleared'}
-            </span>
-          </div>
-        </div>
-        <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-white/10 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-widest">System Verified</span>
-          </div>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 md:px-6 py-1.5 md:py-2 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-full text-[8px] md:text-[10px] font-bold text-white uppercase tracking-widest transition-all"
-          >
-            Modify
-          </button>
-        </div>
-      </div>
-      <TruckProfileModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        profile={truckProfile} 
-        onSave={setTruckProfile} 
-      />
-    </>
-  );
-};
+import { ELDStatusCard } from './ELDStatusCard';
+import { HOSAlertManager } from './HOSAlertManager';
+import { TruckProfileCard } from './TruckProfileCard';
+import { MetricCard } from './MetricCard';
+import { WeatherAnalyticsCard } from './WeatherAnalyticsCard';
+import { QuickActions } from './QuickActions';
 
 
 const chartData = [
@@ -102,304 +38,98 @@ const chartData = [
   { name: 'Sun', value: 0 },
 ];
 
-const MetricCard: React.FC<{ 
-  icon: any, 
-  label: string, 
-  value: string, 
-  trend?: string, 
-  target?: string, 
-  iconBg: string, 
-  iconColor: string,
-  progress?: number,
-  onClick?: () => void,
-  isInteractive?: boolean
-}> = ({ icon: Icon, label, value, trend, target, iconBg, iconColor, progress, onClick, isInteractive }) => (
-  <div 
-    onClick={onClick}
-    className={`bg-black/80 backdrop-blur-3xl border border-white/10 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] relative overflow-hidden group transition-all duration-500 ${isInteractive ? 'cursor-pointer hover:border-[#D4AF37]/50 hover:bg-zinc-900/50' : ''}`}
-  >
-    <div className="flex justify-between items-start mb-4 md:mb-6">
-      <div>
-        <div className="text-zinc-600 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-1 md:mb-2">{label}</div>
-        <div className="text-2xl md:text-4xl font-bold text-white tracking-tight leading-none">{value}</div>
-      </div>
-      <div className={`${iconBg} ${iconColor} p-3 md:p-4 rounded-xl md:rounded-2xl border border-white/5 shadow-inner transition-transform group-hover:scale-110`}>
-        <Icon className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
-      </div>
-    </div>
-    
-    {progress !== undefined && (
-      <div className="mt-6">
-        <div className="flex justify-between items-end mb-2">
-          <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">{target || 'Target Progress'}</span>
-          <span className="text-[11px] font-bold text-[#D4AF37]">{progress.toFixed(2)}%</span>
-        </div>
-        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-          <div 
-            className={`h-full ${iconBg} transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(212,175,55,0.3)]`} 
-            style={{ width: `${progress}%` }} 
+const PerformanceChart = React.memo(() => {
+  return (
+    <div className="h-[300px] md:h-[400px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#D4AF37" stopOpacity={1} />
+              <stop offset="100%" stopColor="#D4AF37" stopOpacity={0.3} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="name" 
+            axisLine={false} 
+            tickLine={false} 
+            tick={{ fill: '#52525b', fontSize: 11, fontWeight: 700 }} 
+            dy={15} 
           />
-        </div>
-      </div>
-    )}
-
-    {trend && (
-      <div className="mt-4 flex items-center gap-2">
-        <TrendingUp className="w-3 h-3 text-emerald-500" />
-        <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{trend}</span>
-      </div>
-    )}
-
-    {target && !progress && (
-      <div className="text-[11px] text-zinc-600 font-bold uppercase tracking-widest mt-4">
-        Target: <span className="text-white ml-1">{target}</span>
-      </div>
-    )}
-
-    {isInteractive && (
-      <div className="absolute bottom-3 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
-        <div className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">Update Entry</div>
-      </div>
-    )}
-  </div>
-);
-
-interface WeatherData {
-  temp: number;
-  condition: string;
-  windSpeed: number;
-  windDir: string;
-  precip: number;
-  locationName: string;
-}
-
-const WeatherAnalyticsCard: React.FC = () => {
-  const context = useContext(AppContext);
-  const userLocation = context?.userLocation;
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const lastFetchPos = React.useRef<[number, number] | null>(null);
-
-  useEffect(() => {
-    async function fetchWeather() {
-      if (!userLocation) return;
-      
-      const [lat, lon] = userLocation;
-      
-      // Only fetch if we haven't fetched yet or if moved > 5km (~0.045 degrees)
-      if (lastFetchPos.current) {
-        const [lastLat, lastLon] = lastFetchPos.current;
-        const dist = Math.sqrt(Math.pow(lat - lastLat, 2) + Math.pow(lon - lastLon, 2));
-        if (dist < 0.045) return;
-      }
-
-      try {
-        // Only show loading pulse on initial load
-        if (!weather) setLoading(true);
-        
-        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`, {
-           headers: { 
-             'Accept-Language': 'en',
-             'User-Agent': 'TruckersNav/1.0'
-           }
-        });
-        const geoData = await geoRes.json();
-        if (!geoData || !geoData.address) {
-          throw new Error("Invalid geolocation data received");
-        }
-        const city = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.suburb || "Unknown Site";
-
-        const weatherRes = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=fahrenheit&windspeed_unit=mph`);
-        const weatherData = await weatherRes.json();
-        if (!weatherData || !weatherData.current_weather) {
-            throw new Error("Invalid weather data received");
-        }
-        const current = weatherData.current_weather;
-        lastFetchPos.current = [lat, lon];
-        
-        setWeather({
-          temp: Math.round(current.temperature),
-          condition: getWeatherCondition(current.weathercode),
-          windSpeed: Math.round(current.windspeed),
-          windDir: getWindDirection(current.winddirection),
-          precip: 0,
-          locationName: city
-        });
-      } catch (err) {
-        console.error("Weather fetch failed", err);
-        setError("Weather data unavailable.");
-        setWeather(null);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchWeather().catch(err => console.error("Dashboard weather fetch failed:", err));
-  }, [userLocation]);
-
-  const getWeatherCondition = (code: number) => {
-    if (code === 0) return "Clear";
-    if (code <= 3) return "Partly Cloudy";
-    if (code <= 48) return "Foggy";
-    if (code <= 67) return "Rainy";
-    if (code <= 77) return "Snowy";
-    return "Stormy";
-  };
-
-  const getWindDirection = (deg: number) => {
-    const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    return directions[Math.round(deg / 45) % 8];
-  };
-
-  const WeatherIcon = () => {
-    if (!weather) return <CloudSun className="w-6 h-6 md:w-8 md:h-8" />;
-    if (weather.condition === "Clear") return <Sun className="w-6 h-6 md:w-8 md:h-8 text-[#D4AF37]" />;
-    if (weather.condition.includes("Cloudy")) return <CloudSun className="w-6 h-6 md:w-8 md:h-8 text-[#D4AF37]" />;
-    if (weather.condition.includes("Rainy") || weather.condition.includes("Stormy")) return <CloudRain className="w-6 h-6 md:w-8 md:h-8 text-[#D4AF37]" />;
-    return <Cloud className="w-6 h-6 md:w-8 md:h-8 text-zinc-500" />;
-  };
-
-  return (
-    <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-5 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] group transition-all hover:border-[#D4AF37]/30 flex flex-col justify-between shadow-2xl">
-      <div>
-        <div className="flex justify-between items-center mb-6 md:mb-8">
-          <div className="flex-1">
-            <div className="text-zinc-600 text-[8px] md:text-[10px] font-bold uppercase tracking-widest mb-2 md:mb-3 flex items-center gap-2">
-              <Navigation className="w-3 h-3 text-[#D4AF37]" />
-              Local Environment
-            </div>
-            {loading ? (
-              <div className="h-8 md:h-12 w-24 md:w-32 bg-white/5 rounded-xl md:rounded-2xl animate-pulse mb-1" />
-            ) : (
-              <div className="text-2xl md:text-4xl font-bold text-white tracking-tight flex items-baseline gap-2 md:gap-3 leading-none">
-                {weather?.temp}°F
-                <span className="text-[#D4AF37] font-bold text-[8px] md:text-xs uppercase tracking-widest">
-                  {weather?.condition}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="bg-[#D4AF37] p-3 md:p-4 rounded-xl md:rounded-2xl text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-            <WeatherIcon />
-          </div>
-        </div>
-
-        {error ? (
-          <div className="text-center py-6">
-            <p className="text-rose-500 text-xs font-black uppercase tracking-widest">{error}</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white/5 p-4 rounded-2xl flex items-center gap-4 border border-white/5">
-              <Wind className="w-5 h-5 text-[#D4AF37]" />
-              <div>
-                <div className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Wind</div>
-                <div className="text-xs font-bold text-white uppercase">
-                  {loading ? "..." : `${weather?.windSpeed} mph ${weather?.windDir}`}
-                </div>
-              </div>
-            </div>
-            <div className="bg-white/5 p-4 rounded-2xl flex items-center gap-4 border border-white/5">
-              <Droplets className="w-5 h-5 text-[#D4AF37]" />
-              <div>
-                <div className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Precip</div>
-                <div className="text-xs font-bold text-white uppercase">{loading ? "..." : `${weather?.precip}%`}</div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8 pt-6 border-t border-white/10 flex items-center justify-between">
-         <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-[#D4AF37] rounded-full animate-pulse shadow-[0_0_15px_#D4AF37]" />
-            <span className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">
-              {weather && weather.temp > 0 ? "Optimal Surface" : "Caution: Icy"}
-            </span>
-         </div>
-         <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest truncate max-w-[120px]">
-           {loading ? "Locating..." : (weather?.locationName || "Unknown")}
-         </span>
-      </div>
-    </div>
-  );
-};
-
-const QuickActions: React.FC = () => {
-  const context = useContext(AppContext);
-  const setActiveView = context?.setActiveView;
-  const setNavTarget = context?.setNavTarget;
-  const setEldStatus = context?.setEldStatus;
-
-  const actions = [
-    { 
-      label: 'Find Fuel', 
-      icon: Fuel, 
-      color: 'text-yellow-400', 
-      bg: 'bg-yellow-400/10',
-      onClick: () => {
-        setNavTarget?.('truck stops');
-        setActiveView?.(ViewType.NAVIGATION);
-      }
-    },
-    { 
-      label: 'Start Break', 
-      icon: Coffee, 
-      color: 'text-blue-400', 
-      bg: 'bg-blue-400/10',
-      onClick: () => {
-        setEldStatus?.(prev => ({ ...prev, status: 'OFF' }));
-      }
-    },
-    { 
-      label: 'Load Board', 
-      icon: TrendingUp, 
-      color: 'text-emerald-400', 
-      bg: 'bg-emerald-400/10',
-      onClick: () => setActiveView?.(ViewType.LOAD_BOARD)
-    },
-    { 
-      label: 'Maintenance', 
-      icon: Wrench, 
-      color: 'text-rose-400', 
-      bg: 'bg-rose-400/10',
-      onClick: () => setActiveView?.(ViewType.MAINTENANCE)
-    },
-  ];
-
-  return (
-    <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 shadow-2xl group hover:border-[#D4AF37]/30 transition-all duration-700">
-      <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight mb-8">Quick Actions</h2>
-      <div className="grid grid-cols-2 gap-4">
-        {actions.map((action, idx) => (
-          <button
-            key={idx}
-            onClick={action.onClick}
-            className="flex flex-col items-center justify-center p-6 rounded-2xl bg-white/5 border border-white/5 hover:border-[#D4AF37]/30 hover:bg-white/10 transition-all group/btn"
+          <YAxis 
+            axisLine={false} 
+            tickLine={false} 
+            tick={{ fill: '#52525b', fontSize: 11, fontWeight: 700 }} 
+            tickFormatter={(value) => `$${value}`}
+            dx={-10}
+          />
+          <Tooltip 
+            cursor={{ fill: 'rgba(212, 175, 55, 0.05)' }} 
+            contentStyle={{ 
+              backgroundColor: '#000', 
+              border: '1px solid rgba(212, 175, 55, 0.2)', 
+              borderRadius: '16px',
+              padding: '12px 16px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
+            }}
+            itemStyle={{ color: '#D4AF37', fontWeight: 'bold' }}
+            labelStyle={{ color: '#fff', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}
+            formatter={(value: number) => [`$${value.toLocaleString()}`, 'Daily Earnings']}
+          />
+          <Bar 
+            dataKey="value" 
+            fill="url(#goldGradient)" 
+            radius={[6, 6, 0, 0]}
+            barSize={window.innerWidth < 768 ? 30 : 50}
+            isAnimationActive={false}
           >
-            <div className={`${action.bg} ${action.color} p-4 rounded-2xl mb-3 group-hover/btn:scale-110 transition-transform`}>
-              <action.icon className="w-6 h-6" />
-            </div>
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest group-hover/btn:text-white transition-colors">
-              {action.label}
-            </span>
-          </button>
-        ))}
-      </div>
+            {chartData.map((entry, index) => (
+              <Cell 
+                key={`cell-${index}`} 
+                fill={entry.value > 0 ? 'url(#goldGradient)' : 'rgba(255,255,255,0.05)'} 
+                className="transition-all duration-500 hover:opacity-80"
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
-};
+});
 
-const Dashboard: React.FC = () => {
+const SpeedDisplay = React.memo(() => {
+  const telemetryContext = useContext(TelemetryContext);
+  
+  const speed = React.useSyncExternalStore(
+    telemetryContext?.subscribe || (() => () => {}),
+    () => telemetryContext?.speedRef.current || 0
+  );
+
+  return (
+    <div className="flex flex-col items-center md:items-end">
+      <span className="text-[8px] md:text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Current Speed</span>
+      <span className="text-lg md:text-xl font-bold text-[#D4AF37] leading-none">{speed} <span className="text-[10px] text-zinc-600">MPH</span></span>
+    </div>
+  );
+});
+
+const Dashboard: React.FC = React.memo(() => {
+  console.log("Dashboard rendering");
   const context = useContext(AppContext);
-  const eldStatus = context?.eldStatus;
-  const setEldStatus = context?.setEldStatus;
-  const speed = context?.speed || 0;
-  const idleSeconds = context?.idleSeconds || 0;
-  const breakSuggestion = context?.breakSuggestion || false;
-  const setBreakSuggestion = context?.setBreakSuggestion || (() => {});
-  const hasViolation = context?.hasViolation || false;
+  const hosContext = useContext(HOSContext);
+  const firebaseContext = useContext(FirebaseContext);
+  
+  const profile = firebaseContext?.profile;
+  const updateProfile = firebaseContext?.updateProfile;
+  const user = firebaseContext?.user;
+
+  const idleSeconds = hosContext?.idleSeconds ?? 0;
+  const eldStatus = hosContext?.eldStatus;
+  const setEldStatus = hosContext?.setEldStatus;
+  const breakSuggestion = hosContext?.breakSuggestion || false;
+  const setBreakSuggestion = hosContext?.setBreakSuggestion || (() => {});
+  const hasViolation = hosContext?.hasViolation || false;
 
   const weeklyEarnings = context?.weeklyEarnings || 0;
   const setWeeklyEarnings = context?.setWeeklyEarnings || (() => {});
@@ -427,69 +157,14 @@ const Dashboard: React.FC = () => {
   const [isDeductionsInputOpen, setIsDeductionsInputOpen] = useState(false);
   const [newDeductionsEntry, setNewDeductionsEntry] = useState('');
 
-  const lastViolationRef = React.useRef(false);
-  const lastSuggestionRef = React.useRef(false);
-  const playedAlertsRef = React.useRef<Record<string, Set<number>>>({});
-
-  useEffect(() => {
-    if (hasViolation && !lastViolationRef.current) {
-      textToSpeech("Attention: Hours of Service violation detected. Immediate stop required.").catch(err => console.error("Violation TTS failed:", err));
-    }
-    lastViolationRef.current = hasViolation;
-  }, [hasViolation]);
-
-  useEffect(() => {
-    if (breakSuggestion && !lastSuggestionRef.current) {
-      textToSpeech("Stationary detected. Would you like to switch to on duty status?").catch(err => console.error("Break suggestion TTS failed:", err));
-    }
-    lastSuggestionRef.current = breakSuggestion;
-  }, [breakSuggestion]);
-
-  useEffect(() => {
-    if (!eldStatus || eldStatus.status === 'OFF' || eldStatus.status === 'SB') {
-      // Clear alerts when off duty
-      playedAlertsRef.current = {};
-      return;
-    }
-
-    eldStatus.timers.forEach(timer => {
-      const { label, seconds } = timer;
-      if (!playedAlertsRef.current[label]) {
-        playedAlertsRef.current[label] = new Set();
-      }
-
-      // Check thresholds: 1 hour (3600), 30 min (1800), 15 min (900)
-      const thresholds = [3600, 1800, 900];
-      thresholds.forEach(threshold => {
-        if (seconds <= threshold && seconds > 0 && !playedAlertsRef.current[label].has(threshold)) {
-          const minutes = threshold / 60;
-          const timeText = minutes >= 60 ? "1 hour" : `${minutes} minutes`;
-          textToSpeech(`HOS Warning: ${timeText} remaining for ${label}.`).catch(err => console.error("HOS Warning TTS failed:", err));
-          playedAlertsRef.current[label].add(threshold);
-        }
-      });
-
-      // Reset threshold if timer is replenished (e.g. after a break)
-      if (seconds > 3600) {
-        playedAlertsRef.current[label].delete(3600);
-      }
-      if (seconds > 1800) {
-        playedAlertsRef.current[label].delete(1800);
-      }
-      if (seconds > 900) {
-        playedAlertsRef.current[label].delete(900);
-      }
-    });
-  }, [eldStatus]);
-
   // ELD Dynamic Timers
   // Removed local timers state as it's now global in AppContext
 
-  const formatTime = (seconds: number) => {
+  const formatTime = React.useCallback((seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     return `${h}h ${m}m`;
-  };
+  }, []);
 
   const getHOSMetric = () => {
     if (!eldStatus) return { label: 'Drive Time Left', value: '00:00', progress: 0 };
@@ -531,7 +206,7 @@ const Dashboard: React.FC = () => {
     if (!isNaN(amount) && amount > 0) {
       setWeeklyEarnings(prev => mode === 'add' ? prev + amount : Math.max(0, prev - amount));
       setNewEntryValue('');
-      setShowEarningsInput(false);
+      setIsEarningsInputOpen(false);
     }
   };
 
@@ -541,7 +216,7 @@ const Dashboard: React.FC = () => {
     if (!isNaN(amount) && amount > 0) {
       setMilesThisWeek(prev => prev + amount);
       setNewMilesEntry('');
-      setShowMilesInput(false);
+      setIsMilesInputOpen(false);
     }
   };
 
@@ -583,6 +258,40 @@ const Dashboard: React.FC = () => {
     setWeekDeductions(0);
   };
 
+  const handleCompleteLoad = useCallback(async () => {
+    if (!profile?.currentLoad || !user || !updateProfile) return;
+
+    try {
+      const load = profile.currentLoad;
+      const rateValue = parseFloat(load.rate.replace(/[^0-9.]/g, ''));
+      
+      // 1. Add to weekly earnings
+      if (!isNaN(rateValue)) {
+        setWeeklyEarnings(prev => prev + rateValue);
+      }
+
+      // 2. Add to history
+      const historyRef = collection(db, 'users', user.uid, 'history');
+      await addDoc(historyRef, {
+        origin: load.origin,
+        destination: load.destination,
+        distance: 0, // We could calculate this if we had it
+        duration: 0,
+        date: new Date().toISOString(),
+        status: 'COMPLETED',
+        rate: load.rate,
+        commodity: load.commodity
+      });
+
+      // 3. Clear current load
+      await updateProfile({ currentLoad: undefined });
+      
+      speak("Load completed successfully. Earnings updated.");
+    } catch (error) {
+      console.error("Error completing load:", error);
+    }
+  }, [profile, user, updateProfile, setWeeklyEarnings]);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -597,13 +306,14 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     // Welcome message to initialize audio on first load
     const timer = setTimeout(() => {
-      textToSpeech("Command Center Active. System Online.").catch(err => console.error("Welcome TTS failed:", err));
+      speak("Command Center Active. System Online.");
     }, 1500);
     return () => clearTimeout(timer);
   }, []);
 
   return (
     <div className="p-4 md:p-10 max-w-[1400px] mx-auto bg-[#050505] relative">
+      <HOSAlertManager eldStatus={eldStatus} />
       {/* HOS Violation Warning */}
       {hasViolation && (
         <div className="mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -674,10 +384,7 @@ const Dashboard: React.FC = () => {
             New Week
           </button>
           <div className="flex-1 md:flex-none px-4 md:px-5 py-2 md:py-2.5 bg-[#0a0a0a] border border-zinc-900 rounded-xl md:rounded-2xl flex items-center justify-center md:justify-start gap-3">
-            <div className="flex flex-col items-center md:items-end">
-              <span className="text-[8px] md:text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Current Speed</span>
-              <span className="text-lg md:text-xl font-bold text-[#D4AF37] leading-none">{speed} <span className="text-[10px] text-zinc-600">MPH</span></span>
-            </div>
+            <SpeedDisplay />
           </div>
           <div className="flex-1 md:flex-none px-4 md:px-5 py-2 md:py-2.5 bg-[#0a0a0a] border border-zinc-900 rounded-xl md:rounded-2xl flex items-center justify-center md:justify-start gap-3">
             <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#D4AF37] animate-ping" />
@@ -687,6 +394,63 @@ const Dashboard: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-6 mb-10 relative">
+        {/* Active Load Card */}
+        {profile?.currentLoad && (
+          <div className="md:col-span-2 lg:col-span-2 xl:col-span-2">
+            <div className="bg-emerald-500/10 backdrop-blur-3xl border border-emerald-500/30 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] relative overflow-hidden group transition-all duration-500 hover:border-emerald-500/50">
+              <div className="flex justify-between items-start mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="bg-emerald-500 p-3 rounded-2xl text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]">
+                    <Package className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Active Load</div>
+                    <div className="text-2xl font-black text-white tracking-tighter uppercase italic">{profile.currentLoad.commodity}</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">Rate</div>
+                  <div className="text-2xl font-black text-emerald-500 italic">{profile.currentLoad.rate}</div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div className="space-y-1">
+                  <div className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Origin</div>
+                  <div className="text-white font-bold text-sm truncate">{profile.currentLoad.origin}</div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Destination</div>
+                  <div className="text-white font-bold text-sm truncate">{profile.currentLoad.destination}</div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button 
+                  onClick={() => {
+                    context?.setNavTarget(profile.currentLoad?.destination || null);
+                    context?.setActiveView(ViewType.NAVIGATION);
+                  }}
+                  className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2"
+                >
+                  <Navigation2 className="w-4 h-4" />
+                  Navigate
+                </button>
+                <button 
+                  onClick={handleCompleteLoad}
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  Complete Load
+                </button>
+              </div>
+
+              {/* Decorative background element */}
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+            </div>
+          </div>
+        )}
+
         <div className="relative">
           <MetricCard 
             icon={DollarSign} 
@@ -860,73 +624,16 @@ const Dashboard: React.FC = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
         <div className="lg:col-span-5">
-          <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col shadow-2xl mb-6 md:mb-8 group hover:border-[#D4AF37]/30 transition-all duration-700">
-            <div className="flex justify-between items-center mb-8 md:mb-12">
-              <div className="flex items-center gap-4 md:gap-5">
-                <div className="bg-[#D4AF37] p-3 md:p-4 rounded-xl md:rounded-2xl text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]">
-                  <Clock className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
-                </div>
-                <div>
-                  <h2 className="text-lg md:text-xl font-bold text-white uppercase tracking-tight">ELD Status</h2>
-                  <div className="flex items-center gap-2">
-                    <div className="w-1 h-1 md:w-1.5 md:h-1.5 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]" />
-                    <p className="text-[8px] md:text-[10px] text-[#D4AF37] font-bold uppercase tracking-widest">Active</p>
-                  </div>
-                </div>
-              </div>
-              <span className={`px-4 md:px-6 py-1.5 md:py-2 ${eldStatus?.status === 'DRIVE' ? 'bg-emerald-500 text-black shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]'} text-[8px] md:text-[10px] font-bold rounded-full uppercase tracking-widest`}>
-                {eldStatus?.status === 'DRIVE' ? 'Driving' : eldStatus?.status === 'ON' ? 'On Duty' : eldStatus?.status === 'SB' ? 'Sleeper' : 'Off Duty'}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 md:gap-3 mb-8 md:mb-12">
-              {(['OFF', 'SB', 'ON', 'DRIVE'] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setEldStatus?.(prev => ({ ...prev, status: s }))}
-                  className={`py-2 md:py-3 rounded-xl md:rounded-2xl text-[8px] md:text-[10px] font-bold uppercase tracking-widest transition-all border ${
-                    eldStatus?.status === s 
-                      ? 'bg-[#D4AF37] text-black border-[#D4AF37] shadow-lg shadow-[#D4AF37]/20' 
-                      : 'bg-white/5 text-zinc-600 border-white/5 hover:border-white/10 hover:text-white'
-                  }`}
-                >
-                  {s === 'SB' ? 'Sleeper' : s === 'DRIVE' ? 'Drive' : s === 'ON' ? 'On Duty' : 'Off'}
-                </button>
-              ))}
-            </div>
-
-            <div className="space-y-8 md:space-y-12 flex-1">
-              {eldStatus?.timers?.map((timer) => (
-                <div key={timer.label} className="relative">
-                  <div className="flex justify-between items-end mb-3 md:mb-4">
-                    <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">{timer.label}</span>
-                    <div className="flex items-baseline gap-2">
-                      <span className={`text-2xl md:text-4xl font-bold tracking-tight ${timer.label === 'Until Break' ? 'text-[#D4AF37]' : 'text-white'}`}>{formatTime(timer.seconds)}</span>
-                      <span className="text-[8px] md:text-[10px] font-bold text-zinc-700 uppercase tracking-widest">REM</span>
-                    </div>
-                  </div>
-                  <div className="h-1.5 md:h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div className={`h-full ${timer.color} rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(212,175,55,0.2)]`} style={{ width: `${(timer.seconds / timer.total) * 100}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-white/10 flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#D4AF37] animate-pulse" />
-                <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Cycle resets in 34h</span>
-              </div>
-              <button className="px-4 md:px-6 py-1.5 md:py-2 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-full text-[8px] md:text-[10px] font-bold text-white uppercase tracking-widest transition-all">View Logs</button>
-            </div>
-          </div>
+          <ELDStatusCard eldStatus={eldStatus} setEldStatus={setEldStatus} formatTime={formatTime} />
           <div className="mb-6 md:mb-8">
             <WeatherAnalyticsCard />
           </div>
           <div className="mb-6 md:mb-8">
-            <QuickActions />
+            <QuickActions setActiveView={context?.setActiveView} setNavTarget={context?.setNavTarget} setEldStatus={hosContext?.setEldStatus} />
           </div>
-          <TruckProfileCard />
+          <TruckProfileCard truckProfile={context?.truckProfile} setTruckProfile={context?.setTruckProfile} />
         </div>
+
       </div>
 
       {/* Weekly Earnings Performance Chart */}
@@ -948,64 +655,10 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className="h-[300px] md:h-[400px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#D4AF37" stopOpacity={1} />
-                  <stop offset="100%" stopColor="#D4AF37" stopOpacity={0.3} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.03)" strokeDasharray="3 3" />
-              <XAxis 
-                dataKey="name" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#52525b', fontSize: 11, fontWeight: 700 }} 
-                dy={15} 
-              />
-              <YAxis 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{ fill: '#52525b', fontSize: 11, fontWeight: 700 }} 
-                tickFormatter={(value) => `$${value}`}
-                dx={-10}
-              />
-              <Tooltip 
-                cursor={{ fill: 'rgba(212, 175, 55, 0.05)' }} 
-                contentStyle={{ 
-                  backgroundColor: '#000', 
-                  border: '1px solid rgba(212, 175, 55, 0.2)', 
-                  borderRadius: '16px',
-                  padding: '12px 16px',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.5)'
-                }}
-                itemStyle={{ color: '#D4AF37', fontWeight: 'bold' }}
-                labelStyle={{ color: '#fff', marginBottom: '4px', fontWeight: 'bold', textTransform: 'uppercase', fontSize: '10px', letterSpacing: '0.1em' }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, 'Daily Earnings']}
-              />
-              <Bar 
-                dataKey="value" 
-                fill="url(#goldGradient)" 
-                radius={[6, 6, 0, 0]}
-                barSize={window.innerWidth < 768 ? 30 : 50}
-                animationDuration={2000}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={entry.value > 0 ? 'url(#goldGradient)' : 'rgba(255,255,255,0.05)'} 
-                    className="transition-all duration-500 hover:opacity-80"
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <PerformanceChart />
       </div>
     </div>
   );
-};
+});
 
 export default Dashboard;

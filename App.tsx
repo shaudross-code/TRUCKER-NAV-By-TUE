@@ -1,151 +1,206 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import { safeStringify, isValidLatLng } from './utils';
+import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import PredictiveParking from './components/PredictiveParking';
-import LoadBoard from './components/LoadBoard';
-import Maintenance from './components/Maintenance';
-import NavigationView from './components/NavigationView';
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const NavigationView = lazy(() => import('./components/NavigationView'));
+const PaySummary = lazy(() => import('./components/PaySummary'));
+const PredictiveParking = lazy(() => import('./components/PredictiveParking'));
+const LoadBoard = lazy(() => import('./components/LoadBoard'));
+const Maintenance = lazy(() => import('./components/Maintenance'));
+const SettingsView = lazy(() => import('./components/SettingsView'));
+const RouteHistory = lazy(() => import('./components/RouteHistory'));
+
+import { ViewType, AppContext, LocationContext, TelemetryContext } from './types';
+import { HOSProvider } from './components/HOSProvider';
+import { FirebaseProvider, useFirebase } from './components/FirebaseProvider';
 import VoiceCommand from './components/VoiceCommand';
-import SettingsView from './components/SettingsView';
-import RouteHistory from './components/RouteHistory';
-import PaySummary from './components/PaySummary';
+import { speak } from './services/speechService';
 
-import { ViewType, AppContext } from './types';
-
-const App: React.FC = () => {
-  const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
-  const [navTarget, setNavTarget] = useState<string | null>(null);
-  const [autoReroute, setAutoReroute] = useState(() => {
-    const saved = localStorage.getItem('trucker_auto_reroute');
-    return saved !== null ? JSON.parse(saved) : true;
+const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(() => {
+    const saved = localStorage.getItem('user_location');
+    return saved ? JSON.parse(saved) : null;
   });
-
-  const [truckProfile, setTruckProfile] = useState(() => {
-    const saved = localStorage.getItem('trucker_profile');
-    return saved ? JSON.parse(saved) : {
-      height: 13.5,
-      weight: 78500,
-      length: 53,
-      width: 8.5,
-      hazmat: false,
-      hazmatClasses: [],
-      tunnelCategory: 'NONE',
-      axleCount: 5,
-      axleWeight: 12000,
-      trailerCount: 1
-    };
-  });
-
-  const [eldStatus, setEldStatus] = useState(() => {
-    const saved = localStorage.getItem('trucker_eld_status');
-    return saved ? JSON.parse(saved) : {
-      status: 'OFF' as 'OFF' | 'SB' | 'ON' | 'DRIVE',
-      resetSeconds: 36000,
-      timers: [
-        { label: 'Until Break', seconds: 28800, total: 28800, color: 'bg-rose-500' }, 
-        { label: 'Drive Time', seconds: 39600, total: 39600, color: 'bg-[#D4AF37]' }, 
-        { label: 'On-Duty Shift', seconds: 50400, total: 50400, color: 'bg-zinc-700' }, 
-        { label: '70h Cycle', seconds: 252000, total: 252000, color: 'bg-[#B8860B]' }, 
-      ]
-    };
-  });
-
-  const [weeklyEarnings, setWeeklyEarnings] = useState(() => {
-    const saved = localStorage.getItem('trucker_weekly_earnings');
-    return saved ? JSON.parse(saved) : 4980.00;
-  });
-  const [milesThisWeek, setMilesThisWeek] = useState(() => {
-    const saved = localStorage.getItem('trucker_miles_this_week');
-    return saved ? JSON.parse(saved) : 2845;
-  });
-  const [fuelCost, setFuelCost] = useState(() => {
-    const saved = localStorage.getItem('trucker_fuel_cost');
-    return saved ? JSON.parse(saved) : 1240.50;
-  });
-  const [truckCost, setTruckCost] = useState(() => {
-    const saved = localStorage.getItem('trucker_truck_cost');
-    return saved ? JSON.parse(saved) : 500.00;
-  });
-  const [weekDeductions, setWeekDeductions] = useState(() => {
-    const saved = localStorage.getItem('trucker_week_deductions');
-    return saved ? JSON.parse(saved) : 0;
-  });
-  const [takeHomePercentage, setTakeHomePercentage] = useState(() => {
-    const saved = localStorage.getItem('trucker_take_home_percentage');
-    return saved ? JSON.parse(saved) : 100;
-  });
-
-  // Persistence Effects
-  useEffect(() => {
-    localStorage.setItem('trucker_profile', JSON.stringify(truckProfile));
-  }, [truckProfile]);
   
-  useEffect(() => {
-    localStorage.setItem('trucker_take_home_percentage', JSON.stringify(takeHomePercentage));
-  }, [takeHomePercentage]);
+  const speedRef = useRef<number>(0);
+  const headingRef = useRef<number>(0);
+  const listenersRef = useRef<Set<() => void>>(new Set());
 
-  useEffect(() => {
-    localStorage.setItem('trucker_eld_status', JSON.stringify(eldStatus));
-  }, [eldStatus]);
-
-  useEffect(() => {
-    localStorage.setItem('trucker_weekly_earnings', JSON.stringify(weeklyEarnings));
-  }, [weeklyEarnings]);
-
-  useEffect(() => {
-    localStorage.setItem('trucker_miles_this_week', JSON.stringify(milesThisWeek));
-  }, [milesThisWeek]);
-
-  useEffect(() => {
-    localStorage.setItem('trucker_fuel_cost', JSON.stringify(fuelCost));
-  }, [fuelCost]);
-
-  useEffect(() => {
-    localStorage.setItem('trucker_truck_cost', JSON.stringify(truckCost));
-  }, [truckCost]);
-
-  useEffect(() => {
-    localStorage.setItem('trucker_week_deductions', JSON.stringify(weekDeductions));
-  }, [weekDeductions]);
-
-  useEffect(() => {
-    localStorage.setItem('trucker_auto_reroute', JSON.stringify(autoReroute));
-  }, [autoReroute]);
+  const notifyListeners = useCallback(() => {
+    listenersRef.current.forEach(listener => listener());
+  }, []);
 
   useEffect(() => {
     if (userLocation) {
-      localStorage.setItem('trucker_last_location', JSON.stringify(userLocation));
+      const str = safeStringify(userLocation);
+      localStorage.setItem('user_location', str);
     }
-  }, [userLocation]);
+  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      console.warn("Geolocation is not supported by this browser.");
+      return;
+    }
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude, speed: geoSpeed, heading: geoHeading } = position.coords;
+        if (isNaN(latitude) || isNaN(longitude)) return;
+        
+        let telemetryChanged = false;
+
+        if (geoSpeed !== null && !isNaN(geoSpeed)) {
+          const mph = Math.round(geoSpeed * 2.23694);
+          if (speedRef.current !== mph) {
+            speedRef.current = mph;
+            telemetryChanged = true;
+          }
+        } else {
+          if (speedRef.current !== 0) {
+            speedRef.current = 0;
+            telemetryChanged = true;
+          }
+        }
+
+        if (geoHeading !== null && !isNaN(geoHeading)) {
+          if (headingRef.current !== geoHeading) {
+            headingRef.current = geoHeading;
+            telemetryChanged = true;
+          }
+        }
+
+        if (telemetryChanged) {
+          notifyListeners();
+        }
+
+        setUserLocation(prev => {
+          const roundedLat = Math.round(latitude * 100000) / 100000;
+          const roundedLon = Math.round(longitude * 100000) / 100000;
+          if (prev && prev[0] === roundedLat && prev[1] === roundedLon) return prev;
+          return [roundedLat, roundedLon];
+        });
+      },
+      (error) => {
+        console.error("watchPosition error:", error);
+        setUserLocation(prev => {
+          if (!prev) {
+            const saved = localStorage.getItem('trucker_last_location');
+            try {
+              return saved ? JSON.parse(saved) : [41.8781, -87.6298];
+            } catch (e) {
+              return [41.8781, -87.6298];
+            }
+          }
+          return prev;
+        });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [notifyListeners]);
+
+  const locationValue = useMemo(() => ({
+    userLocation,
+    setUserLocation
+  }), [userLocation]);
+
+  const telemetryValue = useMemo(() => ({
+    speedRef,
+    headingRef,
+    subscribe: (callback: () => void) => {
+      listenersRef.current.add(callback);
+      return () => {
+        listenersRef.current.delete(callback);
+      };
+    }
+  }), []);
+
+  return (
+    <LocationContext.Provider value={locationValue}>
+      <TelemetryContext.Provider value={telemetryValue}>
+        {children}
+      </TelemetryContext.Provider>
+    </LocationContext.Provider>
+  );
+};
+
+const AppContent: React.FC = () => {
+  const { user, profile, loading, signIn, signOut, updateProfile, authError } = useFirebase();
+  const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [navTarget, setNavTarget] = useState<string | null>(null);
+
+  // Sync profile data to local state or just use profile directly
+  const truckProfile = useMemo(() => profile?.truckProfile || {
+    height: 13.5,
+    weight: 78500,
+    length: 53,
+    width: 8.5,
+    hazmat: false,
+    hazmatClasses: [],
+    tunnelCategory: 'NONE',
+    axleCount: 5,
+    axleWeight: 12000,
+    trailerCount: 1
+  }, [profile]);
+
+  const setTruckProfile = useCallback((newProfile: any) => {
+    const updatedProfile = typeof newProfile === 'function' ? newProfile(truckProfile) : newProfile;
+    updateProfile({ truckProfile: updatedProfile });
+  }, [truckProfile, updateProfile]);
+
+  const autoReroute = profile?.autoReroute ?? true;
+  const setAutoReroute = useCallback((val: boolean) => updateProfile({ autoReroute: val }), [updateProfile]);
+
+  const weeklyEarnings = profile?.weeklyEarnings ?? 0;
+  const setWeeklyEarnings = useCallback((val: any) => {
+    const newVal = typeof val === 'function' ? val(weeklyEarnings) : val;
+    updateProfile({ weeklyEarnings: newVal });
+  }, [weeklyEarnings, updateProfile]);
+
+  const milesThisWeek = profile?.milesThisWeek ?? 0;
+  const setMilesThisWeek = useCallback((val: any) => {
+    const newVal = typeof val === 'function' ? val(milesThisWeek) : val;
+    updateProfile({ milesThisWeek: newVal });
+  }, [milesThisWeek, updateProfile]);
+
+  const fuelCost = profile?.fuelCost ?? 0;
+  const setFuelCost = useCallback((val: any) => {
+    const newVal = typeof val === 'function' ? val(fuelCost) : val;
+    updateProfile({ fuelCost: newVal });
+  }, [fuelCost, updateProfile]);
+
+  const truckCost = profile?.truckCost ?? 0;
+  const setTruckCost = useCallback((val: any) => {
+    const newVal = typeof val === 'function' ? val(truckCost) : val;
+    updateProfile({ truckCost: newVal });
+  }, [truckCost, updateProfile]);
+
+  const weekDeductions = profile?.weekDeductions ?? 0;
+  const setWeekDeductions = useCallback((val: any) => {
+    const newVal = typeof val === 'function' ? val(weekDeductions) : val;
+    updateProfile({ weekDeductions: newVal });
+  }, [weekDeductions, updateProfile]);
+
+  const takeHomePercentage = profile?.takeHomePercentage ?? 100;
+  const setTakeHomePercentage = useCallback((val: any) => {
+    const newVal = typeof val === 'function' ? val(takeHomePercentage) : val;
+    updateProfile({ takeHomePercentage: newVal });
+  }, [takeHomePercentage, updateProfile]);
+
+  // Persistence Effects
   const [isDriving, setIsDriving] = useState(false);
-  const [speed, setSpeed] = useState(0);
-  const [heading, setHeading] = useState(0);
-  const speedRef = useRef(0);
-  useEffect(() => {
-    speedRef.current = speed;
-  }, [speed]);
-
-  const [idleSeconds, setIdleSeconds] = useState(0);
-  const [breakSuggestion, setBreakSuggestion] = useState(false);
-
-  useEffect(() => {
-    // Initial view set to Dashboard
-    setActiveView(ViewType.DASHBOARD);
-  }, []);
-
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
+
   useEffect(() => {
-    if (!process.env.GEMINI_API_KEY) {
+    if (!process.env.GEMINI_API_KEY || !process.env.HERE_API_KEY) {
       setApiKeyMissing(true);
     }
   }, []);
 
-  const hasViolation = eldStatus.timers.some(t => t.seconds <= 0) && (eldStatus.status === 'DRIVE' || eldStatus.status === 'ON');
   
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -160,8 +215,7 @@ const App: React.FC = () => {
     };
     const handleRejection = (event: PromiseRejectionEvent) => {
       console.error("Unhandled Rejection Detail:", {
-        reason: event.reason,
-        promise: event.promise,
+        reason: String(event.reason),
         stack: event.reason?.stack || 'No stack trace'
       });
     };
@@ -173,180 +227,50 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // HOS Logic Engine
   useEffect(() => {
-    const interval = setInterval(() => {
-      const currentSpeed = speedRef.current;
-      // Track idle time
-      if (currentSpeed <= 5) {
-        setIdleSeconds(prev => {
-          const next = prev + 1;
-          if (next === 300) {
-            setEldStatus(current => {
-              if (current.status !== 'OFF' && current.status !== 'SB') {
-                setBreakSuggestion(true);
-              }
-              return current;
-            });
-          }
-          
-          // Reset 'Until Break' timer if stationary for 30 minutes
-          if (next === 1800) {
-            setEldStatus(current => ({
-              ...current,
-              timers: current.timers.map(t => 
-                t.label === 'Until Break' ? { ...t, seconds: t.total } : t
-              )
-            }));
-          }
-          return next;
-        });
-      } else {
-        setIdleSeconds(0);
-        setBreakSuggestion(false);
-      }
-
-      setEldStatus(prev => {
-        // Automatic Driving Detection: Switch to DRIVE if speed > 5
-        if (speedRef.current > 5 && prev.status !== 'DRIVE') {
-          return { ...prev, status: 'DRIVE' };
-        }
-        
-        if (prev.status === 'OFF' || prev.status === 'SB') {
-          // Increment reset timer (or decrement if we want a countdown)
-          // Let's decrement from 10 hours
-          const newReset = Math.max(0, prev.resetSeconds - 1);
-          
-          // If reset reaches 0, we could potentially reset other timers, 
-          // but for now let's just track it.
-          if (newReset === 0 && prev.resetSeconds > 0) {
-             // Reset HOS clocks if 10h reset is complete
-             return {
-               ...prev,
-               resetSeconds: 0,
-               timers: prev.timers.map(t => ({ ...t, seconds: t.total }))
-             };
-          }
-
-          return { ...prev, resetSeconds: newReset };
-        }
-
-        // If we are ON or DRIVE, reset the 10h reset clock
-        const newTimers = prev.timers.map(t => {
-          let shouldDecrement = false;
-          
-          if (t.label === '70h Cycle') shouldDecrement = true; // Always runs when not off-duty
-          if (t.label === 'On-Duty Shift') shouldDecrement = true; // Runs when ON or DRIVE
-          if (t.label === 'Drive Time' && prev.status === 'DRIVE') shouldDecrement = true;
-          if (t.label === 'Until Break' && prev.status === 'DRIVE') shouldDecrement = true;
-
-          return {
-            ...t,
-            seconds: shouldDecrement ? Math.max(0, t.seconds - 1) : t.seconds
-          };
-        });
-
-        return { ...prev, timers: newTimers, resetSeconds: 36000 };
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Global High-Accuracy Geolocation Tracking
-  useEffect(() => {
-    if (!("geolocation" in navigator)) {
-      const saved = localStorage.getItem('trucker_last_location');
-      setUserLocation(prev => prev || (saved ? JSON.parse(saved) : [41.8781, -87.6298]));
-      return;
+    if (!loading) {
+      speak("Welcome to the home of the truckers. Keep on trucking.");
     }
+  }, [loading]);
 
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, speed: geoSpeed, heading: geoHeading } = position.coords;
-        if (isNaN(latitude) || isNaN(longitude)) {
-          console.warn("Received NaN coordinates from GPS");
-          return;
-        }
-        setUserLocation(prev => {
-          if (prev && prev[0] === latitude && prev[1] === longitude) return prev;
-          return [latitude, longitude];
-        });
-        
-        if (geoSpeed !== null && !isNaN(geoSpeed)) {
-          // Convert m/s to mph
-          const mph = Math.round(geoSpeed * 2.23694);
-          setSpeed(mph);
-        } else {
-          setSpeed(0);
-        }
-
-        if (geoHeading !== null && !isNaN(geoHeading)) {
-          setHeading(geoHeading);
-        }
-      },
-      (error) => {
-        console.warn("GPS Signal Issue:", error.message);
-        if (!userLocation) {
-          const saved = localStorage.getItem('trucker_last_location');
-          setUserLocation(saved ? JSON.parse(saved) : [41.8781, -87.6298]);
-        }
-      },
-      { 
-        enableHighAccuracy: true, 
-        timeout: 15000, 
-        maximumAge: 0 
-      }
-    );
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  const handleVoiceToggle = useCallback(() => setIsVoiceOpen(true), []);
+  const handleToggleCollapse = useCallback(() => setIsSidebarCollapsed(prev => !prev), []);
 
   const renderContent = () => {
+    console.log("App: renderContent, activeView:", activeView);
     switch (activeView) {
       case ViewType.DASHBOARD:
-        return <Dashboard />;
+        return <Suspense fallback={<div>Loading...</div>}><Dashboard /></Suspense>;
       case ViewType.TRUCK_STOPS:
-        return <PredictiveParking />;
+        return <Suspense fallback={<div>Loading...</div>}><PredictiveParking /></Suspense>;
       case ViewType.LOAD_BOARD:
-        return <LoadBoard />;
+        return <Suspense fallback={<div>Loading...</div>}><LoadBoard /></Suspense>;
       case ViewType.MAINTENANCE:
-        return <Maintenance />;
+        return <Suspense fallback={<div>Loading...</div>}><Maintenance /></Suspense>;
       case ViewType.NAVIGATION:
         return null; // Handled separately to keep it mounted
       case ViewType.SETTINGS:
-        return <SettingsView />;
+        return <Suspense fallback={<div>Loading...</div>}><SettingsView /></Suspense>;
       case ViewType.ROUTE_HISTORY:
-        return <RouteHistory />;
+        return <Suspense fallback={<div>Loading...</div>}><RouteHistory /></Suspense>;
       case ViewType.PAY_SUMMARY:
-        return <PaySummary />;
+        return <Suspense fallback={<div>Loading...</div>}><PaySummary /></Suspense>;
       default:
-        return <Dashboard />;
+        return <Suspense fallback={<div>Loading...</div>}><Dashboard /></Suspense>;
     }
   };
 
-  return (
-    <AppContext.Provider value={{ 
+  const contextValue = useMemo(() => ({
       activeView, 
       setActiveView, 
-      userLocation, 
-      setUserLocation,
       navTarget, 
       setNavTarget,
       isDriving,
       setIsDriving,
-      speed,
-      setSpeed,
-      heading,
-      setHeading,
-      idleSeconds,
-      breakSuggestion,
-      setBreakSuggestion,
-      hasViolation,
       autoReroute,
       setAutoReroute,
       truckProfile,
       setTruckProfile,
-      eldStatus,
-      setEldStatus,
       weeklyEarnings,
       setWeeklyEarnings,
       milesThisWeek,
@@ -359,37 +283,131 @@ const App: React.FC = () => {
       setWeekDeductions,
       takeHomePercentage,
       setTakeHomePercentage
-    }}>
-      <div className="flex h-screen w-screen bg-[#050505] text-white overflow-hidden">
-        {apiKeyMissing && (
-          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-rose-500 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest shadow-2xl animate-bounce">
-            API Key Missing - Voice Features Disabled
-          </div>
-        )}
-        <Sidebar 
-          activeView={activeView} 
-          onViewChange={setActiveView} 
-          onVoiceToggle={() => setIsVoiceOpen(true)} 
-          isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        />
-        
-        <main className="flex-1 relative overflow-y-auto custom-scrollbar bg-[#050505] pb-20 md:pb-0">
-          <div className={activeView === ViewType.NAVIGATION ? 'h-full w-full' : 'hidden'}>
-            <NavigationView initialTarget={navTarget} isSidebarCollapsed={isSidebarCollapsed} />
-          </div>
-          {activeView !== ViewType.NAVIGATION && renderContent()}
-        </main>
+    }), [
+      activeView, 
+      navTarget, 
+      isDriving,
+      autoReroute,
+      truckProfile,
+      weeklyEarnings,
+      milesThisWeek,
+      fuelCost,
+      truckCost,
+      weekDeductions,
+      takeHomePercentage
+    ]);
 
-        {isVoiceOpen && (
-          <VoiceCommand 
-            onClose={() => setIsVoiceOpen(false)} 
-            setActiveView={setActiveView}
-            setNavTarget={setNavTarget}
-          />
-        )}
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#050505] text-white">
+        <div className="text-center">
+          <div className="relative mb-6 h-24 w-24 mx-auto">
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-[#D4AF37] border-t-transparent shadow-[0_0_15px_rgba(212,175,55,0.6)]"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[#D4AF37] font-black text-xl drop-shadow-[0_0_8px_rgba(212,175,55,0.8)]">TUE</span>
+            </div>
+          </div>
+          <p className="text-[#D4AF37] font-medium tracking-widest uppercase text-xs">Initializing System...</p>
+        </div>
       </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#050505] text-white p-6">
+        <div className="max-w-md w-full space-y-8 text-center">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-black tracking-tighter italic uppercase text-[#D4AF37] drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]">TRUCKERS NAV By TUE</h1>
+            <p className="text-[#D4AF37] text-sm uppercase tracking-widest">THE HOME OF THE TRUCKERS NEXT-GEN LOGISTICS PLATFORM</p>
+          </div>
+          
+          <div className="bg-zinc-900/50 border border-[#D4AF37]/20 p-8 rounded-3xl space-y-6 backdrop-blur-xl">
+            <div className="space-y-4">
+              <h2 className="text-xl font-bold text-[#D4AF37]">Welcome Back, Driver</h2>
+              <p className="text-zinc-400 text-sm">Sign in with your Google account to access your logs, routes, and earnings.</p>
+            </div>
+            
+            <button 
+              onClick={signIn}
+              className="w-full py-4 bg-[#D4AF37] text-black font-bold rounded-2xl transition-all flex items-center justify-center gap-3 hover:bg-[#D4AF37]/90"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Sign In with Google
+            </button>
+            
+            {authError && (
+              <p className="text-rose-500 text-sm mt-4">{authError}</p>
+            )}
+          </div>
+          
+          <p className="text-[10px] text-zinc-600 uppercase tracking-widest">
+            By signing in, you agree to our Terms of Service and Privacy Policy.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <AppContext.Provider value={contextValue}>
+      <HOSProvider>
+        <div className="flex h-screen w-screen bg-[#050505] text-white overflow-hidden">
+            {apiKeyMissing && (
+              <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-rose-500 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest shadow-2xl animate-bounce text-center">
+                API Keys Missing - Voice & Search Features Limited
+              </div>
+            )}
+            <Sidebar 
+              activeView={activeView} 
+              onViewChange={setActiveView} 
+              onVoiceToggle={handleVoiceToggle} 
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={handleToggleCollapse}
+              onSignOut={signOut}
+            />
+            
+            <main className={`flex-1 relative ${activeView === ViewType.NAVIGATION ? 'overflow-hidden' : 'overflow-y-auto'} custom-scrollbar bg-[#050505] pb-20 md:pb-0`}>
+              {console.log("App: Rendering activeView =", activeView)}
+              <div className={`${activeView === ViewType.NAVIGATION ? 'block' : 'hidden'} h-full w-full`}>
+                <ErrorBoundary>
+                  <NavigationView initialTarget={navTarget} activeView={activeView} />
+                </ErrorBoundary>
+              </div>
+              {activeView !== ViewType.NAVIGATION && (
+                <ErrorBoundary>
+                  {renderContent()}
+                </ErrorBoundary>
+              )}
+            </main>
+
+            {isVoiceOpen && (
+              <VoiceCommand 
+                onClose={() => setIsVoiceOpen(false)} 
+                setActiveView={setActiveView}
+                setNavTarget={setNavTarget}
+              />
+            )}
+          </div>
+        </HOSProvider>
     </AppContext.Provider>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <FirebaseProvider>
+        <LocationProvider>
+          <AppContent />
+        </LocationProvider>
+      </FirebaseProvider>
+    </ErrorBoundary>
   );
 };
 
