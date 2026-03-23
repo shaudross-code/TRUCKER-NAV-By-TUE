@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        allowedHosts: ['trucker-gps-9.cluster-12.preview.emergentcf.cloud'],
       },
       plugins: [
         tailwindcss(),
