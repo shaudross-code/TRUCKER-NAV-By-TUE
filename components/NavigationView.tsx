@@ -2159,6 +2159,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
         }
 
+        // Ensure coords exists and is valid before returning
+        if (!coords || coords.length === 0) {
+          console.error(`Frontend: Route ${routeIdx} has no valid coordinates after processing`);
+          return null;
+        }
+
         return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans };
       }).filter(Boolean);
 
@@ -2393,6 +2399,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
 
       const { coords, distMi, durationSec, steps } = primaryRoute;
+      
+      if (!coords || coords.length === 0) {
+        throw new Error("Route calculation returned no coordinates");
+      }
       
       routeCoordsRef.current = coords;
       setRoutePoints(coords);
