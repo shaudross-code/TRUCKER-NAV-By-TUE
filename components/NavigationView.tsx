@@ -2070,7 +2070,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               icon: AlertTriangle,
               color: 'text-red-500',
               bg: 'bg-red-500/10',
-              progress: 0
+              progress: 0,
+              coords: coords.length > 0 ? coords[0] : undefined
             });
           });
         }
