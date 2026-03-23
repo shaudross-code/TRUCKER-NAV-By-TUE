@@ -1,5 +1,5 @@
 import { safeStringify, isValidLatLng } from './utils';
-import React, { useState, useEffect, useMemo, useCallback, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 const Dashboard = lazy(() => import('./components/Dashboard'));

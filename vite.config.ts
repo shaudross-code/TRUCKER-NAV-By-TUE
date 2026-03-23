@@ -82,6 +82,10 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': fileURLToPath(new URL('.', import.meta.url)),
         }
+      },
+      optimizeDeps: {
+        include: ['react-is', 'recharts'],
+        force: true
       }
     };
 });
