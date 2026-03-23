@@ -3216,7 +3216,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               </button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {alternativeRoutes.map((route, idx) => (
+              {alternativeRoutes.map((route, idx) => {
+                if (!route || !route.coords || !Array.isArray(route.coords)) {
+                  console.warn('Skipping invalid route in alternativeRoutes:', route);
+                  return null;
+                }
+                return (
                 <button
                   key={idx}
                   onClick={() => {
@@ -3253,7 +3258,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     {route.alerts.length} alerts • {route.steps.length} steps
                   </div>
                 </button>
-              ))}
+                );
+              })}
             </div>
             <button
               onClick={() => {
