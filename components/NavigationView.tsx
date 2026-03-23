@@ -1975,6 +1975,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       // Process all routes
       const processedRoutes = hereRouteData.routes.map((route: any, routeIdx: number) => {
+        console.log(`Frontend: Processing route ${routeIdx}`, { sections: route.sections?.length });
+        
         if (!route.sections || route.sections.length === 0) {
           console.warn(`Frontend: Route ${routeIdx} has no sections`);
           return null;
@@ -1982,6 +1984,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         const section = route.sections[0];
         const summary = section.summary;
+        console.log(`Frontend: Route ${routeIdx} summary`, { length: summary?.length, duration: summary?.duration });
+        
         if (!summary || isNaN(summary.length) || isNaN(summary.duration)) {
           console.warn(`Frontend: Route ${routeIdx} section 0 has invalid summary`, summary);
           return null;
