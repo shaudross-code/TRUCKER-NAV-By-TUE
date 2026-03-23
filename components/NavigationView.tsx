@@ -103,27 +103,31 @@ const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocat
 
   useEffect(() => {
     if (!mapInstance || !currentSpeedLimit) {
-      if (speedLimitMarkerRef.current) {
+      if (speedLimitMarkerRef.current && mapInstance) {
         mapInstance.removeLayer(speedLimitMarkerRef.current);
         speedLimitMarkerRef.current = null;
       }
       return;
     }
 
-    const el = document.createElement('div');
-    el.className = 'speed-limit-marker';
-    el.innerHTML = `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={speed} />)}</div>`;
+    try {
+      const el = document.createElement('div');
+      el.className = 'speed-limit-marker';
+      el.innerHTML = `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={speed} />)}</div>`;
 
-    if (!speedLimitMarkerRef.current) {
-      if (isValidLatLng(userLocation)) {
-        speedLimitMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }) });
-        speedLimitMarkerRef.current.addTo(mapInstance);
+      if (!speedLimitMarkerRef.current) {
+        if (isValidLatLng(userLocation)) {
+          speedLimitMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }) });
+          speedLimitMarkerRef.current.addTo(mapInstance);
+        }
+      } else {
+        if (isValidLatLng(userLocation)) {
+          speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
+          speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
+        }
       }
-    } else {
-      if (isValidLatLng(userLocation)) {
-        speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
-        speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
-      }
+    } catch (error) {
+      console.log("SpeedLimitMarker error:", String(error));
     }
   }, [mapInstance, currentSpeedLimit, speed, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
