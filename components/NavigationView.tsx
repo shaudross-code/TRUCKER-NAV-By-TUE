@@ -2609,13 +2609,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!isMapReady) return;
 
-    restrictionAlertMarkersRef.current.forEach(m => m.remove());
-    restrictionAlertMarkersRef.current = [];
+    try {
+      restrictionAlertMarkersRef.current.forEach(m => m.remove());
+      restrictionAlertMarkersRef.current = [];
 
-    restrictionAlerts.forEach((alert) => {
-      if (!alert.coords) return;
+      restrictionAlerts.forEach((alert) => {
+        if (!alert.coords || !Array.isArray(alert.coords) || alert.coords.length < 2) {
+          console.warn('Skipping restriction alert with invalid coords:', alert);
+          return;
+        }
 
-      const iconHtml = renderToStaticMarkup(
+        const iconHtml = renderToStaticMarkup(
         <div className="flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
             alert.type === 'BRIDGE' ? 'bg-red-600 border-red-400 text-white' : 'bg-orange-500 border-orange-300 text-white'
@@ -2662,18 +2666,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       marker.bindPopup(popup);
       restrictionAlertMarkersRef.current.push(marker);
     });
+    } catch (error) {
+      console.error('Error rendering restriction alert markers:', error);
+      setError(`Failed to render route restrictions: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }, [restrictionAlerts, isMapReady]);
 
   useEffect(() => {
     if (!isMapReady) return;
 
-    trafficAlertMarkersRef.current.forEach(m => m.remove());
-    trafficAlertMarkersRef.current = [];
+    try {
+      trafficAlertMarkersRef.current.forEach(m => m.remove());
+      trafficAlertMarkersRef.current = [];
 
-    trafficAlerts.forEach((alert) => {
-      if (!alert.coords) return;
+      trafficAlerts.forEach((alert) => {
+        if (!alert.coords || !Array.isArray(alert.coords) || alert.coords.length < 2) {
+          console.warn('Skipping traffic alert with invalid coords:', alert);
+          return;
+        }
 
-      const iconHtml = renderToStaticMarkup(
+        const iconHtml = renderToStaticMarkup(
         <div className="flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
             alert.type === 'STOP_SIGN' ? 'bg-red-700 border-red-500 text-white' : 'bg-emerald-600 border-emerald-400 text-white'
@@ -2720,6 +2732,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       marker.bindPopup(popup);
       trafficAlertMarkersRef.current.push(marker);
     });
+    } catch (error) {
+      console.error('Error rendering traffic alert markers:', error);
+      setError(`Failed to render traffic alerts: ${error instanceof Error ? error.message : String(error)}`);
+    }
   }, [trafficAlerts, isMapReady]);
 
   useEffect(() => {
