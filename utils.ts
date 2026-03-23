@@ -2,7 +2,18 @@ export const safeStringify = (obj: any, replacer?: any, space?: string | number)
   const cache = new Set();
   try {
     return JSON.stringify(obj, (key, value) => {
+      // Skip React internal properties and DOM elements
+      if (key && (key.startsWith('__react') || key.startsWith('_react'))) {
+        return '[React Internal]';
+      }
+      
       if (typeof value === 'object' && value !== null) {
+        // Check if it's a DOM element
+        if (value instanceof Element || value instanceof Node) {
+          return '[DOM Element]';
+        }
+        
+        // Check for circular reference
         if (cache.has(value)) {
           return '[Circular]';
         }
@@ -17,8 +28,8 @@ export const safeStringify = (obj: any, replacer?: any, space?: string | number)
       return value;
     }, space);
   } catch (e) {
-    console.error("safeStringify failed for:", obj, e);
-    return "Unserializable object";
+    console.error("safeStringify failed:", e instanceof Error ? e.message : String(e));
+    return null;
   }
 };
 
