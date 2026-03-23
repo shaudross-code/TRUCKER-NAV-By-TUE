@@ -1,5 +1,5 @@
 import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
-import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
 import "@maptiler/leaflet-maptilersdk";
@@ -94,7 +94,7 @@ const noop = () => {};
 
 const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocation }: { mapInstance: any, currentSpeedLimit: number | null, userLocation: [number, number] | null }) => {
   const telemetryContext = useContext(TelemetryContext);
-  const speed = React.useSyncExternalStore(
+  const speed = useSyncExternalStore(
     telemetryContext?.subscribe || (() => () => {}),
     () => telemetryContext?.speedRef.current || 0
   );
