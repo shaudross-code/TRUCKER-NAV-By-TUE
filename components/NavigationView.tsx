@@ -2081,6 +2081,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const instruction = (action.instruction || '').toLowerCase();
             if (instruction.includes('stop sign') || action.action === 'stop') {
               const progress = action.offset / summary.length;
+              const coordIndex = Math.min(Math.floor(progress * (coords.length - 1)), coords.length - 1);
               trafficAlertsList.push({
                 type: 'STOP_SIGN',
                 message: 'Stop Sign',
@@ -2088,7 +2089,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 color: 'text-red-600',
                 bg: 'bg-red-600/10',
                 progress,
-                coords: coords[action.offset] || coords[Math.floor(action.offset * (coords.length - 1) / summary.length)]
+                coords: coords[coordIndex] || coords[0]
               });
             }
           });
@@ -2096,10 +2097,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         if (section.spans) {
           let currentPointIndex = 0;
+          let accumulatedDistance = 0;
           const totalPoints = decoded.polyline.length;
+          const totalDistance = summary.length;
           
           section.spans.forEach((span: any) => {
-            const progress = currentPointIndex / totalPoints;
+            // Calculate the array index based on distance progress
+            const progress = accumulatedDistance / totalDistance;
+            const coordIndex = Math.min(Math.floor(progress * (coords.length - 1)), coords.length - 1);
 
             if (span.streetAttributes && span.streetAttributes.includes('trafficLight')) {
               trafficAlertsList.push({
@@ -2109,13 +2114,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 color: 'text-emerald-500',
                 bg: 'bg-emerald-500/10',
                 progress,
-                coords: coords[currentPointIndex]
+                coords: coords[coordIndex] || coords[0]
               });
             }
 
             if (span.truckAttributes) {
               const attrs = span.truckAttributes;
-              const progress = currentPointIndex / totalPoints;
               
               if (attrs.maxHeight !== undefined) {
                 const heightFt = (attrs.maxHeight / 30.48).toFixed(1);
@@ -2129,7 +2133,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     bg: 'bg-red-500/20',
                     progress,
                     value: attrs.maxHeight,
-                    coords: coords[currentPointIndex]
+                    coords: coords[coordIndex] || coords[0]
                   });
                 }
               }
@@ -2146,12 +2150,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     bg: 'bg-orange-500/20',
                     progress,
                     value: attrs.maxWeight,
-                    coords: coords[currentPointIndex]
+                    coords: coords[coordIndex] || coords[0]
                   });
                 }
               }
             }
-            currentPointIndex += (span.length || 0);
+            accumulatedDistance += (span.length || 0);
           });
         }
 
