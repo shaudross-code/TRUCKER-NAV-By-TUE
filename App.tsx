@@ -80,19 +80,35 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
           const roundedLat = Math.round(latitude * 100000) / 100000;
           const roundedLon = Math.round(longitude * 100000) / 100000;
           if (prev && prev[0] === roundedLat && prev[1] === roundedLon) return prev;
-          return [roundedLat, roundedLon];
+          
+          // Save last known location to localStorage
+          const newLocation: [number, number] = [roundedLat, roundedLon];
+          try {
+            localStorage.setItem('trucker_last_location', JSON.stringify(newLocation));
+          } catch (e) {
+            console.warn('Failed to save last location:', e);
+          }
+          
+          return newLocation;
         });
       },
       (error) => {
         console.error("watchPosition error:", error);
         setUserLocation(prev => {
           if (!prev) {
+            // Try to load last known location from localStorage
             const saved = localStorage.getItem('trucker_last_location');
             try {
-              return saved ? JSON.parse(saved) : [41.8781, -87.6298];
-            } catch {
-              return [41.8781, -87.6298];
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                console.log('Using last known location:', parsed);
+                return parsed;
+              }
+            } catch (e) {
+              console.warn('Failed to parse saved location:', e);
             }
+            // No fallback - return null to indicate no location available
+            return null;
           }
           return prev;
         });
