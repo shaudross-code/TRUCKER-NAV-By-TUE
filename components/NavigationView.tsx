@@ -60,7 +60,6 @@ interface Waypoint {
   lon: number;
   type: 'DEADHEAD' | 'PAID';
 }
-import { STATIC_POIS } from '../src/constants/staticPois';
 import { AppContext, HOSContext, LocationContext, TelemetryContext, POI } from '../types';
 import { RouteHistoryItem, RestrictionAlert } from '../types';
 import { fetchTruckPOIs, searchPlaces, fetchAddressSuggestions, lookupPlace } from '../services/geminiService';
@@ -342,25 +341,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
   const [pois, setPois] = useState<any[]>(() => {
-    const saved = localStorage.getItem('truck_pois');
-    try {
-      const savedPois = saved ? JSON.parse(saved) : [];
-      const dynamicPois = savedPois
-        .filter((p: any) => !STATIC_POIS.some(sp => sp.id === p.id))
-        .map((p: any) => ({ ...p, lat: Number(p.lat), lon: Number(p.lon) }));
-      return [...STATIC_POIS, ...dynamicPois];
-    } catch (e) {
-      console.error("Failed to parse truck_pois from localStorage", e);
-      return STATIC_POIS;
-    }
+    // Clear any old fake POIs from localStorage
+    localStorage.removeItem('truck_pois');
+    console.log('🧹 Cleared old POI cache - will fetch fresh real data from HERE Maps');
+    return [];
   });
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
 
   useEffect(() => {
-    const dynamicPois = pois.filter(p => !STATIC_POIS.some(sp => sp.id === p.id));
-    const str = safeStringify(dynamicPois);
-    if (str) localStorage.setItem('truck_pois', str);
+    // Save only real POIs fetched from APIs
+    const str = safeStringify(pois);
+    if (str && pois.length > 0) {
+      localStorage.setItem('truck_pois', str);
+      console.log(`💾 Saved ${pois.length} real POIs to cache`);
+    }
   }, [pois]);
   const isFetchingPoisRef = useRef(false);
   const lastPoiFetchRef = useRef<{ time: number, lat: number, lon: number } | null>(null);

@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { getRoute } from '../src/services/hereRoutingService';
 import { AppContext, LocationContext, TelemetryContext, RouteHistoryItem, POI } from '../types';
-import { STATIC_POIS } from '../src/constants/staticPois';
 import { speak } from '../services/speechService';
 import { SpeedLimitSign } from './MapUI';
 import { getPoiIcon, getPoiCategory } from './PoiIcon';
@@ -170,7 +169,7 @@ const GoogleMapsNavigationView: React.FC<NavigationViewProps> = ({ initialTarget
   const [eta, setEta] = useState('--:-- --');
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [isFollowMode, setIsFollowMode] = useState(true);
-  const [pois, setPois] = useState<POI[]>(STATIC_POIS);
+  const [pois, setPois] = useState<POI[]>([]); // Start with empty array, fetch real POIs only
 
   // Persistence for destination
   useEffect(() => {
@@ -185,10 +184,10 @@ const GoogleMapsNavigationView: React.FC<NavigationViewProps> = ({ initialTarget
     }
   }, [destinationCoords]);
 
-  // Combine static and custom POIs
+  // Use only custom POIs from profile (no static fake POIs)
   useEffect(() => {
     const customPois = profile?.customPois || [];
-    setPois([...STATIC_POIS, ...customPois]);
+    setPois(customPois);
   }, [profile?.customPois]);
 
   const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
