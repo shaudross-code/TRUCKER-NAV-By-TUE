@@ -20,9 +20,21 @@ import { speak } from './services/speechService';
 
 const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(() => {
-    const saved = localStorage.getItem('user_location');
-    return saved ? JSON.parse(saved) : null;
+    // Check for saved location on initial load
+    const saved = localStorage.getItem('trucker_last_location');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        console.log('Initial load: Found saved location', parsed);
+        return parsed;
+      } catch (e) {
+        console.warn('Failed to parse initial saved location:', e);
+      }
+    }
+    return null;
   });
+  
+  const [locationError, setLocationError] = useState<string | null>(null);
   
   const speedRef = useRef<number>(0);
   const headingRef = useRef<number>(0);
@@ -35,7 +47,10 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   useEffect(() => {
     if (userLocation) {
       const str = safeStringify(userLocation);
-      localStorage.setItem('user_location', str);
+      if (str) {
+        // Save to consistent key for location persistence
+        localStorage.setItem('trucker_last_location', str);
+      }
     }
   }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
@@ -74,7 +89,18 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         }
       },
       (error) => {
-        console.warn("getCurrentPosition failed:", error.message);
+        console.warn("getCurrentPosition failed:", error.message, "Code:", error.code);
+        setLocationError(error.message);
+        
+        // Error codes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+        if (error.code === 1) {
+          console.error("Location permission denied by user");
+        } else if (error.code === 2) {
+          console.error("Location unavailable from device");
+        } else if (error.code === 3) {
+          console.error("Location request timed out");
+        }
+        
         // Only use fallback if getCurrentPosition fails
         setUserLocation(prev => {
           if (!prev) {
