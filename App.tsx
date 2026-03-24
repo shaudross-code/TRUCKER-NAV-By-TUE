@@ -42,9 +42,60 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   useEffect(() => {
     if (!navigator.geolocation) {
       console.warn("Geolocation is not supported by this browser.");
+      // Load last known location as fallback when geolocation not supported
+      const saved = localStorage.getItem('trucker_last_location');
+      if (saved) {
+        try {
+          setUserLocation(JSON.parse(saved));
+          console.log('Geolocation not supported, using last known location');
+        } catch (e) {
+          console.warn('Failed to parse saved location:', e);
+        }
+      }
       return;
     }
 
+    // First, try to get current position immediately
+    console.log('Attempting to get current location...');
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        if (!isNaN(latitude) && !isNaN(longitude)) {
+          const roundedLat = Math.round(latitude * 100000) / 100000;
+          const roundedLon = Math.round(longitude * 100000) / 100000;
+          const newLocation: [number, number] = [roundedLat, roundedLon];
+          setUserLocation(newLocation);
+          try {
+            localStorage.setItem('trucker_last_location', JSON.stringify(newLocation));
+          } catch (e) {
+            console.warn('Failed to save location:', e);
+          }
+          console.log('Current location acquired:', newLocation);
+        }
+      },
+      (error) => {
+        console.warn("getCurrentPosition failed:", error.message);
+        // Only use fallback if getCurrentPosition fails
+        setUserLocation(prev => {
+          if (!prev) {
+            const saved = localStorage.getItem('trucker_last_location');
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved);
+                console.log('Using last known location as fallback:', parsed);
+                return parsed;
+              } catch (e) {
+                console.warn('Failed to parse saved location:', e);
+              }
+            }
+          }
+          return prev;
+        });
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+
+    // Then start watching for position updates
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         const { latitude, longitude, speed: geoSpeed, heading: geoHeading } = position.coords;
@@ -94,20 +145,20 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
       },
       (error) => {
         console.error("watchPosition error:", error);
+        // Keep existing location if watch fails, don't override with fallback
         setUserLocation(prev => {
           if (!prev) {
-            // Try to load last known location from localStorage
+            // Only use fallback if we have no location at all
             const saved = localStorage.getItem('trucker_last_location');
             try {
               if (saved) {
                 const parsed = JSON.parse(saved);
-                console.log('Using last known location:', parsed);
+                console.log('Using last known location (watch failed):', parsed);
                 return parsed;
               }
             } catch (e) {
               console.warn('Failed to parse saved location:', e);
             }
-            // No fallback - return null to indicate no location available
             return null;
           }
           return prev;
