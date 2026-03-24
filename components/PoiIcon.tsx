@@ -1,4 +1,4 @@
-import { Fuel, ParkingSquare, UtensilsCrossed, Wrench, Box, Droplets, Truck, Scale, LogIn, LogOut } from 'lucide-react';
+import { Fuel, ParkingSquare, UtensilsCrossed, Wrench, Box, Droplets, Truck, Scale, LogIn, LogOut, AlertTriangle } from 'lucide-react';
 
 export const getPoiCategory = (type: any = '', name: any = ''): string => {
   const typeStr = typeof type === 'string' ? type : '';
@@ -314,6 +314,12 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
     case 'repair':
     case 'wrench':
       return <Wrench className="w-7 h-7 text-red-400 drop-shadow-lg" />;
+    case 'low_clearance':
+      return (
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-red-600 border-2 border-white shadow-lg animate-pulse">
+          <AlertTriangle className="w-5 h-5 text-white" />
+        </div>
+      );
     default:
       // Fallback for any other truck-related POI
       return (

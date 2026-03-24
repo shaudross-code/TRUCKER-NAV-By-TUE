@@ -11,6 +11,7 @@ import {
   Navigation as NavIcon,
   Loader2,
   RotateCcw,
+  RotateCw,
   Wind,
   CloudSun,
   Cloud,
@@ -2984,7 +2985,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         console.log("Calling updateNavigationState (periodic)", userLocationRef.current);
         updateNavigationState(userLocationRef.current).catch(err => console.error("Navigation periodic update failed:", err));
       }
-    }, 30000); // Every 30 seconds
+    }, 2000); // Every 2 seconds for real-time turn-by-turn updates
     
     return () => clearInterval(etaInterval);
   }, [isDriving, updateNavigationState]);
