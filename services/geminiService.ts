@@ -258,42 +258,84 @@ export async function fetchMajorChains(lat: number, lon: number) {
 
 export async function fetchTruckPOIs(lat: number, lon: number) {
   try {
-    // Use HERE Maps Browse API for reliable, professional truck stop data
-    const response = await fetch('/api/browse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: safeStringify({ 
-        lat, 
-        lon, 
-        // Truck-specific categories:
-        // 700-7600-0116 = Truck Stop
-        // 700-7600-0117 = Rest Area  
-        // 700-7600-0322 = Weigh Station
-        // 700-7000-0000 = Gas Station (includes truck lanes)
-        categories: '700-7600-0116,700-7600-0117,700-7600-0322,700-7000-0000'
-      })
-    });
+    // Fetch multiple types of truck-related POIs in parallel
+    const [generalPOIs, servicePOIs, brandPOIs] = await Promise.all([
+      // General truck stops, rest areas, weigh stations
+      fetch('/api/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeStringify({ 
+          lat, 
+          lon, 
+          categories: '700-7600-0116,700-7600-0117,700-7600-0322,700-7000-0000'
+        })
+      }).then(r => r.ok ? r.json() : { items: [] }),
+      
+      // Truck service centers (includes Speedco, tire shops, repair)
+      fetch('/api/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeStringify({ 
+          lat, 
+          lon, 
+          categories: '600-6300-0066,600-6100-0062,600-6300-0000' // Truck repair, tire dealers, auto service
+        })
+      }).then(r => r.ok ? r.json() : { items: [] }),
+      
+      // Search for specific truck service brands
+      fetch('/api/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeStringify({ 
+          query: 'Speedco OR Southern Tire Mart',
+          lat,
+          lon
+        })
+      }).then(r => r.ok ? r.json() : { items: [] })
+    ]);
     
-    if (!response.ok) {
-      console.warn("HERE API failed, falling back to Overpass API");
+    // Combine all results
+    const allItems = [
+      ...(generalPOIs.items || []),
+      ...(servicePOIs.items || []),
+      ...(brandPOIs.items || [])
+    ];
+    
+    if (allItems.length === 0) {
+      console.warn("HERE API returned no results, falling back to Overpass API");
       return fetchTruckPOIsFromOverpass(lat, lon);
     }
     
-    const data = await response.json();
-    
     // Map HERE results to our POI format
-    return (data.items || []).map((item: any) => {
+    return allItems.map((item: any) => {
       const position = item.position || item.access?.[0]?.position;
       if (!position) return null;
       
-      // Determine type based on categories
-      let type = "fuel";
-      if (item.categories?.some((c: any) => c.id === '700-7600-0116')) type = "major_chains";
-      else if (item.categories?.some((c: any) => c.id === '700-7600-0117')) type = "rest_area";
-      else if (item.categories?.some((c: any) => c.id === '700-7600-0322')) type = "weigh_station";
+      const itemName = (item.title || "").toLowerCase();
       
-      // Extract amenities from categories and contacts
+      // Determine type based on categories and name
+      let type = "fuel";
+      if (itemName.includes('speedco') || itemName.includes('southern tire')) {
+        type = "service"; // Truck service/repair
+      } else if (item.categories?.some((c: any) => c.id === '700-7600-0116')) {
+        type = "major_chains";
+      } else if (item.categories?.some((c: any) => c.id === '700-7600-0117')) {
+        type = "rest_area";
+      } else if (item.categories?.some((c: any) => c.id === '700-7600-0322')) {
+        type = "weigh_station";
+      } else if (item.categories?.some((c: any) => c.id?.startsWith('600-6'))) {
+        type = "service";
+      }
+      
+      // Extract amenities from categories and name
       const amenities = [];
+      
+      if (itemName.includes('speedco')) {
+        amenities.push("Truck Repair", "Maintenance", "Oil Change", "Inspection");
+      } else if (itemName.includes('southern tire')) {
+        amenities.push("Tires", "Tire Repair", "Tire Sales", "Road Service");
+      }
+      
       if (item.contacts?.phone) amenities.push("Phone");
       if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('fuel') || c.name?.toLowerCase().includes('gas'))) {
         amenities.push("Diesel");
@@ -304,6 +346,13 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('parking'))) {
         amenities.push("Truck Parking");
       }
+      if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('repair') || c.name?.toLowerCase().includes('service'))) {
+        if (!amenities.includes("Truck Repair")) amenities.push("Truck Repair");
+      }
+      if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('tire'))) {
+        if (!amenities.includes("Tires")) amenities.push("Tires");
+      }
+      
       if (amenities.length === 0) amenities.push("Services");
       
       return {
@@ -313,7 +362,8 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         lon: position.lng,
         amenities,
         address: item.address?.label,
-        distance: item.distance // Distance in meters from query point
+        distance: item.distance,
+        phone: item.contacts?.phone?.[0]?.value
       };
     }).filter(Boolean);
   } catch (e) {
@@ -337,8 +387,12 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
         way["highway"="rest_area"](around:${radius},${lat},${lon});
         node["highway"="services"](around:${radius},${lat},${lon});
         way["highway"="services"](around:${radius},${lat},${lon});
-        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express",i](around:${radius},${lat},${lon});
-        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express",i](around:${radius},${lat},${lon});
+        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart",i](around:${radius},${lat},${lon});
+        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart",i](around:${radius},${lat},${lon});
+        node["name"~"Speedco|Southern Tire Mart",i](around:${radius},${lat},${lon});
+        way["name"~"Speedco|Southern Tire Mart",i](around:${radius},${lat},${lon});
+        node["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
+        way["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
       );
       out center;
     `;
@@ -359,20 +413,38 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
       const elLon = el.lon || el.center?.lon;
       const tags = el.tags || {};
       
+      const name = tags.name || tags.operator || tags.brand || "Truck Stop";
+      const isSpeedco = name.toLowerCase().includes('speedco');
+      const isSouthernTire = name.toLowerCase().includes('southern tire');
+      
       let type = "other";
-      if (tags.highway === "weigh_station") type = "weigh_station";
-      else if (tags.highway === "rest_area" || tags.highway === "services") type = "rest_area";
-      else if (tags.amenity === "fuel" || tags.brand) type = "major_chains";
+      if (isSpeedco || isSouthernTire || tags.shop === "tyres") {
+        type = "service";
+      } else if (tags.highway === "weigh_station") {
+        type = "weigh_station";
+      } else if (tags.highway === "rest_area" || tags.highway === "services") {
+        type = "rest_area";
+      } else if (tags.amenity === "fuel" || tags.brand) {
+        type = "major_chains";
+      }
       
       const amenities = [];
+      
+      if (isSpeedco) {
+        amenities.push("Truck Repair", "Maintenance", "Oil Change", "Inspection");
+      } else if (isSouthernTire) {
+        amenities.push("Tires", "Tire Repair", "Tire Sales", "Road Service");
+      }
+      
       if (tags.fuel === "yes" || tags["fuel:diesel"] === "yes") amenities.push("Diesel");
       if (tags.toilets === "yes") amenities.push("Restrooms");
       if (tags.shower === "yes") amenities.push("Showers");
       if (tags.food === "yes" || tags.restaurant === "yes" || tags.fast_food === "yes") amenities.push("Food");
+      if (tags.shop === "tyres" && !amenities.includes("Tires")) amenities.push("Tires");
       if (amenities.length === 0) amenities.push("Truck Parking");
       
       return {
-        name: tags.name || tags.operator || tags.brand || "Truck Stop",
+        name,
         type,
         lat: elLat,
         lon: elLon,

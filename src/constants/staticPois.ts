@@ -7,6 +7,7 @@ export const TRUCK_POI_CATEGORIES = [
   '700-7000-0000', // Gas Station (with truck lanes)
   '800-8500-0000', // Truck Parking
   '600-6300-0066', // Truck Repair & Service
+  '600-6100-0062', // Tire Dealers
   '700-7850-0000', // Truck Wash
 ];
 
@@ -22,6 +23,17 @@ export const MAJOR_TRUCK_STOPS = [
   "Road Ranger",
   "Roady's",
   "TravelCenters of America"
+];
+
+// Truck service providers
+export const TRUCK_SERVICE_PROVIDERS = [
+  "Speedco",
+  "Southern Tire Mart",
+  "Ryder",
+  "Penske",
+  "Rush Truck Centers",
+  "Freightliner",
+  "Cummins"
 ];
 
 // Empty static POIs - all POIs will be fetched from HERE Maps API
