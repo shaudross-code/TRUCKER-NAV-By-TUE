@@ -2693,22 +2693,89 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           console.log('Sample POI data:', poiData[0]); // Log first POI to verify data structure
           
           const combinedRaw = [...poiData];
-          const seenInBatch = new Set();
-          const combined = combinedRaw.filter(p => {
-            const id = `${p.lat}-${p.lon}-${p.name}`;
-            if (seenInBatch.has(id)) return false;
-            seenInBatch.add(id);
-            return true;
+          
+          // Group POIs by location (within 10 meters) and merge amenities
+          const locationGroups = new Map<string, any>();
+          
+          combinedRaw.forEach(poi => {
+            // Round coordinates to ~10m precision (0.0001 degrees ≈ 11m)
+            const locationKey = `${Math.round(poi.lat * 10000)}-${Math.round(poi.lon * 10000)}`;
+            
+            if (locationGroups.has(locationKey)) {
+              // Merge with existing POI at this location
+              const existing = locationGroups.get(locationKey);
+              
+              // Prefer name from major truck stop chains
+              if (poi.type === 'major_chains' && existing.type !== 'major_chains') {
+                existing.name = poi.name;
+                existing.type = poi.type;
+              }
+              
+              // Merge amenities (remove duplicates)
+              if (poi.amenities && Array.isArray(poi.amenities)) {
+                const currentAmenities = existing.amenities || [];
+                existing.amenities = [...new Set([...currentAmenities, ...poi.amenities])];
+              }
+              
+              // Keep the more precise coordinates
+              if (!existing.address && poi.address) {
+                existing.address = poi.address;
+              }
+              
+              // Use shorter distance if available
+              if (poi.distance && (!existing.distance || poi.distance < existing.distance)) {
+                existing.distance = poi.distance;
+              }
+            } else {
+              // New location
+              locationGroups.set(locationKey, {
+                ...poi,
+                amenities: poi.amenities || []
+              });
+            }
           });
+          
+          const combined = Array.from(locationGroups.values());
 
-          console.log(`📍 ${combined.length} unique POIs after deduplication`);
+          console.log(`📍 ${combined.length} unique locations (merged from ${combinedRaw.length} POIs)`);
+          console.log(`🏪 Example merged POI:`, combined[0]);
+          
           setPois(prev => {
-            const existingIds = new Set();
-            prev.forEach(p => existingIds.add(`${p.lat}-${p.lon}-${p.name}`));
-            const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
-            if (newPois.length === 0) return prev;
-            const updated = [...prev, ...newPois];
-            if (updated.length > 1000) return updated.slice(updated.length - 1000);
+            // Use location-based deduplication
+            const locationMap = new Map<string, any>();
+            
+            // Add existing POIs to map
+            prev.forEach(p => {
+              const key = `${Math.round(p.lat * 10000)}-${Math.round(p.lon * 10000)}`;
+              locationMap.set(key, p);
+            });
+            
+            // Add or merge new POIs
+            let addedCount = 0;
+            combined.forEach(p => {
+              const key = `${Math.round(p.lat * 10000)}-${Math.round(p.lon * 10000)}`;
+              if (!locationMap.has(key)) {
+                locationMap.set(key, p);
+                addedCount++;
+              } else {
+                // Merge amenities if POI already exists
+                const existing = locationMap.get(key);
+                if (p.amenities && Array.isArray(p.amenities)) {
+                  const currentAmenities = existing.amenities || [];
+                  existing.amenities = [...new Set([...currentAmenities, ...p.amenities])];
+                }
+              }
+            });
+            
+            if (addedCount === 0) return prev;
+            
+            const updated = Array.from(locationMap.values());
+            console.log(`✅ Added ${addedCount} new locations (total: ${updated.length})`);
+            
+            // Keep only last 1000 POIs
+            if (updated.length > 1000) {
+              return updated.slice(updated.length - 1000);
+            }
             return updated;
           });
         })
