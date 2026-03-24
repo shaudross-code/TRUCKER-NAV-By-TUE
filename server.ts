@@ -26,6 +26,11 @@ async function createServer() {
   const app = express();
   app.use(express.json());
 
+  // Health check endpoint for platform monitoring (must be before Vite middleware)
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'trucker-nav' });
+  });
+
   // API routes
   app.post('/api/route', async (req, res) => {
     const { 
@@ -308,11 +313,6 @@ async function createServer() {
     });
     app.use(vite.middlewares);
   }
-
-  // Health check endpoint for platform monitoring
-  app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', service: 'trucker-nav' });
-  });
 
   app.listen(8001, '0.0.0.0', () => {
     console.log('Server is listening on port 8001...');
