@@ -2694,6 +2694,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       fetchTruckPOIs(userLocation[0], userLocation[1])
         .then((poiData) => {
+          console.log(`✅ Fetched ${poiData.length} real truck stops from HERE Maps API`);
+          console.log('Sample POI data:', poiData[0]); // Log first POI to verify data structure
+          
           const combinedRaw = [...poiData];
           const seenInBatch = new Set();
           const combined = combinedRaw.filter(p => {
@@ -2703,7 +2706,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             return true;
           });
 
-          console.log(`Fetched ${combined.length} POIs total (Gemini + HERE)`);
+          console.log(`📍 ${combined.length} unique POIs after deduplication`);
           setPois(prev => {
             const existingIds = new Set();
             prev.forEach(p => existingIds.add(`${p.lat}-${p.lon}-${p.name}`));
@@ -3070,7 +3073,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const popup = L.popup({ offset: [0, -25] }).setContent(`
               <div class="p-3 min-w-[180px]">
                 <div class="font-black text-zinc-900 text-sm mb-1">${poi.name}</div>
-                <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-3">${poi.type}</div>
+                <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">${poi.type}</div>
+                ${poi.address ? `<div class="text-[9px] text-zinc-600 mb-2">${poi.address}</div>` : ''}
+                ${poi.amenities && poi.amenities.length > 0 ? `
+                  <div class="flex flex-wrap gap-1 mb-2">
+                    ${poi.amenities.map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-bold">${a}</span>`).join('')}
+                  </div>
+                ` : ''}
+                ${poi.distance ? `<div class="text-[9px] text-zinc-500 mb-2">📍 ${(poi.distance / 1000).toFixed(1)} km away</div>` : ''}
                 <button 
                   class="view-poi-details-btn w-full py-2 bg-[#D4AF37] text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#B8860B] transition-colors mb-2"
                   data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
