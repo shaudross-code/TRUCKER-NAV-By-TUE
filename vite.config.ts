@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        allowedHosts: ["https://poi-integration-dev.preview.emergentagent.com/"],
+        allowedHosts: ["poi-integration-dev.preview.emergentagent.com", "trucker-nav-by-tue.preview.emergentagent.com"],
       },
       plugins: [
         tailwindcss(),
