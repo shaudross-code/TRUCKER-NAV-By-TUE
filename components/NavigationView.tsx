@@ -53,6 +53,8 @@ import {
   X,
   Mic
 } from 'lucide-react';
+import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
+import { TrafficIcon } from './TrafficIcon';
 
 interface Waypoint {
   id: string;
@@ -347,6 +349,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log('🧹 Cleared old POI cache - will fetch fresh real data from HERE Maps');
     return [];
   });
+
+  const [trafficInfrastructure, setTrafficInfrastructure] = useState<any[]>([]);
+  const [showTrafficSigns, setShowTrafficSigns] = useState(() => 
+    localStorage.getItem('nav_show_traffic_signs') !== 'false'
+  );
+  const alertedTrafficItems = useRef<Set<string>>(new Set());
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
 
@@ -2999,6 +3007,58 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
   }, [isDriving, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, updateNavigationState]);
 
+  // Fetch traffic infrastructure (signs, lights, signage) when location changes
+  useEffect(() => {
+    if (!showTrafficSigns || !isValidLatLng(userLocation)) return;
+
+    const fetchTraffic = async () => {
+      try {
+        const infrastructure = await fetchTrafficInfrastructure(userLocation[0], userLocation[1], 2000);
+        setTrafficInfrastructure(infrastructure);
+        console.log(`Fetched ${infrastructure.length} traffic infrastructure items`);
+      } catch (error) {
+        console.error('Error fetching traffic infrastructure:', error);
+      }
+    };
+
+    // Fetch traffic infrastructure every 10 seconds
+    fetchTraffic();
+    const interval = setInterval(fetchTraffic, 10000);
+    
+    return () => clearInterval(interval);
+  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, showTrafficSigns]);
+
+  // Monitor distance to traffic infrastructure and play audio alerts
+  useEffect(() => {
+    if (!isDriving || !isValidLatLng(userLocation) || trafficInfrastructure.length === 0) return;
+
+    const checkTrafficAlerts = () => {
+      for (const item of trafficInfrastructure) {
+        const distanceMiles = calcDistMi(
+          userLocation[0], userLocation[1],
+          item.position[0], item.position[1]
+        );
+        const distanceMeters = distanceMiles * 1609.34; // Convert miles to meters
+
+        // Alert if within range and not already alerted
+        if (distanceMeters < 300 && !alertedTrafficItems.current.has(item.id)) {
+          playTrafficAlert(item, distanceMeters);
+          alertedTrafficItems.current.add(item.id);
+          
+          // Remove from alerted set after 30 seconds
+          setTimeout(() => {
+            alertedTrafficItems.current.delete(item.id);
+          }, 30000);
+        }
+      }
+    };
+
+    checkTrafficAlerts();
+    const interval = setInterval(checkTrafficAlerts, 2000);
+    
+    return () => clearInterval(interval);
+  }, [isDriving, userLocation, trafficInfrastructure]);
+
   useEffect(() => {
     if (!telemetryContext || !userMarkerElRef.current || !isValidLatLng(userLocationRef.current)) return;
 
@@ -3236,6 +3296,48 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       return () => document.removeEventListener('click', handlePopupClick);
   }, [pois, showPois, poiFilters, mapCenter, isMapReady]);
+
+  // Render traffic infrastructure markers (signs, lights, signage)
+  useEffect(() => {
+    const trafficMarkersRef: L.Marker[] = [];
+    
+    if (!mapInstanceRef.current || !showTrafficSigns || trafficInfrastructure.length === 0) {
+      return;
+    }
+
+    trafficInfrastructure.forEach((item: TrafficInfrastructure) => {
+      try {
+        const iconHtml = renderToStaticMarkup(
+          <TrafficIcon 
+            type={item.type} 
+            signType={item.type === 'traffic_sign' ? item.signType : undefined}
+            value={item.type === 'traffic_sign' ? item.value : undefined}
+          />
+        );
+
+        const marker = L.marker([item.position[0], item.position[1]], {
+          icon: L.divIcon({
+            html: `<div class="traffic-infrastructure-icon">${iconHtml}</div>`,
+            className: 'traffic-marker',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+          })
+        });
+
+        marker.addTo(mapInstanceRef.current!);
+        marker.bindPopup(`<div class="p-2 font-bold text-xs">${item.name}</div>`);
+        trafficMarkersRef.push(marker);
+      } catch (error) {
+        console.error('Error rendering traffic infrastructure marker:', error);
+      }
+    });
+
+    console.log(`Rendered ${trafficMarkersRef.length} traffic infrastructure markers`);
+
+    return () => {
+      trafficMarkersRef.forEach(marker => marker.remove());
+    };
+  }, [trafficInfrastructure, showTrafficSigns, isMapReady]);
 
   useEffect(() => {
     if (!isDriving || pois.length === 0 || routePoints.length === 0 || !userLocation) {
@@ -4407,6 +4509,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         isFollowMode={isFollowMode}
         isNorthUp={isNorthUp}
         setIsNorthUp={setIsNorthUp}
+        showTrafficSigns={showTrafficSigns}
+        setShowTrafficSigns={setShowTrafficSigns}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
       />
               <RouteSettingsModal

@@ -14,7 +14,9 @@ export const MapControls: React.FC<any> = React.memo(({
   userLocation, 
   isFollowMode, 
   isNorthUp, 
-  setIsNorthUp, 
+  setIsNorthUp,
+  showTrafficSigns,
+  setShowTrafficSigns,
   className = ""
 }) => {
   return (
@@ -47,6 +49,21 @@ export const MapControls: React.FC<any> = React.memo(({
             {isFilterMenuOpen && (
               <div className="absolute right-full mr-2 md:mr-4 top-0 bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-2 md:p-3 shadow-[0_40px_100px_rgba(0,0,0,0.8)] w-40 md:w-56 flex flex-col gap-1.5 md:gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
                 <h3 className="text-[#D4AF37] font-black text-[8px] md:text-[10px] uppercase tracking-widest border-b border-[#D4AF37]/20 pb-1 mb-0.5">Filters</h3>
+                
+                {/* Traffic Signs Toggle */}
+                <button
+                  onClick={() => {
+                    setShowTrafficSigns(!showTrafficSigns);
+                    localStorage.setItem('nav_show_traffic_signs', String(!showTrafficSigns));
+                  }}
+                  className="flex items-center justify-between p-1.5 md:p-2 rounded-lg bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-all mb-1"
+                >
+                  <span className="text-white font-bold text-[9px] md:text-[11px]">🚦 Traffic Signs & Lights</span>
+                  <div className={`w-3 h-3 md:w-4 md:h-4 rounded border-2 flex items-center justify-center transition-all ${showTrafficSigns ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-600'}`}>
+                    {showTrafficSigns && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={4} />}
+                  </div>
+                </button>
+
                 <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
