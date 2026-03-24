@@ -1,42 +1,28 @@
-export const STATIC_POIS = [
-  {
-    id: 'static-1',
-    name: 'Main Distribution Center (2026-2027)',
-    lat: 41.8781,
-    lon: -87.6298,
-    type: 'DISTRIBUTION',
-    validUntil: '2027-12-31'
-  },
-  {
-    id: 'static-2',
-    name: 'Primary Fuel Stop (2026-2027)',
-    lat: 41.9000,
-    lon: -87.6500,
-    type: 'FUEL',
-    validUntil: '2027-12-31'
-  },
-  {
-    id: 'static-3',
-    name: 'Conoco Truck Stop',
-    lat: 41.8500,
-    lon: -87.6800,
-    type: 'FUEL',
-    validUntil: '2027-12-31'
-  },
-  {
-    id: 'static-4',
-    name: "Casey's Truck Stop",
-    lat: 41.8200,
-    lon: -87.7000,
-    type: 'FUEL',
-    validUntil: '2027-12-31'
-  },
-  {
-    id: 'static-5',
-    name: 'Static Warehouse POI',
-    lat: 41.8800,
-    lon: -87.6500,
-    type: 'WAREHOUSE',
-    validUntil: '2027-12-31'
-  }
+// Real truck-specific POI categories for HERE Maps API
+// These categories are specifically for professional truck drivers
+export const TRUCK_POI_CATEGORIES = [
+  '700-7600-0116', // Truck Stop
+  '700-7600-0117', // Rest Area
+  '700-7600-0322', // Weigh Station
+  '700-7000-0000', // Gas Station (with truck lanes)
+  '800-8500-0000', // Truck Parking
+  '600-6300-0066', // Truck Repair & Service
+  '700-7850-0000', // Truck Wash
 ];
+
+// Professional truck stop chains to prioritize
+export const MAJOR_TRUCK_STOPS = [
+  "Pilot",
+  "Flying J",
+  "Love's",
+  "TA",
+  "Petro",
+  "Speedway",
+  "Ambest",
+  "Road Ranger",
+  "Roady's",
+  "TravelCenters of America"
+];
+
+// Empty static POIs - all POIs will be fetched from HERE Maps API
+export const STATIC_POIS: any[] = [];

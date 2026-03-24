@@ -258,6 +258,73 @@ export async function fetchMajorChains(lat: number, lon: number) {
 
 export async function fetchTruckPOIs(lat: number, lon: number) {
   try {
+    // Use HERE Maps Browse API for reliable, professional truck stop data
+    const response = await fetch('/api/browse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: safeStringify({ 
+        lat, 
+        lon, 
+        // Truck-specific categories:
+        // 700-7600-0116 = Truck Stop
+        // 700-7600-0117 = Rest Area  
+        // 700-7600-0322 = Weigh Station
+        // 700-7000-0000 = Gas Station (includes truck lanes)
+        categories: '700-7600-0116,700-7600-0117,700-7600-0322,700-7000-0000'
+      })
+    });
+    
+    if (!response.ok) {
+      console.warn("HERE API failed, falling back to Overpass API");
+      return fetchTruckPOIsFromOverpass(lat, lon);
+    }
+    
+    const data = await response.json();
+    
+    // Map HERE results to our POI format
+    return (data.items || []).map((item: any) => {
+      const position = item.position || item.access?.[0]?.position;
+      if (!position) return null;
+      
+      // Determine type based on categories
+      let type = "fuel";
+      if (item.categories?.some((c: any) => c.id === '700-7600-0116')) type = "major_chains";
+      else if (item.categories?.some((c: any) => c.id === '700-7600-0117')) type = "rest_area";
+      else if (item.categories?.some((c: any) => c.id === '700-7600-0322')) type = "weigh_station";
+      
+      // Extract amenities from categories and contacts
+      const amenities = [];
+      if (item.contacts?.phone) amenities.push("Phone");
+      if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('fuel') || c.name?.toLowerCase().includes('gas'))) {
+        amenities.push("Diesel");
+      }
+      if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('restaurant') || c.name?.toLowerCase().includes('food'))) {
+        amenities.push("Food");
+      }
+      if (item.categories?.some((c: any) => c.name?.toLowerCase().includes('parking'))) {
+        amenities.push("Truck Parking");
+      }
+      if (amenities.length === 0) amenities.push("Services");
+      
+      return {
+        name: item.title || "Truck Stop",
+        type,
+        lat: position.lat,
+        lon: position.lng,
+        amenities,
+        address: item.address?.label,
+        distance: item.distance // Distance in meters from query point
+      };
+    }).filter(Boolean);
+  } catch (e) {
+    console.warn("HERE API error, falling back to Overpass API:", e instanceof Error ? e.message : String(e));
+    return fetchTruckPOIsFromOverpass(lat, lon);
+  }
+}
+
+// Fallback to OpenStreetMap Overpass API
+async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
+  try {
     const radius = 50000; // 50km radius
     const query = `
       [out:json][timeout:25];
@@ -313,7 +380,7 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       };
     }).filter((poi: any) => poi.lat && poi.lon);
   } catch (e) {
-    console.warn("API error fetching POIs, returning empty array to prevent inaccurate POIs.", e instanceof Error ? e.message : String(e));
+    console.warn("Overpass API error, returning empty array:", e instanceof Error ? e.message : String(e));
     return [];
   }
 }

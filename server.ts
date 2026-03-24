@@ -158,9 +158,13 @@ async function createServer() {
     try {
       const hereUrl = new URL('https://browse.search.hereapi.com/v1/browse');
       hereUrl.searchParams.append('at', `${lat},${lon}`);
-      if (categories) hereUrl.searchParams.append('categories', categories);
+      
+      // Use truck-specific categories if none provided
+      const truckCategories = categories || '700-7600-0116,700-7600-0117,700-7600-0322,700-7000-0000';
+      hereUrl.searchParams.append('categories', truckCategories);
+      
       hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
-      hereUrl.searchParams.append('limit', '20');
+      hereUrl.searchParams.append('limit', '50'); // Increased for better coverage
       
       const response = await fetch(hereUrl.toString());
       const data = await response.json();
