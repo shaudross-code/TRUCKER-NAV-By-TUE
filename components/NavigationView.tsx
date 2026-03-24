@@ -4302,9 +4302,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       {isDriving && !isExploreMode && (
         <div id="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-8 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[750px] px-2 md:px-6 pointer-events-none">
           <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] landscape:rounded-2xl p-2 md:p-6 landscape:p-2 flex items-center justify-between shadow-[0_40px_100px_rgba(0,0,0,0.8)] pointer-events-auto transition-all hover:scale-[1.005]">
-            <button id="nav-exit-button" onClick={handleCancelRoute} className="p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[1.5rem] landscape:rounded-xl bg-zinc-900 text-zinc-600 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all active:scale-90 shrink-0">
-              <X className="w-4 h-4 md:w-7 md:h-7 landscape:w-5 landscape:h-5" strokeWidth={5} />
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button id="nav-exit-button" onClick={handleCancelRoute} className="p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[1.5rem] landscape:rounded-xl bg-zinc-900 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90" title="Clear Route">
+                <X className="w-4 h-4 md:w-7 md:h-7 landscape:w-5 landscape:h-5" strokeWidth={5} />
+              </button>
+              
+              <button id="nav-reroute-button" onClick={handleReroute} className="p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[1.5rem] landscape:rounded-xl bg-zinc-900 text-zinc-600 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all active:scale-90" title="Recalculate Route">
+                <RotateCcw className="w-4 h-4 md:w-7 md:h-7 landscape:w-5 landscape:h-5" strokeWidth={5} />
+              </button>
+            </div>
 
             <div className="flex items-center gap-2 md:gap-12 landscape:gap-4 overflow-x-auto no-scrollbar px-1 md:px-2">
               <div id="nav-stat-speed" className="flex flex-col items-center shrink-0">
