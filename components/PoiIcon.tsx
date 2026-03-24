@@ -6,6 +6,7 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   const lowerName = nameStr.toLowerCase();
   const normalizedType = typeStr.toLowerCase().replace(/_/g, ' ');
 
+  // Major truck stop chains
   if (lowerName.includes("love")) return 'loves';
   if (lowerName.includes("pilot")) return 'pilot';
   if (lowerName.includes("flying j")) return 'flying_j';
@@ -25,6 +26,28 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   // Truck service providers
   if (lowerName.includes("speedco")) return 'speedco';
   if (lowerName.includes("southern tire")) return 'southern_tire';
+  if (lowerName.includes("rush truck")) return 'rush';
+  if (lowerName.includes("ryder")) return 'ryder';
+  if (lowerName.includes("penske")) return 'penske';
+  if (lowerName.includes("cummins")) return 'cummins';
+  
+  // Truck dealerships/OEMs
+  if (lowerName.includes("peterbilt")) return 'peterbilt';
+  if (lowerName.includes("volvo") && (lowerName.includes("truck") || normalizedType.includes("service"))) return 'volvo';
+  if (lowerName.includes("freightliner")) return 'freightliner';
+  
+  // Retail
+  if (lowerName.includes("walmart") || lowerName.includes("wal-mart")) return 'walmart';
+  
+  // Infrastructure warnings
+  if (lowerName.includes("low clearance") || lowerName.includes("low bridge") || normalizedType.includes("low clearance")) {
+    return 'low_clearance';
+  }
+  
+  // Truck wash
+  if (lowerName.includes("truck wash") || lowerName.includes("blue beacon") || normalizedType.includes('truck wash')) {
+    return 'truck_wash';
+  }
 
   if (normalizedType.includes('weigh station') || normalizedType.includes('scale') || normalizedType.includes('weigh')) {
     return 'weigh_station';
@@ -47,10 +70,10 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   }
 
   if (normalizedType.includes('wash') || lowerName.includes('wash') || lowerName.includes('beacon')) {
-    return 'service';
+    return 'truck_wash';
   }
 
-  if (normalizedType.includes('distribution') || normalizedType.includes('fulfillment') || lowerName.includes('amazon') || lowerName.includes('walmart') || lowerName.includes('fedex') || lowerName.includes('ups') || lowerName.includes('target') || lowerName.includes('depot') || lowerName.includes('sysco') || lowerName.includes('mclane') || normalizedType.includes('warehouse')) {
+  if (normalizedType.includes('distribution') || normalizedType.includes('fulfillment') || lowerName.includes('amazon') || lowerName.includes('fedex') || lowerName.includes('ups') || lowerName.includes('target') || lowerName.includes('depot') || lowerName.includes('sysco') || lowerName.includes('mclane') || normalizedType.includes('warehouse')) {
     return 'distribution';
   }
 

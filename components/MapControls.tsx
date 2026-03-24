@@ -50,10 +50,10 @@ export const MapControls: React.FC<any> = React.memo(({
                 <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
-                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'speedco', 'southern_tire'];
+                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'truck_wash'];
                       const allIds = [
                         ...brandIds, 'fuel', 'parking', 'rest_area', 
-                        'weigh_station', 'food', 'service', 'distribution', 'other'
+                        'weigh_station', 'food', 'service', 'distribution', 'low_clearance', 'other'
                       ];
                       setPoiFilters(new Set(allIds));
                     }}
@@ -79,20 +79,30 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'kwik_trip', label: 'Kwik Trip' },
                     { id: 'bucees', label: "Buc-ee's" },
                     { id: 'speedway', label: 'Speedway' },
+                    { id: 'speedco', label: 'Speedco 🔧' },
+                    { id: 'southern_tire', label: 'Southern Tire 🛞' },
                     { id: 'caseys', label: "Casey's" },
                     { id: 'wawa', label: 'Wawa' },
                     { id: 'sheetz', label: 'Sheetz' },
                     { id: 'quiktrip', label: 'QuikTrip' },
                     { id: 'racetrac', label: 'RaceTrac' },
                     { id: 'conoco', label: 'Conoco' },
-                    { id: 'speedco', label: 'Speedco 🔧', divider: true },
-                    { id: 'southern_tire', label: 'Southern Tire 🛞' },
+                    { id: 'rush', label: 'Rush Truck Centers 🔧', divider: true },
+                    { id: 'ryder', label: 'Ryder 🚛' },
+                    { id: 'penske', label: 'Penske 🚛' },
+                    { id: 'peterbilt', label: 'Peterbilt 🏭' },
+                    { id: 'volvo', label: 'Volvo 🏭' },
+                    { id: 'freightliner', label: 'Freightliner 🏭' },
+                    { id: 'cummins', label: 'Cummins ⚙️' },
+                    { id: 'truck_wash', label: 'Truck Washes 💦' },
+                    { id: 'walmart', label: 'Walmart 🏪', divider: true },
                     { id: 'fuel', label: 'Fuel (Other)', divider: true },
                     { id: 'parking', label: 'Parking' },
                     { id: 'rest_area', label: 'Rest Areas' },
                     { id: 'weigh_station', label: 'Scales' },
+                    { id: 'low_clearance', label: 'Low Clearance ⚠️' },
                     { id: 'food', label: 'Food' },
-                    { id: 'service', label: 'Service' },
+                    { id: 'service', label: 'Service (Other)' },
                     { id: 'distribution', label: 'Distribution' },
                     { id: 'other', label: 'Other' }
                   ].map(filter => (
