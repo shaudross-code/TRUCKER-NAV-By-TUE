@@ -14,6 +14,20 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { AppContext } from '../types';
+import { offlineMapsData } from '../src/constants/offlineMaps';
+
+const MapFolder: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <div className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-4 mb-3">
+      <button onClick={() => setIsOpen(!isOpen)} className="flex items-center justify-between w-full text-white font-bold text-[15px]">
+        {title}
+        <span>{isOpen ? '▼' : '▶'}</span>
+      </button>
+      {isOpen && <div className="mt-4 space-y-2">{children}</div>}
+    </div>
+  );
+};
 
 interface ToggleProps {
   label: string;
@@ -308,28 +322,33 @@ const SettingsView: React.FC = () => {
             <Download className="w-4 h-4 text-[#D4AF37]" />
             <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">Offline Maps</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {[
-              { region: 'California', size: '1.2 GB' },
-              { region: 'Texas', size: '1.5 GB' },
-              { region: 'New York', size: '850 MB' },
-              { region: 'Florida', size: '920 MB' },
-              { region: 'Illinois', size: '780 MB' },
-              { region: 'Pennsylvania', size: '810 MB' },
-              { region: 'Ohio', size: '750 MB' },
-              { region: 'Georgia', size: '840 MB' },
-              { region: 'North Carolina', size: '790 MB' },
-              { region: 'Michigan', size: '720 MB' },
-              { region: 'Canada (All)', size: '4.2 GB' },
-              { region: 'Mexico (All)', size: '3.8 GB' },
-            ].map(map => (
-              <MapDownloadItem 
-                key={map.region}
-                region={map.region}
-                size={map.size}
-                isDownloaded={downloadedMaps.includes(map.region)}
-                onDownload={() => setDownloadedMaps(prev => [...prev, map.region])}
-              />
+          <div className="space-y-4">
+            {offlineMapsData.map(continent => (
+              <MapFolder key={continent.name} title={continent.name}>
+                {continent.countries.map(country => (
+                  <div key={country.name} className="ml-4">
+                    <MapDownloadItem 
+                      region={country.name}
+                      size={country.size}
+                      isDownloaded={downloadedMaps.includes(country.name)}
+                      onDownload={() => setDownloadedMaps(prev => [...prev, country.name])}
+                    />
+                    {country.states && (
+                      <div className="ml-8 mt-2 space-y-2">
+                        {country.states.map(state => (
+                          <MapDownloadItem 
+                            key={state.name}
+                            region={state.name}
+                            size={state.size}
+                            isDownloaded={downloadedMaps.includes(state.name)}
+                            onDownload={() => setDownloadedMaps(prev => [...prev, state.name])}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </MapFolder>
             ))}
           </div>
         </section>

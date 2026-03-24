@@ -93,17 +93,19 @@
   }
 }
 
-.custom-poi-icon {
+.custom-poi-icon, .custom-entrance-icon, .custom-exit-icon {
   background: transparent;
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
+  animation: poiFadeIn 0.3s ease-out forwards;
 }
 
-.custom-poi-icon > div, .custom-poi-icon > svg {
+.custom-poi-icon > div, .custom-poi-icon > svg,
+.custom-entrance-icon > div, .custom-entrance-icon > svg,
+.custom-exit-icon > div, .custom-exit-icon > svg {
   filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
-  animation: poiFadeIn 0.4s ease-out forwards;
 }
 
 .route-label-marker {

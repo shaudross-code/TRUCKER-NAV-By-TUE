@@ -7,7 +7,8 @@ export async function getRoute(
   via?: string[],
   avoidTolls?: boolean,
   avoidFerries?: boolean,
-  avoidUnpaved?: boolean
+  avoidUnpaved?: boolean,
+  signal?: AbortSignal
 ) {
-  return fetchTruckRoute(origin, destination, truckProfile, via, avoidTolls, avoidFerries, avoidUnpaved);
+  return fetchTruckRoute(origin, destination, truckProfile, via, avoidTolls, avoidFerries, avoidUnpaved, signal);
 }

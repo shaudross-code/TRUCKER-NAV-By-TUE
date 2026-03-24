@@ -79,7 +79,8 @@ export enum ViewType {
   MAINTENANCE = 'MAINTENANCE',
   SETTINGS = 'SETTINGS',
   ROUTE_HISTORY = 'ROUTE_HISTORY',
-  PAY_SUMMARY = 'PAY_SUMMARY'
+  PAY_SUMMARY = 'PAY_SUMMARY',
+  GITHUB_UPDATES = 'GITHUB_UPDATES'
 }
 
 export interface TelemetryContextType {

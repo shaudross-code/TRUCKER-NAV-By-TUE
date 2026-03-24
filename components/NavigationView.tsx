@@ -1,12 +1,10 @@
+import { getRoute } from '../src/services/hereRoutingService';
 import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
-import "@maptiler/leaflet-maptilersdk";
+import { MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
 import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import 'leaflet.markercluster';
 import { 
   Plus, 
   Search,
@@ -51,7 +49,8 @@ import {
   Phone,
   Globe,
   Clock,
-  X
+  X,
+  Mic
 } from 'lucide-react';
 
 interface Waypoint {
@@ -90,7 +89,25 @@ const MAPTILER_STYLE = {
 
 const FALLBACK_LOCATION: [number, number] = [39.0119, -98.4842];
 const noop = () => {};
-// Removed unused HERE_API_KEY
+
+// Manual distance calculation helpers
+const R_EARTH = 6371e3; // Earth radius in meters
+const toRad = (val: number) => val * Math.PI / 180;
+const calcDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const deltaPhi = toRad(lat2 - lat1);
+  const deltaLambda = toRad(lon2 - lon1);
+  const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+            Math.cos(phi1) * Math.cos(phi2) *
+            Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R_EARTH * c;
+};
+
+const calcEuclideanDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
+};
 
 const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocation }: { mapInstance: any, currentSpeedLimit: number | null, userLocation: [number, number] | null }) => {
   const telemetryContext = useContext(TelemetryContext);
@@ -105,6 +122,8 @@ const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocat
     if (!mapInstance || !currentSpeedLimit) {
       if (speedLimitMarkerRef.current && mapInstance) {
         mapInstance.removeLayer(speedLimitMarkerRef.current);
+      }
+      if (!currentSpeedLimit) {
         speedLimitMarkerRef.current = null;
       }
       return;
@@ -135,9 +154,9 @@ const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocat
 });
 
 const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLocation: propUserLocation, activeView }) => {
-  console.log("NavigationView rendering, activeView:", activeView);
+  // console.log("NavigationView rendering, activeView:", activeView);
   const hasValidMapTilerKey = Boolean(MAPTILER_KEY) && MAPTILER_KEY !== 'YOUR_API_KEY';
-  console.log("NavigationView: MAPTILER_KEY", MAPTILER_KEY, "hasValidMapTilerKey", hasValidMapTilerKey);
+  // console.log("NavigationView: MAPTILER_KEY", MAPTILER_KEY, "hasValidMapTilerKey", hasValidMapTilerKey);
 
   if (!hasValidMapTilerKey) {
     return (
@@ -174,12 +193,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     );
   }
 
-  console.log("NavigationView: Rendering", { initialTarget: !!initialTarget, propUserLocation: !!propUserLocation });
+  // console.log("NavigationView: Rendering", { initialTarget: !!initialTarget, propUserLocation: !!propUserLocation });
   const context = useContext(AppContext);
   const locationContext = useContext(LocationContext);
   const telemetryContext = useContext(TelemetryContext);
-
+  const speed = useSyncExternalStore(
+    telemetryContext?.subscribe || (() => () => {}),
+    () => telemetryContext?.speedRef.current || 0
+  );
   const mapInstanceRef = useRef<any>(null);
+  const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -187,7 +210,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const mapLayersRef = useRef<Record<string, L.Polyline>>({});
   const poiMarkersRef = useRef<L.Marker[]>([]);
   const userLocation = useMemo(() => {
-    console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
+    // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
     return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
   }, [propUserLocation, locationContext?.userLocation]); 
   const truckProfile = context?.truckProfile || { 
@@ -212,6 +235,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const routeSavedRef = useRef<boolean>(false);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [isListening, setIsListening] = useState(false);
   
   const [mapCenter, setMapCenter] = useState<[number, number]>(userLocation);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -228,11 +252,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [currentDestination, setCurrentDestination] = useState(() => localStorage.getItem('nav_current_destination') || 'Standby');
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(() => {
     const saved = localStorage.getItem('nav_destination_coords');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Failed to parse nav_destination_coords from localStorage", e);
+      return null;
+    }
   });
   const [milesRemaining, setMilesRemaining] = useState(0);
   const [initialMiles, setInitialMiles] = useState(0);
   const [eta, setEta] = useState('--:-- --');
+  const [remainingDuration, setRemainingDuration] = useState<number>(0);
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [isOverviewMode, setIsOverviewMode] = useState(false);
   const [isFollowMode, setIsFollowMode] = useState(true);
@@ -296,7 +326,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       mapEl.removeEventListener('touchend', handleTouchEnd);
     };
   }, []);
-  const [showTruckRestrictions, setShowTruckRestrictions] = useState(() => localStorage.getItem('nav_show_truck_restrictions') === 'true');
+  const [showTruckRestrictions] = useState(() => {
+    const saved = localStorage.getItem('nav_show_truck_restrictions');
+    return saved === null ? true : saved === 'true';
+  });
   
   const [avoidTolls, setAvoidTolls] = useState(() => localStorage.getItem('nav_avoid_tolls') === 'true');
   const [avoidFerries, setAvoidFerries] = useState(() => localStorage.getItem('nav_avoid_ferries') === 'true');
@@ -314,11 +347,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
   const [pois, setPois] = useState<any[]>(() => {
     const saved = localStorage.getItem('truck_pois');
-    const savedPois = saved ? JSON.parse(saved) : [];
-    const dynamicPois = savedPois
-      .filter((p: any) => !STATIC_POIS.some(sp => sp.id === p.id))
-      .map((p: any) => ({ ...p, lat: Number(p.lat), lon: Number(p.lon) }));
-    return [...STATIC_POIS, ...dynamicPois];
+    try {
+      const savedPois = saved ? JSON.parse(saved) : [];
+      const dynamicPois = savedPois
+        .filter((p: any) => !STATIC_POIS.some(sp => sp.id === p.id))
+        .map((p: any) => ({ ...p, lat: Number(p.lat), lon: Number(p.lon) }));
+      return [...STATIC_POIS, ...dynamicPois];
+    } catch (e) {
+      console.error("Failed to parse truck_pois from localStorage", e);
+      return STATIC_POIS;
+    }
   });
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
@@ -335,7 +373,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('poi_filters');
     const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
-    return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'other']);
+    try {
+      return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'other']);
+    } catch (e) {
+      console.error("Failed to parse poi_filters from localStorage", e);
+      return new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'other']);
+    }
   });
 
   useEffect(() => {
@@ -351,9 +394,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [routeSteps, setRouteSteps] = useState<any[]>([]);
   const [waypoints, setWaypoints] = useState<Waypoint[]>(() => {
     const saved = localStorage.getItem('nav_waypoints');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error("Failed to parse nav_waypoints from localStorage", e);
+      return [];
+    }
   });
-  console.log("NavigationView rendering");
+  // console.log("NavigationView rendering");
   const lastPoiUpdateLocationRef = useRef<[number, number] | null>(null);
   const [upcomingPois, setUpcomingPois] = useState<any[]>([]);
 
@@ -373,7 +421,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, [currentDestination]);
 
   useEffect(() => {
-    console.log("NavigationView: activeView changed to", activeView);
+    // console.log("NavigationView: activeView changed to", activeView);
     if (activeView === ViewType.NAVIGATION) {
       if (!mapInstanceRef.current) {
         initializeMap();
@@ -384,31 +432,31 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, [activeView]);
 
   useLayoutEffect(() => {
-    console.log("NavigationView: mapRef.current changed to", mapRef.current);
+    // console.log("NavigationView: mapRef.current changed to", mapRef.current ? "exists" : "null");
   }, [mapRef.current]);
 
   const initializeMap = () => {
-    console.log("NavigationView: initializeMap called");
+    // console.log("NavigationView: initializeMap called");
     try {
       if (!mapRef.current) {
-        console.log("NavigationView: mapRef.current is null");
+        // console.log("NavigationView: mapRef.current is null");
         return;
       }
       if (mapInstanceRef.current) {
-        console.log("NavigationView: mapInstanceRef.current already exists");
+        // console.log("NavigationView: mapInstanceRef.current already exists");
         return;
       }
 
       // Ensure container has dimensions
       const width = mapRef.current.clientWidth;
       const height = mapRef.current.clientHeight;
-      console.log("NavigationView: map container dimensions", { width, height });
+      // console.log("NavigationView: map container dimensions", { width, height });
 
       if (width > 0 && height > 0) {
-        console.log("NavigationView: container has dimensions", { width, height });
+        // console.log("NavigationView: container has dimensions", { width, height });
         let timeoutId: any;
         try {
-          console.log("NavigationView: starting map initialization");
+          // console.log("NavigationView: starting map initialization");
           // Add a timeout to trigger error if map takes too long to load
           timeoutId = setTimeout(() => {
             if (!isMapReady) {
@@ -418,36 +466,32 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }, 30000); // 30 seconds timeout
 
           const L_obj = (window as any).L || L;
-          console.log("NavigationView: L_obj", L_obj);
-          if (!L_obj || typeof L_obj.map !== 'function') {
-            console.error("Leaflet library is not properly loaded. L_obj:", L_obj);
-            throw new Error("Leaflet library is not properly loaded.");
+          
+          if (!mapRef.current) {
+            // console.log("NavigationView: mapRef.current is null before map initialization");
+            return;
           }
-
-          console.log("NavigationView: mapRef.current", mapRef.current);
           if ((mapRef.current as any)._leaflet_id) {
-            console.log("NavigationView: deleting _leaflet_id");
+            // console.log("NavigationView: deleting _leaflet_id");
             delete (mapRef.current as any)._leaflet_id;
           }
 
-          console.log("NavigationView: mapRef.current before map initialization", mapRef.current);
-          console.log("NavigationView: L_obj before map initialization", L_obj);
-          console.log("NavigationView: initializing map with center", isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION);
+          // console.log("NavigationView: initializing map with center", isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION);
           let map;
           try {
-            console.log("NavigationView: calling L.map");
+            // console.log("NavigationView: calling L.map");
             map = L.map(mapRef.current!, {
               center: isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION,
               zoom: 13,
               maxZoom: 20,
               zoomControl: false
             });
-            console.log("NavigationView: map initialized successfully");
+            // console.log("NavigationView: map initialized successfully");
           } catch (e) {
             console.error("NavigationView: L.map() failed", e);
             throw e;
           }
-          console.log("NavigationView: map initialized, setting up event listeners");
+          // console.log("NavigationView: map initialized, setting up event listeners");
           
           map.on('dragstart', () => {
             setIsFollowMode(false);
@@ -456,10 +500,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const center = map.getCenter();
             setMapCenter([center.lat, center.lng]);
           });
-          console.log("Map created successfully");
+          // console.log("Map created successfully");
 
           mapInstanceRef.current = map;
           
+          // Initialize routeGroup
+          routeGroupRef.current = L.layerGroup().addTo(map);
+
           // Add rotation class to the main pane
           map.getPane('mapPane')?.classList.add('leaflet-rotate-pane');
 
@@ -469,27 +516,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
 
           const L_any = L_obj as any;
-          console.log("NavigationView: checking markerClusterGroup");
+          // Initialize POI layer group (static, no clustering)
           try {
-            if (typeof L_any.markerClusterGroup === 'function') {
-              console.log("NavigationView: L_any.markerClusterGroup is a function");
-              markerClusterGroupRef.current = L_any.markerClusterGroup();
-              console.log("NavigationView: markerClusterGroup created");
-              map.addLayer(markerClusterGroupRef.current);
-              console.log("NavigationView: markerClusterGroup added to map");
-            } else if (typeof (window as any).L?.markerClusterGroup === 'function') {
-              console.log("NavigationView: window.L.markerClusterGroup is a function");
-              markerClusterGroupRef.current = (window as any).L.markerClusterGroup();
-              console.log("NavigationView: markerClusterGroup created from window.L");
-              map.addLayer(markerClusterGroupRef.current);
-              console.log("NavigationView: markerClusterGroup added to map from window.L");
-            } else {
-              console.warn("markerClusterGroup is not available");
-            }
+            markerClusterGroupRef.current = L.layerGroup();
+            map.addLayer(markerClusterGroupRef.current);
+            console.log("NavigationView: static POI layer group created and added to map");
           } catch (e) {
-            console.error("NavigationView: markerClusterGroup initialization failed", e);
+            console.error("NavigationView: POI layer group initialization failed", e);
           }
-          console.log("NavigationView: markerClusterGroup check complete");
 
           clearTimeout(timeoutId);
           console.log("NavigationView: timeout cleared");
@@ -653,7 +687,33 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return html;
   };
 
-  const updateMapLine = (map: L.Map, id: string, coords: [number, number][], color: string, width: number) => {
+  const updateMapLine = (map: L.Map | null, id: string, coords: [number, number][], color: string, width: number) => {
+    if (!map) return;
+    
+    if (id === 'route' && routeGroupRef.current) {
+      // Clear any existing route lines
+      routeGroupRef.current.clearLayers();
+      
+      // 1. Outer black border line (creates the outline effect)
+      L.polyline(coords, { 
+        color: 'black', 
+        weight: 18, 
+        opacity: 0.8, 
+        lineCap: 'round', 
+        lineJoin: 'round' 
+      }).addTo(routeGroupRef.current);
+
+      // 2. Inner gold route line (the main navigation path)
+      L.polyline(coords, { 
+        color: color, 
+        weight: 12, 
+        opacity: 1, 
+        lineCap: 'round', 
+        lineJoin: 'round' 
+      }).addTo(routeGroupRef.current);
+      return;
+    }
+
     const layer = mapLayersRef.current[id];
     if (layer) {
       layer.setLatLngs(coords);
@@ -673,7 +733,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const map = mapInstanceRef.current;
 
     map.on('contextmenu', (e: L.LeafletMouseEvent) => {
-      console.log('contextmenu:', e);
+      console.log('contextmenu at:', e.latlng);
       const { lat, lng } = e.latlng;
       L.popup()
         .setLatLng(e.latlng)
@@ -779,31 +839,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     const el = document.createElement('div');
     el.className = 'user-marker-wrapper';
-    el.innerHTML = renderToStaticMarkup(
-      <div className="relative flex items-center justify-center w-16 h-16">
-        {/* GPS Pulse Effect */}
-        <div className="absolute inset-0 bg-[#D4AF37]/20 rounded-full animate-ping" />
-        
-        {/* Vehicle Container */}
-        <div className="vehicle-pointer relative flex items-center justify-center w-12 h-12 transition-transform duration-300 ease-out" style={{ transform: 'rotate(var(--vehicle-rotation, 0deg))' }}>
-          {/* Shadow */}
-          <div className="absolute top-1 left-1 w-10 h-10 bg-black/40 rounded-full blur-sm" />
-          
-          {/* Main Body */}
-          <div className="relative w-10 h-10 bg-gradient-to-b from-[#D4AF37] to-[#B8860B] rounded-xl flex items-center justify-center border-2 border-white/30 shadow-2xl overflow-hidden">
-            <Truck className="w-6 h-6 text-black fill-current" strokeWidth={2.5} />
-            
-            {/* Glossy Overlay */}
-            <div className="absolute inset-0 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
-          </div>
-          
-          {/* Direction Indicator */}
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[8px] border-b-white drop-shadow-md" />
+    el.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
+      <div class="absolute w-14 h-14 bg-[#D4AF37]/10 rounded-full animate-ping"></div>
+      <div class="absolute w-10 h-10 bg-[#D4AF37]/20 rounded-full animate-pulse"></div>
+      <div class="w-10 h-10 bg-black rounded-full shadow-[0_0_25px_rgba(212,175,55,0.8)] flex items-center justify-center border-[2.5px] border-[#D4AF37] z-10 overflow-visible">
+        <div class="relative w-full h-full flex items-center justify-center vehicle-pointer transition-transform duration-300" style="transform: rotate(var(--vehicle-rotation, 0deg))">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="#D4AF37" class="drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">
+            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
+          </svg>
+          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#D4AF37]/30 blur-md rounded-full"></div>
         </div>
       </div>
-    );
+    </div>`;
     
-    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [64, 64], iconAnchor: [32, 32] }) }).addTo(mapInstanceRef.current);
+    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [60, 60], iconAnchor: [30, 30] }) }).addTo(mapInstanceRef.current);
     userMarkerElRef.current = el.querySelector('.vehicle-pointer') as HTMLElement;
 
     // POI fetch logic
@@ -887,14 +936,42 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         maxZoom: 20
       }).addTo(map);
     } else {
-      // Use MapTiler Leaflet SDK for high-performance vector tiles
-      console.log("Adding MapTiler layer", MAPTILER_STYLE.url);
-      console.log("L.maptiler:", (L as any).maptiler);
+      console.log("Adding MapTiler vector layer");
       try {
-        const _mtLayer = new (L as any).maptiler.maptilerLayer({
-          apiKey: MAPTILER_KEY,
-          style: MAPTILER_STYLE_ID,
-        }).addTo(map);
+        let _mtLayer;
+        // Try direct import first
+        if (typeof MaptilerLayer === 'function') {
+          console.log("NavigationView: Using imported MaptilerLayer");
+          _mtLayer = new MaptilerLayer({
+            apiKey: MAPTILER_KEY,
+            style: MAPTILER_STYLE_ID,
+          }).addTo(map);
+        } else {
+          // Fallback to L.maptilerLayer or L.MaptilerLayer
+          const L_any = L as any;
+          const maptilerLayer = L_any.maptilerLayer || L_any.MaptilerLayer || (window as any).L?.maptilerLayer || (window as any).L?.MaptilerLayer;
+          
+          if (typeof maptilerLayer === 'function') {
+            console.log("NavigationView: Using L.maptilerLayer");
+            _mtLayer = new (maptilerLayer as any)({
+              apiKey: MAPTILER_KEY,
+              style: MAPTILER_STYLE_ID,
+            }).addTo(map);
+          } else {
+            // Check for L.maptiler.MaptilerLayer (some versions)
+            const maptilerObj = L_any.maptiler || (window as any).L?.maptiler;
+            if (maptilerObj && (maptilerObj.MaptilerLayer || maptilerObj.maptilerLayer)) {
+              const constructor = maptilerObj.MaptilerLayer || maptilerObj.maptilerLayer;
+              console.log("NavigationView: Using L.maptiler.MaptilerLayer");
+              _mtLayer = new constructor({
+                apiKey: MAPTILER_KEY,
+                style: MAPTILER_STYLE_ID,
+              }).addTo(map);
+            } else {
+              throw new Error("MaptilerLayer is not available on L or window.L");
+            }
+          }
+        }
         console.log("MapTiler layer added successfully");
       } catch (e) {
         console.error("Failed to add MapTiler layer, falling back to raster", e);
@@ -1126,14 +1203,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const lastLaneSpokenRef = useRef('');
 
   useEffect(() => {
-    if (!isDriving || nextInstruction.text === 'Ready for Route') return;
+    if (!isDriving || nextInstruction.text === 'Ready for Route') {
+      if (isDriving && nextInstruction.text === 'Ready for Route') {
+        console.log("Navigation Speak Effect: isDriving is true but instruction is 'Ready for Route'");
+      }
+      return;
+    }
 
     const dist = parseFloat(nextInstruction.distance);
-    if (isNaN(dist)) return;
+    if (isNaN(dist)) {
+      console.warn("Navigation Speak Effect: distance is NaN", nextInstruction.distance);
+      return;
+    }
     let shouldSpeak = false;
     let phrase = "";
 
     const lanePhrase = getLaneGuidancePhrase(nextInstruction.lanes || []);
+    console.log(`Navigation Speak Effect: dist=${dist}, text="${nextInstruction.text}", lanePhrase="${lanePhrase}"`);
 
     if (nextInstruction.text !== lastSpokenRef.current) {
       lastSpokenRef.current = nextInstruction.text;
@@ -1240,7 +1326,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     initialMilesRef.current = initialMiles;
     handleRerouteRef.current = handleReroute;
   }, [routeSteps, poiFilters, isOffRoute, isCalculating, context?.autoReroute, weighStationAlert, initialMiles, handleReroute]);
-
+ 
   const updateNavigationState = useCallback(async (currentLocation: [number, number]) => {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
@@ -1256,25 +1342,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       if (!currentLocation || isNaN(currentLocation[0]) || isNaN(currentLocation[1])) return;
       if (!routeStepsRef.current.length || !routeCoordsRef.current || routeCoordsRef.current.length < 2) return;
-
-      // Manual distance calculation to avoid turf.js overhead
-      const R = 6371e3; // Earth radius in meters
-      const toRad = (val: number) => val * Math.PI / 180;
-      const calcDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-        const phi1 = toRad(lat1);
-        const phi2 = toRad(lat2);
-        const deltaPhi = toRad(lat2 - lat1);
-        const deltaLambda = toRad(lon2 - lon1);
-        const a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
-                  Math.cos(phi1) * Math.cos(phi2) *
-                  Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-      };
-
-      const calcEuclideanDist = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-        return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
-      };
 
       // Find nearest point on route line manually
       let minEuclideanDist = Infinity;
@@ -1345,7 +1412,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 8);
       }
 
-      if (routeMarkersRef.current.length > 0 && routeCoordsRef.current.length > nearestIndex + 1) {
+      if (routeCoordsRef.current.length > nearestIndex + 1) {
         const segmentCoords = [currentLocation, routeCoordsRef.current[nearestIndex + 1]];
         if (!currentSegmentLineRef.current) {
           updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
@@ -1508,6 +1575,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               const arrival = new Date();
               arrival.setSeconds(arrival.getSeconds() + remainingDuration);
               setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+              setRemainingDuration(remainingDuration);
             }
           }
         }
@@ -1720,11 +1788,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setDestinationCoords(null);
     setCurrentDestination('Standby');
     setRoutePoints([]);
+    routeCoordsRef.current = [];
     routeDistancesRef.current = [];
     setMilesRemaining(0);
     setEta('--:-- --');
+    setRemainingDuration(0);
     setWeatherAlerts([]);
     setRouteWeatherForecast([]);
+    
+    // Clear map layers
+    if (mapLayersRef.current) {
+      Object.values(mapLayersRef.current).forEach(layer => {
+        try {
+          layer.remove();
+        } catch (e) {
+          console.warn("Failed to remove layer:", e);
+        }
+      });
+      mapLayersRef.current = {};
+    }
+    
     clearRouteMarkers();
     currentSegmentLineRef.current = null;
     if (context) context.setNavTarget(null);
@@ -1929,48 +2012,34 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const calculateTruckRoute = async (
     destLat: number,
     destLon: number
-  ): Promise<{ coords: [number, number][]; distMi: number; durationSec: number; steps: any[]; alerts: any[]; spans: any[] }[] | null> => {
+  ): Promise<{ 
+    coords: [number, number][]; 
+    distMi: number; 
+    durationSec: number; 
+    steps: any[]; 
+    alerts: any[]; 
+    restrictions: any[]; 
+    trafficAlerts: any[]; 
+    spans: any[] 
+  }[] | null> => {
     if (!userLocation) return null;
 
     try {
-      const body = safeStringify({
-        origin: `${userLocation[0]},${userLocation[1]}`,
-        destination: `${destLat},${destLon}`,
-        via: waypoints.map(wp => `${wp.lat},${wp.lon}`),
-        truckProfile,
-        avoidTolls,
-        avoidFerries,
-        avoidUnpaved
-      });
-
-      console.log('Frontend: Sending body to /api/route', body);
-
-      if (!body) {
-        console.error("Failed to stringify route request");
-        return null;
-      }
-
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      const response = await fetch('/api/route', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body,
-        signal: controller.signal
-      });
+      const hereRouteData = await getRoute(
+        `${userLocation[0]},${userLocation[1]}`,
+        `${destLat},${destLon}`,
+        truckProfile,
+        waypoints.map(wp => `${wp.lat},${wp.lon}`),
+        avoidTolls,
+        avoidFerries,
+        avoidUnpaved,
+        controller.signal
+      );
       clearTimeout(timeoutId);
 
-      console.log('Frontend: Received response from /api/route', response.status);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Frontend: /api/route failed', errorText);
-        return null;
-      }
-      
-      const hereRouteData = await response.json();
       console.log('Frontend: Parsed HERE route data', hereRouteData);
       if (!hereRouteData.routes || hereRouteData.routes.length === 0) {
         console.warn('Frontend: No routes found in HERE response', hereRouteData);
@@ -1979,8 +2048,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       // Process all routes
       const processedRoutes = hereRouteData.routes.map((route: any, routeIdx: number) => {
-        console.log(`Frontend: Processing route ${routeIdx}`, { sections: route.sections?.length });
-        
         if (!route.sections || route.sections.length === 0) {
           console.warn(`Frontend: Route ${routeIdx} has no sections`);
           return null;
@@ -1988,8 +2055,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         const section = route.sections[0];
         const summary = section.summary;
-        console.log(`Frontend: Route ${routeIdx} summary`, { length: summary?.length, duration: summary?.duration });
-        
         if (!summary || isNaN(summary.length) || isNaN(summary.duration)) {
           console.warn(`Frontend: Route ${routeIdx} section 0 has invalid summary`, summary);
           return null;
@@ -2078,8 +2143,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               icon: AlertTriangle,
               color: 'text-red-500',
               bg: 'bg-red-500/10',
-              progress: 0,
-              coords: coords.length > 0 ? coords[0] : undefined
+              progress: 0
             });
           });
         }
@@ -2089,7 +2153,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const instruction = (action.instruction || '').toLowerCase();
             if (instruction.includes('stop sign') || action.action === 'stop') {
               const progress = action.offset / summary.length;
-              const coordIndex = Math.min(Math.floor(progress * (coords.length - 1)), coords.length - 1);
               trafficAlertsList.push({
                 type: 'STOP_SIGN',
                 message: 'Stop Sign',
@@ -2097,7 +2160,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 color: 'text-red-600',
                 bg: 'bg-red-600/10',
                 progress,
-                coords: coords[coordIndex] || coords[0]
+                coords: coords[action.offset] || coords[Math.floor(action.offset * (coords.length - 1) / summary.length)]
               });
             }
           });
@@ -2105,14 +2168,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         if (section.spans) {
           let currentPointIndex = 0;
-          let accumulatedDistance = 0;
           const totalPoints = decoded.polyline.length;
-          const totalDistance = summary.length;
           
           section.spans.forEach((span: any) => {
-            // Calculate the array index based on distance progress
-            const progress = accumulatedDistance / totalDistance;
-            const coordIndex = Math.min(Math.floor(progress * (coords.length - 1)), coords.length - 1);
+            const progress = currentPointIndex / totalPoints;
 
             if (span.streetAttributes && span.streetAttributes.includes('trafficLight')) {
               trafficAlertsList.push({
@@ -2122,12 +2181,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 color: 'text-emerald-500',
                 bg: 'bg-emerald-500/10',
                 progress,
-                coords: coords[coordIndex] || coords[0]
+                coords: coords[currentPointIndex]
               });
             }
 
             if (span.truckAttributes) {
               const attrs = span.truckAttributes;
+              const progress = currentPointIndex / totalPoints;
               
               if (attrs.maxHeight !== undefined) {
                 const heightFt = (attrs.maxHeight / 30.48).toFixed(1);
@@ -2141,7 +2201,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     bg: 'bg-red-500/20',
                     progress,
                     value: attrs.maxHeight,
-                    coords: coords[coordIndex] || coords[0]
+                    coords: coords[currentPointIndex]
                   });
                 }
               }
@@ -2158,19 +2218,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     bg: 'bg-orange-500/20',
                     progress,
                     value: attrs.maxWeight,
-                    coords: coords[coordIndex] || coords[0]
+                    coords: coords[currentPointIndex]
                   });
                 }
               }
             }
-            accumulatedDistance += (span.length || 0);
+            currentPointIndex += (span.length || 0);
           });
-        }
-
-        // Ensure coords exists and is valid before returning
-        if (!coords || coords.length === 0) {
-          console.error(`Frontend: Route ${routeIdx} has no valid coordinates after processing`);
-          return null;
         }
 
         return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans };
@@ -2313,7 +2367,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   };
 
   const handleCancelRoute = useCallback(() => {
-    setRoutePolyline(null);
+    setRoutePoints([]);
+    routeCoordsRef.current = [];
     setRouteSteps([]);
     setMilesRemaining(0);
     setCurrentDestination('');
@@ -2323,6 +2378,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setIsCalculating(false);
     setIsDriving(false);
     setEta('--:--');
+    setRemainingDuration(0);
     setNextInstruction({ 
       text: 'Ready for Route', 
       distance: '0.0', 
@@ -2331,13 +2387,64 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       maneuver: null as any,
       followingStep: null
     });
+    
+    // Clear map layers
+    if (mapLayersRef.current) {
+      Object.values(mapLayersRef.current).forEach(layer => {
+        try {
+          layer.remove();
+        } catch (e) {
+          console.warn("Failed to remove layer:", e);
+        }
+      });
+      mapLayersRef.current = {};
+    }
+    currentSegmentLineRef.current = null;
+    
     if (context) context.setNavTarget(null);
   }, [context]);
+
+  const startVoiceSearch = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Your browser does not support voice search.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchQuery(transcript);
+      setIsSuggestionsVisible(true);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
+  };
 
   const handleNavigate = async (target?: string, targetCoords?: { lat: number, lon: number }) => {
     console.log(`[handleNavigate] target: ${target}, targetCoords:`, targetCoords);
     if (context) context.setNavTarget(null);
     setError(null);
+    setWeatherAlerts([]);
+    setRestrictionAlerts([]);
+    setTrafficAlerts([]);
     
     if (isCalculating) {
       console.warn(`[handleNavigate] Already calculating, ignoring request.`);
@@ -2408,11 +2515,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       const { coords, distMi, durationSec, steps } = primaryRoute;
       
-      if (!coords || coords.length === 0) {
-        throw new Error("Route calculation returned no coordinates");
-      }
-      
       routeCoordsRef.current = coords;
+      
+      // Calculate cumulative distances for each point in the route
+      const distances: number[] = [0];
+      let cumulativeDist = 0;
+      for (let i = 0; i < coords.length - 1; i++) {
+        cumulativeDist += calcDist(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+        distances.push(cumulativeDist);
+      }
+      routeDistancesRef.current = distances;
+      console.log(`[handleNavigate] Populated routeDistancesRef with ${distances.length} points. Total dist: ${cumulativeDist}m`);
+
       setRoutePoints(coords);
       setRouteSteps(steps);
       setMilesRemaining(distMi);
@@ -2423,6 +2537,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const arrival = new Date();
       arrival.setSeconds(arrival.getSeconds() + durationSec);
       setEta(arrival.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      setRemainingDuration(durationSec);
       
       // Update map
       if (mapInstanceRef.current) {
@@ -2438,7 +2553,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         currentSegmentLineRef.current = null;
         
         // Draw route polyline using updateMapLine for consistency
-        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 8);
+        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
         
         // Fit map to route
@@ -2462,14 +2577,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         }, 2000);
       }
-    } catch (error) {
-        console.error(`[handleNavigate] Error:`, error);
-        setError("Failed to calculate route. Please try again.");
-        setIsCalculating(false);
-      }
 
-      try {
-        // Fetch extra data in background
+      // Fetch extra data in background
       const fetchRoutePOIs = async (points: [number, number][], totalDistMi: number) => {
         const allRoutePois: any[] = [];
         if (points.length > 0) {
@@ -2493,6 +2602,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const promises = batch.map(p => fetchTruckPOIs(p[0], p[1]).catch(() => []));
             const results = await Promise.all(promises);
             allRoutePois.push(...results.flat());
+            if (i + 3 < sampledPoints.length) {
+              await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5s delay between batches
+            }
           }
         }
         
@@ -2541,10 +2653,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
       
       setIsDriving(true);
-    } catch (err) { 
-      console.error("Routing Error:", err); 
-      setError(err instanceof Error ? err.message : "Failed to calculate route.");
-    } finally {
+    } catch (error) {
+        console.error(`[handleNavigate] Error:`, error);
+        setError("Failed to calculate route. Please try again.");
+        setIsCalculating(false);
+      } finally {
       setIsCalculating(false);
     }
   };
@@ -2617,17 +2730,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!isMapReady) return;
 
-    try {
-      restrictionAlertMarkersRef.current.forEach(m => m.remove());
-      restrictionAlertMarkersRef.current = [];
+    restrictionAlertMarkersRef.current.forEach(m => m.remove());
+    restrictionAlertMarkersRef.current = [];
 
-      restrictionAlerts.forEach((alert) => {
-        if (!alert.coords || !Array.isArray(alert.coords) || alert.coords.length < 2) {
-          console.warn('Skipping restriction alert with invalid coords:', alert);
-          return;
-        }
+    restrictionAlerts.forEach((alert) => {
+      if (!alert.coords) return;
 
-        const iconHtml = renderToStaticMarkup(
+      const iconHtml = renderToStaticMarkup(
         <div className="flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
             alert.type === 'BRIDGE' ? 'bg-red-600 border-red-400 text-white' : 'bg-orange-500 border-orange-300 text-white'
@@ -2674,26 +2783,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       marker.bindPopup(popup);
       restrictionAlertMarkersRef.current.push(marker);
     });
-    } catch (error) {
-      console.error('Error rendering restriction alert markers:', error);
-      setError(`Failed to render route restrictions: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }, [restrictionAlerts, isMapReady]);
 
   useEffect(() => {
     if (!isMapReady) return;
 
-    try {
-      trafficAlertMarkersRef.current.forEach(m => m.remove());
-      trafficAlertMarkersRef.current = [];
+    trafficAlertMarkersRef.current.forEach(m => m.remove());
+    trafficAlertMarkersRef.current = [];
 
-      trafficAlerts.forEach((alert) => {
-        if (!alert.coords || !Array.isArray(alert.coords) || alert.coords.length < 2) {
-          console.warn('Skipping traffic alert with invalid coords:', alert);
-          return;
-        }
+    trafficAlerts.forEach((alert) => {
+      if (!alert.coords) return;
 
-        const iconHtml = renderToStaticMarkup(
+      const iconHtml = renderToStaticMarkup(
         <div className="flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
             alert.type === 'STOP_SIGN' ? 'bg-red-700 border-red-500 text-white' : 'bg-emerald-600 border-emerald-400 text-white'
@@ -2740,10 +2841,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       marker.bindPopup(popup);
       trafficAlertMarkersRef.current.push(marker);
     });
-    } catch (error) {
-      console.error('Error rendering traffic alert markers:', error);
-      setError(`Failed to render traffic alerts: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }, [trafficAlerts, isMapReady]);
 
   useEffect(() => {
@@ -2877,10 +2974,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Update map rotation if in follow mode
       const mapPane = mapInstanceRef.current?.getPane('mapPane');
       if (mapPane) {
+        const rotation = manualRotationRef.current;
         if (isFollowMode && !isNorthUp) {
-          mapPane.style.setProperty('--map-rotation', `${-currentHeading + manualRotation}deg`);
+          mapPane.style.setProperty('--map-rotation', `${-currentHeading + rotation}deg`);
         } else {
-          mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
+          mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
         }
       }
 
@@ -2915,7 +3013,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
     // Subscribe to telemetry changes
     return telemetryContext.subscribe(updateRotationAndPan);
-  }, [telemetryContext, isDriving, isFollowMode, isNorthUp, manualRotation]);
+  }, [telemetryContext, isDriving, isFollowMode, isNorthUp]);
 
 
   useEffect(() => {
@@ -3042,7 +3140,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       console.log(`Rendering ${poiMarkersRef.current.length} POI markers out of ${validPoisCount} valid POIs within range`);
       console.log("Show POIs:", showPois);
       console.log("POI Filters:", Array.from(poiFilters).join(', '));
-      console.log("Marker Cluster Group:", markerClusterGroupRef.current);
+      console.log("Marker Cluster Group:", markerClusterGroupRef.current ? "exists" : "null");
 
       // Add event delegation for the "Add as Stop" button in popups
       const handlePopupClick = (e: MouseEvent) => {
@@ -3195,7 +3293,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           filter: drop-shadow(0 0 5px rgba(212, 175, 55, 0.8));
         }
       `}</style>
-      <div className="absolute inset-0 z-0 h-full w-full bg-zinc-950" ref={mapRef}>
+      {/* Main Map Container */}
+      <div className="absolute inset-0 z-0 h-full w-full bg-zinc-950">
+        <div id="nav-map-container" ref={mapRef} className={`h-full w-full transition-opacity duration-500`}>
+          {/* The contents of this div are dynamically generated by Leaflet at runtime */}
+        </div>
         <SpeedLimitMarker mapInstance={isMapReady ? mapInstanceRef.current : null} currentSpeedLimit={currentSpeedLimit} userLocation={userLocation} />
       </div>
       {error && (
@@ -3224,12 +3326,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               </button>
             </div>
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {alternativeRoutes.map((route, idx) => {
-                if (!route || !route.coords || !Array.isArray(route.coords)) {
-                  console.warn('Skipping invalid route in alternativeRoutes:', route);
-                  return null;
-                }
-                return (
+              {alternativeRoutes.map((route, idx) => (
                 <button
                   key={idx}
                   onClick={() => {
@@ -3239,6 +3336,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     setMilesRemaining(route.distMi);
                     setInitialMiles(route.distMi);
                     setEta(new Date(Date.now() + route.durationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    setRemainingDuration(route.durationSec);
                     
                     if (mapInstanceRef.current) {
                       clearRouteMarkers();
@@ -3266,8 +3364,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     {route.alerts.length} alerts • {route.steps.length} steps
                   </div>
                 </button>
-                );
-              })}
+              ))}
             </div>
             <button
               onClick={() => {
@@ -3422,7 +3519,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       {/* POI Detail Modal */}
       {selectedPoi && (
         <div className="absolute inset-0 z-[4000] flex items-center justify-center p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-[2rem] landscape:rounded-2xl w-full max-w-md overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300 max-h-[calc(100vh-4rem)] flex flex-col">
+          <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] landscape:rounded-2xl w-full max-w-md overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300 max-h-[calc(100vh-4rem)] flex flex-col transition-all hover:scale-[1.005]">
             <div className="relative h-24 md:h-32 landscape:h-16 shrink-0 bg-gradient-to-br from-[#D4AF37]/20 to-black border-b border-white/5 p-4 md:p-8 landscape:p-4 flex items-end justify-between">
               <div>
                 <h3 className="text-lg md:text-2xl landscape:text-lg font-black text-white uppercase tracking-tight leading-tight">{selectedPoi.name}</h3>
@@ -3594,29 +3691,29 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Modern Navigation HUD */}
       {!isExploreMode && milesRemaining > 0 && (
-        <div className="absolute top-4 left-4 right-4 md:left-8 md:right-auto md:w-[450px] z-[2100] flex flex-col gap-3 pointer-events-none">
-          {/* Main Instruction Card */}
-          <div className="bg-black/80 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-[2rem] p-4 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] pointer-events-auto animate-in fade-in slide-in-from-top-4 duration-700">
-            <div className="flex items-center gap-4 md:gap-6">
-              <div className="bg-[#D4AF37] p-3 md:p-5 rounded-2xl md:rounded-[1.5rem] shadow-[0_10px_30px_rgba(212,175,55,0.3)] shrink-0">
-                <nextInstruction.icon className="w-8 h-8 md:w-12 md:h-12 text-black" strokeWidth={4} />
-              </div>
-              <div className="flex flex-col min-w-0 flex-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-4xl md:text-6xl font-[1000] text-white tracking-tighter leading-none">{nextInstruction.distance}</span>
-                  <span className="text-lg md:text-2xl font-black text-[#D4AF37] uppercase">mi</span>
+        <div className={`absolute top-0 left-0 right-0 z-[2100] transition-all duration-700 ease-in-out ${milesRemaining > 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
+          <div className="bg-gradient-to-b from-black/95 to-black/60 backdrop-blur-3xl border-b border-[#D4AF37]/20 p-2 md:p-6 landscape:p-2 landscape:md:p-4 pt-[calc(0.5rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] landscape:pt-[calc(0.25rem+env(safe-area-inset-top))] shadow-2xl">
+            <div className="flex flex-col md:flex-row landscape:flex-row items-start md:items-center landscape:items-center justify-between gap-2 md:gap-4 landscape:gap-2">
+              <div className="flex items-center gap-2 md:gap-10 landscape:gap-4 w-full md:w-auto landscape:w-auto">
+                <div className="bg-[#D4AF37] p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-2xl landscape:rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.4)] shrink-0">
+                  <nextInstruction.icon className="w-8 h-8 md:w-20 md:h-20 landscape:w-10 landscape:h-10 text-black" strokeWidth={4} />
                 </div>
-                <div className="flex items-center gap-2 mt-1 truncate">
-                   {(() => {
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2 md:gap-4 landscape:gap-2">
+                    <span className="text-4xl md:text-8xl landscape:text-5xl font-[1000] text-white tracking-tighter leading-none drop-shadow-2xl">{nextInstruction.distance}</span>
+                    <span className="text-xl md:text-4xl landscape:text-2xl font-black text-[#D4AF37] uppercase tracking-tighter">mi</span>
+                  </div>
+                  <div className="flex items-center gap-2 md:gap-4 landscape:gap-2 mt-1 md:mt-2 landscape:mt-1 truncate">
+                    {(() => {
                       const highwayMatch = nextInstruction.text.match(/(I-|US-|SR-|Hwy|Route|State Route)\s*(\d+[A-Z]?)/i);
                       const exitMatch = nextInstruction.text.match(/exit\s+(\d+[A-Z]?)/i);
                       
                       if (highwayMatch || exitMatch) {
                         return (
-                          <div className="flex gap-2 scale-75 origin-left shrink-0">
+                          <div className="flex gap-2 scale-75 md:scale-100 origin-left shrink-0">
                             {highwayMatch && <HighwayShield roadName={highwayMatch[0]} />}
                             {exitMatch && (
-                              <div className="bg-[#D4AF37] text-black font-black px-2 py-1 rounded-lg text-sm md:text-base uppercase tracking-tight shrink-0">
+                              <div className="bg-[#D4AF37] text-black font-black px-2 py-1 rounded-lg text-sm md:text-2xl uppercase tracking-tight shrink-0">
                                 Exit {exitMatch[1]}
                               </div>
                             )}
@@ -3625,92 +3722,33 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       }
                       return null;
                     })()}
-                  <span className="text-lg md:text-xl font-black text-white italic uppercase tracking-tight truncate">
-                    {nextInstruction.text}
-                  </span>
+                    <span className="text-lg md:text-4xl landscape:text-2xl font-black text-white italic uppercase tracking-tight truncate drop-shadow-lg">
+                      {nextInstruction.text}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Lane Guidance Integrated */}
-            {nextInstruction.lanes && nextInstruction.lanes.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-white/10">
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {/* Lane Guidance Integrated */}
+              {nextInstruction.lanes && nextInstruction.lanes.length > 0 && (
+                <div className="flex gap-2 md:gap-4 overflow-x-auto no-scrollbar py-2">
                   {nextInstruction.lanes.map((lane, idx) => {
                     const { rotation, active } = parseLane(lane);
                     return (
-                      <div key={idx} className={`p-2 rounded-xl border-2 transition-all duration-500 shrink-0 flex items-center justify-center ${active ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-[0_0_15px_rgba(212,175,55,0.3)]' : 'bg-white/5 border-white/10 text-white/20'}`}>
-                        <ArrowUp className="w-5 h-5" strokeWidth={active ? 4 : 3} style={{ transform: `rotate(${rotation}deg)` }} />
+                      <div key={idx} className={`p-2 md:p-4 rounded-xl md:rounded-2xl border-2 transition-all duration-500 shrink-0 flex items-center justify-center ${active ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-[0_0_20px_rgba(212,175,55,0.4)]' : 'bg-white/5 border-white/10 text-white/20'}`}>
+                        <ArrowUp className="w-6 h-6 md:w-12 md:h-12" strokeWidth={active ? 5 : 3} style={{ transform: `rotate(${rotation}deg)` }} />
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
-          </div>
-
-          {/* Following Instruction Card (Secondary) */}
-          {nextInstruction.followingStep && (
-            <div className="bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl p-3 md:p-4 shadow-xl ml-4 md:ml-8 w-fit max-w-[300px] pointer-events-auto animate-in fade-in slide-in-from-left-4 duration-1000 delay-300">
-              <div className="flex items-center gap-3">
-                <div className="bg-zinc-800 p-2 rounded-lg shrink-0">
-                  <nextInstruction.followingStep.icon className="w-4 h-4 md:w-5 md:h-5 text-[#D4AF37]" strokeWidth={3} />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">Then</span>
-                  <span className="text-[10px] md:text-xs font-bold text-white/80 uppercase truncate">
-                    {nextInstruction.followingStep.text}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* Trip Progress HUD */}
-      {!isExploreMode && milesRemaining > 0 && (
-        <div className="absolute bottom-24 left-4 right-4 md:left-auto md:right-8 md:w-80 z-[2100] pointer-events-none">
-          <div className="bg-black/80 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-3xl p-4 md:p-6 shadow-[0_20px_60px_rgba(0,0,0,0.5)] pointer-events-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Destination</span>
-                <span className="text-xl font-[1000] text-[#D4AF37] tracking-tighter uppercase italic truncate max-w-[150px]">
-                  {currentDestination}
-                </span>
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">ETA</span>
-                <span className="text-2xl font-[1000] text-white tracking-tighter italic">{eta}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between items-end">
-                <span className="text-3xl font-[1000] text-white tracking-tighter leading-none">
-                  {milesRemaining.toFixed(1)}
-                  <span className="text-sm font-black text-[#D4AF37] ml-1 uppercase">mi</span>
-                </span>
-                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Remaining</span>
-              </div>
-              <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-gradient-to-r from-[#D4AF37] to-amber-500 transition-all duration-1000"
-                  style={{ width: `${Math.min(100, Math.max(0, (1 - milesRemaining / initialMiles) * 100))}%` }}
-                />
-              </div>
-            </div>
-
-            <button 
-              onClick={handleCancelRoute}
-              className="mt-4 w-full py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border border-rose-500/30 flex items-center justify-center gap-2 pointer-events-auto"
-            >
-              <X className="w-3 h-3" strokeWidth={4} />
-              Cancel Route
-            </button>
           </div>
         </div>
       )}
+
+      {/* Trip Progress HUD removed in favor of nav-arrival-hud */}
+
 
       {/* Map Controls consolidated in nav-map-controls below */}
 
@@ -4026,7 +4064,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           )}
 
-          <div className={`w-full bg-black/95 backdrop-blur-3xl ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-3xl' : 'rounded-3xl'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_0_40px_rgba(212,175,55,0.2)] scale-[1.01]' : 'border-white/10 shadow-2xl'}`}>
+          <div className={`w-full bg-black ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-2xl md:rounded-t-[2.5rem]' : 'rounded-2xl md:rounded-[2.5rem]'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_40px_100px_rgba(212,175,55,0.4)] scale-[1.01]' : 'border-white/10 shadow-[0_40px_100px_rgba(0,0,0,0.8)]'}`}>
             <div className="flex items-center p-2 pl-6">
               <Search className={`w-5 h-5 mr-4 transition-colors ${isSearchFocused ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
               <input 
@@ -4054,6 +4092,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   setError("Failed to calculate route. Please try again.");
                 })}  
               />
+              <button
+                type="button"
+                onClick={startVoiceSearch}
+                disabled={isCalculating || !isMapReady}
+                className={`p-2 transition-colors ${isListening ? 'text-red-500 animate-pulse' : 'text-zinc-500 hover:text-[#D4AF37]'}`}
+              >
+                <Mic className="w-5 h-5" />
+              </button>
               {isSearchFocused && (
                 <button 
                   onClick={() => { setIsSearchFocused(false); setIsSuggestionsVisible(false); }}
@@ -4096,7 +4142,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           </div>
           {isSuggestionsVisible && suggestions.length > 0 && (
-            <div className={`w-full bg-black/95 backdrop-blur-3xl rounded-b-[1.5rem] md:rounded-b-[2.5rem] landscape:rounded-b-2xl border-x border-b border-[#D4AF37]/40 shadow-[0_20px_50px_rgba(0,0,0,0.5)] animate-in slide-in-from-top-2 duration-300 ${milesRemaining > 0 ? 'max-h-[150px] md:max-h-[200px] landscape:max-h-[100px]' : 'max-h-[250px] md:max-h-[400px] landscape:max-h-[200px]'} overflow-y-auto custom-scrollbar`}>
+            <div className={`w-full bg-black rounded-b-2xl md:rounded-b-[2.5rem] landscape:rounded-b-2xl border-x border-b border-[#D4AF37]/40 shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-300 ${milesRemaining > 0 ? 'max-h-[150px] md:max-h-[200px] landscape:max-h-[100px]' : 'max-h-[250px] md:max-h-[400px] landscape:max-h-[200px]'} overflow-y-auto custom-scrollbar`}>
               <ul className="py-1 md:py-2 landscape:py-1">
                 {suggestions.map((s, idx) => {
                   const isFirstRecommended = s.isRecommended && idx === 0;
@@ -4185,20 +4231,95 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {isDriving && currentRoad && !isExploreMode && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[2005] pointer-events-none transition-all duration-500 animate-in slide-in-from-bottom-4">
-          <div className="bg-black/80 backdrop-blur-md border border-[#D4AF37]/30 rounded-2xl px-6 py-2 shadow-2xl flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />
-            <span className="text-white font-black text-sm md:text-base uppercase tracking-widest">{currentRoad}</span>
+      {isDriving && !isExploreMode && (
+        <div id="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-8 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[750px] px-2 md:px-6 pointer-events-none">
+          <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] landscape:rounded-2xl p-2 md:p-6 landscape:p-2 flex items-center justify-between shadow-[0_40px_100px_rgba(0,0,0,0.8)] pointer-events-auto transition-all hover:scale-[1.005]">
+            <button id="nav-exit-button" onClick={handleCancelRoute} className="p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[1.5rem] landscape:rounded-xl bg-zinc-900 text-zinc-600 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all active:scale-90 shrink-0">
+              <X className="w-4 h-4 md:w-7 md:h-7 landscape:w-5 landscape:h-5" strokeWidth={5} />
+            </button>
+
+            <div className="flex items-center gap-2 md:gap-12 landscape:gap-4 overflow-x-auto no-scrollbar px-1 md:px-2">
+              <div id="nav-stat-speed" className="flex flex-col items-center shrink-0">
+                <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0 h-3">Speed</span>
+                <div className="flex items-center">
+                  <span className={`text-lg md:text-4xl landscape:text-2xl font-bold tracking-tight leading-none ${currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-500' : 'text-[#D4AF37]'}`}>
+                    {Math.round(speed * 2.23694)}
+                    <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">mph</span>
+                  </span>
+                  {currentSpeedLimit && (
+                    <div className="ml-2">
+                      <SpeedLimitSign limit={currentSpeedLimit} currentSpeed={Math.round(speed * 2.23694)} compact />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
+              <div id="nav-stat-dist" className="flex flex-col shrink-0">
+                <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Target Dist</span>
+                <span className="text-xl md:text-5xl landscape:text-3xl font-bold text-[#D4AF37] tracking-tight leading-none">
+                  {milesRemaining > 0 ? milesRemaining.toFixed(1) : '---'}
+                  <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">mi</span>
+                </span>
+              </div>
+              <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
+              <div id="nav-stat-duration" className="flex flex-col shrink-0">
+                <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Time</span>
+                <span className="text-xl md:text-5xl landscape:text-3xl font-bold text-[#D4AF37] tracking-tight leading-none">
+                  {remainingDuration > 0 ? `${Math.floor(remainingDuration / 3600)}h ${Math.floor((remainingDuration % 3600) / 60)}m` : '---'}
+                </span>
+              </div>
+              <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
+              {waypoints.length > 0 && (
+                <>
+                  <div id="nav-stat-stops" className="flex flex-col items-center shrink-0">
+                    <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Stops</span>
+                    <span className="text-lg md:text-4xl landscape:text-2xl font-bold text-[#D4AF37] tracking-tight leading-none">
+                      {waypoints.length}
+                      <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">pts</span>
+                    </span>
+                  </div>
+                  <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
+                </>
+              )}
+              <div id="nav-stat-eta" className="flex flex-col items-end shrink-0">
+                <div className="flex items-center gap-1 md:gap-3 landscape:gap-1.5">
+                  <div className={`w-1.5 h-1.5 md:w-4 md:h-4 landscape:w-2 landscape:h-2 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_10px_#D4AF37]' : 'bg-zinc-800'}`} />
+                  <span className="text-lg md:text-4xl landscape:text-2xl font-bold text-white tracking-tight leading-none">{eta}</span>
+                </div>
+                <span className="text-[6px] md:text-[10px] landscape:text-[7px] font-bold text-zinc-500 uppercase tracking-[0.25em] mt-0.5 md:mt-1.5 landscape:mt-0.5">Verified ETA • LIVE</span>
+              </div>
+              {currentDestination !== 'Standby' && currentRoad && (
+                <>
+                  <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
+                  <div className="flex items-center gap-4 md:gap-6 pr-2 md:pr-4 shrink-0">
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />
+                        <span className="text-[#D4AF37] text-[10px] md:text-xs font-bold uppercase tracking-widest opacity-60">Current Road</span>
+                      </div>
+                      <span className="text-white font-black text-sm md:text-2xl uppercase tracking-widest truncate max-w-[150px] md:max-w-md">
+                        {currentRoad}
+                      </span>
+                    </div>
+                    
+                    {(() => {
+                      const highwayMatch = currentRoad.match(/(I-|US-|SR-|Hwy|Route|State Route)\s*(\d+[A-Z]?)/i);
+                      return highwayMatch ? (
+                        <div className="scale-75 md:scale-110 origin-right">
+                          <HighwayShield roadName={highwayMatch[0]} />
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       <MapControls
         mapInstanceRef={mapInstanceRef}
-        isFetchingPoisRef={isFetchingPoisRef}
-        fetchTruckPOIs={fetchTruckPOIs}
-        setPois={setPois}
         isFilterMenuOpen={isFilterMenuOpen}
         setIsFilterMenuOpen={setIsFilterMenuOpen}
         poiFilters={poiFilters}
@@ -4206,17 +4327,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         isOverviewMode={isOverviewMode}
         setIsOverviewMode={setIsOverviewMode}
         setIsFollowMode={setIsFollowMode}
-        showTruckRestrictions={showTruckRestrictions}
-        setShowTruckRestrictions={setShowTruckRestrictions}
-        HERE_API_KEY={HERE_API_KEY}
-        setError={setError}
         isValidLatLng={isValidLatLng}
         userLocation={userLocation}
         isFollowMode={isFollowMode}
         isNorthUp={isNorthUp}
         setIsNorthUp={setIsNorthUp}
-        setShowSteps={setShowSteps}
-        showSteps={showSteps}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
       />
               <RouteSettingsModal

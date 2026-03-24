@@ -182,27 +182,8 @@ export async function fetchTruckStops(lat: number, lon: number) {
       exit: stop.exitLat && stop.exitLon ? { lat: Number(stop.exitLat), lon: Number(stop.exitLon) } : undefined
     }));
   } catch (e) {
-    console.warn("Using fallback data for truck stops due to API error.", e instanceof Error ? e.message : String(e));
-    return [
-      {
-        name: "Love's Travel Stop",
-        location: "Exit 42",
-        distance: 2.5,
-        availability: 85,
-        amenities: ["Showers", "Diesel", "Subway", "CAT Scale", "Parking"],
-        entrance: { lat: lat + 0.001, lon: lon + 0.001 },
-        exit: { lat: lat + 0.0015, lon: lon + 0.0015 }
-      },
-      {
-        name: "Pilot Travel Center",
-        location: "Exit 45",
-        distance: 5.1,
-        availability: 40,
-        amenities: ["Showers", "Diesel", "Wendy's", "Parking", "ATM"],
-        entrance: { lat: lat - 0.001, lon: lon - 0.001 },
-        exit: { lat: lat - 0.0015, lon: lon - 0.0015 }
-      }
-    ];
+    console.warn("API error fetching truck stops, returning empty array to prevent inaccurate POIs.", e instanceof Error ? e.message : String(e));
+    return [];
   }
 }
 
@@ -270,91 +251,70 @@ export async function fetchMajorChains(lat: number, lon: number) {
       lon: Number(poi.lon)
     }));
   } catch (err) {
-    console.warn("Using fallback data for major chains due to API error.", err instanceof Error ? err.message : String(err));
-    // Fallback data
-    return [
-      { name: "Love's Travel Stop", type: "major_chains", lat: lat + 0.001, lon: lon + 0.001, amenities: ["Showers", "Diesel", "Subway"] },
-      { name: "Pilot Travel Center", type: "major_chains", lat: lat - 0.001, lon: lon - 0.001, amenities: ["Showers", "Diesel", "Wendy's"] },
-      { name: "TA Travel Center", type: "major_chains", lat: lat + 0.002, lon: lon - 0.002, amenities: ["Showers", "Diesel", "Country Pride"] },
-      { name: "Flying J Travel Center", type: "major_chains", lat: lat - 0.002, lon: lon + 0.002, amenities: ["Showers", "Diesel", "Denny's"] },
-      { name: "Petro Stopping Center", type: "major_chains", lat: lat + 0.003, lon: lon + 0.003, amenities: ["Showers", "Diesel", "Iron Skillet"] }
-    ];
+    console.warn("API error fetching major chains, returning empty array to prevent inaccurate POIs.", err instanceof Error ? err.message : String(err));
+    return [];
   }
 }
 
 export async function fetchTruckPOIs(lat: number, lon: number) {
   try {
-    const ai = getAI();
-    if (!ai) throw new Error("AI not initialized");
-    const response = await withRetry(() => ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Find 150 real truck-related points of interest within a 250-mile radius of coordinates ${lat}, ${lon}. 
-      This is for a professional worldwide trucking application. Ensure high reliability and accurate coordinates.
-      CRITICAL: You MUST perform a thorough search for these specific brands and include as many as possible: 
-      - Love's Travel Stops
-      - Pilot Travel Centers
-      - Flying J Travel Centers
-      - Petro Stopping Centers
-      - TA (TravelCenters of America)
-      - Road Ranger
-      - KwikTrip / KwikStar
-      - TA Express
-      - Conoco
-      - Casey's
-      
-      Also include weigh stations, rest areas, truck washes (like Blue Beacon), and major truck service centers.
-      For each facility, provide the main coordinates (lat, lon) AND specific entrance and exit coordinates (entranceLat, entranceLon, exitLat, exitLon) for truck-specific access points.
-      Return a JSON array of objects with: name, type, lat, lon, entranceLat, entranceLon, exitLat, exitLon, and amenities (a list of 4-5 key features or services).`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              type: { type: Type.STRING },
-              lat: { type: Type.NUMBER },
-              lon: { type: Type.NUMBER },
-              entranceLat: { type: Type.NUMBER },
-              entranceLon: { type: Type.NUMBER },
-              exitLat: { type: Type.NUMBER },
-              exitLon: { type: Type.NUMBER },
-              amenities: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-              }
-            },
-            required: ["name", "type", "lat", "lon", "amenities"]
-          }
-        }
-      }
-    }));
-
-    if (!response.text) throw new Error("Empty response from AI");
+    const radius = 50000; // 50km radius
+    const query = `
+      [out:json][timeout:25];
+      (
+        node["amenity"="fuel"]["hgv"="yes"](around:${radius},${lat},${lon});
+        way["amenity"="fuel"]["hgv"="yes"](around:${radius},${lat},${lon});
+        node["highway"="weigh_station"](around:${radius},${lat},${lon});
+        way["highway"="weigh_station"](around:${radius},${lat},${lon});
+        node["highway"="rest_area"](around:${radius},${lat},${lon});
+        way["highway"="rest_area"](around:${radius},${lat},${lon});
+        node["highway"="services"](around:${radius},${lat},${lon});
+        way["highway"="services"](around:${radius},${lat},${lon});
+        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express",i](around:${radius},${lat},${lon});
+        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express",i](around:${radius},${lat},${lon});
+      );
+      out center;
+    `;
     
-    let jsonStr = response.text.trim();
-    if (jsonStr.startsWith('```json')) {
-      jsonStr = jsonStr.replace(/^```json\n/, '').replace(/\n```$/, '');
-    } else if (jsonStr.startsWith('```')) {
-      jsonStr = jsonStr.replace(/^```\n/, '').replace(/\n```$/, '');
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: query
+    });
+    
+    if (!response.ok) {
+      throw new Error("Overpass API error");
     }
     
-    return JSON.parse(jsonStr).map((poi: any) => ({
-      ...poi,
-      lat: Number(poi.lat),
-      lon: Number(poi.lon),
-      entrance: poi.entranceLat && poi.entranceLon ? { lat: Number(poi.entranceLat), lon: Number(poi.entranceLon) } : undefined,
-      exit: poi.exitLat && poi.exitLon ? { lat: Number(poi.exitLat), lon: Number(poi.exitLon) } : undefined
-    }));
+    const data = await response.json();
+    
+    return data.elements.map((el: any) => {
+      const elLat = el.lat || el.center?.lat;
+      const elLon = el.lon || el.center?.lon;
+      const tags = el.tags || {};
+      
+      let type = "other";
+      if (tags.highway === "weigh_station") type = "weigh_station";
+      else if (tags.highway === "rest_area" || tags.highway === "services") type = "rest_area";
+      else if (tags.amenity === "fuel" || tags.brand) type = "major_chains";
+      
+      const amenities = [];
+      if (tags.fuel === "yes" || tags["fuel:diesel"] === "yes") amenities.push("Diesel");
+      if (tags.toilets === "yes") amenities.push("Restrooms");
+      if (tags.shower === "yes") amenities.push("Showers");
+      if (tags.food === "yes" || tags.restaurant === "yes" || tags.fast_food === "yes") amenities.push("Food");
+      if (amenities.length === 0) amenities.push("Truck Parking");
+      
+      return {
+        name: tags.name || tags.operator || tags.brand || "Truck Stop",
+        type,
+        lat: elLat,
+        lon: elLon,
+        amenities
+      };
+    }).filter((poi: any) => poi.lat && poi.lon);
   } catch (e) {
-    console.warn("Using fallback data for POIs due to API error.", e instanceof Error ? e.message : String(e));
-    return [
-      { name: "Love's Travel Stop", type: "major_chains", lat: lat + 0.005, lon: lon + 0.005, amenities: ["Showers", "Diesel", "Subway", "CAT Scale"] },
-      { name: "Pilot Travel Center", type: "major_chains", lat: lat - 0.005, lon: lon - 0.005, amenities: ["Showers", "Diesel", "Wendy's", "Parking"] },
-      { name: "Rest Area", type: "rest_area", lat: lat + 0.008, lon: lon - 0.002, amenities: ["Restrooms", "Vending Machines", "Parking"] },
-      { name: "Weigh Station", type: "weigh_station", lat: lat - 0.003, lon: lon + 0.007, amenities: ["Scales", "Inspection"] }
-    ];
+    console.warn("API error fetching POIs, returning empty array to prevent inaccurate POIs.", e instanceof Error ? e.message : String(e));
+    return [];
   }
 }
 
@@ -404,8 +364,14 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
     }
 
     const audioCtx = getAudioContext();
+    console.log("Speech Service: AudioContext state:", audioCtx.state);
     if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
+      try {
+        await audioCtx.resume();
+        console.log("Speech Service: AudioContext resumed successfully");
+      } catch (e) {
+        console.error("Speech Service: Failed to resume AudioContext", e);
+      }
     }
     
     const binaryString = atob(base64Audio);
@@ -418,7 +384,7 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
     try {
       audioBuffer = await audioCtx.decodeAudioData(bytes.buffer.slice(0));
     } catch (_error) {
-      console.warn("Native decoding failed, attempting manual PCM decoding");
+      console.warn("Speech Service: Native decoding failed, attempting manual PCM decoding");
       const pcmData = bytes.length % 2 === 0 ? bytes : bytes.slice(0, -1);
       audioBuffer = await decodeAudioData(pcmData, audioCtx, 24000, 1);
     }
@@ -428,14 +394,12 @@ export async function textToSpeech(text: string, voice: 'Kore' | 'Puck' | 'Zephy
     source.connect(audioCtx.destination);
     
     return new Promise<boolean>((resolve) => {
-      source.onended = () => resolve(true);
-      source.onerror = () => resolve(false);
-      try {
-        source.start(0);
-      } catch (e) {
-        console.error("Failed to start audio source:", e);
-        resolve(false);
-      }
+      source.onended = () => {
+        console.log("Speech Service: Audio playback finished");
+        resolve(true);
+      };
+      source.start(0);
+      console.log("Speech Service: Audio playback started");
     });
   } catch (error: any) {
     const errorStr = String(error?.message || error);

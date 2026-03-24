@@ -6,6 +6,7 @@ let isSpeaking = false;
 const speakNative = (text: string): Promise<void> => {
   return new Promise((resolve) => {
     if (!window.speechSynthesis) {
+      console.error("Speech Service: window.speechSynthesis not available");
       resolve();
       return;
     }
@@ -14,8 +15,14 @@ const speakNative = (text: string): Promise<void> => {
     utterance.rate = 1.0;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
+    utterance.onend = () => {
+      console.log("Speech Service: Native TTS finished");
+      resolve();
+    };
+    utterance.onerror = (e) => {
+      console.error("Speech Service: Native TTS error", e);
+      resolve();
+    };
     window.speechSynthesis.speak(utterance);
   });
 };
@@ -33,10 +40,11 @@ const processQueue = async () => {
     try {
       const success = await textToSpeech(text);
       if (!success) {
+        console.warn("Speech Service: Gemini TTS failed, falling back to native");
         await speakNative(text);
       }
     } catch (error) {
-      console.error("Speech synthesis failed:", error instanceof Error ? error.message : String(error));
+      console.error("Speech Service: synthesis failed:", error instanceof Error ? error.message : String(error));
       await speakNative(text);
     }
   }

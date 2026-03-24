@@ -1,4 +1,4 @@
-import { safeStringify, isValidLatLng } from './utils';
+import { safeStringify } from './utils';
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
@@ -10,6 +10,7 @@ const LoadBoard = lazy(() => import('./components/LoadBoard'));
 const Maintenance = lazy(() => import('./components/Maintenance'));
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const RouteHistory = lazy(() => import('./components/RouteHistory'));
+const GitHubUpdates = lazy(() => import('./components/GitHubUpdates'));
 
 import { ViewType, AppContext, LocationContext, TelemetryContext } from './types';
 import { HOSProvider } from './components/HOSProvider';
@@ -89,7 +90,7 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
             const saved = localStorage.getItem('trucker_last_location');
             try {
               return saved ? JSON.parse(saved) : [41.8781, -87.6298];
-            } catch (e) {
+            } catch {
               return [41.8781, -87.6298];
             }
           }
@@ -126,7 +127,7 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   );
 };
 
-const AppContent: React.FC = () => {
+const AppContent: React.FC = React.memo(() => {
   const { user, profile, loading, signIn, signOut, updateProfile, authError } = useFirebase();
   const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
@@ -255,6 +256,8 @@ const AppContent: React.FC = () => {
         return <Suspense fallback={<div>Loading...</div>}><RouteHistory /></Suspense>;
       case ViewType.PAY_SUMMARY:
         return <Suspense fallback={<div>Loading...</div>}><PaySummary /></Suspense>;
+      case ViewType.GITHUB_UPDATES:
+        return <Suspense fallback={<div>Loading...</div>}><GitHubUpdates /></Suspense>;
       default:
         return <Suspense fallback={<div>Loading...</div>}><Dashboard /></Suspense>;
     }
@@ -397,7 +400,7 @@ const AppContent: React.FC = () => {
         </HOSProvider>
     </AppContext.Provider>
   );
-};
+});
 
 const App: React.FC = () => {
   return (

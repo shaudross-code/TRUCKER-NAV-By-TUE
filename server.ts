@@ -3,8 +3,24 @@ import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { safeStringify } from './utils';
+import admin from 'firebase-admin';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// Initialize Firebase Admin
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('Firebase Admin initialized successfully');
+  } else {
+    console.warn('FIREBASE_SERVICE_ACCOUNT is not set. Firebase Admin is not initialized.');
+  }
+} catch (error) {
+  console.error('Failed to initialize Firebase Admin:', error);
+}
 
 async function createServer() {
   const app = express();
@@ -34,11 +50,19 @@ async function createServer() {
     try {
       console.log('Backend: Received truckProfile', safeStringify(truckProfile));
 
-      const heightCm = Math.round(truckProfile.height * 30.48);
-      const weightKg = Math.round(truckProfile.weight * 0.453592);
-      const lengthCm = Math.round(truckProfile.length * 30.48);
-      const widthCm = Math.round(truckProfile.width * 30.48);
-      const axleWeightKg = Math.round(truckProfile.axleWeight * 0.453592);
+      const height = Number(truckProfile.height) || 13.5;
+      const weight = Number(truckProfile.weight) || 80000;
+      const length = Number(truckProfile.length) || 53;
+      const width = Number(truckProfile.width) || 8.5;
+      const axleWeight = Number(truckProfile.axleWeight) || 12000;
+      const axleCount = Number(truckProfile.axleCount) || 5;
+      const trailerCount = Number(truckProfile.trailerCount) || 1;
+
+      const heightCm = Math.round(height * 30.48);
+      const weightKg = Math.round(weight * 0.453592);
+      const lengthCm = Math.round(length * 30.48);
+      const widthCm = Math.round(width * 30.48);
+      const axleWeightKg = Math.round(axleWeight * 0.453592);
       
       const hereUrl = new URL('https://router.hereapi.com/v8/routes');
       hereUrl.searchParams.append('transportMode', 'truck');
@@ -51,15 +75,15 @@ async function createServer() {
       }
       
       hereUrl.searchParams.append('destination', destination);
-      hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions,notices');
-      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,laneInfo,streetAttributes');
+      hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions');
+      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes');
       hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
       hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
       hereUrl.searchParams.append('vehicle[length]', lengthCm.toString());
       hereUrl.searchParams.append('vehicle[width]', widthCm.toString());
-      hereUrl.searchParams.append('vehicle[axleCount]', truckProfile.axleCount.toString());
+      hereUrl.searchParams.append('vehicle[axleCount]', axleCount.toString());
       hereUrl.searchParams.append('vehicle[weightPerAxle]', axleWeightKg.toString());
-      hereUrl.searchParams.append('vehicle[trailerCount]', truckProfile.trailerCount.toString());
+      hereUrl.searchParams.append('vehicle[trailerCount]', trailerCount.toString());
       
       if (truckProfile.tunnelCategory && truckProfile.tunnelCategory !== 'NONE') {
         hereUrl.searchParams.append('vehicle[tunnelCategory]', truckProfile.tunnelCategory);
@@ -86,13 +110,17 @@ async function createServer() {
       console.log('Backend: Calling HERE API:', hereUrl.toString());
       const response = await fetch(hereUrl.toString());
       const data = await response.json();
-      console.log('HERE API response for route:', safeStringify(data));
       
       if (!response.ok) {
-        console.error('Backend: HERE API error response:', data);
-        return res.status(response.status).json({ error: 'HERE API error', details: data });
+        console.error('Backend: HERE API error response:', safeStringify(data));
+        return res.status(response.status).json({ 
+          error: 'HERE API error', 
+          details: data,
+          url: hereUrl.toString().replace(process.env.HERE_API_KEY!, 'REDACTED')
+        });
       }
 
+      console.log('HERE API response for route received successfully');
       res.json(data);
     } catch (error) {
       console.error('Error fetching route:', error);

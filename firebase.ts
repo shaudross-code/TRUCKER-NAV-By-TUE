@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, browserPopupRedirectResolver } from 'firebase/auth';
+import { initializeAuth, browserPopupRedirectResolver, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 import { safeStringify } from './utils';
@@ -7,8 +7,12 @@ import { safeStringify } from './utils';
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-// Use browserPopupRedirectResolver to fix cookie issues in iframes on iOS/Safari
-export const auth = getAuth(app);
+
+// Use initializeAuth with browserPopupRedirectResolver to fix cookie issues in iframes
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
+  popupRedirectResolver: browserPopupRedirectResolver,
+});
 auth.useDeviceLanguage();
 
 

@@ -15,6 +15,7 @@ import {
   Truck,
   MapPin
 } from 'lucide-react';
+import { getRoute } from '../src/services/hereRoutingService';
 import { AppContext, LocationContext, TelemetryContext, RouteHistoryItem, POI } from '../types';
 import { STATIC_POIS } from '../src/constants/staticPois';
 import { speak } from '../services/speechService';
@@ -215,17 +216,12 @@ const GoogleMapsNavigationView: React.FC<NavigationViewProps> = ({ initialTarget
     setIsCalculating(true);
     setError(null);
     try {
-      const response = await fetch('/api/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: safeStringify({
-          origin: `${userLocation[0]},${userLocation[1]}`,
-          destination: target,
-          truckProfile: context?.truckProfile
-        })
-      });
+      const data = await getRoute(
+        `${userLocation[0]},${userLocation[1]}`,
+        target,
+        context?.truckProfile
+      );
 
-      const data = await response.json();
       if (data.routes && data.routes[0]) {
         const route = data.routes[0];
         const polyline = route.sections[0].polyline;

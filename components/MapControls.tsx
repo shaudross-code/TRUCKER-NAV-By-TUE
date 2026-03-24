@@ -1,11 +1,8 @@
 import React from 'react';
-import { RotateCcw, Filter, Plus, Minus, Map as MapIcon, AlertTriangle, Target, Compass, Check, Navigation as NavIcon, List } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon } from 'lucide-react';
 
 export const MapControls: React.FC<any> = React.memo(({ 
   mapInstanceRef, 
-  isFetchingPoisRef, 
-  fetchTruckPOIs, 
-  setPois, 
   isFilterMenuOpen, 
   setIsFilterMenuOpen, 
   poiFilters, 
@@ -13,17 +10,11 @@ export const MapControls: React.FC<any> = React.memo(({
   isOverviewMode, 
   setIsOverviewMode, 
   setIsFollowMode, 
-  showTruckRestrictions, 
-  setShowTruckRestrictions, 
-  HERE_API_KEY, 
-  setError, 
   isValidLatLng, 
   userLocation, 
   isFollowMode, 
   isNorthUp, 
   setIsNorthUp, 
-  setShowSteps, 
-  showSteps,
   className = ""
 }) => {
   return (
@@ -43,47 +34,7 @@ export const MapControls: React.FC<any> = React.memo(({
           </button>
         )}
         
-        <div className="bg-black/90 backdrop-blur-3xl border border-[#D4AF37]/30 rounded-2xl md:rounded-3xl p-1.5 md:p-2 shadow-2xl flex flex-col gap-1.5 md:gap-2">
-          <button
-            onClick={() => {
-              if (mapInstanceRef.current && !isFetchingPoisRef.current) {
-                const center = mapInstanceRef.current.getCenter();
-                isFetchingPoisRef.current = true;
-                fetchTruckPOIs(center.lat, center.lng)
-                  .then((poiData) => {
-                    const combinedRaw = [...poiData];
-                    const seenInBatch = new Set();
-                    const combined = combinedRaw.filter(p => {
-                      const id = `${p.lat}-${p.lon}-${p.name}`;
-                      if (seenInBatch.has(id)) return false;
-                      seenInBatch.add(id);
-                      return true;
-                    });
-
-                    setPois(prev => {
-                      const existingIds = new Set();
-                      prev.forEach(p => existingIds.add(`${p.lat}-${p.lon}-${p.name}`));
-                      const newPois = combined.filter(p => !existingIds.has(`${p.lat}-${p.lon}-${p.name}`));
-                      if (newPois.length === 0) return prev;
-                      const updated = [...prev, ...newPois];
-                      if (updated.length > 1000) return updated.slice(updated.length - 1000);
-                      return updated;
-                    });
-                  })
-                  .catch(err => {
-                    console.error("Failed to fetch POIs:", err instanceof Error ? err.message : String(err));
-                  })
-                  .finally(() => {
-                    isFetchingPoisRef.current = false;
-                  });
-              }
-            }}
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all bg-white/5 text-[#D4AF37] hover:bg-white/10`}
-            title="Refresh POIs"
-          >
-            <RotateCcw className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" />
-          </button>
-          
+        <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-1.5 md:p-2 shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 md:gap-2 transition-all hover:scale-[1.005]">
           <div className="relative">
             <button 
               onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
@@ -94,7 +45,7 @@ export const MapControls: React.FC<any> = React.memo(({
             </button>
             
             {isFilterMenuOpen && (
-              <div className="absolute right-full mr-2 md:mr-4 top-0 bg-black/95 backdrop-blur-3xl border border-[#D4AF37]/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-40 md:w-56 flex flex-col gap-1.5 md:gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="absolute right-full mr-2 md:mr-4 top-0 bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-2 md:p-3 shadow-[0_40px_100px_rgba(0,0,0,0.8)] w-40 md:w-56 flex flex-col gap-1.5 md:gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
                 <h3 className="text-[#D4AF37] font-black text-[8px] md:text-[10px] uppercase tracking-widest border-b border-[#D4AF37]/20 pb-1 mb-0.5">Filters</h3>
                 <div className="flex gap-2 mb-2">
                   <button
@@ -189,20 +140,6 @@ export const MapControls: React.FC<any> = React.memo(({
           </button>
 
           <button 
-            onClick={() => {
-              if (!HERE_API_KEY) {
-                setError("HERE API Key required for truck restrictions. Please add HERE_API_KEY to your secrets.");
-                return;
-              }
-              setShowTruckRestrictions(!showTruckRestrictions);
-            }} 
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${showTruckRestrictions ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title="Toggle Truck Restrictions (HERE Maps)"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
-          </button>
-
-          <button 
             onClick={() => { 
               if (isValidLatLng(userLocation) && mapInstanceRef.current) { 
                 mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17); 
@@ -222,14 +159,6 @@ export const MapControls: React.FC<any> = React.memo(({
             title={isNorthUp ? "Switch to Heading Up" : "Switch to North Up"}
           >
             <NavIcon className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${!isNorthUp ? 'animate-pulse' : ''}`} strokeWidth={4} />
-          </button>
-
-          <button 
-            onClick={() => setShowSteps(true)} 
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${showSteps ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title="View Turn-by-Turn Steps"
-          >
-            <List className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>
         </div>
     </div>

@@ -1,3 +1,5 @@
+import { safeStringify } from '../../utils';
+
 export const fetchTruckRoute = async (
   origin: string, 
   destination: string, 
@@ -5,14 +7,15 @@ export const fetchTruckRoute = async (
   via?: string[],
   avoidTolls?: boolean,
   avoidFerries?: boolean,
-  avoidUnpaved?: boolean
+  avoidUnpaved?: boolean,
+  signal?: AbortSignal
 ) => {
   const response = await fetch('/api/route', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
+    body: safeStringify({
       origin,
       destination,
       via,
@@ -21,6 +24,7 @@ export const fetchTruckRoute = async (
       avoidFerries,
       avoidUnpaved
     }),
+    signal
   });
   if (!response.ok) {
     const errorData = await response.json();

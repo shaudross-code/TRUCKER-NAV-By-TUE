@@ -14,7 +14,8 @@ import {
   ChevronRight,
   History,
   DollarSign,
-  LogOut
+  LogOut,
+  Github
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { speak } from '../services/speechService';
@@ -44,6 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ViewType.PAY_SUMMARY, icon: DollarSign, label: 'Pay Summary' },
     { id: ViewType.MAINTENANCE, icon: Wrench, label: 'Maintenance' },
     { id: ViewType.ROUTE_HISTORY, icon: History, label: 'History' },
+    { id: ViewType.GITHUB_UPDATES, icon: Github, label: 'Updates' },
     { id: ViewType.SETTINGS, icon: Settings, label: 'Settings' },
   ];
 
@@ -154,14 +156,14 @@ const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-900 px-2 py-2 flex items-center justify-around z-[100] pb-safe">
-        {menuItems.slice(0, 5).map((item) => {
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-black border-t border-zinc-900 px-2 py-2 flex items-center gap-2 overflow-x-auto no-scrollbar z-[100] pb-safe">
+        {menuItems.map((item) => {
           const isActive = activeView === item.id;
           return (
             <button
               key={item.id}
               onClick={() => onViewChange(item.id)}
-              className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+              className={`flex flex-col items-center justify-center gap-1 p-2 rounded-xl transition-all shrink-0 min-w-[64px] ${
                 isActive ? 'text-[#D4AF37]' : 'text-zinc-500'
               }`}
             >
@@ -172,7 +174,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         })}
         <button 
           onClick={onVoiceToggle}
-          className="flex flex-col items-center gap-1 p-2 text-zinc-500"
+          className="flex flex-col items-center justify-center gap-1 p-2 text-zinc-500 shrink-0 min-w-[64px]"
         >
           <div className="bg-[#D4AF37] p-1.5 rounded-full shadow-[0_0_10px_rgba(212,175,55,0.4)]">
             <Mic className="w-4 h-4 text-black" />
