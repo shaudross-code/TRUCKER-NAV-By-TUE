@@ -309,8 +309,13 @@ async function createServer() {
     app.use(vite.middlewares);
   }
 
-  app.listen(3000, '0.0.0.0', () => {
-    console.log('Server is listening on port 3000...');
+  // Health check endpoint for platform monitoring
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'trucker-nav' });
+  });
+
+  app.listen(8001, '0.0.0.0', () => {
+    console.log('Server is listening on port 8001...');
   });
 }
 
