@@ -1,6 +1,6 @@
 import { getRoute } from '../src/services/hereRoutingService';
 import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
-import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback, useSyncExternalStore } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
 import { MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
@@ -111,7 +111,7 @@ const calcEuclideanDist = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocation }: { mapInstance: any, currentSpeedLimit: number | null, userLocation: [number, number] | null }) => {
   const telemetryContext = useContext(TelemetryContext);
-  const speed = useSyncExternalStore(
+  const speed = React.useSyncExternalStore(
     telemetryContext?.subscribe || (() => () => {}),
     () => telemetryContext?.speedRef.current || 0
   );
@@ -129,24 +129,20 @@ const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocat
       return;
     }
 
-    try {
-      const el = document.createElement('div');
-      el.className = 'speed-limit-marker';
-      el.innerHTML = `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={speed} />)}</div>`;
+    const el = document.createElement('div');
+    el.className = 'speed-limit-marker';
+    el.innerHTML = `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={speed} />)}</div>`;
 
-      if (!speedLimitMarkerRef.current) {
-        if (isValidLatLng(userLocation)) {
-          speedLimitMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }) });
-          speedLimitMarkerRef.current.addTo(mapInstance);
-        }
-      } else {
-        if (isValidLatLng(userLocation)) {
-          speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
-          speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
-        }
+    if (!speedLimitMarkerRef.current) {
+      if (isValidLatLng(userLocation)) {
+        speedLimitMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }) });
+        speedLimitMarkerRef.current.addTo(mapInstance);
       }
-    } catch (error) {
-      console.log("SpeedLimitMarker error:", String(error));
+    } else {
+      if (isValidLatLng(userLocation)) {
+        speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
+        speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
+      }
     }
   }, [mapInstance, currentSpeedLimit, speed, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
@@ -197,7 +193,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const context = useContext(AppContext);
   const locationContext = useContext(LocationContext);
   const telemetryContext = useContext(TelemetryContext);
-  const speed = useSyncExternalStore(
+  const speed = React.useSyncExternalStore(
     telemetryContext?.subscribe || (() => () => {}),
     () => telemetryContext?.speedRef.current || 0
   );
