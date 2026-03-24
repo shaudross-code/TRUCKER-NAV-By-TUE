@@ -34,3 +34,8 @@ dist-ssr
 # Environment files
 *.env
 *.env.*
+
+# Firebase Service Account Keys (CRITICAL - DO NOT COMMIT)
+serviceAccountKey.json
+*serviceAccount*.json
+firebase-adminsdk*.json

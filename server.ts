@@ -4,22 +4,24 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { safeStringify } from './utils';
 import admin from 'firebase-admin';
+import { readFileSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Initialize Firebase Admin
+// Initialize Firebase Admin with service account file
 try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('Firebase Admin initialized successfully');
-  } else {
-    console.warn('FIREBASE_SERVICE_ACCOUNT is not set. Firebase Admin is not initialized.');
-  }
+  const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
+  const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+  
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  
+  console.log('✅ Firebase Admin initialized successfully from serviceAccountKey.json');
 } catch (error) {
-  console.error('Failed to initialize Firebase Admin:', error);
+  console.error('❌ Failed to initialize Firebase Admin:', error);
+  console.error('📝 Make sure serviceAccountKey.json exists in /app directory');
+  console.error('📥 Download it from: Firebase Console → Project Settings → Service Accounts');
 }
 
 async function createServer() {
