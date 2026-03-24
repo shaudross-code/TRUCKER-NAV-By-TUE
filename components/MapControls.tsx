@@ -50,7 +50,7 @@ export const MapControls: React.FC<any> = React.memo(({
                 <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
-                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
+                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'speedco', 'southern_tire'];
                       const allIds = [
                         ...brandIds, 'fuel', 'parking', 'rest_area', 
                         'weigh_station', 'food', 'service', 'distribution', 'other'
@@ -85,7 +85,9 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'quiktrip', label: 'QuikTrip' },
                     { id: 'racetrac', label: 'RaceTrac' },
                     { id: 'conoco', label: 'Conoco' },
-                    { id: 'fuel', label: 'Fuel (Other)' },
+                    { id: 'speedco', label: 'Speedco 🔧', divider: true },
+                    { id: 'southern_tire', label: 'Southern Tire 🛞' },
+                    { id: 'fuel', label: 'Fuel (Other)', divider: true },
                     { id: 'parking', label: 'Parking' },
                     { id: 'rest_area', label: 'Rest Areas' },
                     { id: 'weigh_station', label: 'Scales' },
@@ -94,23 +96,25 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'distribution', label: 'Distribution' },
                     { id: 'other', label: 'Other' }
                   ].map(filter => (
-                    <button
-                      key={filter.id}
-                      onClick={() => {
-                        setPoiFilters(prev => {
-                          const next = new Set(prev);
-                          if (next.has(filter.id)) next.delete(filter.id);
-                          else next.add(filter.id);
-                          return next;
-                        });
-                      }}
-                      className="flex items-center justify-between text-left group py-0.5"
-                    >
-                      <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-tight transition-colors ${poiFilters.has(filter.id) ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{filter.label}</span>
-                      <div className={`w-2.5 h-2.5 md:w-4 md:h-4 rounded border flex items-center justify-center transition-all ${poiFilters.has(filter.id) ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-700 group-hover:border-zinc-500'}`}>
-                        {poiFilters.has(filter.id) && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={5} />}
-                      </div>
-                    </button>
+                    <React.Fragment key={filter.id}>
+                      {filter.divider && <div className="h-px bg-[#D4AF37]/10 my-1" />}
+                      <button
+                        onClick={() => {
+                          setPoiFilters(prev => {
+                            const next = new Set(prev);
+                            if (next.has(filter.id)) next.delete(filter.id);
+                            else next.add(filter.id);
+                            return next;
+                          });
+                        }}
+                        className="flex items-center justify-between text-left group py-0.5"
+                      >
+                        <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-tight transition-colors ${poiFilters.has(filter.id) ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{filter.label}</span>
+                        <div className={`w-2.5 h-2.5 md:w-4 md:h-4 rounded border flex items-center justify-center transition-all ${poiFilters.has(filter.id) ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-700 group-hover:border-zinc-500'}`}>
+                          {poiFilters.has(filter.id) && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={5} />}
+                        </div>
+                      </button>
+                    </React.Fragment>
                   ))}
                 </div>
               </div>

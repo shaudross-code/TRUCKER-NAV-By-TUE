@@ -363,7 +363,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [showPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('poi_filters');
-    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
+    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'speedco', 'southern_tire'];
     try {
       return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'other']);
     } catch (e) {

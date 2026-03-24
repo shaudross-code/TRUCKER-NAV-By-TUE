@@ -21,6 +21,10 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   if (lowerName.includes("quiktrip") || lowerName.includes("qt")) return 'quiktrip';
   if (lowerName.includes("racetrac")) return 'racetrac';
   if (lowerName.includes("conoco")) return 'conoco';
+  
+  // Truck service providers
+  if (lowerName.includes("speedco")) return 'speedco';
+  if (lowerName.includes("southern tire")) return 'southern_tire';
 
   if (normalizedType.includes('weigh station') || normalizedType.includes('scale') || normalizedType.includes('weigh')) {
     return 'weigh_station';
