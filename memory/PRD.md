@@ -38,7 +38,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - App Store icons and screenshots generated (store-assets/)
 - Firebase Admin SDK configured via serviceAccountKey.json
 
-### Phase 6 — New POI Brands (DONE — 2026-03-25)
+### Phase 7 — Crowd-Sourced Parking Status (DONE — 2026-03-25)
+- Added **Parking Status section** to every POI popup
+- 4 colored report buttons: **Light** (green), **Medium** (yellow), **Heavy** (orange), **Maxed** (red)
+- Shows current crowd-sourced status badge, last updated timestamp, and total report count
+- Data persisted in `/app/data/parking_status.json` via file-based JSON store
+- APIs: `GET /api/poi/parking-status?poiId=` and `POST /api/poi/parking-status`
+- POI ID keyed as `lat.toFixed(4)_lon.toFixed(4)` for consistent cross-session matching
+- Updated: server.ts, NavigationView.tsx
 Added to filter panel, map icons, category detection, and API queries:
 - **Fuel brands**: Exxon, Shell, BP, Marathon, Circle K, 7-Eleven
 - **Retail with truck parking**: Lowe's, Home Depot
