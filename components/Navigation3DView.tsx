@@ -2,8 +2,11 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || '';
+const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '';
+
 // Set Mapbox access token
-mapboxgl.accessToken = import.meta.env.REACT_APP_MAPBOX_TOKEN || '';
+if (MAPBOX_TOKEN) mapboxgl.accessToken = MAPBOX_TOKEN;
 
 interface Navigation3DViewProps {
   userLocation: [number, number] | null;
@@ -34,12 +37,17 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    // userLocation is [lat, lon] from Leaflet — Mapbox needs [lon, lat]
+    const lngLat = userLocation ? [userLocation[1], userLocation[0]] as [number, number] : null;
+
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: userLocation || [-118.2437, 34.0522],
+      style: MAPTILER_KEY
+        ? `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
+        : 'mapbox://styles/mapbox/dark-v11',
+      center: lngLat || [-83.0458, 42.3314],
       zoom: 17,
-      pitch: 60, // 3D perspective angle
+      pitch: 60,
       bearing: heading,
       antialias: true
     });
@@ -47,52 +55,36 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     map.current.on('load', () => {
       setMapLoaded(true);
       
-      // Add 3D terrain
-      map.current!.addSource('mapbox-dem', {
-        'type': 'raster-dem',
-        'url': 'mapbox://mapbox.mapbox-terrain-dem-v1',
-        'tileSize': 512,
-        'maxzoom': 14
-      });
-      
-      map.current!.setTerrain({ 'source': 'mapbox-dem', 'exaggeration': 1.5 });
-      
-      // Add 3D buildings
-      const layers = map.current!.getStyle().layers;
-      const labelLayerId = layers?.find(
-        (layer) => layer.type === 'symbol' && layer.layout && layer.layout['text-field']
-      )?.id;
+      // Add 3D buildings if composite source is available (Mapbox styles only)
+      try {
+        const layers = map.current!.getStyle().layers;
+        const labelLayerId = layers?.find(
+          (layer) => layer.type === 'symbol' && layer.layout && (layer.layout as any)['text-field']
+        )?.id;
 
-      map.current!.addLayer({
-        'id': '3d-buildings',
-        'source': 'composite',
-        'source-layer': 'building',
-        'filter': ['==', 'extrude', 'true'],
-        'type': 'fill-extrusion',
-        'minzoom': 15,
-        'paint': {
-          'fill-extrusion-color': '#1a1a1a',
-          'fill-extrusion-height': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            15,
-            0,
-            15.05,
-            ['get', 'height']
-          ],
-          'fill-extrusion-base': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            15,
-            0,
-            15.05,
-            ['get', 'min_height']
-          ],
-          'fill-extrusion-opacity': 0.6
-        }
-      }, labelLayerId);
+        map.current!.addLayer({
+          'id': '3d-buildings',
+          'source': 'composite',
+          'source-layer': 'building',
+          'filter': ['==', 'extrude', 'true'],
+          'type': 'fill-extrusion',
+          'minzoom': 15,
+          'paint': {
+            'fill-extrusion-color': '#1a1a1a',
+            'fill-extrusion-height': [
+              'interpolate', ['linear'], ['zoom'],
+              15, 0, 15.05, ['get', 'height']
+            ],
+            'fill-extrusion-base': [
+              'interpolate', ['linear'], ['zoom'],
+              15, 0, 15.05, ['get', 'min_height']
+            ],
+            'fill-extrusion-opacity': 0.6
+          }
+        }, labelLayerId);
+      } catch {
+        // 3D buildings not available with this map style — skip silently
+      }
     });
 
     return () => {
@@ -103,9 +95,9 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   // Update camera position and bearing
   useEffect(() => {
     if (!map.current || !userLocation) return;
-
+    // userLocation is [lat, lon] — Mapbox needs [lon, lat]
     map.current.easeTo({
-      center: userLocation,
+      center: [userLocation[1], userLocation[0]],
       bearing: heading,
       pitch: 60,
       zoom: 17.5,

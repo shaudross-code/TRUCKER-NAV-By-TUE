@@ -11,6 +11,8 @@ export default defineConfig(({ mode }) => {
         'process.env.HERE_API_KEY': JSON.stringify(env.HERE_API_KEY || ''),
         'process.env.GOOGLE_MAPS_PLATFORM_KEY': JSON.stringify(env.GOOGLE_MAPS_PLATFORM_KEY || ''),
         'process.env.MAPTILER_API_KEY': JSON.stringify(env.MAPTILER_API_KEY || ''),
+        'process.env.REACT_APP_MAPBOX_TOKEN': JSON.stringify(env.REACT_APP_MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN || ''),
+        'import.meta.env.REACT_APP_MAPBOX_TOKEN': JSON.stringify(env.REACT_APP_MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN || ''),
       },
       server: {
         port: 3000,

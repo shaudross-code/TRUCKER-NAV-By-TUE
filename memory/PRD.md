@@ -38,7 +38,16 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - App Store icons and screenshots generated (store-assets/)
 - Firebase Admin SDK configured via serviceAccountKey.json
 
-### Phase 9 — Startup Loading Screen (DONE — 2026-03-25)
+### Phase 10 — 3D Route Bugs Fixed & Map Tiles Restored (DONE — 2026-03-25)
+- Fixed `nextSpeedLimit is not defined` ReferenceError in 3D view → replaced with `currentSpeedLimit ?? undefined`
+- Fixed `nextTurnDistance.toFixed is not a function` → `parseFloat(nextInstruction.distance) || undefined`
+- Fixed `incident.from.offset` undefined crash → added null-guard filter on incidents
+- Fixed `action.offset` crash → defaulted to `?? 0` with `|| 1` for safe division
+- Fixed `userLocation` lat/lon coordinate swap in Mapbox GL → `[lon, lat]` order now correct for both `new Map()` and `easeTo()`
+- Fixed HERE Maps v1 tiles returning HTTP 410 (Gone) → switched to MapTiler `streets-v2-dark` GL style
+- Added `process.env.REACT_APP_MAPBOX_TOKEN` to Vite `define` block so Mapbox token is available
+- 3D view now uses MapTiler GL-compatible style (works in preview env)
+- Route demonstrated: Detroit, MI → Midland, MI = **128.1 miles, 2h 21min** via HERE Routing API
 - Created `LoadingScreen.tsx` — full-screen black/gold splash with:
   - App icon (truck/THE letters from `/app-icon.png`) with animated gold glow halo
   - "TRUCKERS NAV / By TUE" title with staggered entrance animation

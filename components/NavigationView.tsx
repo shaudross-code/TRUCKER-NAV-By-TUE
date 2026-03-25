@@ -956,14 +956,22 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
 
     if (showTruckRestrictions && HERE_API_KEY) {
-      console.log("Adding HERE Truck Restrictions layer");
-      // Use HERE Map Tile API v2 with truck.day scheme for reliable truck restrictions
-      const hereUrl = `https://{s}.base.maps.ls.hereapi.com/maptile/2.1/maptile/newest/truck.day/{z}/{x}/{y}/256/png8?apiKey=${HERE_API_KEY}`;
-      L.tileLayer(hereUrl, {
-        subdomains: '1234',
-        attribution: '&copy; HERE 2024',
-        maxZoom: 20
-      }).addTo(map);
+      console.log("Adding MapTiler truck/roads layer (HERE tiles deprecated)");
+      // HERE Maps v1 tile API deprecated — use MapTiler truck-friendly style as base
+      try {
+        if (typeof MaptilerLayer === 'function') {
+          new MaptilerLayer({ apiKey: MAPTILER_KEY, style: MAPTILER_STYLE_ID }).addTo(map);
+        } else {
+          L.tileLayer(`https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
+            attribution: '&copy; MapTiler &copy; OpenStreetMap',
+            maxZoom: 20
+          }).addTo(map);
+        }
+      } catch {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
+        }).addTo(map);
+      }
     } else {
       console.log("Adding MapTiler vector layer");
       try {
@@ -2123,7 +2131,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             },
             distance: action.length,
             duration: summary.length > 0 ? (action.length / summary.length) * summary.duration : 0,
-            offset: action.offset,
+            offset: action.offset ?? 0,
             lanes: (action.lanes || []).map((lane: any) => ({
               direction: (lane.directions || lane.indications || []).join(';'),
               matches: (lane.isRecommended || lane.recommendation === 'recommended') ? ['selected'] : []
@@ -2149,8 +2157,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         console.log(`Frontend: Processed ${coords.length} coordinates for route ${routeIdx}`);
 
         const allIncidents = section.incidents || [];
-        const alerts = allIncidents.map((incident: any) => {
-          const progress = incident.from.offset / summary.length;
+        const alerts = allIncidents.filter((incident: any) => incident?.from?.offset != null).map((incident: any) => {
+          const progress = incident.from.offset / (summary.length || 1);
           let type = 'INFO';
           let message = incident.description.value;
           let icon = Zap;
@@ -2200,7 +2208,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           section.actions.forEach((action: any) => {
             const instruction = (action.instruction || '').toLowerCase();
             if (instruction.includes('stop sign') || action.action === 'stop') {
-              const progress = action.offset / summary.length;
+              const progress = (action.offset ?? 0) / (summary.length || 1);
               trafficAlertsList.push({
                 type: 'STOP_SIGN',
                 message: 'Stop Sign',
@@ -2208,7 +2216,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 color: 'text-red-600',
                 bg: 'bg-red-600/10',
                 progress,
-                coords: coords[action.offset] || coords[Math.floor(action.offset * (coords.length - 1) / summary.length)]
+                coords: coords[action.offset ?? 0] || coords[Math.floor((action.offset ?? 0) * (coords.length - 1) / (summary.length || 1))]
               });
             }
           });
@@ -3520,9 +3528,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             userLocation={userLocation}
             route={routeCoordinates ? { coordinates: routeCoordinates } : undefined}
             heading={telemetryContext?.headingRef.current || 0}
-            nextTurnDistance={milesRemaining > 0 ? nextInstruction.distance : undefined}
+            nextTurnDistance={milesRemaining > 0 ? (parseFloat(nextInstruction.distance) || undefined) : undefined}
             nextTurnDirection={milesRemaining > 0 ? nextInstruction.text : undefined}
-            speedLimit={nextSpeedLimit}
+            speedLimit={currentSpeedLimit ?? undefined}
             currentSpeed={telemetryContext?.speedRef.current || 0}
             trafficSigns={trafficInfrastructure.slice(0, 1)}
           />
