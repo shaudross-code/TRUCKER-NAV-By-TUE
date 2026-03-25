@@ -365,6 +365,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   );
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
+  const [poiParkingStatus, setPoiParkingStatus] = useState<{ status: string | null; updatedAt: string | null; updateCount: number } | null>(null);
+  const [isParkingLoading, setIsParkingLoading] = useState(false);
+  const [parkingSubmitDone, setParkingSubmitDone] = useState<string | null>(null);
 
   useEffect(() => {
     // Save only real POIs fetched from APIs
@@ -641,6 +644,24 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
     }
   }, [selectedPoi]);
+
+  // Fetch crowd-sourced parking status when a POI popup opens
+  useEffect(() => {
+    if (!selectedPoi) {
+      setPoiParkingStatus(null);
+      setParkingSubmitDone(null);
+      return;
+    }
+    const poiId = `${selectedPoi.lat.toFixed(4)}_${selectedPoi.lon.toFixed(4)}`;
+    setIsParkingLoading(true);
+    setPoiParkingStatus(null);
+    setParkingSubmitDone(null);
+    fetch(`/api/poi/parking-status?poiId=${encodeURIComponent(poiId)}`)
+      .then(r => r.json())
+      .then(data => setPoiParkingStatus(data))
+      .catch(() => setPoiParkingStatus({ status: null, updatedAt: null, updateCount: 0 }))
+      .finally(() => setIsParkingLoading(false));
+  }, [selectedPoi?.lat, selectedPoi?.lon]);
 
   useEffect(() => {
     if (hasViolation && !lastViolationRef.current) {
@@ -1751,6 +1772,25 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       handleNavigate().catch(err => console.error("Auto re-route failed:", err));
     }
   }, [waypoints]);
+
+  const submitParkingStatus = async (status: string) => {
+    if (!selectedPoi) return;
+    const poiId = `${selectedPoi.lat.toFixed(4)}_${selectedPoi.lon.toFixed(4)}`;
+    setParkingSubmitDone(status);
+    try {
+      const res = await fetch('/api/poi/parking-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ poiId, status, name: selectedPoi.name, lat: selectedPoi.lat, lon: selectedPoi.lon })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPoiParkingStatus({ status, updatedAt: new Date().toISOString(), updateCount: data.updateCount });
+      }
+    } catch {
+      setParkingSubmitDone(null);
+    }
+  };
 
   const addWaypoint = (s: any, type: 'DEADHEAD' | 'PAID' = 'DEADHEAD') => {
     const newWaypoint: Waypoint = {
@@ -3792,6 +3832,78 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   )}
                 </div>
               )}
+
+              {/* Parking Status — crowd-sourced */}
+              <div className="border border-[#D4AF37]/20 rounded-2xl landscape:rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[#D4AF37]/8 border-b border-[#D4AF37]/15">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-[#D4AF37]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <span className="text-[10px] landscape:text-[8px] font-black text-[#D4AF37] uppercase tracking-widest">Parking Status</span>
+                  </div>
+                  {isParkingLoading && (
+                    <div className="w-3 h-3 rounded-full border-2 border-[#D4AF37]/40 border-t-[#D4AF37] animate-spin" />
+                  )}
+                  {!isParkingLoading && poiParkingStatus?.status && (
+                    <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                      poiParkingStatus.status === 'light' ? 'bg-emerald-500/20 text-emerald-400' :
+                      poiParkingStatus.status === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                      poiParkingStatus.status === 'heavy' ? 'bg-orange-500/20 text-orange-400' :
+                      'bg-red-500/20 text-red-400'
+                    }`}>
+                      {poiParkingStatus.status === 'light' ? 'Light' :
+                       poiParkingStatus.status === 'medium' ? 'Medium' :
+                       poiParkingStatus.status === 'heavy' ? 'Heavy' : 'Maxed Out'}
+                    </span>
+                  )}
+                  {!isParkingLoading && !poiParkingStatus?.status && (
+                    <span className="text-[9px] font-bold text-zinc-600 uppercase">No reports yet</span>
+                  )}
+                </div>
+
+                <div className="p-3 landscape:p-2 space-y-2.5 landscape:space-y-1.5">
+                  {poiParkingStatus?.updatedAt && (
+                    <p className="text-[9px] landscape:text-[8px] text-zinc-500 font-medium">
+                      Last updated: {new Date(poiParkingStatus.updatedAt).toLocaleString()} · {poiParkingStatus.updateCount} report{poiParkingStatus.updateCount !== 1 ? 's' : ''}
+                    </p>
+                  )}
+
+                  <p className="text-[10px] landscape:text-[9px] font-bold text-zinc-400">Report current parking availability:</p>
+
+                  <div className="grid grid-cols-4 gap-1.5 landscape:gap-1">
+                    {([
+                      { key: 'light',  label: 'Light',  bg: 'bg-emerald-600/15 hover:bg-emerald-600 border-emerald-600/30 hover:border-emerald-600', text: 'text-emerald-400 hover:text-white', dot: 'bg-emerald-400', activeBg: 'bg-emerald-600 border-emerald-600' },
+                      { key: 'medium', label: 'Medium', bg: 'bg-yellow-600/15 hover:bg-yellow-600 border-yellow-600/30 hover:border-yellow-600',   text: 'text-yellow-400 hover:text-white',  dot: 'bg-yellow-400',  activeBg: 'bg-yellow-600 border-yellow-600' },
+                      { key: 'heavy',  label: 'Heavy',  bg: 'bg-orange-600/15 hover:bg-orange-600 border-orange-600/30 hover:border-orange-600',   text: 'text-orange-400 hover:text-white',  dot: 'bg-orange-400',  activeBg: 'bg-orange-600 border-orange-600' },
+                      { key: 'maxed',  label: 'Maxed',  bg: 'bg-red-600/15 hover:bg-red-600 border-red-600/30 hover:border-red-600',               text: 'text-red-400 hover:text-white',     dot: 'bg-red-400',     activeBg: 'bg-red-600 border-red-600' },
+                    ] as const).map(opt => {
+                      const isActive = parkingSubmitDone === opt.key || poiParkingStatus?.status === opt.key;
+                      const isJustSubmitted = parkingSubmitDone === opt.key;
+                      return (
+                        <button
+                          key={opt.key}
+                          data-testid={`parking-status-${opt.key}`}
+                          onClick={() => submitParkingStatus(opt.key)}
+                          disabled={!!parkingSubmitDone}
+                          className={`flex flex-col items-center gap-1 py-2 landscape:py-1.5 px-1 rounded-xl landscape:rounded-lg border transition-all ${
+                            isJustSubmitted ? `${opt.activeBg} text-white scale-105` : opt.bg
+                          } ${isActive && !isJustSubmitted ? `${opt.bg} ring-1 ring-inset ring-current` : ''} disabled:opacity-60`}
+                        >
+                          <div className={`w-2 h-2 landscape:w-1.5 landscape:h-1.5 rounded-full ${opt.dot} ${isActive ? 'animate-pulse' : ''}`} />
+                          <span className={`text-[8px] landscape:text-[7px] font-black uppercase tracking-wide leading-none ${isJustSubmitted ? 'text-white' : opt.text.split(' ')[0]}`}>
+                            {isJustSubmitted ? '✓' : opt.label}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {parkingSubmitDone && (
+                    <p className="text-[9px] landscape:text-[8px] text-emerald-400 font-bold text-center animate-in fade-in duration-300">
+                      Thanks for reporting! Status updated.
+                    </p>
+                  )}
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-3 md:gap-4 landscape:gap-2">
                 <button 

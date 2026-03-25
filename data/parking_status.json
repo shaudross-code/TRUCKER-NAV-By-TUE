@@ -1,0 +1,66 @@
+{
+  "41.8827_-87.6231": {
+    "status": "light",
+    "name": "Test Loves",
+    "lat": 41.8827,
+    "lon": -87.6231,
+    "updatedAt": "2026-03-25T19:31:54.786Z",
+    "updateCount": 2
+  },
+  "33.4484_-112.0740": {
+    "status": "maxed",
+    "name": "Shell Truck Stop",
+    "lat": 33.4484,
+    "lon": -112.074,
+    "updatedAt": "2026-03-25T19:30:32.934Z",
+    "updateCount": 4
+  },
+  "TEST_10.0000_20.0000": {
+    "status": "light",
+    "name": "Test POI",
+    "lat": 10,
+    "lon": 20,
+    "updatedAt": "2026-03-25T19:32:29.141Z",
+    "updateCount": 1
+  },
+  "TEST_10.0001_20.0001": {
+    "status": "medium",
+    "name": "Test POI 2",
+    "lat": 10.0001,
+    "lon": 20.0001,
+    "updatedAt": "2026-03-25T19:32:29.144Z",
+    "updateCount": 1
+  },
+  "TEST_10.0002_20.0002": {
+    "status": "heavy",
+    "name": "Test POI 3",
+    "lat": 10.0002,
+    "lon": 20.0002,
+    "updatedAt": "2026-03-25T19:32:29.146Z",
+    "updateCount": 1
+  },
+  "TEST_10.0003_20.0003": {
+    "status": "maxed",
+    "name": "Test POI 4",
+    "lat": 10.0003,
+    "lon": 20.0003,
+    "updatedAt": "2026-03-25T19:32:29.149Z",
+    "updateCount": 1
+  },
+  "TEST_50.0000_60.0000": {
+    "status": "medium",
+    "name": "Persist Test",
+    "lat": 50,
+    "lon": 60,
+    "updatedAt": "2026-03-25T19:32:29.151Z",
+    "updateCount": 1
+  },
+  "TEST_70.0000_80.0000": {
+    "status": "heavy",
+    "name": "Count Test",
+    "lat": 70,
+    "lon": 80,
+    "updatedAt": "2026-03-25T19:32:29.155Z",
+    "updateCount": 2
+  }
+}

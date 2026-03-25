@@ -4,9 +4,26 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { safeStringify } from './utils';
 import admin from 'firebase-admin';
-import { readFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// ─── File-based parking status store ───────────────────────────────────────
+const PARKING_STATUS_FILE = path.join(__dirname, 'data', 'parking_status.json');
+
+function readParkingStore(): Record<string, any> {
+  try {
+    if (!existsSync(PARKING_STATUS_FILE)) return {};
+    return JSON.parse(readFileSync(PARKING_STATUS_FILE, 'utf8'));
+  } catch { return {}; }
+}
+
+function writeParkingStore(data: Record<string, any>) {
+  try {
+    writeFileSync(PARKING_STATUS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) { console.error('Failed to write parking store:', e); }
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 // Initialize Firebase Admin with service account file
 try {
@@ -278,6 +295,46 @@ async function createServer() {
     } catch (error) {
       console.error('Error fetching traffic incidents:', error);
       res.status(500).json({ error: 'Failed to fetch traffic incidents' });
+    }
+  });
+
+  // GET parking status for a specific POI (identified by lat/lon)
+  app.get('/api/poi/parking-status', async (req, res) => {
+    const { poiId } = req.query;
+    if (!poiId) return res.status(400).json({ error: 'poiId is required' });
+    try {
+      const store = readParkingStore();
+      const entry = store[String(poiId)];
+      if (!entry) return res.json({ status: null, updatedAt: null, updateCount: 0 });
+      res.json(entry);
+    } catch (error) {
+      console.error('Error fetching parking status:', error);
+      res.status(500).json({ error: 'Failed to fetch parking status' });
+    }
+  });
+
+  // POST — user submits a parking status update
+  app.post('/api/poi/parking-status', async (req, res) => {
+    const { poiId, status, name, lat, lon } = req.body;
+    if (!poiId || !status) return res.status(400).json({ error: 'poiId and status are required' });
+    const valid = ['light', 'medium', 'heavy', 'maxed'];
+    if (!valid.includes(status)) return res.status(400).json({ error: 'Invalid status value' });
+    try {
+      const store = readParkingStore();
+      const updateCount = (store[String(poiId)]?.updateCount || 0) + 1;
+      store[String(poiId)] = {
+        status,
+        name: name || 'Unknown',
+        lat: lat || 0,
+        lon: lon || 0,
+        updatedAt: new Date().toISOString(),
+        updateCount
+      };
+      writeParkingStore(store);
+      res.json({ success: true, status, updateCount });
+    } catch (error) {
+      console.error('Error saving parking status:', error);
+      res.status(500).json({ error: 'Failed to save parking status' });
     }
   });
 
