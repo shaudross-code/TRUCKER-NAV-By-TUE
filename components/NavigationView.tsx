@@ -273,10 +273,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isNorthUp, setIsNorthUp] = useState(() => localStorage.getItem('nav_north_up') === 'true');
   const manualRotationRef = useRef(0);
   const [manualRotation, setManualRotation] = useState(0);
+  const [isCompassMode, setIsCompassMode] = useState(false);
+  const compassHeadingRef = useRef(0);
 
   useEffect(() => {
     manualRotationRef.current = manualRotation;
-  }, [manualRotation]);
+    // Immediately apply CSS when manual rotation changes (telemetry handles heading-up on its own tick)
+    const mapPane = mapInstanceRef.current?.getPane('mapPane');
+    if (mapPane && isNorthUp && !isCompassMode) {
+      mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
+    }
+  }, [manualRotation, isNorthUp, isCompassMode]);
 
   const isRotatingRef = useRef(false);
   const initialAngleRef = useRef(0);
@@ -328,6 +335,58 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       mapEl.removeEventListener('touchend', handleTouchEnd);
     };
   }, []);
+
+  // Device compass mode — uses DeviceOrientationEvent for physical compass heading
+  useEffect(() => {
+    if (!isCompassMode) return;
+
+    const handleOrientation = (event: DeviceOrientationEvent) => {
+      let bearing = 0;
+      // iOS provides webkitCompassHeading (true north, clockwise)
+      if ((event as any).webkitCompassHeading !== undefined) {
+        bearing = (event as any).webkitCompassHeading;
+      } else if (event.alpha !== null) {
+        // Android absolute / fallback — alpha is CCW from north, invert it
+        bearing = (360 - (event.alpha || 0)) % 360;
+      } else {
+        return; // No usable data
+      }
+
+      compassHeadingRef.current = bearing;
+
+      // Rotate vehicle icon to match compass bearing
+      if (userMarkerElRef.current) {
+        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${bearing}deg`);
+      }
+
+      // Rotate map pane
+      const mapPane = mapInstanceRef.current?.getPane('mapPane');
+      if (mapPane) {
+        const rotation = manualRotationRef.current;
+        mapPane.style.setProperty('--map-rotation', `${-bearing + rotation}deg`);
+      }
+    };
+
+    const setup = async () => {
+      // iOS 13+ requires explicit permission
+      if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+        try {
+          const perm = await (DeviceOrientationEvent as any).requestPermission();
+          if (perm !== 'granted') { setIsCompassMode(false); return; }
+        } catch { setIsCompassMode(false); return; }
+      }
+      // Prefer absolute orientation (Android), fall back to relative
+      window.addEventListener('deviceorientationabsolute', handleOrientation as any, true);
+      window.addEventListener('deviceorientation', handleOrientation as any);
+    };
+
+    setup();
+
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handleOrientation as any);
+      window.removeEventListener('deviceorientation', handleOrientation as any);
+    };
+  }, [isCompassMode]);
   const [showTruckRestrictions] = useState(() => {
     const saved = localStorage.getItem('nav_show_truck_restrictions');
     return saved === null ? true : saved === 'true';
@@ -3123,6 +3182,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const currentLoc = userLocationRef.current;
       if (!currentLoc) return;
 
+      // Compass mode handles its own rotation — only do the follow-pan here
+      if (isCompassMode) {
+        if (isFollowMode && mapInstanceRef.current) {
+          const now = Date.now();
+          if (now - lastPanRef.current > 500) {
+            lastPanRef.current = now;
+            try {
+              const compassH = compassHeadingRef.current;
+              const zoom = mapInstanceRef.current.getZoom();
+              const offsetPixels = window.innerHeight * 0.2;
+              const point = mapInstanceRef.current.project(currentLoc, zoom);
+              const offsetPoint = point.add(L.point(0, -offsetPixels).rotate(compassH * Math.PI / 180));
+              const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
+              mapInstanceRef.current.panTo([unprojected.lat, unprojected.lng], { animate: true, duration: 0.8, easeLinearity: 0.25 });
+            } catch (e) { /* ignore */ }
+          }
+        }
+        return;
+      }
+
       let rawHeading = telemetryContext.headingRef.current || 0;
       const speed = telemetryContext.speedRef.current || 0;
 
@@ -3192,7 +3271,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
     // Subscribe to telemetry changes
     return telemetryContext.subscribe(updateRotationAndPan);
-  }, [telemetryContext, isDriving, isFollowMode, isNorthUp]);
+  }, [telemetryContext, isDriving, isFollowMode, isNorthUp, isCompassMode]);
 
 
   useEffect(() => {
@@ -4799,6 +4878,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setShowTrafficSigns={setShowTrafficSigns}
         is3DMode={is3DMode}
         setIs3DMode={setIs3DMode}
+        isCompassMode={isCompassMode}
+        setIsCompassMode={setIsCompassMode}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
       />
               <RouteSettingsModal
