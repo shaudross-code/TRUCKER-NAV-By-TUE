@@ -3064,8 +3064,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, [isDriving, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, updateNavigationState]);
 
   // Fetch traffic infrastructure (signs, lights, signage) when location changes
+  // Fetch traffic infrastructure ONLY when actively navigating and user moves significantly
   useEffect(() => {
-    if (!showTrafficSigns || !isValidLatLng(userLocation)) return;
+    if (!showTrafficSigns || !isValidLatLng(userLocation) || milesRemaining <= 0) return;
 
     const fetchTraffic = async () => {
       try {
@@ -3353,21 +3354,67 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return () => document.removeEventListener('click', handlePopupClick);
   }, [pois, showPois, poiFilters, mapCenter, isMapReady]);
 
-  // Render traffic infrastructure markers (signs, lights, signage)
+  // Render traffic infrastructure markers — only on-route, only next 15 ahead, smaller icons
   useEffect(() => {
     const trafficMarkersRef: L.Marker[] = [];
-    
-    if (!mapInstanceRef.current || !showTrafficSigns || trafficInfrastructure.length === 0) {
+
+    if (!mapInstanceRef.current || !showTrafficSigns || trafficInfrastructure.length === 0 || milesRemaining <= 0) {
       return;
     }
 
-    trafficInfrastructure.forEach((item: TrafficInfrastructure) => {
+    // Helper: distance in metres between two [lat,lon] points
+    const distM = (a: [number, number], b: [number, number]) => {
+      const R = 6371000;
+      const dLat = (b[0] - a[0]) * Math.PI / 180;
+      const dLon = (b[1] - a[1]) * Math.PI / 180;
+      const s = Math.sin(dLat / 2) ** 2 +
+        Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+    };
+
+    // Step 1: Find the user's current position in the route
+    const routePts = routePoints as [number, number][];
+    const userPos = userLocation as [number, number];
+    let closestIdx = 0;
+    let closestDist = Infinity;
+    for (let i = 0; i < routePts.length; i++) {
+      const d = distM(userPos, routePts[i]);
+      if (d < closestDist) { closestDist = d; closestIdx = i; }
+    }
+
+    // Step 2: Collect route points within next ~10 miles (≈16km) ahead
+    const LOOK_AHEAD_M = 16000;
+    let accumulated = 0;
+    let lookAheadEnd = closestIdx;
+    for (let i = closestIdx; i < routePts.length - 1; i++) {
+      accumulated += distM(routePts[i], routePts[i + 1]);
+      lookAheadEnd = i + 1;
+      if (accumulated >= LOOK_AHEAD_M) break;
+    }
+    const aheadPts = routePts.slice(closestIdx, lookAheadEnd + 1);
+
+    // Step 3: Keep only signs within 80m of any ahead route point
+    const ON_ROUTE_M = 80;
+    const onRoute = trafficInfrastructure.filter((item: TrafficInfrastructure) => {
+      const pos: [number, number] = [item.position[0], item.position[1]];
+      return aheadPts.some(rp => distM(pos, rp) <= ON_ROUTE_M);
+    });
+
+    // Step 4: Sort by distance from user, cap at 15 markers
+    const sorted = onRoute
+      .map(item => ({ item, d: distM(userPos, [item.position[0], item.position[1]]) }))
+      .sort((a, b) => a.d - b.d)
+      .slice(0, 15)
+      .map(x => x.item);
+
+    sorted.forEach((item: TrafficInfrastructure) => {
       try {
         const iconHtml = renderToStaticMarkup(
-          <TrafficIcon 
-            type={item.type} 
+          <TrafficIcon
+            type={item.type}
             signType={item.type === 'traffic_sign' ? item.signType : undefined}
             value={item.type === 'traffic_sign' ? item.value : undefined}
+            size={18}
           />
         );
 
@@ -3375,25 +3422,24 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           icon: L.divIcon({
             html: `<div class="traffic-infrastructure-icon">${iconHtml}</div>`,
             className: 'traffic-marker',
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-          })
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+          }),
+          zIndexOffset: 500
         });
 
         marker.addTo(mapInstanceRef.current!);
-        marker.bindPopup(`<div class="p-2 font-bold text-xs">${item.name}</div>`);
+        marker.bindTooltip(`<span class="text-xs font-bold">${item.name}</span>`, { permanent: false, direction: 'top', offset: [0, -12] });
         trafficMarkersRef.push(marker);
       } catch (error) {
-        console.error('Error rendering traffic infrastructure marker:', error);
+        console.error('Error rendering traffic marker:', error);
       }
     });
-
-    console.log(`Rendered ${trafficMarkersRef.length} traffic infrastructure markers`);
 
     return () => {
       trafficMarkersRef.forEach(marker => marker.remove());
     };
-  }, [trafficInfrastructure, showTrafficSigns, isMapReady]);
+  }, [trafficInfrastructure, showTrafficSigns, isMapReady, milesRemaining, userLocation, routePoints]);
 
   useEffect(() => {
     if (!isDriving || pois.length === 0 || routePoints.length === 0 || !userLocation) {

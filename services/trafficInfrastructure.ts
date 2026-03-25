@@ -34,26 +34,21 @@ export type TrafficInfrastructure = TrafficLight | TrafficSign | RoadSignage;
 export async function fetchTrafficInfrastructure(
   lat: number,
   lon: number,
-  radius: number = 5000
+  radius: number = 2000
 ): Promise<TrafficInfrastructure[]> {
   const results: TrafficInfrastructure[] = [];
 
   try {
-    // Use Overpass API to get traffic infrastructure from OpenStreetMap
+    // Smaller radius, no way queries — only actual sign/signal nodes
     const overpassQuery = `
-      [out:json][timeout:25];
+      [out:json][timeout:15];
       (
         node["highway"="traffic_signals"](around:${radius},${lat},${lon});
-        node["traffic_sign"](around:${radius},${lat},${lon});
         node["highway"="stop"](around:${radius},${lat},${lon});
         node["highway"="give_way"](around:${radius},${lat},${lon});
-        node["traffic_sign:forward"](around:${radius},${lat},${lon});
-        node["traffic_sign:backward"](around:${radius},${lat},${lon});
-        way["highway"]["name"](around:${radius},${lat},${lon});
+        node["traffic_sign"~"."](around:${radius},${lat},${lon});
       );
-      out body;
-      >;
-      out skel qt;
+      out body qt;
     `;
 
     const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
