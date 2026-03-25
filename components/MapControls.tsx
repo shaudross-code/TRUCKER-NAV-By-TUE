@@ -17,6 +17,8 @@ export const MapControls: React.FC<any> = React.memo(({
   setIsNorthUp,
   showTrafficSigns,
   setShowTrafficSigns,
+  is3DMode,
+  setIs3DMode,
   className = ""
 }) => {
   return (
@@ -168,6 +170,18 @@ export const MapControls: React.FC<any> = React.memo(({
             title="Toggle Route Overview"
           >
             <MapIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
+          </button>
+          
+          <button 
+            onClick={() => { 
+              const newMode = !is3DMode;
+              setIs3DMode(newMode);
+              localStorage.setItem('nav_3d_mode', String(newMode));
+            }} 
+            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${is3DMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
+            title={is3DMode ? '3D View Active' : 'Switch to 3D'}
+          >
+            <span className="font-black text-[10px] md:text-xs">{is3DMode ? '3D' : '2D'}</span>
           </button>
 
           <button 
