@@ -1,5 +1,6 @@
 import React from 'react';
 import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon } from 'lucide-react';
+import { getPoiFilterIcon } from './PoiIcon';
 
 export const MapControls: React.FC<any> = React.memo(({ 
   mapInstanceRef, 
@@ -49,7 +50,7 @@ export const MapControls: React.FC<any> = React.memo(({
             </button>
             
             {isFilterMenuOpen && (
-              <div className="absolute right-full mr-2 md:mr-4 top-0 bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-2 md:p-3 shadow-[0_40px_100px_rgba(0,0,0,0.8)] w-40 md:w-56 flex flex-col gap-1.5 md:gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="absolute right-full mr-2 md:mr-4 top-0 bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-2 md:p-3 shadow-[0_40px_100px_rgba(0,0,0,0.8)] w-48 md:w-64 flex flex-col gap-1.5 md:gap-2 animate-in fade-in slide-in-from-right-4 duration-300">
                 <h3 className="text-[#D4AF37] font-black text-[8px] md:text-[10px] uppercase tracking-widest border-b border-[#D4AF37]/20 pb-1 mb-0.5">Filters</h3>
                 
                 {/* Traffic Signs Toggle */}
@@ -89,49 +90,49 @@ export const MapControls: React.FC<any> = React.memo(({
                 </div>
                 <div className="flex flex-col gap-0.5 md:gap-1 max-h-[40vh] md:max-h-[50vh] overflow-y-auto pr-1 custom-scrollbar">
                   {[
-                    { id: 'loves', label: "Love's" },
-                    { id: 'pilot', label: 'Pilot' },
-                    { id: 'flying_j', label: 'Flying J' },
-                    { id: 'petro', label: 'Petro' },
-                    { id: 'ta', label: 'TA' },
-                    { id: 'road_ranger', label: 'Road Ranger' },
-                    { id: 'kwik_trip', label: 'Kwik Trip' },
-                    { id: 'bucees', label: "Buc-ee's" },
-                    { id: 'speedway', label: 'Speedway' },
-                    { id: 'speedco', label: 'Speedco 🔧' },
-                    { id: 'southern_tire', label: 'Southern Tire 🛞' },
-                    { id: 'caseys', label: "Casey's" },
-                    { id: 'wawa', label: 'Wawa' },
-                    { id: 'sheetz', label: 'Sheetz' },
-                    { id: 'quiktrip', label: 'QuikTrip' },
-                    { id: 'racetrac', label: 'RaceTrac' },
-                    { id: 'conoco', label: 'Conoco' },
-                    { id: 'exxon', label: 'Exxon' },
-                    { id: 'shell', label: 'Shell' },
-                    { id: 'bp', label: 'BP' },
-                    { id: 'marathon', label: 'Marathon' },
-                    { id: 'circle_k', label: 'Circle K' },
-                    { id: 'seven_eleven', label: '7-Eleven' },
-                    { id: 'rush', label: 'Rush Truck Centers 🔧', divider: true },
-                    { id: 'ryder', label: 'Ryder 🚛' },
-                    { id: 'penske', label: 'Penske 🚛' },
-                    { id: 'peterbilt', label: 'Peterbilt 🏭' },
-                    { id: 'volvo', label: 'Volvo 🏭' },
-                    { id: 'freightliner', label: 'Freightliner 🏭' },
-                    { id: 'cummins', label: 'Cummins ⚙️' },
-                    { id: 'truck_wash', label: 'Truck Washes 💦' },
-                    { id: 'walmart', label: 'Walmart 🏪', divider: true },
-                    { id: 'lowes', label: "Lowe's 🔨" },
-                    { id: 'home_depot', label: 'Home Depot 🏗️' },
-                    { id: 'fuel', label: 'Fuel (Other)', divider: true },
-                    { id: 'parking', label: 'Parking' },
-                    { id: 'rest_area', label: 'Rest Areas' },
+                    { id: 'loves',         label: "Love's" },
+                    { id: 'pilot',         label: 'Pilot' },
+                    { id: 'flying_j',      label: 'Flying J' },
+                    { id: 'petro',         label: 'Petro' },
+                    { id: 'ta',            label: 'TA' },
+                    { id: 'road_ranger',   label: 'Road Ranger' },
+                    { id: 'kwik_trip',     label: 'Kwik Trip' },
+                    { id: 'bucees',        label: "Buc-ee's" },
+                    { id: 'speedway',      label: 'Speedway' },
+                    { id: 'caseys',        label: "Casey's" },
+                    { id: 'wawa',          label: 'Wawa' },
+                    { id: 'sheetz',        label: 'Sheetz' },
+                    { id: 'quiktrip',      label: 'QuikTrip' },
+                    { id: 'racetrac',      label: 'RaceTrac' },
+                    { id: 'conoco',        label: 'Conoco' },
+                    { id: 'exxon',         label: 'Exxon' },
+                    { id: 'shell',         label: 'Shell' },
+                    { id: 'bp',            label: 'BP' },
+                    { id: 'marathon',      label: 'Marathon' },
+                    { id: 'circle_k',      label: 'Circle K' },
+                    { id: 'seven_eleven',  label: '7-Eleven' },
+                    { id: 'speedco',       label: 'Speedco',       divider: true },
+                    { id: 'southern_tire', label: 'Southern Tire' },
+                    { id: 'rush',          label: 'Rush Truck Centers' },
+                    { id: 'ryder',         label: 'Ryder' },
+                    { id: 'penske',        label: 'Penske' },
+                    { id: 'peterbilt',     label: 'Peterbilt' },
+                    { id: 'volvo',         label: 'Volvo Trucks' },
+                    { id: 'freightliner',  label: 'Freightliner' },
+                    { id: 'cummins',       label: 'Cummins' },
+                    { id: 'truck_wash',    label: 'Truck Wash' },
+                    { id: 'walmart',       label: 'Walmart',       divider: true },
+                    { id: 'lowes',         label: "Lowe's" },
+                    { id: 'home_depot',    label: 'Home Depot' },
+                    { id: 'fuel',          label: 'Fuel (Other)',  divider: true },
+                    { id: 'parking',       label: 'Parking' },
+                    { id: 'rest_area',     label: 'Rest Areas' },
                     { id: 'weigh_station', label: 'Scales' },
-                    { id: 'low_clearance', label: 'Low Clearance ⚠️' },
-                    { id: 'food', label: 'Food' },
-                    { id: 'service', label: 'Service (Other)' },
-                    { id: 'distribution', label: 'Distribution' },
-                    { id: 'other', label: 'Other' }
+                    { id: 'low_clearance', label: 'Low Clearance' },
+                    { id: 'food',          label: 'Food' },
+                    { id: 'service',       label: 'Service (Other)' },
+                    { id: 'distribution',  label: 'Distribution' },
+                    { id: 'other',         label: 'Other' }
                   ].map(filter => (
                     <React.Fragment key={filter.id}>
                       {filter.divider && <div className="h-px bg-[#D4AF37]/10 my-1" />}
@@ -144,10 +145,15 @@ export const MapControls: React.FC<any> = React.memo(({
                             return next;
                           });
                         }}
-                        className="flex items-center justify-between text-left group py-0.5"
+                        className="flex items-center justify-between text-left group py-0.5 gap-1"
                       >
-                        <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-tight transition-colors ${poiFilters.has(filter.id) ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{filter.label}</span>
-                        <div className={`w-2.5 h-2.5 md:w-4 md:h-4 rounded border flex items-center justify-center transition-all ${poiFilters.has(filter.id) ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-700 group-hover:border-zinc-500'}`}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <div className={`transition-all duration-200 ${poiFilters.has(filter.id) ? 'opacity-100 scale-100' : 'opacity-60 scale-95 group-hover:opacity-80 group-hover:scale-100'}`}>
+                            {getPoiFilterIcon(filter.id)}
+                          </div>
+                          <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-tight transition-colors truncate ${poiFilters.has(filter.id) ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>{filter.label}</span>
+                        </div>
+                        <div className={`shrink-0 w-2.5 h-2.5 md:w-4 md:h-4 rounded border flex items-center justify-center transition-all ${poiFilters.has(filter.id) ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-700 group-hover:border-zinc-500'}`}>
                           {poiFilters.has(filter.id) && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={5} />}
                         </div>
                       </button>
