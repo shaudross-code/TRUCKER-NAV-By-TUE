@@ -22,7 +22,17 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   if (lowerName.includes("quiktrip") || lowerName.includes("qt")) return 'quiktrip';
   if (lowerName.includes("racetrac")) return 'racetrac';
   if (lowerName.includes("conoco")) return 'conoco';
-  
+  if (lowerName.includes("exxon") || lowerName.includes("esso")) return 'exxon';
+  if (lowerName.includes("shell")) return 'shell';
+  if (lowerName.includes(" bp ") || lowerName.startsWith("bp ") || lowerName === "bp" || lowerName.includes("bp truck") || lowerName.includes("bp gas") || lowerName.includes("british petroleum")) return 'bp';
+  if (lowerName.includes("marathon")) return 'marathon';
+  if (lowerName.includes("circle k")) return 'circle_k';
+  if (lowerName.includes("7-eleven") || lowerName.includes("7 eleven") || lowerName.includes("seven-eleven") || lowerName.includes("seven eleven")) return 'seven_eleven';
+
+  // Retail with truck parking
+  if (lowerName.includes("lowe's") || lowerName.includes("lowes")) return 'lowes';
+  if (lowerName.includes("home depot")) return 'home_depot';
+
   // Truck service providers
   if (lowerName.includes("speedco")) return 'speedco';
   if (lowerName.includes("southern tire")) return 'southern_tire';
@@ -249,6 +259,87 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
       <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
         <circle cx="20" cy="20" r="18" fill="#E31837" stroke="#FFFFFF" strokeWidth="2"/>
         <text x="20" y="24" textAnchor="middle" fill="#FFFFFF" fontFamily="Inter, sans-serif" fontSize="7" fontWeight="900" letterSpacing="0.05em">CONOCO</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("exxon") || lowerName.includes("esso")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="36" rx="6" fill="#1A3A6E" stroke="#E31837" strokeWidth="2.5"/>
+        <text x="20" y="17" textAnchor="middle" fill="#E31837" fontFamily="Impact, sans-serif" fontSize="9" fontWeight="900" letterSpacing="1px">EXXON</text>
+        <rect x="5" y="20" width="30" height="3" fill="#E31837"/>
+        <text x="20" y="32" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="7" fontWeight="700">TRUCK STOP</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("shell")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <circle cx="20" cy="20" r="18" fill="#FFD500" stroke="#E31837" strokeWidth="3"/>
+        <path d="M20 8 L23 14 L30 13 L26 19 L30 25 L23 24 L20 30 L17 24 L10 25 L14 19 L10 13 L17 14 Z" fill="#E31837"/>
+        <text x="20" y="37" textAnchor="middle" fill="#E31837" fontFamily="Impact, sans-serif" fontSize="6" fontWeight="900" letterSpacing="0.5px">SHELL</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes(" bp ") || lowerName.startsWith("bp ") || lowerName === "bp" || lowerName.includes("bp truck") || lowerName.includes("bp gas") || lowerName.includes("british petroleum")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <circle cx="20" cy="20" r="18" fill="#009900" stroke="#FFD500" strokeWidth="2.5"/>
+        <text x="20" y="26" textAnchor="middle" fill="#FFD500" fontFamily="Impact, sans-serif" fontSize="18" fontWeight="900" letterSpacing="1px">BP</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("marathon")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="36" rx="6" fill="#003087" stroke="#FFFFFF" strokeWidth="2.5"/>
+        <text x="20" y="17" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="7" fontWeight="900" letterSpacing="0.5px">MARATHON</text>
+        <rect x="5" y="20" width="30" height="2" fill="#E31837"/>
+        <text x="20" y="31" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="7" fontWeight="700">TRUCK STOP</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("circle k")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <circle cx="20" cy="20" r="18" fill="#E31837" stroke="#FFFFFF" strokeWidth="2"/>
+        <circle cx="20" cy="20" r="10" fill="none" stroke="#FFFFFF" strokeWidth="3"/>
+        <text x="20" y="25" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="12" fontWeight="900">K</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("7-eleven") || lowerName.includes("7 eleven") || lowerName.includes("seven-eleven") || lowerName.includes("seven eleven")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="20" rx="4" fill="#FF7200"/>
+        <rect x="2" y="20" width="36" height="18" rx="4" fill="#006B3E"/>
+        <text x="20" y="17" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="11" fontWeight="900">7-ELEVEn</text>
+        <text x="20" y="33" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="7" fontWeight="700">TRUCK STOP</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("lowe's") || lowerName.includes("lowes")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="36" rx="6" fill="#004990" stroke="#FFFFFF" strokeWidth="2.5"/>
+        <text x="20" y="25" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="14" fontWeight="900" letterSpacing="-0.5px">LOWE'S</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("home depot")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="36" rx="6" fill="#F96302" stroke="#FFFFFF" strokeWidth="2.5"/>
+        <text x="20" y="16" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="7" fontWeight="900">THE HOME</text>
+        <text x="20" y="28" textAnchor="middle" fill="#FFFFFF" fontFamily="Impact, sans-serif" fontSize="9" fontWeight="900">DEPOT</text>
       </svg>
     );
   }

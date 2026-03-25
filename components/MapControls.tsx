@@ -69,7 +69,7 @@ export const MapControls: React.FC<any> = React.memo(({
                 <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
-                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'truck_wash'];
+                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
                       const allIds = [
                         ...brandIds, 'fuel', 'parking', 'rest_area', 
                         'weigh_station', 'food', 'service', 'distribution', 'low_clearance', 'other'
@@ -106,6 +106,12 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'quiktrip', label: 'QuikTrip' },
                     { id: 'racetrac', label: 'RaceTrac' },
                     { id: 'conoco', label: 'Conoco' },
+                    { id: 'exxon', label: 'Exxon' },
+                    { id: 'shell', label: 'Shell' },
+                    { id: 'bp', label: 'BP' },
+                    { id: 'marathon', label: 'Marathon' },
+                    { id: 'circle_k', label: 'Circle K' },
+                    { id: 'seven_eleven', label: '7-Eleven' },
                     { id: 'rush', label: 'Rush Truck Centers 🔧', divider: true },
                     { id: 'ryder', label: 'Ryder 🚛' },
                     { id: 'penske', label: 'Penske 🚛' },
@@ -115,6 +121,8 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'cummins', label: 'Cummins ⚙️' },
                     { id: 'truck_wash', label: 'Truck Washes 💦' },
                     { id: 'walmart', label: 'Walmart 🏪', divider: true },
+                    { id: 'lowes', label: "Lowe's 🔨" },
+                    { id: 'home_depot', label: 'Home Depot 🏗️' },
                     { id: 'fuel', label: 'Fuel (Other)', divider: true },
                     { id: 'parking', label: 'Parking' },
                     { id: 'rest_area', label: 'Rest Areas' },

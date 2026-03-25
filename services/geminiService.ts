@@ -322,12 +322,19 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
                              itemName.includes('volvo') || itemName.includes('truck wash') ||
                              itemName.includes('blue beacon');
       const isWalmart = itemName.includes('walmart') || itemName.includes('wal-mart');
+      const isRetail = itemName.includes("lowe's") || itemName.includes('lowes') || itemName.includes('home depot');
+      const isFuelBrand = itemName.includes('exxon') || itemName.includes('shell') ||
+                          itemName.includes('marathon') || itemName.includes('circle k') ||
+                          itemName.includes('7-eleven') || itemName.includes('seven eleven') ||
+                          itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp';
       const isLowClearance = itemName.includes('low clearance') || itemName.includes('low bridge');
       
       if (isTruckService) {
         type = "service"; // Truck service/repair
-      } else if (isWalmart) {
+      } else if (isWalmart || isRetail) {
         type = "distribution"; // Retail/Distribution
+      } else if (isFuelBrand) {
+        type = "fuel"; // Known fuel brands
       } else if (isLowClearance) {
         type = "low_clearance"; // Warning/Hazard
       } else if (item.categories?.some((c: any) => c.id === '700-7600-0116')) {
@@ -363,6 +370,22 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         amenities.push("Truck Sales", "Parts", "Service", "Warranty");
       } else if (itemName.includes('walmart') || itemName.includes('wal-mart')) {
         amenities.push("Parking", "Restrooms", "Shopping", "Food");
+      } else if (itemName.includes("lowe's") || itemName.includes('lowes')) {
+        amenities.push("Truck Parking", "Hardware", "Building Materials");
+      } else if (itemName.includes('home depot')) {
+        amenities.push("Truck Parking", "Hardware", "Building Materials");
+      } else if (itemName.includes('exxon') || itemName.includes('esso')) {
+        amenities.push("Diesel", "Fuel", "Truck Stop");
+      } else if (itemName.includes('shell')) {
+        amenities.push("Diesel", "Fuel", "Truck Stop");
+      } else if (itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp') {
+        amenities.push("Diesel", "Fuel", "Truck Stop");
+      } else if (itemName.includes('marathon')) {
+        amenities.push("Diesel", "Fuel", "Truck Stop");
+      } else if (itemName.includes('circle k')) {
+        amenities.push("Diesel", "Fuel", "Convenience");
+      } else if (itemName.includes('7-eleven') || itemName.includes('seven eleven')) {
+        amenities.push("Diesel", "Fuel", "Convenience");
       } else if (itemName.includes('truck wash') || itemName.includes('blue beacon')) {
         amenities.push("Truck Wash", "Detailing", "Fleet Service");
       } else if (itemName.includes('low clearance') || itemName.includes('low bridge')) {
@@ -420,10 +443,10 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
         way["highway"="rest_area"](around:${radius},${lat},${lon});
         node["highway"="services"](around:${radius},${lat},${lon});
         way["highway"="services"](around:${radius},${lat},${lon});
-        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon",i](around:${radius},${lat},${lon});
-        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon",i](around:${radius},${lat},${lon});
-        node["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge",i](around:${radius},${lat},${lon});
-        way["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge",i](around:${radius},${lat},${lon});
+        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven|Lowe's|Home Depot",i](around:${radius},${lat},${lon});
+        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven|Lowe's|Home Depot",i](around:${radius},${lat},${lon});
+        node["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven|Lowes|Home Depot",i](around:${radius},${lat},${lon});
+        way["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven|Lowes|Home Depot",i](around:${radius},${lat},${lon});
         node["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
         way["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
       );
@@ -447,25 +470,34 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
       const tags = el.tags || {};
       
       const name = tags.name || tags.operator || tags.brand || "Truck Stop";
-      const isSpeedco = name.toLowerCase().includes('speedco');
-      const isSouthernTire = name.toLowerCase().includes('southern tire');
-      const isRushTruck = name.toLowerCase().includes('rush truck');
-      const isRyder = name.toLowerCase().includes('ryder');
-      const isPenske = name.toLowerCase().includes('penske');
-      const isFreightliner = name.toLowerCase().includes('freightliner');
-      const isCummins = name.toLowerCase().includes('cummins');
-      const isPeterbilt = name.toLowerCase().includes('peterbilt');
-      const isVolvo = name.toLowerCase().includes('volvo');
-      const isWalmart = name.toLowerCase().includes('walmart') || name.toLowerCase().includes('wal-mart');
-      const isTruckWash = name.toLowerCase().includes('truck wash') || name.toLowerCase().includes('blue beacon');
-      const isLowClearance = name.toLowerCase().includes('low clearance') || name.toLowerCase().includes('low bridge');
+      const lName = name.toLowerCase();
+      const isSpeedco = lName.includes('speedco');
+      const isSouthernTire = lName.includes('southern tire');
+      const isRushTruck = lName.includes('rush truck');
+      const isRyder = lName.includes('ryder');
+      const isPenske = lName.includes('penske');
+      const isFreightliner = lName.includes('freightliner');
+      const isCummins = lName.includes('cummins');
+      const isPeterbilt = lName.includes('peterbilt');
+      const isVolvo = lName.includes('volvo');
+      const isWalmart = lName.includes('walmart') || lName.includes('wal-mart');
+      const isLowes = lName.includes("lowe's") || lName.includes('lowes');
+      const isHomeDepot = lName.includes('home depot');
+      const isTruckWash = lName.includes('truck wash') || lName.includes('blue beacon');
+      const isLowClearance = lName.includes('low clearance') || lName.includes('low bridge');
+      const isFuelBrand = lName.includes('exxon') || lName.includes('shell') ||
+                          lName.includes('marathon') || lName.includes('circle k') ||
+                          lName.includes('7-eleven') || lName.includes('seven eleven') ||
+                          lName === 'bp' || lName.startsWith('bp ') || lName.includes(' bp ');
       
       let type = "other";
       if (isSpeedco || isSouthernTire || isRushTruck || isRyder || isPenske || 
           isFreightliner || isCummins || isPeterbilt || isVolvo || isTruckWash || tags.shop === "tyres") {
         type = "service";
-      } else if (isWalmart) {
+      } else if (isWalmart || isLowes || isHomeDepot) {
         type = "distribution";
+      } else if (isFuelBrand) {
+        type = "fuel";
       } else if (isLowClearance) {
         type = "low_clearance";
       } else if (tags.highway === "weigh_station") {
@@ -498,6 +530,12 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
         amenities.push("Truck Sales", "Parts", "Service", "Warranty");
       } else if (isWalmart) {
         amenities.push("Parking", "Restrooms", "Shopping", "Food");
+      } else if (isLowes) {
+        amenities.push("Truck Parking", "Hardware", "Building Materials");
+      } else if (isHomeDepot) {
+        amenities.push("Truck Parking", "Hardware", "Building Materials");
+      } else if (isFuelBrand) {
+        amenities.push("Diesel", "Fuel", "Truck Stop");
       } else if (isTruckWash) {
         amenities.push("Truck Wash", "Detailing", "Fleet Service");
       } else if (isLowClearance) {

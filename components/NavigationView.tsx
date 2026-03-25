@@ -380,7 +380,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [showPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('poi_filters');
-    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'truck_wash'];
+    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
     try {
       return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'service', 'distribution', 'low_clearance', 'other']);
     } catch (e) {
