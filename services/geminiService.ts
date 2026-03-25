@@ -287,7 +287,7 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
-          query: 'Speedco OR "Southern Tire Mart" OR "Rush Truck Centers" OR Ryder OR Penske OR Freightliner OR Cummins OR Walmart OR "Truck Wash" OR "Blue Beacon" OR Peterbilt OR Volvo OR "Lowe\'s" OR "Home Depot" OR "Exxon Travel Plaza" OR "Marathon Truck Stop" OR "Circle K Truck Stop" OR "7-Eleven Truck Stop" OR "BP Truck Stop" OR "Shell Truck Stop"',
+          query: 'Speedco OR "Southern Tire Mart" OR "Rush Truck Centers" OR Ryder OR Penske OR Freightliner OR Cummins OR Walmart OR "Truck Wash" OR "Blue Beacon" OR Peterbilt OR Volvo OR "Lowe\'s Pro" OR "Home Depot Pro" OR "Lowe\'s Distribution" OR "Home Depot Distribution" OR "Exxon Travel Plaza" OR "Marathon Truck Stop" OR "Circle K Truck Stop" OR "7-Eleven Truck Stop" OR "BP Truck Stop" OR "Shell Truck Stop"',
           lat,
           lon
         })
@@ -371,9 +371,9 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       } else if (itemName.includes('walmart') || itemName.includes('wal-mart')) {
         amenities.push("Parking", "Restrooms", "Shopping", "Food");
       } else if (itemName.includes("lowe's") || itemName.includes('lowes')) {
-        amenities.push("Truck Parking", "Hardware", "Building Materials");
+        amenities.push("Large Lot Parking", "Hardware", "Building Materials", "Contractor Access");
       } else if (itemName.includes('home depot')) {
-        amenities.push("Truck Parking", "Hardware", "Building Materials");
+        amenities.push("Large Lot Parking", "Hardware", "Building Materials", "Pro Desk");
       } else if (itemName.includes('exxon') || itemName.includes('esso')) {
         amenities.push("Diesel", "Fuel", "Truck Stop");
       } else if (itemName.includes('shell')) {
@@ -443,10 +443,14 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
         way["highway"="rest_area"](around:${radius},${lat},${lon});
         node["highway"="services"](around:${radius},${lat},${lon});
         way["highway"="services"](around:${radius},${lat},${lon});
-        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven|Lowe's|Home Depot",i](around:${radius},${lat},${lon});
-        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven|Lowe's|Home Depot",i](around:${radius},${lat},${lon});
-        node["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven|Lowes|Home Depot",i](around:${radius},${lat},${lon});
-        way["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven|Lowes|Home Depot",i](around:${radius},${lat},${lon});
+        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        node["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        way["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        node["brand"~"Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
+        way["brand"~"Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
+        node["name"~"Lowes|Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
+        way["name"~"Lowes|Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
         node["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
         way["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
       );
@@ -531,9 +535,9 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
       } else if (isWalmart) {
         amenities.push("Parking", "Restrooms", "Shopping", "Food");
       } else if (isLowes) {
-        amenities.push("Truck Parking", "Hardware", "Building Materials");
+        amenities.push("Large Lot Parking", "Hardware", "Building Materials", "Contractor Access");
       } else if (isHomeDepot) {
-        amenities.push("Truck Parking", "Hardware", "Building Materials");
+        amenities.push("Large Lot Parking", "Hardware", "Building Materials", "Pro Desk");
       } else if (isFuelBrand) {
         amenities.push("Diesel", "Fuel", "Truck Stop");
       } else if (isTruckWash) {

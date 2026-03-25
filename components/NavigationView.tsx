@@ -3083,7 +3083,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const interval = setInterval(fetchTraffic, 10000);
     
     return () => clearInterval(interval);
-  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, showTrafficSigns]);
+  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, showTrafficSigns, milesRemaining > 0 ? 1 : 0]);
 
   // Monitor distance to traffic infrastructure and play audio alerts
   useEffect(() => {
