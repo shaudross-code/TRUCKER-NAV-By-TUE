@@ -81,19 +81,23 @@ Added to filter panel, map icons, category detection, and API queries:
 - **Retail with truck parking**: Lowe's, Home Depot
 - Updated: MapControls.tsx, PoiIcon.tsx, NavigationView.tsx, geminiService.ts
 
-### Phase 12 — Traffic Sign Decluttering + POI Verification (DONE — 2026-03-25)
-- Traffic signs only render when `milesRemaining > 0` (active navigation only)
-- Signs filtered to within 80m of the active route ahead, capped at 15 markers
-- Icons reduced from 32px to 18px to reduce visual clutter
-- Fetch effect now correctly re-triggers when navigation starts (added `milesRemaining > 0 ? 1 : 0` to dep array)
-- Lowe's/Home Depot HERE API search changed to `"Lowe's Pro"` / `"Home Depot Pro"` variants
-- Overpass query for Lowe's/Home Depot now uses `["hgv"!="no"]["access"!="no"]["access"!="private"]` filters
-- Amenities for Lowe's/Home Depot updated to `"Large Lot Parking"` + `"Contractor Access"` / `"Pro Desk"` (more accurate than "Truck Parking")
+### Phase 13 — Parking Confidence Indicator + 3D Camera Tracking (DONE — 2026-03-25)
+- **Parking Confidence Indicator** (distribution POIs only: Lowe's, Home Depot, Walmart):
+  - 4-segment visual confidence bar — fills based on crowd-sourced status (light=4, medium=3, heavy=2, maxed=1)
+  - Color-coded: emerald (high) → yellow → orange → red (full/no space)
+  - Descriptive text: "Plenty of truck space reported" to "Reported full — no truck parking available right now"
+  - "Unverified" grey state when no driver reports yet
+  - Shows report count + last updated timestamp
+  - Appears ABOVE the regular parking status buttons (so confidence level is immediately visible)
+  - Non-distribution POIs (fuel/service/rest areas) continue to show the standard parking status section only
+- **3D Camera Tracking**:
+  - `Navigation3DView` now subscribes to `TelemetryContext` directly via `useContext`
+  - Real-time heading updates via `telemetry.subscribe()` — fires at 400ms duration (heading-only easeTo)
+  - Location+heading updates via `[userLocation, heading]` effect — fires at 800ms duration (full position+bearing easeTo)
+  - Speed-adaptive zoom: highway (>55mph) → 16.5, regular (>25mph) → 17, slow/stopped → 17.5
+  - `userLocationRef` keeps location accessible inside the telemetry subscription closure
 
 ## Prioritized Backlog
-
-### P2 — Upcoming
-- Validate Mapbox 3D camera tracking during active route movement
 
 ### P2 — Future
 - Final App Store (Apple) and Google Play submissions

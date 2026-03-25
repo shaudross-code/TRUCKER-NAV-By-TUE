@@ -365,11 +365,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   );
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
-  // Expose setSelectedPoi for test automation (removed in production builds)
-  useEffect(() => {
-    (window as any).__TEST_SET_SELECTED_POI = setSelectedPoi;
-    return () => { delete (window as any).__TEST_SET_SELECTED_POI; };
-  }, [setSelectedPoi]);
   const [poiParkingStatus, setPoiParkingStatus] = useState<{ status: string | null; updatedAt: string | null; updateCount: number } | null>(null);
   const [isParkingLoading, setIsParkingLoading] = useState(false);
   const [parkingSubmitDone, setParkingSubmitDone] = useState<string | null>(null);
