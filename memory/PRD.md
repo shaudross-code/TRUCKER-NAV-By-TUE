@@ -38,7 +38,16 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - App Store icons and screenshots generated (store-assets/)
 - Firebase Admin SDK configured via serviceAccountKey.json
 
-### Phase 8 — POI Filter Panel Brand Icons (DONE — 2026-03-25)
+### Phase 9 — Startup Loading Screen (DONE — 2026-03-25)
+- Created `LoadingScreen.tsx` — full-screen black/gold splash with:
+  - App icon (truck/THE letters from `/app-icon.png`) with animated gold glow halo
+  - "TRUCKERS NAV / By TUE" title with staggered entrance animation
+  - Double-ring TUE spinner (outer ring spins CW, inner ring CCW)
+  - 5-step status text cycling: "Initializing session..." → "Loading truck profile..." → etc.
+  - Animated progress bar tracking status steps
+- Shows for minimum 2.8 seconds on every fresh load (regardless of Firebase auth speed)
+- Smooth 750ms opacity fade-out transition to Dashboard
+- Static asset: copied `/app/app-icon.png` → `/app/public/app-icon.png`
 - Added `getPoiFilterIcon(id)` to `PoiIcon.tsx` — 43 brand-accurate 20×20 SVG icons
 - Every filter item now shows a mini brand icon: authentic colors (Love's red/yellow, Shell yellow/red star, BP green/yellow, Walmart blue/yellow spark, etc.)
 - Removed all emoji labels, replaced with clean text + SVG icon (including Traffic Signs toggle)
