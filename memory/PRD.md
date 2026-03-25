@@ -38,7 +38,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - App Store icons and screenshots generated (store-assets/)
 - Firebase Admin SDK configured via serviceAccountKey.json
 
-### Phase 10 — 3D Route Bugs Fixed & Map Tiles Restored (DONE — 2026-03-25)
+### Phase 11 — Load Board: Dynamic Loads + Editable Targets (DONE — 2026-03-25)
+- **Dynamic loads near GPS location**: 53 US cities database, `haversine()` filter — loads generated from cities within 200 miles of user, destinations 300-2000 miles away
+- **Editable RPM Target** (`data-testid=target-rate-field`): click → inline input → Enter saves; loads color-coded green (≥ target) / orange (< target); persisted to `localStorage['truck_target_rate']`
+- **Editable Max Weight** (`data-testid=max-weight-field`): click → inline input → Enter saves; loads ≥ max weight show "Overweight" and disable Book Now; persisted to `localStorage['truck_max_weight']`
+- **Distance badge** on each card: "X mi from you" to pickup city
+- **Stats bar**: load count, how many meet rate target, capacity display
+- **Auto-refresh** every 60s + manual Refresh button
+- Weight formula bug fixed: `Math.round((min + r * range) / 1000) * 1000` (operator precedence)
 - Fixed `nextSpeedLimit is not defined` ReferenceError in 3D view → replaced with `currentSpeedLimit ?? undefined`
 - Fixed `nextTurnDistance.toFixed is not a function` → `parseFloat(nextInstruction.distance) || undefined`
 - Fixed `incident.from.offset` undefined crash → added null-guard filter on incidents
