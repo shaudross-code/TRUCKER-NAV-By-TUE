@@ -3193,7 +3193,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               const zoom = mapInstanceRef.current.getZoom();
               const offsetPixels = window.innerHeight * 0.2;
               const point = mapInstanceRef.current.project(currentLoc, zoom);
-              const offsetPoint = point.add(L.point(0, -offsetPixels).rotate(compassH * Math.PI / 180));
+              const compassRad = compassH * Math.PI / 180;
+              const offsetPoint = point.add(L.point(
+                offsetPixels * Math.sin(compassRad),
+                -offsetPixels * Math.cos(compassRad)
+              ));
               const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
               mapInstanceRef.current.panTo([unprojected.lat, unprojected.lng], { animate: true, duration: 0.8, easeLinearity: 0.25 });
             } catch (e) { /* ignore */ }
@@ -3253,7 +3257,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               const offsetPixels = window.innerHeight * 0.2; // Offset by 20% of screen height
               const point = mapInstanceRef.current.project(center, zoom);
               
-              const offsetPoint = point.add(L.point(0, -offsetPixels).rotate(currentHeading * Math.PI / 180));
+              const headingRad = currentHeading * Math.PI / 180;
+              const offsetPoint = point.add(L.point(
+                offsetPixels * Math.sin(headingRad),
+                -offsetPixels * Math.cos(headingRad)
+              ));
               const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
               center = [unprojected.lat, unprojected.lng];
             }

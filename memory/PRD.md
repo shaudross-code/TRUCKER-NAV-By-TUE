@@ -81,7 +81,16 @@ Added to filter panel, map icons, category detection, and API queries:
 - **Retail with truck parking**: Lowe's, Home Depot
 - Updated: MapControls.tsx, PoiIcon.tsx, NavigationView.tsx, geminiService.ts
 
-### Phase 13 — Parking Confidence Indicator + 3D Camera Tracking (DONE — 2026-03-25)
+### Phase 14 — Touch Orientation + Device Compass Mode (DONE — 2026-03-25)
+- **Touch rotation fixed** — CSS changed from `.map-heading-up .leaflet-rotate-pane` to `.leaflet-rotate-pane` so 2-finger rotation works in ALL map modes (North-up + Heading-up)
+- `manualRotation` useEffect now immediately applies `--map-rotation` CSS variable (no longer waits for telemetry tick)
+- **Device Compass Mode** — new compass toggle button in map controls:
+  - Subscribes to `deviceorientationabsolute` (preferred) + `deviceorientation` (fallback)
+  - iOS 13+ permission via `DeviceOrientationEvent.requestPermission()`
+  - `webkitCompassHeading` for true north on iOS, `360 - alpha` fallback for Android
+  - When active: rotates map pane + vehicle icon from physical compass, bypasses GPS heading
+  - UI: blue glow + `animate-ping` dot when active
+- **Bug fix** — `L.point().rotate()` is not a Leaflet method; replaced with manual trigonometry (`sin/cos`) in both the heading-up pan-ahead and compass pan-ahead blocks
 - **Parking Confidence Indicator** (distribution POIs only: Lowe's, Home Depot, Walmart):
   - 4-segment visual confidence bar — fills based on crowd-sourced status (light=4, medium=3, heavy=2, maxed=1)
   - Color-coded: emerald (high) → yellow → orange → red (full/no space)
