@@ -38,7 +38,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - App Store icons and screenshots generated (store-assets/)
 - Firebase Admin SDK configured via serviceAccountKey.json
 
-### Phase 7 — Crowd-Sourced Parking Status (DONE — 2026-03-25)
+### Phase 8 — POI Filter Panel Brand Icons (DONE — 2026-03-25)
+- Added `getPoiFilterIcon(id)` to `PoiIcon.tsx` — 43 brand-accurate 20×20 SVG icons
+- Every filter item now shows a mini brand icon: authentic colors (Love's red/yellow, Shell yellow/red star, BP green/yellow, Walmart blue/yellow spark, etc.)
+- Removed all emoji labels, replaced with clean text + SVG icon (including Traffic Signs toggle)
+- Filter panel widened to `w-48 md:w-64` to accommodate icon + label layout
+- Icons fade/scale on hover and glow when filter is active
 - Added **Parking Status section** to every POI popup
 - 4 colored report buttons: **Light** (green), **Medium** (yellow), **Heavy** (orange), **Maxed** (red)
 - Shows current crowd-sourced status badge, last updated timestamp, and total report count

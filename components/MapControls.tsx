@@ -61,7 +61,10 @@ export const MapControls: React.FC<any> = React.memo(({
                   }}
                   className="flex items-center justify-between p-1.5 md:p-2 rounded-lg bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-all mb-1"
                 >
-                  <span className="text-white font-bold text-[9px] md:text-[11px]">🚦 Traffic Signs & Lights</span>
+                  <span className="text-white font-bold text-[9px] md:text-[11px] flex items-center gap-1.5">
+                    <svg width="16" height="16" viewBox="0 0 16 16" className="shrink-0"><rect x="6.5" y="0" width="3" height="2.5" rx=".5" fill="#fff" opacity=".5"/><rect x="5" y="2" width="6" height="10" rx="1.5" fill="#333"/><rect x="6" y="3" width="4" height="2.5" rx="1" fill="#ef4444"/><rect x="6" y="6" width="4" height="2.5" rx="1" fill="#facc15"/><rect x="6" y="9" width="4" height="2.5" rx="1" fill="#22c55e"/><rect x="6.5" y="12" width="3" height="3" rx=".5" fill="#555"/></svg>
+                    Traffic Signs &amp; Lights
+                  </span>
                   <div className={`w-3 h-3 md:w-4 md:h-4 rounded border-2 flex items-center justify-center transition-all ${showTrafficSigns ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-600'}`}>
                     {showTrafficSigns && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={4} />}
                   </div>
