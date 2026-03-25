@@ -263,6 +263,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [eta, setEta] = useState('--:-- --');
   const [remainingDuration, setRemainingDuration] = useState<number>(0);
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  
+  // Convert routePoints to Mapbox coordinate format [lng, lat] for 3D view
+  const routeCoordinates = routePoints.map(point => [point[1], point[0]]);
   const [isOverviewMode, setIsOverviewMode] = useState(false);
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
