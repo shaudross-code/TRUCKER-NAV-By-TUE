@@ -2,6 +2,7 @@ import { safeStringify } from './utils';
 import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, lazy } from 'react';
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
+import { LoadingScreen } from './components/LoadingScreen';
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const NavigationView = lazy(() => import('./components/NavigationView'));
 const PaySummary = lazy(() => import('./components/PaySummary'));
@@ -393,20 +394,27 @@ const AppContent: React.FC = React.memo(() => {
       takeHomePercentage
     ]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#050505] text-white">
-        <div className="text-center">
-          <div className="relative mb-6 h-24 w-24 mx-auto">
-            <div className="absolute inset-0 animate-spin rounded-full border-4 border-[#D4AF37] border-t-transparent shadow-[0_0_15px_rgba(212,175,55,0.6)]"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[#D4AF37] font-black text-xl drop-shadow-[0_0_8px_rgba(212,175,55,0.8)]">TUE</span>
-            </div>
-          </div>
-          <p className="text-[#D4AF37] font-medium tracking-widest uppercase text-xs">Initializing System...</p>
-        </div>
-      </div>
-    );
+  const mountTimeRef = useRef(Date.now());
+  const MIN_SPLASH_MS = 2800;
+
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [splashExiting, setSplashExiting] = useState(false);
+
+  useEffect(() => {
+    if (!loading) {
+      const elapsed = Date.now() - mountTimeRef.current;
+      const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+      const exitTimer = setTimeout(() => {
+        setSplashExiting(true);
+        const unmountTimer = setTimeout(() => setSplashVisible(false), 750);
+        return () => clearTimeout(unmountTimer);
+      }, remaining);
+      return () => clearTimeout(exitTimer);
+    }
+  }, [loading]);
+
+  if (splashVisible) {
+    return <LoadingScreen isExiting={splashExiting} />;
   }
 
   if (!user) {
