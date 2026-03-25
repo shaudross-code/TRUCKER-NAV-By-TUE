@@ -287,7 +287,7 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
-          query: 'Speedco OR "Southern Tire Mart" OR "Rush Truck Centers" OR Ryder OR Penske OR Freightliner OR Cummins OR Walmart OR "Truck Wash" OR "Blue Beacon" OR Peterbilt OR Volvo',
+          query: 'Speedco OR "Southern Tire Mart" OR "Rush Truck Centers" OR Ryder OR Penske OR Freightliner OR Cummins OR Walmart OR "Truck Wash" OR "Blue Beacon" OR Peterbilt OR Volvo OR "Lowe\'s" OR "Home Depot" OR "Exxon Travel Plaza" OR "Marathon Truck Stop" OR "Circle K Truck Stop" OR "7-Eleven Truck Stop" OR "BP Truck Stop" OR "Shell Truck Stop"',
           lat,
           lon
         })
