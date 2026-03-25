@@ -55,6 +55,7 @@ import {
 } from 'lucide-react';
 import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
 import { TrafficIcon } from './TrafficIcon';
+import { Navigation3DView } from './Navigation3DView';
 
 interface Waypoint {
   id: string;
@@ -355,6 +356,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     localStorage.getItem('nav_show_traffic_signs') !== 'false'
   );
   const alertedTrafficItems = useRef<Set<string>>(new Set());
+  
+  const [is3DMode, setIs3DMode] = useState(() => 
+    localStorage.getItem('nav_3d_mode') === 'true'
+  );
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
 
