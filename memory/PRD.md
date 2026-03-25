@@ -81,13 +81,18 @@ Added to filter panel, map icons, category detection, and API queries:
 - **Retail with truck parking**: Lowe's, Home Depot
 - Updated: MapControls.tsx, PoiIcon.tsx, NavigationView.tsx, geminiService.ts
 
+### Phase 12 — Traffic Sign Decluttering + POI Verification (DONE — 2026-03-25)
+- Traffic signs only render when `milesRemaining > 0` (active navigation only)
+- Signs filtered to within 80m of the active route ahead, capped at 15 markers
+- Icons reduced from 32px to 18px to reduce visual clutter
+- Fetch effect now correctly re-triggers when navigation starts (added `milesRemaining > 0 ? 1 : 0` to dep array)
+- Lowe's/Home Depot HERE API search changed to `"Lowe's Pro"` / `"Home Depot Pro"` variants
+- Overpass query for Lowe's/Home Depot now uses `["hgv"!="no"]["access"!="no"]["access"!="private"]` filters
+- Amenities for Lowe's/Home Depot updated to `"Large Lot Parking"` + `"Contractor Access"` / `"Pro Desk"` (more accurate than "Truck Parking")
+
 ## Prioritized Backlog
 
-### P1 — Upcoming
-- Verify Home Depot / Lowe's only surface when truck parking is confirmed available
-  (requires HERE API filter or Overpass `hgv_truck=yes` / `parking:condition` tag check)
-
-### P2 — Upcoming  
+### P2 — Upcoming
 - Validate Mapbox 3D camera tracking during active route movement
 
 ### P2 — Future
