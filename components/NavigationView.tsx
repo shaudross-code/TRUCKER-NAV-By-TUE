@@ -365,6 +365,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   );
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
+  // Expose setSelectedPoi for test automation (removed in production builds)
+  useEffect(() => {
+    (window as any).__TEST_SET_SELECTED_POI = setSelectedPoi;
+    return () => { delete (window as any).__TEST_SET_SELECTED_POI; };
+  }, [setSelectedPoi]);
   const [poiParkingStatus, setPoiParkingStatus] = useState<{ status: string | null; updatedAt: string | null; updateCount: number } | null>(null);
   const [isParkingLoading, setIsParkingLoading] = useState(false);
   const [parkingSubmitDone, setParkingSubmitDone] = useState<string | null>(null);
@@ -3884,6 +3889,101 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       <span className="text-xs font-bold text-zinc-300">{selectedPoi.openingHours}</span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Parking Confidence Banner — Distribution POIs only (Lowe's, Home Depot, Walmart) */}
+              {selectedPoi.type === 'distribution' && (
+                <div className={`border rounded-2xl landscape:rounded-xl overflow-hidden ${
+                  isParkingLoading ? 'border-zinc-700' :
+                  poiParkingStatus?.status === 'light'  ? 'border-emerald-500/40' :
+                  poiParkingStatus?.status === 'medium' ? 'border-yellow-500/40' :
+                  poiParkingStatus?.status === 'heavy'  ? 'border-orange-500/40' :
+                  poiParkingStatus?.status === 'maxed'  ? 'border-red-500/40' :
+                  'border-zinc-700/50'
+                }`}>
+                  {/* Header */}
+                  <div className={`flex items-center justify-between px-4 py-2.5 border-b ${
+                    isParkingLoading ? 'bg-zinc-900/60 border-zinc-700/30' :
+                    poiParkingStatus?.status === 'light'  ? 'bg-emerald-500/10 border-emerald-500/20' :
+                    poiParkingStatus?.status === 'medium' ? 'bg-yellow-500/10 border-yellow-500/20' :
+                    poiParkingStatus?.status === 'heavy'  ? 'bg-orange-500/10 border-orange-500/20' :
+                    poiParkingStatus?.status === 'maxed'  ? 'bg-red-500/10 border-red-500/20' :
+                    'bg-zinc-900/60 border-zinc-700/30'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <svg className={`w-4 h-4 flex-shrink-0 ${
+                        poiParkingStatus?.status === 'light'  ? 'text-emerald-400' :
+                        poiParkingStatus?.status === 'medium' ? 'text-yellow-400' :
+                        poiParkingStatus?.status === 'heavy'  ? 'text-orange-400' :
+                        poiParkingStatus?.status === 'maxed'  ? 'text-red-400' :
+                        'text-zinc-400'
+                      }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17H5a2 2 0 01-2-2V5a2 2 0 012-2h11a2 2 0 012 2v3m-1 9h-5m5 0v-5m0 5l3-3m-3 3l-3-3" />
+                      </svg>
+                      <span className="text-[10px] landscape:text-[8px] font-black text-white uppercase tracking-widest">Truck Parking Confidence</span>
+                    </div>
+                    {isParkingLoading ? (
+                      <div className="w-3 h-3 rounded-full border-2 border-zinc-500 border-t-white animate-spin" />
+                    ) : (
+                      <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
+                        poiParkingStatus?.status === 'light'  ? 'bg-emerald-500/20 text-emerald-300' :
+                        poiParkingStatus?.status === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
+                        poiParkingStatus?.status === 'heavy'  ? 'bg-orange-500/20 text-orange-300' :
+                        poiParkingStatus?.status === 'maxed'  ? 'bg-red-500/20 text-red-300' :
+                        'bg-zinc-700/50 text-zinc-500'
+                      }`}>
+                        {poiParkingStatus?.status === 'light'  ? 'High' :
+                         poiParkingStatus?.status === 'medium' ? 'Moderate' :
+                         poiParkingStatus?.status === 'heavy'  ? 'Limited' :
+                         poiParkingStatus?.status === 'maxed'  ? 'Full' :
+                         'Unverified'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Confidence Meter */}
+                  <div className="px-4 py-3 landscape:py-2 space-y-2.5 landscape:space-y-1.5">
+                    <div className="flex gap-1">
+                      {[1,2,3,4].map(seg => {
+                        const filled = !isParkingLoading && (
+                          (poiParkingStatus?.status === 'light'  && seg <= 4) ||
+                          (poiParkingStatus?.status === 'medium' && seg <= 3) ||
+                          (poiParkingStatus?.status === 'heavy'  && seg <= 2) ||
+                          (poiParkingStatus?.status === 'maxed'  && seg <= 1)
+                        );
+                        return (
+                          <div key={seg} className={`h-2 landscape:h-1.5 flex-1 rounded-full transition-all duration-500 ${
+                            filled
+                              ? (poiParkingStatus?.status === 'light'  ? 'bg-emerald-400' :
+                                 poiParkingStatus?.status === 'medium' ? 'bg-yellow-400' :
+                                 poiParkingStatus?.status === 'heavy'  ? 'bg-orange-400' :
+                                 'bg-red-400')
+                              : 'bg-zinc-800'
+                          }`} />
+                        );
+                      })}
+                    </div>
+                    <p className="text-[9px] landscape:text-[8px] font-semibold leading-relaxed">
+                      {isParkingLoading
+                        ? <span className="text-zinc-600">Loading parking data...</span>
+                        : poiParkingStatus?.status === 'light'
+                        ? <span className="text-emerald-400">Plenty of truck space reported — safe to stop</span>
+                        : poiParkingStatus?.status === 'medium'
+                        ? <span className="text-yellow-400">Some space available — arrive early to secure a spot</span>
+                        : poiParkingStatus?.status === 'heavy'
+                        ? <span className="text-orange-400">Limited space — very few spots remaining</span>
+                        : poiParkingStatus?.status === 'maxed'
+                        ? <span className="text-red-400">Reported full — no truck parking available right now</span>
+                        : <span className="text-zinc-500">No driver reports yet — be the first to report availability below</span>
+                      }
+                    </p>
+                    {poiParkingStatus?.updateCount ? (
+                      <p className="text-[8px] landscape:text-[7px] text-zinc-600 font-medium">
+                        Based on {poiParkingStatus.updateCount} driver report{poiParkingStatus.updateCount !== 1 ? 's' : ''} · {poiParkingStatus.updatedAt ? new Date(poiParkingStatus.updatedAt).toLocaleString() : ''}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               )}
 

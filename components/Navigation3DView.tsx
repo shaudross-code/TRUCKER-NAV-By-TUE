@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { TelemetryContext } from '../types';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || '';
 const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '';
@@ -32,6 +33,8 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const telemetry = useContext(TelemetryContext);
+  const userLocationRef = useRef(userLocation);
 
   // Initialize 3D map
   useEffect(() => {
@@ -92,18 +95,44 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     };
   }, []);
 
-  // Update camera position and bearing
+  // Keep userLocationRef in sync
+  useEffect(() => {
+    userLocationRef.current = userLocation;
+  }, [userLocation]);
+
+  // Update camera position and bearing when location/heading prop changes
   useEffect(() => {
     if (!map.current || !userLocation) return;
     // userLocation is [lat, lon] — Mapbox needs [lon, lat]
+    const speed = telemetry?.speedRef.current || 0;
+    // Zoom out slightly at highway speeds for better situational awareness
+    const zoom = speed > 55 ? 16.5 : speed > 25 ? 17 : 17.5;
     map.current.easeTo({
       center: [userLocation[1], userLocation[0]],
-      bearing: heading,
+      bearing: telemetry?.headingRef.current ?? heading,
       pitch: 60,
-      zoom: 17.5,
-      duration: 1000
+      zoom,
+      duration: 800
     });
   }, [userLocation, heading]);
+
+  // Subscribe to telemetry for real-time heading updates (fires even without location change)
+  useEffect(() => {
+    if (!telemetry) return;
+    const unsub = telemetry.subscribe(() => {
+      if (!map.current || !userLocationRef.current) return;
+      const newHeading = telemetry.headingRef.current || 0;
+      const speed = telemetry.speedRef.current || 0;
+      const zoom = speed > 55 ? 16.5 : speed > 25 ? 17 : 17.5;
+      map.current.easeTo({
+        bearing: newHeading,
+        zoom,
+        pitch: 60,
+        duration: 400
+      });
+    });
+    return unsub;
+  }, [telemetry]);
 
   // Add route line in 3D
   useEffect(() => {

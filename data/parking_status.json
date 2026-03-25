@@ -62,5 +62,13 @@
     "lon": 80,
     "updatedAt": "2026-03-25T19:32:29.155Z",
     "updateCount": 2
+  },
+  "39.0100_-98.4800": {
+    "status": "light",
+    "name": "Home Depot Distribution Center",
+    "lat": 39.01,
+    "lon": -98.48,
+    "updatedAt": "2026-03-25T23:04:42.726Z",
+    "updateCount": 3
   }
 }
