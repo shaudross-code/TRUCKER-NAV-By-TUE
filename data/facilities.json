@@ -1,0 +1,312 @@
+{
+  "_grid_cache": {
+    "43_-84": "2026-03-26T18:57:23.729Z",
+    "43.5_-84.5": "2026-03-26T19:00:31.312Z",
+    "39_-98.5": "2026-03-26T19:09:40.740Z",
+    "39_-99": "2026-03-26T19:15:14.002Z"
+  },
+  "manual_1774551488838_g8f8x": {
+    "id": "manual_1774551488838_g8f8x",
+    "source": "manual",
+    "name": "XYZ Warehouse",
+    "lat": 43.1,
+    "lon": -84.1,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T18:58:08.838Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 0,
+        "receiver": 2,
+        "both": 0
+      },
+      "loading_speed": {
+        "fast": 1,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 1,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 1,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 1
+      },
+      "open_days": {
+        "Mon": 1,
+        "Tue": 1,
+        "Wed": 1,
+        "Thu": 1,
+        "Fri": 1,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {
+        "06:00": 1
+      },
+      "close_time": {
+        "18:00": 1
+      },
+      "total_reports": 2,
+      "last_updated": "2026-03-26T18:58:16.707Z"
+    }
+  },
+  "manual_1774551631297_1e9cm": {
+    "id": "manual_1774551631297_1e9cm",
+    "source": "manual",
+    "name": "TEST_Distribution Center Alpha",
+    "lat": 43.5,
+    "lon": -84.5,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T19:00:31.297Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 0,
+        "receiver": 1,
+        "both": 0
+      },
+      "loading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 0,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 0
+      },
+      "open_days": {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {},
+      "close_time": {},
+      "total_reports": 1,
+      "last_updated": "2026-03-26T19:00:31.297Z"
+    }
+  },
+  "manual_1774551631303_l24hc": {
+    "id": "manual_1774551631303_l24hc",
+    "source": "manual",
+    "name": "TEST_Shipper Warehouse",
+    "lat": 43.2,
+    "lon": -84.2,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T19:00:31.303Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 1,
+        "receiver": 0,
+        "both": 0
+      },
+      "loading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 0,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 0
+      },
+      "open_days": {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {},
+      "close_time": {},
+      "total_reports": 1,
+      "last_updated": "2026-03-26T19:00:31.303Z"
+    }
+  },
+  "manual_1774551631305_qrmqe": {
+    "id": "manual_1774551631305_qrmqe",
+    "source": "manual",
+    "name": "TEST_Crossdock DC",
+    "lat": 43.3,
+    "lon": -84.3,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T19:00:31.305Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 0,
+        "receiver": 0,
+        "both": 1
+      },
+      "loading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 0,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 0
+      },
+      "open_days": {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {},
+      "close_time": {},
+      "total_reports": 1,
+      "last_updated": "2026-03-26T19:00:31.305Z"
+    }
+  },
+  "manual_1774551631310_rmagy": {
+    "id": "manual_1774551631310_rmagy",
+    "source": "manual",
+    "name": "TEST_Persistence Check DC",
+    "lat": 43.6,
+    "lon": -84.6,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T19:00:31.310Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 1,
+        "receiver": 0,
+        "both": 0
+      },
+      "loading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 0,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 0
+      },
+      "open_days": {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {},
+      "close_time": {},
+      "total_reports": 1,
+      "last_updated": "2026-03-26T19:00:31.310Z"
+    }
+  },
+  "manual_1774552448284_1d3eh": {
+    "id": "manual_1774552448284_1d3eh",
+    "source": "manual",
+    "name": "UI Test Warehouse",
+    "lat": 39.0119,
+    "lon": -98.4842,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T19:14:08.284Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 1,
+        "receiver": 0,
+        "both": 0
+      },
+      "loading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 0,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 0
+      },
+      "open_days": {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {},
+      "close_time": {},
+      "total_reports": 1,
+      "last_updated": "2026-03-26T19:14:08.284Z"
+    }
+  }
+}

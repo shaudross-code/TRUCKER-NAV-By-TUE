@@ -1,5 +1,5 @@
 import React from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2 } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 
 export const MapControls: React.FC<any> = React.memo(({ 
@@ -22,6 +22,9 @@ export const MapControls: React.FC<any> = React.memo(({
   setIs3DMode,
   isCompassMode,
   setIsCompassMode,
+  showFacilities,
+  setShowFacilities,
+  onAddFacility,
   className = ""
 }) => {
   return (
@@ -164,6 +167,50 @@ export const MapControls: React.FC<any> = React.memo(({
                       </button>
                     </React.Fragment>
                   ))}
+                </div>
+
+                {/* ── Facilities Section ── */}
+                <div className="border-t border-[#D4AF37]/10 pt-3 mt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <Building2 className="w-3 h-3 text-[#D4AF37]" />
+                      <span className="text-[9px] md:text-[11px] font-black uppercase text-white tracking-widest">Facilities</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onAddFacility?.()}
+                        data-testid="add-facility-btn"
+                        className="text-[8px] font-black uppercase text-[#D4AF37] hover:text-white flex items-center gap-1 border border-[#D4AF37]/30 rounded-lg px-1.5 py-0.5 hover:border-[#D4AF37]/60 transition-all"
+                        title="Add a new facility"
+                      >
+                        <Plus className="w-2.5 h-2.5" strokeWidth={3} /> Add
+                      </button>
+                      <button
+                        data-testid="facilities-toggle"
+                        onClick={() => {
+                          setShowFacilities?.(!showFacilities);
+                          localStorage.setItem('nav_show_facilities', String(!showFacilities));
+                        }}
+                        className={`w-3 h-3 md:w-4 md:h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${showFacilities ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-600'}`}
+                      >
+                        {showFacilities && <Check className="w-2 h-2 md:w-3 md:h-3 text-black" strokeWidth={4} />}
+                      </button>
+                    </div>
+                  </div>
+                  {showFacilities && (
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        { type: 'shipper',  color: '#3b82f6', label: 'Shippers' },
+                        { type: 'receiver', color: '#22c55e', label: 'Receivers' },
+                        { type: 'both',     color: '#a855f7', label: 'Both' },
+                      ].map(t => (
+                        <div key={t.type} className="flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-sm shrink-0" style={{ backgroundColor: t.color }} />
+                          <span className="text-[8px] text-zinc-400 font-semibold">{t.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

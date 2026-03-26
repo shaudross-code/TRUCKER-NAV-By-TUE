@@ -359,6 +359,202 @@ async function createServer() {
     }
   });
 
+// ─── File-based facility store ──────────────────────────────────────────────
+const FACILITIES_FILE = path.join(__dirname, 'data', 'facilities.json');
+const GOOGLE_KEY = process.env.GOOGLE_MAPS_PLATFORM_KEY;
+const FACILITY_CACHE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function readFacilityStore(): Record<string, any> {
+  try {
+    if (!existsSync(FACILITIES_FILE)) return { _grid_cache: {} };
+    return JSON.parse(readFileSync(FACILITIES_FILE, 'utf8'));
+  } catch { return { _grid_cache: {} }; }
+}
+function writeFacilityStore(data: Record<string, any>) {
+  try { writeFileSync(FACILITIES_FILE, JSON.stringify(data, null, 2), 'utf8'); }
+  catch (e) { console.error('Failed to write facility store:', e); }
+}
+
+function getMajorityVote(votes: Record<string, number>): string | null {
+  const entries = Object.entries(votes).filter(([, v]) => v > 0);
+  if (!entries.length) return null;
+  return entries.sort((a, b) => b[1] - a[1])[0][0];
+}
+
+function buildMajority(crowd: any) {
+  return {
+    type:               getMajorityVote(crowd.type_votes || {}) || 'both',
+    loading_speed:      getMajorityVote(crowd.loading_speed || {}),
+    unloading_speed:    getMajorityVote(crowd.unloading_speed || {}),
+    parking_allowed:    getMajorityVote(crowd.parking_allowed || {}),
+    overnight_parking:  getMajorityVote(crowd.overnight_parking || {}),
+    open_days: (Object.entries(crowd.open_days || {}) as [string, number][])
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .map(([d]) => d),
+    open_time:  getMajorityVote(crowd.open_time || {}),
+    close_time: getMajorityVote(crowd.close_time || {}),
+  };
+}
+
+function gridKey(lat: number, lon: number): string {
+  return `${Math.round(lat * 2) / 2}_${Math.round(lon * 2) / 2}`;
+}
+
+const FACILITY_KEYWORDS = ['warehouse', 'distribution center', 'fulfillment center', 'truck terminal', 'freight terminal'];
+
+async function seedFacilitiesFromGoogle(lat: number, lon: number, gk: string): Promise<void> {
+  if (!GOOGLE_KEY) return;
+  const store = readFacilityStore();
+  store._grid_cache = store._grid_cache || {};
+  store._grid_cache[gk] = new Date().toISOString(); // mark as fetched
+
+  for (const kw of FACILITY_KEYWORDS) {
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lon}&radius=50000&keyword=${encodeURIComponent(kw)}&key=${GOOGLE_KEY}`;
+      const resp = await fetch(url);
+      const data = await resp.json() as any;
+      if (!['OK','ZERO_RESULTS'].includes(data.status)) continue;
+
+      for (const p of (data.results || [])) {
+        const id = String(p.place_id);
+        if (!id || store[id]) continue; // skip if already exists
+        store[id] = {
+          id, source: 'google',
+          name: p.name || 'Unknown Facility',
+          lat: p.geometry?.location?.lat || lat,
+          lon: p.geometry?.location?.lng || lon,
+          address: p.vicinity || '',
+          phone: '',
+          rating: p.rating,
+          google_hours: [],
+          hours_fetched: false,
+          last_fetched: new Date().toISOString(),
+          crowd_data: {
+            type_votes:        { shipper: 0, receiver: 0, both: 0 },
+            loading_speed:     { fast: 0, average: 0, slow: 0 },
+            unloading_speed:   { fast: 0, average: 0, slow: 0 },
+            parking_allowed:   { yes: 0, no: 0 },
+            overnight_parking: { yes: 0, no: 0 },
+            open_days:         { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
+            open_time:         {},
+            close_time:        {},
+            total_reports: 0,
+            last_updated: new Date().toISOString(),
+          },
+        };
+      }
+      await new Promise(r => setTimeout(r, 150)); // gentle rate limit
+    } catch (e) { console.error('Google Places seed error:', e); }
+  }
+  writeFacilityStore(store);
+}
+
+// ─── Facility API Routes ─────────────────────────────────────────────────────
+
+  app.get('/api/facilities', async (req, res) => {
+    const lat = parseFloat(String(req.query.lat));
+    const lon = parseFloat(String(req.query.lon));
+    const radius = parseFloat(String(req.query.radius || '80000'));
+    if (isNaN(lat) || isNaN(lon)) return res.status(400).json({ error: 'lat/lon required' });
+
+    const gk = gridKey(lat, lon);
+    const store = readFacilityStore();
+    const cachedAt = store._grid_cache?.[gk];
+    const stale = !cachedAt || (Date.now() - new Date(cachedAt).getTime() > FACILITY_CACHE_MS);
+
+    if (stale) {
+      // Kick off background seed — don't block the response
+      seedFacilitiesFromGoogle(lat, lon, gk).catch(console.error);
+    }
+
+    // Haversine filter
+    const R = 6371000;
+    const toRad = (d: number) => d * Math.PI / 180;
+    const result = Object.values(store)
+      .filter((f: any) => f && f.id && typeof f.lat === 'number')
+      .filter((f: any) => {
+        const dlat = toRad(f.lat - lat);
+        const dlon = toRad(f.lon - lon);
+        const a = Math.sin(dlat/2)**2 + Math.cos(toRad(lat)) * Math.cos(toRad(f.lat)) * Math.sin(dlon/2)**2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) <= radius;
+      })
+      .map((f: any) => ({ ...f, majority: buildMajority(f.crowd_data) }));
+
+    res.json({ facilities: result, seeding: stale });
+  });
+
+  app.post('/api/facilities', async (req, res) => {
+    const { name, lat, lon, address, type } = req.body;
+    if (!name || !lat || !lon) return res.status(400).json({ error: 'name/lat/lon required' });
+    const id = `manual_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+    const store = readFacilityStore();
+    store[id] = {
+      id, source: 'manual', name, lat, lon,
+      address: address || '', phone: '', google_hours: [], hours_fetched: false,
+      last_fetched: new Date().toISOString(),
+      crowd_data: {
+        type_votes:        { shipper: type === 'shipper' ? 1 : 0, receiver: type === 'receiver' ? 1 : 0, both: type === 'both' ? 1 : 0 },
+        loading_speed:     { fast: 0, average: 0, slow: 0 },
+        unloading_speed:   { fast: 0, average: 0, slow: 0 },
+        parking_allowed:   { yes: 0, no: 0 },
+        overnight_parking: { yes: 0, no: 0 },
+        open_days:         { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
+        open_time: {}, close_time: {},
+        total_reports: 1, last_updated: new Date().toISOString(),
+      },
+    };
+    writeFacilityStore(store);
+    res.json({ success: true, facility: { ...store[id], majority: buildMajority(store[id].crowd_data) } });
+  });
+
+  app.get('/api/facilities/:id/hours', async (req, res) => {
+    const { id } = req.params;
+    const store = readFacilityStore();
+    const fac = store[id];
+    if (!fac) return res.status(404).json({ error: 'Not found' });
+    if (fac.hours_fetched || fac.source === 'manual') return res.json({ google_hours: fac.google_hours || [] });
+
+    if (!GOOGLE_KEY) return res.json({ google_hours: [] });
+    try {
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${id}&fields=opening_hours,formatted_phone_number&key=${GOOGLE_KEY}`;
+      const resp = await fetch(url);
+      const data = await resp.json() as any;
+      const hours = data.result?.opening_hours?.weekday_text || [];
+      const phone = data.result?.formatted_phone_number || fac.phone || '';
+      store[id].google_hours = hours;
+      store[id].phone = phone;
+      store[id].hours_fetched = true;
+      writeFacilityStore(store);
+      res.json({ google_hours: hours, phone });
+    } catch (e) { res.json({ google_hours: [] }); }
+  });
+
+  app.post('/api/facilities/report', async (req, res) => {
+    const { facility_id, type, loading_speed, unloading_speed, parking_allowed, overnight_parking, open_days, open_time, close_time } = req.body;
+    if (!facility_id) return res.status(400).json({ error: 'facility_id required' });
+    const store = readFacilityStore();
+    const fac = store[String(facility_id)];
+    if (!fac) return res.status(404).json({ error: 'Facility not found' });
+
+    const cd = fac.crowd_data;
+    if (type && ['shipper','receiver','both'].includes(type)) cd.type_votes[type] = (cd.type_votes[type] || 0) + 1;
+    if (loading_speed && ['fast','average','slow'].includes(loading_speed)) cd.loading_speed[loading_speed] = (cd.loading_speed[loading_speed] || 0) + 1;
+    if (unloading_speed && ['fast','average','slow'].includes(unloading_speed)) cd.unloading_speed[unloading_speed] = (cd.unloading_speed[unloading_speed] || 0) + 1;
+    if (parking_allowed !== undefined) cd.parking_allowed[parking_allowed ? 'yes' : 'no'] = (cd.parking_allowed[parking_allowed ? 'yes' : 'no'] || 0) + 1;
+    if (overnight_parking !== undefined) cd.overnight_parking[overnight_parking ? 'yes' : 'no'] = (cd.overnight_parking[overnight_parking ? 'yes' : 'no'] || 0) + 1;
+    if (Array.isArray(open_days)) open_days.forEach((d: string) => { if (cd.open_days[d] !== undefined) cd.open_days[d]++; });
+    if (open_time) cd.open_time[open_time] = (cd.open_time[open_time] || 0) + 1;
+    if (close_time) cd.close_time[close_time] = (cd.close_time[close_time] || 0) + 1;
+    cd.total_reports = (cd.total_reports || 0) + 1;
+    cd.last_updated = new Date().toISOString();
+
+    writeFacilityStore(store);
+    res.json({ success: true, majority: buildMajority(cd), total_reports: cd.total_reports });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(__dirname, 'dist');
     app.use(express.static(distPath));

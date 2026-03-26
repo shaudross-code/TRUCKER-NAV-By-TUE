@@ -71,6 +71,8 @@ import { speak } from '../services/speechService';
 import { SpeedLimitSign, HighwayShield } from './MapUI';
 import { MapControls } from './MapControls';
 import { CompassRose } from './CompassRose';
+import { FacilityPanel, AddFacilityForm } from './FacilityPanel';
+import { fetchFacilities, facilityIconSVG, Facility } from '../services/facilityService';
 import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { decode } from '@here/flexpolyline';
@@ -441,6 +443,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const lastPoiFetchRef = useRef<{ time: number, lat: number, lon: number } | null>(null);
   const smoothedHeadingRef = useRef(0);
   const [showPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
+
+  // ─── Facility state ──────────────────────────────────────────────────────
+  const [showFacilities, setShowFacilities] = useState(() => localStorage.getItem('nav_show_facilities') !== 'false');
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  const [showAddFacility, setShowAddFacility] = useState(false);
+  const facilityLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const facilityMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('poi_filters');
     const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
@@ -1111,6 +1122,51 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     observer.observe(mapRef.current);
     return () => observer.disconnect();
   }, [isMapReady]);
+
+  // ─── Facility layer group setup ──────────────────────────────────────────
+  useEffect(() => {
+    if (!isMapReady || !mapInstanceRef.current) return;
+    const group = L.layerGroup().addTo(mapInstanceRef.current);
+    facilityLayerGroupRef.current = group;
+    return () => { group.remove(); facilityLayerGroupRef.current = null; };
+  }, [isMapReady]);
+
+  // ─── Fetch facilities when location changes ──────────────────────────────
+  useEffect(() => {
+    if (!isValidLatLng(userLocation) || !showFacilities) return;
+    const [lat, lon] = userLocation as [number, number];
+    fetchFacilities(lat, lon, 80000).then(result => {
+      setFacilities(result);
+    });
+  }, [
+    userLocation ? Math.round((userLocation[0]) * 10) / 10 : null,
+    userLocation ? Math.round((userLocation[1]) * 10) / 10 : null,
+    showFacilities,
+  ]);
+
+  // ─── Render facility markers on map ─────────────────────────────────────
+  useEffect(() => {
+    if (!facilityLayerGroupRef.current) return;
+    facilityLayerGroupRef.current.clearLayers();
+    facilityMarkersRef.current.clear();
+    if (!showFacilities) return;
+
+    facilities.forEach(facility => {
+      const type = facility.majority?.type || 'both';
+      const iconEl = document.createElement('div');
+      iconEl.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))';
+      iconEl.innerHTML = facilityIconSVG(type, 32);
+
+      const marker = L.marker([facility.lat, facility.lon], {
+        icon: L.divIcon({ html: iconEl, className: '', iconSize: [32, 36], iconAnchor: [16, 36] }),
+        zIndexOffset: 200,
+      });
+
+      marker.on('click', () => setSelectedFacility(facility));
+      marker.addTo(facilityLayerGroupRef.current!);
+      facilityMarkersRef.current.set(facility.id, marker);
+    });
+  }, [facilities, showFacilities]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -3894,7 +3950,36 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* POI Detail Modal */}
+      {/* ── Facility Detail Panel ── */}
+      {selectedFacility && (
+        <div className="absolute inset-0 z-[4001] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md max-h-[85vh] sm:max-h-[90vh] rounded-t-3xl sm:rounded-3xl border border-zinc-800 overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.9)] animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300 flex flex-col">
+            <FacilityPanel
+              facility={selectedFacility}
+              userLocation={userLocation}
+              onClose={() => setSelectedFacility(null)}
+              onReportSubmitted={(id, majority, totalReports) => {
+                setFacilities(prev => prev.map(f => f.id === id ? { ...f, majority, crowd_data: { ...f.crowd_data, total_reports: totalReports } } : f));
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Facility Modal ── */}
+      {showAddFacility && (
+        <div className="absolute inset-0 z-[4002] flex items-end sm:items-center justify-center sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md rounded-t-3xl sm:rounded-3xl border border-zinc-800 bg-black overflow-hidden shadow-[0_40px_80px_rgba(0,0,0,0.9)] animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
+            <AddFacilityForm
+              userLocation={userLocation}
+              onAdd={newFacility => setFacilities(prev => [...prev, newFacility])}
+              onClose={() => setShowAddFacility(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── POI Detail Modal ── */}
       {selectedPoi && (
         <div className="absolute inset-0 z-[4000] flex items-center justify-center p-4 pt-[calc(1rem+env(safe-area-inset-top))] pb-[calc(1rem+env(safe-area-inset-bottom))] bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] landscape:rounded-2xl w-full max-w-md overflow-hidden shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-300 max-h-[calc(100vh-4rem)] flex flex-col transition-all hover:scale-[1.005]">
@@ -4897,6 +4982,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setIs3DMode={setIs3DMode}
         isCompassMode={isCompassMode}
         setIsCompassMode={setIsCompassMode}
+        showFacilities={showFacilities}
+        setShowFacilities={setShowFacilities}
+        onAddFacility={() => setShowAddFacility(true)}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
       />
               <RouteSettingsModal
