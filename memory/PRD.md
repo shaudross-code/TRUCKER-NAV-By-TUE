@@ -81,7 +81,22 @@ Added to filter panel, map icons, category detection, and API queries:
 - **Retail with truck parking**: Lowe's, Home Depot
 - Updated: MapControls.tsx, PoiIcon.tsx, NavigationView.tsx, geminiService.ts
 
-### Phase 15 — Compass Rose Overlay (DONE — 2026-03-25)
+### Phase 16 — Facility POI System (DONE — 2026-03-26)
+- **New `Facility` POI type** on map: Shipper (blue), Receiver (green), Both/Unknown (purple)
+- **Google Places API seed** — auto-fetches warehouses, distribution centers, truck terminals within 50km on first visit, cached per 0.5° grid cell for 30 days
+- **Manual facility add** — drivers tap "Add" in filter panel → form with name, type, GPS location → appears on map immediately
+- **Crowd-sourced driver reports** (majority vote system):
+  - Loading speed (Fast/Average/Slow with visual progress bar)
+  - Unloading speed (Fast/Average/Slow)
+  - Parking allowed (Yes/No with vote count)
+  - Overnight parking (Yes/No with vote count)
+  - Open days (Mon–Sun checkboxes)
+  - Operating hours (open/close time)
+  - Facility type (Shipper/Receiver/Both can be corrected by drivers)
+- **Google operating hours** fetched lazily on first click (saves API quota)
+- **FacilityPanel** slide-up modal: TypeBadge, address, phone, Google hours section, driver consensus section, submit-your-report form
+- **Backend**: `/api/facilities` GET/POST, `/api/facilities/:id/hours` GET, `/api/facilities/report` POST; data stored in `/app/data/facilities.json`
+- **Filter panel**: "Facilities" section with legend (blue=S, green=R, purple=Both) + Add + show/hide toggle
 - New `CompassRose.tsx` component — always visible in bottom-left of map
 - SVG design: dark glass background, gold/amber accent (GPS mode) or blue accent (compass mode)
 - 36 tick marks (every 10°): major ticks at N/E/S/W, intercardinal at NE/SE/SW/NW, minor for all others
