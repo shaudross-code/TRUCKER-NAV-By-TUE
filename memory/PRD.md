@@ -81,7 +81,15 @@ Added to filter panel, map icons, category detection, and API queries:
 - **Retail with truck parking**: Lowe's, Home Depot
 - Updated: MapControls.tsx, PoiIcon.tsx, NavigationView.tsx, geminiService.ts
 
-### Phase 14 — Touch Orientation + Device Compass Mode (DONE — 2026-03-25)
+### Phase 15 — Compass Rose Overlay (DONE — 2026-03-25)
+- New `CompassRose.tsx` component — always visible in bottom-left of map
+- SVG design: dark glass background, gold/amber accent (GPS mode) or blue accent (compass mode)
+- 36 tick marks (every 10°): major ticks at N/E/S/W, intercardinal at NE/SE/SW/NW, minor for all others
+- 8 cardinal labels rotate as group by `-bearing` so N always points to true geographic north
+- Fixed needle always points UP (driver's forward direction)
+- Bearing pill below the rose: 3-digit zero-padded degrees + 16-point cardinal abbreviation (e.g. `045° NE`)
+- `animate-ping` blue dot indicator when compass mode active
+- Subscribes to `TelemetryContext` for GPS heading; switches to `deviceorientation` events when compass mode active
 - **Touch rotation fixed** — CSS changed from `.map-heading-up .leaflet-rotate-pane` to `.leaflet-rotate-pane` so 2-finger rotation works in ALL map modes (North-up + Heading-up)
 - `manualRotation` useEffect now immediately applies `--map-rotation` CSS variable (no longer waits for telemetry tick)
 - **Device Compass Mode** — new compass toggle button in map controls:
