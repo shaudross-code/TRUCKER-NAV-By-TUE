@@ -73,6 +73,7 @@ import { MapControls } from './MapControls';
 import { CompassRose } from './CompassRose';
 import { FacilityPanel, AddFacilityForm } from './FacilityPanel';
 import { fetchFacilities, facilityIconSVG, Facility } from '../services/facilityService';
+import { TruckStopReputation } from './ReputationScore';
 import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { decode } from '@here/flexpolyline';
@@ -4059,6 +4060,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   )}
                 </div>
               )}
+
+              {/* ── Truck Stop Reputation Score ── */}
+              <div data-testid="truckstop-reputation-section" className="border border-[#D4AF37]/20 rounded-2xl landscape:rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-[#D4AF37]/8 border-b border-[#D4AF37]/15">
+                  <svg className="w-4 h-4 text-[#D4AF37]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                  </svg>
+                  <span className="text-[10px] landscape:text-[8px] font-black text-[#D4AF37] uppercase tracking-widest">Truck Stop Reputation</span>
+                </div>
+                <div className="px-4 py-3 landscape:py-2">
+                  <TruckStopReputation
+                    parkingStatus={poiParkingStatus?.status as any}
+                    updateCount={poiParkingStatus?.updateCount || 0}
+                    amenityCount={selectedPoi.amenities?.length || 0}
+                  />
+                </div>
+              </div>
 
               {/* Parking Confidence Banner — Distribution POIs only (Lowe's, Home Depot, Walmart) */}
               {selectedPoi.type === 'distribution' && (

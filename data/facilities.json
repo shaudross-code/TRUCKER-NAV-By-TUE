@@ -3,7 +3,9 @@
     "43_-84": "2026-03-26T18:57:23.729Z",
     "43.5_-84.5": "2026-03-26T19:00:31.312Z",
     "39_-98.5": "2026-03-26T19:09:40.740Z",
-    "39_-99": "2026-03-26T19:15:14.002Z"
+    "39_-99": "2026-03-26T19:15:14.002Z",
+    "42_-83": "2026-03-26T19:38:23.404Z",
+    "42.5_-83.5": "2026-03-26T19:43:18.699Z"
   },
   "manual_1774551488838_g8f8x": {
     "id": "manual_1774551488838_g8f8x",
@@ -19,25 +21,25 @@
     "crowd_data": {
       "type_votes": {
         "shipper": 0,
-        "receiver": 2,
+        "receiver": 3,
         "both": 0
       },
       "loading_speed": {
-        "fast": 1,
+        "fast": 2,
         "average": 0,
         "slow": 0
       },
       "unloading_speed": {
-        "fast": 0,
+        "fast": 1,
         "average": 1,
         "slow": 0
       },
       "parking_allowed": {
-        "yes": 1,
+        "yes": 2,
         "no": 0
       },
       "overnight_parking": {
-        "yes": 0,
+        "yes": 1,
         "no": 1
       },
       "open_days": {
@@ -55,8 +57,8 @@
       "close_time": {
         "18:00": 1
       },
-      "total_reports": 2,
-      "last_updated": "2026-03-26T18:58:16.707Z"
+      "total_reports": 3,
+      "last_updated": "2026-03-26T19:39:55.496Z"
     }
   },
   "manual_1774551631297_1e9cm": {
@@ -307,6 +309,56 @@
       "close_time": {},
       "total_reports": 1,
       "last_updated": "2026-03-26T19:14:08.284Z"
+    }
+  },
+  "manual_1774554198679_3t4gk": {
+    "id": "manual_1774554198679_3t4gk",
+    "source": "manual",
+    "name": "TEST_NoReports_Facility",
+    "lat": 42.5,
+    "lon": -83.5,
+    "address": "",
+    "phone": "",
+    "google_hours": [],
+    "hours_fetched": false,
+    "last_fetched": "2026-03-26T19:43:18.679Z",
+    "crowd_data": {
+      "type_votes": {
+        "shipper": 0,
+        "receiver": 0,
+        "both": 1
+      },
+      "loading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "unloading_speed": {
+        "fast": 0,
+        "average": 0,
+        "slow": 0
+      },
+      "parking_allowed": {
+        "yes": 0,
+        "no": 0
+      },
+      "overnight_parking": {
+        "yes": 0,
+        "no": 0
+      },
+      "open_days": {
+        "Mon": 0,
+        "Tue": 0,
+        "Wed": 0,
+        "Thu": 0,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "open_time": {},
+      "close_time": {},
+      "total_reports": 1,
+      "last_updated": "2026-03-26T19:43:18.679Z"
     }
   }
 }

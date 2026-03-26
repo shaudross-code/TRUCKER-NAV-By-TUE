@@ -70,5 +70,37 @@
     "lon": -98.48,
     "updatedAt": "2026-03-25T23:04:42.726Z",
     "updateCount": 3
+  },
+  "TEST_light_poi": {
+    "status": "light",
+    "name": "Test light POI",
+    "lat": 42,
+    "lon": -83,
+    "updatedAt": "2026-03-26T19:43:18.721Z",
+    "updateCount": 1
+  },
+  "TEST_medium_poi": {
+    "status": "medium",
+    "name": "Test medium POI",
+    "lat": 42,
+    "lon": -83,
+    "updatedAt": "2026-03-26T19:43:18.724Z",
+    "updateCount": 1
+  },
+  "TEST_heavy_poi": {
+    "status": "heavy",
+    "name": "Test heavy POI",
+    "lat": 42,
+    "lon": -83,
+    "updatedAt": "2026-03-26T19:43:18.728Z",
+    "updateCount": 1
+  },
+  "TEST_maxed_poi": {
+    "status": "maxed",
+    "name": "Test maxed POI",
+    "lat": 42,
+    "lon": -83,
+    "updatedAt": "2026-03-26T19:43:18.732Z",
+    "updateCount": 1
   }
 }

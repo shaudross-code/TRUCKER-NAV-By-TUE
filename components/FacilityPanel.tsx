@@ -5,6 +5,7 @@ import {
   submitFacilityReport, fetchFacilityHours, addFacility,
   getSpeedScore, getTotalVotes, facilityIconSVG,
 } from '../services/facilityService';
+import { FacilityReputation } from './ReputationScore';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -276,6 +277,19 @@ export const FacilityPanel: React.FC<FacilityPanelProps> = ({ facility, userLoca
               <a href={`tel:${phone}`} className="hover:text-[#D4AF37] transition-colors">{phone}</a>
             </div>
           )}
+        </div>
+
+        {/* ── Facility Reputation Score ── */}
+        <div data-testid="facility-reputation-section" className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800">
+            <svg className="w-3.5 h-3.5 text-[#D4AF37]" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <span className="text-[10px] font-black text-white uppercase tracking-widest">Reputation Score</span>
+          </div>
+          <div className="px-4 py-3">
+            <FacilityReputation crowdData={crowd} />
+          </div>
         </div>
 
         {/* ── Google Hours ── */}

@@ -305,8 +305,11 @@ async function createServer() {
     try {
       const store = readParkingStore();
       const entry = store[String(poiId)];
-      if (!entry) return res.json({ status: null, updatedAt: null, updateCount: 0 });
-      res.json(entry);
+      if (!entry) return res.json({ status: null, updatedAt: null, updateCount: 0, reputation_score: 0 });
+      // Calculate truck stop reputation from parking data
+      const statusScores: Record<string, number> = { light: 4.5, medium: 3.2, heavy: 2.0, maxed: 1.0 };
+      const reputation_score = entry.status ? Math.round((statusScores[entry.status] || 0) * 10) / 10 : 0;
+      res.json({ ...entry, reputation_score });
     } catch (error) {
       console.error('Error fetching parking status:', error);
       res.status(500).json({ error: 'Failed to fetch parking status' });
@@ -381,6 +384,35 @@ function getMajorityVote(votes: Record<string, number>): string | null {
   return entries.sort((a, b) => b[1] - a[1])[0][0];
 }
 
+function calcWeightedScore(votes: Record<string, number>, weights: Record<string, number>): number {
+  let total = 0, weighted = 0;
+  for (const [k, v] of Object.entries(votes)) {
+    if (v > 0 && weights[k] !== undefined) { total += v; weighted += v * weights[k]; }
+  }
+  return total > 0 ? weighted / total : 0;
+}
+
+function calcFacilityReputationScore(crowd: any): number {
+  if (!crowd || (crowd.total_reports || 0) === 0) return 0;
+  const scores: number[] = [];
+
+  const loadTotal = (crowd.loading_speed?.fast || 0) + (crowd.loading_speed?.average || 0) + (crowd.loading_speed?.slow || 0);
+  if (loadTotal > 0) scores.push(calcWeightedScore(crowd.loading_speed, { fast: 5, average: 3, slow: 1 }));
+
+  const unloadTotal = (crowd.unloading_speed?.fast || 0) + (crowd.unloading_speed?.average || 0) + (crowd.unloading_speed?.slow || 0);
+  if (unloadTotal > 0) scores.push(calcWeightedScore(crowd.unloading_speed, { fast: 5, average: 3, slow: 1 }));
+
+  const parkTotal = (crowd.parking_allowed?.yes || 0) + (crowd.parking_allowed?.no || 0);
+  if (parkTotal > 0) scores.push((crowd.parking_allowed.yes / parkTotal) * 5);
+
+  const overnightTotal = (crowd.overnight_parking?.yes || 0) + (crowd.overnight_parking?.no || 0);
+  if (overnightTotal > 0) scores.push((crowd.overnight_parking.yes / overnightTotal) * 5);
+
+  if (scores.length === 0) return 0;
+  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+  return Math.round(Math.max(0, Math.min(5, avg)) * 10) / 10;
+}
+
 function buildMajority(crowd: any) {
   return {
     type:               getMajorityVote(crowd.type_votes || {}) || 'both',
@@ -394,6 +426,8 @@ function buildMajority(crowd: any) {
       .map(([d]) => d),
     open_time:  getMajorityVote(crowd.open_time || {}),
     close_time: getMajorityVote(crowd.close_time || {}),
+    reputation_score: calcFacilityReputationScore(crowd),
+    total_reports: crowd.total_reports || 0,
   };
 }
 
