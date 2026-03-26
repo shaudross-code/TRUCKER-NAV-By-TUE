@@ -70,6 +70,7 @@ import { fetchTruckPOIs, searchPlaces, fetchAddressSuggestions, lookupPlace } fr
 import { speak } from '../services/speechService';
 import { SpeedLimitSign, HighwayShield } from './MapUI';
 import { MapControls } from './MapControls';
+import { CompassRose } from './CompassRose';
 import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { decode } from '@here/flexpolyline';
@@ -4774,6 +4775,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           )}
         </div>
       )}
+
+      {/* ── Compass Rose — always visible, bottom-left of map ── */}
+      <div
+        className="absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-3 md:left-5 z-[2005] pointer-events-none"
+        data-testid="compass-rose-container"
+      >
+        <CompassRose isCompassMode={isCompassMode} />
+      </div>
 
       {isDriving && !isExploreMode && (
         <div id="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-8 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[750px] px-2 md:px-6 pointer-events-none">
