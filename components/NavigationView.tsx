@@ -86,7 +86,7 @@ interface NavigationViewProps {
   activeView?: ViewType;
 }
 
-const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '4D6H6eQaS6oyaQmgNGly';
+const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '';
 const HERE_API_KEY = process.env.HERE_API_KEY || '';
 const MAPTILER_STYLE_ID = '019cd801-e446-7ed9-b765-d542688d7f3e';
 const MAPTILER_STYLE = {
