@@ -178,17 +178,17 @@ async function createServer() {
   });
 
   app.post('/api/browse', async (req, res) => {
-    const { lat, lon, categories } = req.body;
+    const { lat, lon, categories, radius } = req.body;
     try {
       const hereUrl = new URL('https://browse.search.hereapi.com/v1/browse');
       hereUrl.searchParams.append('at', `${lat},${lon}`);
       
       // Use truck-specific categories if none provided
-      const truckCategories = categories || '700-7600-0116,700-7600-0117,700-7600-0322,700-7000-0000';
+      const truckCategories = categories || '700-7600-0116,700-7600-0117,700-7600-0322,700-7900-0132,700-7000-0000';
       hereUrl.searchParams.append('categories', truckCategories);
       
       hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
-      hereUrl.searchParams.append('limit', '50'); // Increased for better coverage
+      hereUrl.searchParams.append('limit', '100');
       
       const response = await fetch(hereUrl.toString());
       const data = await response.json();
@@ -216,13 +216,15 @@ async function createServer() {
   });
 
   app.post('/api/discover', async (req, res) => {
-    const { lat, lon, q } = req.body;
+    const { lat, lon, q, radius } = req.body;
     try {
       const hereUrl = new URL('https://discover.search.hereapi.com/v1/discover');
-      hereUrl.searchParams.append('at', `${lat},${lon}`);
       if (q) hereUrl.searchParams.append('q', q);
+      // Use `in` for area restriction (replaces `at` for radius-based search)
+      const r = radius || 80000;
+      hereUrl.searchParams.append('in', `circle:${lat},${lon};r=${r}`);
       hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
-      hereUrl.searchParams.append('limit', '20');
+      hereUrl.searchParams.append('limit', '50');
       
       const response = await fetch(hereUrl.toString());
       const data = await response.json();

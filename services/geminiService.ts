@@ -258,47 +258,53 @@ export async function fetchMajorChains(lat: number, lon: number) {
 
 export async function fetchTruckPOIs(lat: number, lon: number) {
   try {
-    // Fetch multiple types of truck-related POIs in parallel
-    const [generalPOIs, servicePOIs, brandPOIs] = await Promise.all([
-      // General truck stops, rest areas, weigh stations
+    // Fetch multiple types of truck-related POIs in parallel using HERE APIs
+    const [generalPOIs, servicePOIs, truckStopPOIs, ...brandResults] = await Promise.all([
+      // General fueling stations, rest areas, weigh stations via Browse
       fetch('/api/browse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
           lat, 
           lon, 
-          categories: '700-7600-0116,700-7600-0117,700-7600-0322,700-7000-0000'
+          categories: '700-7600-0116,700-7600-0117,700-7600-0322'
         })
       }).then(r => r.ok ? r.json() : { items: [] }),
       
-      // Truck service centers (includes Speedco, tire shops, repair)
+      // Truck service centers via Browse (repair, tires, truck-specific services)
       fetch('/api/browse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
           lat, 
           lon, 
-          categories: '600-6300-0066,600-6100-0062,600-6300-0000' // Truck repair, tire dealers, auto service
+          categories: '600-6300-0066,600-6100-0062,600-6300-0000,700-7900-0132'
         })
       }).then(r => r.ok ? r.json() : { items: [] }),
       
-      // Search for specific truck service brands
-      fetch('/api/search', {
+      // Truck stops specifically via Discover API (most accurate)
+      fetch('/api/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: safeStringify({ 
-          query: 'Speedco OR "Southern Tire Mart" OR "Rush Truck Centers" OR Ryder OR Penske OR Freightliner OR Cummins OR Walmart OR "Truck Wash" OR "Blue Beacon" OR Peterbilt OR Volvo OR "Lowe\'s Pro" OR "Home Depot Pro" OR "Lowe\'s Distribution" OR "Home Depot Distribution" OR "Exxon Travel Plaza" OR "Marathon Truck Stop" OR "Circle K Truck Stop" OR "7-Eleven Truck Stop" OR "BP Truck Stop" OR "Shell Truck Stop"',
-          lat,
-          lon
-        })
-      }).then(r => r.ok ? r.json() : { items: [] })
+        body: safeStringify({ q: 'truck stop', lat, lon, radius: 80000 })
+      }).then(r => r.ok ? r.json() : { items: [] }),
+      
+      // Major brands via individual Discover calls (HERE doesn't support OR queries)
+      ...["Love's Travel Stop", "Pilot Flying J", "Petro Stopping Centers", "TA TravelCenters", "Cat Scale", "Speedco", "Blue Beacon Truck Wash"].map(brand =>
+        fetch('/api/discover', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: safeStringify({ q: brand, lat, lon, radius: 80000 })
+        }).then(r => r.ok ? r.json() : { items: [] })
+      )
     ]);
     
     // Combine all results
     const allItems = [
       ...(generalPOIs.items || []),
       ...(servicePOIs.items || []),
-      ...(brandPOIs.items || [])
+      ...(truckStopPOIs.items || []),
+      ...brandResults.flatMap((r: any) => r.items || [])
     ];
     
     if (allItems.length === 0) {
@@ -306,51 +312,101 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       return fetchTruckPOIsFromOverpass(lat, lon);
     }
     
+    // Deduplicate by position (round to 4 decimal places ~11m precision)
+    const seen = new Set<string>();
+    const deduped = allItems.filter((item: any) => {
+      const pos = item.position || item.access?.[0]?.position;
+      if (!pos) return false;
+      const key = `${pos.lat.toFixed(4)}_${pos.lng.toFixed(4)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    
     // Map HERE results to our POI format
-    return allItems.map((item: any) => {
+    return deduped.map((item: any) => {
       const position = item.position || item.access?.[0]?.position;
       if (!position) return null;
       
       const itemName = (item.title || "").toLowerCase();
+      const catIds = (item.categories || []).map((c: any) => c.id);
+      const catNames = (item.categories || []).map((c: any) => (c.name || '').toLowerCase());
       
-      // Determine type based on categories and name
+      // ── Determine type based on categories, name, and HERE category IDs ──
       let type = "fuel";
+      
+      // Known truck service brands
       const isTruckService = itemName.includes('speedco') || itemName.includes('southern tire') ||
                              itemName.includes('rush truck') || itemName.includes('ryder') ||
                              itemName.includes('penske') || itemName.includes('freightliner') ||
                              itemName.includes('cummins') || itemName.includes('peterbilt') ||
                              itemName.includes('volvo') || itemName.includes('truck wash') ||
-                             itemName.includes('blue beacon');
+                             itemName.includes('blue beacon') || itemName.includes('cat scale');
+      
+      // Known truck stop / travel center brands  
+      const isTruckStop = itemName.includes('travel stop') || itemName.includes('travel center') ||
+                          itemName.includes('travel plaza') || itemName.includes('truck stop') ||
+                          itemName.includes("love's") || itemName.includes('loves ') ||
+                          itemName.includes('pilot') || itemName.includes('flying j') ||
+                          itemName.includes('petro stopping') || itemName.includes('ta ') ||
+                          (itemName.startsWith('ta ') || itemName === 'ta') ||
+                          itemName.includes('ambest') || itemName.includes('sapp bros') ||
+                          itemName.includes('buc-ee') || itemName.includes('bucees') ||
+                          itemName.includes('road ranger');
+      
       const isWalmart = itemName.includes('walmart') || itemName.includes('wal-mart');
       const isRetail = itemName.includes("lowe's") || itemName.includes('lowes') || itemName.includes('home depot');
       const isFuelBrand = itemName.includes('exxon') || itemName.includes('shell') ||
                           itemName.includes('marathon') || itemName.includes('circle k') ||
                           itemName.includes('7-eleven') || itemName.includes('seven eleven') ||
-                          itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp';
+                          itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp' ||
+                          itemName.includes('chevron') || itemName.includes('sinclair') ||
+                          itemName.includes('conoco') || itemName.includes('phillips 66') ||
+                          itemName.includes('casey') || itemName.includes('kwik') ||
+                          itemName.includes('quiktrip') || itemName.includes('wawa') ||
+                          itemName.includes('sheetz') || itemName.includes('racetrac') ||
+                          itemName.includes('speedway');
       const isLowClearance = itemName.includes('low clearance') || itemName.includes('low bridge');
       
-      if (isTruckService) {
+      if (isTruckStop) {
+        type = "major_chains"; // Full-service truck stops
+      } else if (isTruckService) {
         type = "service"; // Truck service/repair
       } else if (isWalmart || isRetail) {
         type = "distribution"; // Retail/Distribution
-      } else if (isFuelBrand) {
-        type = "fuel"; // Known fuel brands
       } else if (isLowClearance) {
         type = "low_clearance"; // Warning/Hazard
-      } else if (item.categories?.some((c: any) => c.id === '700-7600-0116')) {
-        type = "major_chains";
-      } else if (item.categories?.some((c: any) => c.id === '700-7600-0117')) {
+      } else if (catIds.includes('700-7900-0132')) {
+        type = "service"; // HERE truck-related services (Cat Scale, etc.)
+      } else if (catIds.includes('700-7600-0117') || catNames.some((n: string) => n.includes('rest area'))) {
         type = "rest_area";
-      } else if (item.categories?.some((c: any) => c.id === '700-7600-0322')) {
+      } else if (catIds.includes('700-7600-0322')) {
         type = "weigh_station";
-      } else if (item.categories?.some((c: any) => c.id?.startsWith('600-6'))) {
+      } else if (catIds.some((id: string) => id?.startsWith('600-6'))) {
         type = "service";
+      } else if (isFuelBrand || catIds.includes('700-7600-0116')) {
+        type = "fuel";
       }
       
       // Extract amenities from categories and name
-      const amenities = [];
+      const amenities: string[] = [];
       
-      if (itemName.includes('speedco')) {
+      // Truck stop / travel center brands — full amenity sets
+      if (itemName.includes("love's") || itemName.includes('loves ')) {
+        amenities.push("Diesel", "DEF", "Showers", "Laundry", "Truck Parking", "Scales", "WiFi", "Food");
+      } else if (itemName.includes('pilot') || itemName.includes('flying j')) {
+        amenities.push("Diesel", "DEF", "Showers", "Laundry", "Truck Parking", "Scales", "WiFi", "Food");
+      } else if (itemName.includes('petro') && itemName.includes('stop')) {
+        amenities.push("Diesel", "DEF", "Showers", "Truck Parking", "Iron Skillet", "Scales");
+      } else if (itemName.startsWith('ta ') || itemName === 'ta' || itemName.includes('travelcenters')) {
+        amenities.push("Diesel", "DEF", "Showers", "Truck Parking", "Food", "Scales");
+      } else if (itemName.includes('buc-ee') || itemName.includes('bucees')) {
+        amenities.push("Diesel", "DEF", "Food", "Shopping", "Clean Restrooms", "Large Parking");
+      } else if (itemName.includes('sapp bros')) {
+        amenities.push("Diesel", "DEF", "Showers", "Truck Parking", "Food");
+      } else if (itemName.includes('cat scale')) {
+        amenities.push("Certified Scale", "Truck Weighing", "Reweigh Guarantee");
+      } else if (itemName.includes('speedco')) {
         amenities.push("Truck Repair", "Maintenance", "Oil Change", "Inspection");
       } else if (itemName.includes('southern tire')) {
         amenities.push("Tires", "Tire Repair", "Tire Sales", "Road Service");
@@ -374,22 +430,14 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         amenities.push("Large Lot Parking", "Hardware", "Building Materials", "Contractor Access");
       } else if (itemName.includes('home depot')) {
         amenities.push("Large Lot Parking", "Hardware", "Building Materials", "Pro Desk");
-      } else if (itemName.includes('exxon') || itemName.includes('esso')) {
-        amenities.push("Diesel", "Fuel", "Truck Stop");
-      } else if (itemName.includes('shell')) {
-        amenities.push("Diesel", "Fuel", "Truck Stop");
-      } else if (itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp') {
-        amenities.push("Diesel", "Fuel", "Truck Stop");
-      } else if (itemName.includes('marathon')) {
-        amenities.push("Diesel", "Fuel", "Truck Stop");
-      } else if (itemName.includes('circle k')) {
-        amenities.push("Diesel", "Fuel", "Convenience");
-      } else if (itemName.includes('7-eleven') || itemName.includes('seven eleven')) {
-        amenities.push("Diesel", "Fuel", "Convenience");
       } else if (itemName.includes('truck wash') || itemName.includes('blue beacon')) {
         amenities.push("Truck Wash", "Detailing", "Fleet Service");
       } else if (itemName.includes('low clearance') || itemName.includes('low bridge')) {
         amenities.push("Warning", "Height Restriction");
+      } else if (itemName.includes('travel center') || itemName.includes('travel plaza') || itemName.includes('truck stop')) {
+        amenities.push("Diesel", "Truck Parking", "Food");
+      } else if (itemName.includes('rest area')) {
+        amenities.push("Restrooms", "Parking", "Picnic Area");
       }
       
       if (item.contacts?.phone) amenities.push("Phone");
@@ -409,17 +457,19 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         if (!amenities.includes("Tires")) amenities.push("Tires");
       }
       
-      if (amenities.length === 0) amenities.push("Services");
+      if (amenities.length === 0) amenities.push("Diesel");
       
       return {
         name: item.title || "Truck Stop",
         type,
         lat: position.lat,
         lon: position.lng,
-        amenities,
+        amenities: [...new Set(amenities)], // Deduplicate amenities
         address: item.address?.label,
         distance: item.distance,
-        phone: item.contacts?.phone?.[0]?.value
+        phone: item.contacts?.phone?.[0]?.value,
+        place_id: item.id, // HERE place ID for lookup
+        id: item.id,
       };
     }).filter(Boolean);
   } catch (e) {
