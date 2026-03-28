@@ -478,6 +478,141 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
   }
 }
 
+// ─── Corridor-Based POI Search ────────────────────────────────────────────────
+// Samples points every ~25 miles along the route and fetches POIs within a
+// tight 16km (~10mi) corridor using HERE Discover API.
+export async function fetchCorridorPOIs(
+  routeCoords: [number, number][],  // [lng, lat] from route geometry
+  totalDistMiles: number
+): Promise<any[]> {
+  if (!routeCoords || routeCoords.length < 2) return [];
+
+  // Sample points every ~25 miles along the route
+  const sampleIntervalMi = 25;
+  const numSamples = Math.max(2, Math.ceil(totalDistMiles / sampleIntervalMi));
+  const samplePoints: [number, number][] = []; // [lat, lng]
+  
+  for (let i = 0; i <= numSamples; i++) {
+    const idx = Math.min(
+      Math.floor((i / numSamples) * (routeCoords.length - 1)),
+      routeCoords.length - 1
+    );
+    const coord = routeCoords[idx];
+    samplePoints.push([coord[1], coord[0]]); // Convert [lng,lat] → [lat,lng]
+  }
+
+  // Deduplicate sample points that are too close (< 10 miles apart)
+  const dedupedSamples: [number, number][] = [samplePoints[0]];
+  for (let i = 1; i < samplePoints.length; i++) {
+    const prev = dedupedSamples[dedupedSamples.length - 1];
+    const dlat = samplePoints[i][0] - prev[0];
+    const dlng = samplePoints[i][1] - prev[1];
+    const approxMiles = Math.sqrt(dlat * dlat + dlng * dlng) * 69; // Rough conversion
+    if (approxMiles > 10) dedupedSamples.push(samplePoints[i]);
+  }
+  // Always include the last point
+  const lastSample = samplePoints[samplePoints.length - 1];
+  const lastDeduped = dedupedSamples[dedupedSamples.length - 1];
+  if (lastSample[0] !== lastDeduped[0] || lastSample[1] !== lastDeduped[1]) {
+    dedupedSamples.push(lastSample);
+  }
+
+  console.log(`[Corridor] Sampling ${dedupedSamples.length} points along ${totalDistMiles.toFixed(0)}mi route`);
+
+  const corridorRadius = 16000; // 16km ≈ 10 miles
+  const allItems: any[] = [];
+
+  // Process in batches of 3 to avoid rate limiting
+  for (let i = 0; i < dedupedSamples.length; i += 3) {
+    const batch = dedupedSamples.slice(i, i + 3);
+    
+    const batchPromises = batch.flatMap(([lat, lng]) => [
+      // Discover: truck stops
+      fetch('/api/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeStringify({ q: 'truck stop', lat, lon: lng, radius: corridorRadius })
+      }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] })),
+      
+      // Browse: fuel + rest areas + weigh stations within corridor
+      fetch('/api/browse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeStringify({ 
+          lat, lon: lng, 
+          categories: '700-7600-0116,700-7600-0117,700-7600-0322,700-7900-0132'
+        })
+      }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }))
+    ]);
+
+    const results = await Promise.all(batchPromises);
+    results.forEach(r => {
+      if (r.items) allItems.push(...r.items);
+    });
+
+    // Rate limit between batches
+    if (i + 3 < dedupedSamples.length) {
+      await new Promise(resolve => setTimeout(resolve, 800));
+    }
+  }
+
+  // Deduplicate by position (4 decimal places ≈ 11m precision)
+  const seen = new Set<string>();
+  const deduped = allItems.filter((item: any) => {
+    const pos = item.position || item.access?.[0]?.position;
+    if (!pos) return false;
+    const key = `${pos.lat.toFixed(4)}_${pos.lng.toFixed(4)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  console.log(`[Corridor] Found ${deduped.length} unique POIs (from ${allItems.length} raw)`);
+
+  // Map to POI format (reuse the same mapping logic)
+  return deduped.map((item: any) => {
+    const position = item.position || item.access?.[0]?.position;
+    if (!position) return null;
+
+    const itemName = (item.title || "").toLowerCase();
+    const catIds = (item.categories || []).map((c: any) => c.id);
+
+    let type = "fuel";
+    const isTruckStop = itemName.includes('travel stop') || itemName.includes('travel center') ||
+                        itemName.includes('truck stop') || itemName.includes("love's") ||
+                        itemName.includes('pilot') || itemName.includes('flying j') ||
+                        itemName.includes('petro stopping') || itemName.includes('sapp bros') ||
+                        itemName.includes('buc-ee');
+    const isTruckService = itemName.includes('cat scale') || itemName.includes('speedco') ||
+                           itemName.includes('blue beacon') || itemName.includes('rush truck');
+
+    if (isTruckStop) type = "major_chains";
+    else if (isTruckService || catIds.includes('700-7900-0132')) type = "service";
+    else if (catIds.includes('700-7600-0117')) type = "rest_area";
+    else if (catIds.includes('700-7600-0322')) type = "weigh_station";
+
+    const amenities: string[] = [];
+    if (isTruckStop) amenities.push("Diesel", "DEF", "Truck Parking", "Food");
+    else if (type === "rest_area") amenities.push("Restrooms", "Parking");
+    else amenities.push("Diesel");
+
+    return {
+      name: item.title || "Truck Stop",
+      type,
+      lat: position.lat,
+      lon: position.lng,
+      amenities,
+      address: item.address?.label,
+      distance: item.distance,
+      phone: item.contacts?.phone?.[0]?.value,
+      place_id: item.id,
+      id: item.id,
+      corridorPoi: true, // Flag for corridor-sourced POIs
+    };
+  }).filter(Boolean);
+}
+
+
 // Fallback to OpenStreetMap Overpass API
 async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
   try {

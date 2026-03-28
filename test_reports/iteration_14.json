@@ -1,0 +1,77 @@
+{
+  "summary": "Route-based corridor POI search feature testing complete. All 11 backend tests passed (100%). Frontend UI testing verified: corridor POI search triggers on route start, 'Along Route' panel displays POIs with distance in miles, POIs are clickable. Console shows '[Corridor] Sampling 30 points along 746mi route'. Total POI count increased from ~183 to 377.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_corridor_poi.py",
+    "/app/test_reports/pytest/corridor_poi_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: POST /api/discover endpoint works with radius parameter (16km corridor)",
+    "VERIFIED: POST /api/browse endpoint works for truck categories (700-7600-0116,700-7600-0117,700-7600-0322,700-7900-0132)",
+    "VERIFIED: fetchCorridorPOIs function exists and is exported from geminiService.ts (line 484)",
+    "VERIFIED: Console shows '[Corridor] Sampling 30 points along 746mi route' when route is active",
+    "VERIFIED: 'Along Route' header displays instead of 'Upcoming POIs' (line 4629 in NavigationView.tsx)",
+    "VERIFIED: Along Route panel shows POIs with distance in miles (e.g., '4.0 mi', '18.0 mi')",
+    "VERIFIED: POIs in Along Route panel are clickable and open POI popup",
+    "VERIFIED: Along Route panel filters POIs within 10mi of route line (corridorDist < 10 check at line 3653)",
+    "VERIFIED: Corridor POIs increase total POI count (from ~183 to 377 - exceeds 300+ target)",
+    "VERIFIED: Deduplication by position works correctly (4-decimal precision)"
+  ],
+
+  "updated_files": ["/app/backend/tests/test_corridor_poi.py"],
+
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100% (all UI features verified)"
+  },
+
+  "test_results": {
+    "discover_api": {
+      "test_discover_returns_200": "PASS",
+      "test_discover_with_radius_parameter": "PASS - radius=16000 accepted",
+      "test_discover_returns_truck_stops": "PASS - returns truck stops with position data",
+      "test_discover_items_have_distance": "PASS - all items have distance field"
+    },
+    "browse_api": {
+      "test_browse_returns_200": "PASS",
+      "test_browse_with_truck_categories": "PASS - returns POIs for truck categories",
+      "test_browse_items_have_position": "PASS - all items have position data",
+      "test_browse_items_have_categories": "PASS - all items have category information"
+    },
+    "corridor_poi_logic": {
+      "test_corridor_sampling_multiple_points": "PASS - found POIs across sample points",
+      "test_corridor_deduplication_logic": "PASS - deduplication reduces duplicates"
+    },
+    "health_check": {
+      "test_health_endpoint": "PASS"
+    },
+    "frontend_ui": {
+      "corridor_console_log": "PASS - '[Corridor] Sampling 30 points along 746mi route'",
+      "along_route_header": "PASS - 'Along Route' header visible",
+      "poi_distance_in_miles": "PASS - distances shown as '4.0 mi', '18.0 mi', etc.",
+      "poi_clickable": "PASS - POI popup appears on click",
+      "poi_count_increase": "PASS - 377 POIs (from ~183 baseline)"
+    }
+  },
+
+  "seed_data_creation": "None - used HERE API live data",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at http://localhost:8001. Vite+Express single-stack. Corridor POI search feature verified: 1) fetchCorridorPOIs() in geminiService.ts samples route points every ~25 miles, 2) Calls /api/discover (truck stop) + /api/browse (fuel/rest/weigh) at each sample with 16km radius, 3) Console shows '[Corridor] Sampling X points along Ymi route', 4) 'Along Route' panel replaces 'Upcoming POIs' header, 5) POIs filtered within 10mi of route line, 6) Total POI count increased from ~183 to 377. Test file: /app/backend/tests/test_corridor_poi.py"
+}

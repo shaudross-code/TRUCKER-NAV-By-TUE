@@ -66,7 +66,7 @@ interface Waypoint {
 }
 import { AppContext, HOSContext, LocationContext, TelemetryContext, POI } from '../types';
 import { RouteHistoryItem, RestrictionAlert } from '../types';
-import { fetchTruckPOIs, searchPlaces, fetchAddressSuggestions, lookupPlace } from '../services/geminiService';
+import { fetchTruckPOIs, fetchCorridorPOIs, searchPlaces, fetchAddressSuggestions, lookupPlace } from '../services/geminiService';
 import { speak } from '../services/speechService';
 import { SpeedLimitSign, HighwayShield } from './MapUI';
 import { MapControls } from './MapControls';
@@ -2753,41 +2753,37 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       // Fetch extra data in background
       const fetchRoutePOIs = async (points: [number, number][], totalDistMi: number) => {
-        const allRoutePois: any[] = [];
-        if (points.length > 0) {
-          const sampledPoints: [number, number][] = [];
-          sampledPoints.push(points[0]); // Start
+        // Use corridor-based search for tighter, more accurate results along the route
+        try {
+          const corridorPois = await fetchCorridorPOIs(points, totalDistMi);
+          console.log(`[Route] Corridor search returned ${corridorPois.length} POIs along ${totalDistMi.toFixed(0)}mi route`);
           
-          if (totalDistMi > 100) {
-            const numSamples = Math.floor(totalDistMi / 100);
-            for (let i = 1; i <= numSamples; i++) {
-              const idx = Math.floor((i / (numSamples + 1)) * (points.length - 1));
-              sampledPoints.push(points[idx]);
-            }
-          } else if (points.length > 20) {
-            sampledPoints.push(points[Math.floor(points.length / 2)]); // Mid
-          }
-          
-          sampledPoints.push(points[points.length - 1]); // End
-          
-          for (let i = 0; i < sampledPoints.length; i += 3) {
-            const batch = sampledPoints.slice(i, i + 3);
-            const promises = batch.map(p => fetchTruckPOIs(p[0], p[1]).catch(() => []));
-            const results = await Promise.all(promises);
-            allRoutePois.push(...results.flat());
-            if (i + 3 < sampledPoints.length) {
-              await new Promise(resolve => setTimeout(resolve, 1500)); // 1.5s delay between batches
-            }
-          }
+          setPois(prev => {
+            const combined = [...prev, ...corridorPois];
+            const next = Array.from(new Map(combined.map(item => [
+              `${item.name}_${parseFloat(item.lat).toFixed(4)}_${parseFloat(item.lon).toFixed(4)}`,
+              item
+            ])).values());
+            if (next.length > 1500) return next.slice(next.length - 1500);
+            return next;
+          });
+        } catch (err) {
+          console.error("[Route] Corridor POI fetch failed, using fallback:", err);
+          // Fallback: fetch at start, middle, end
+          const fallbackPoints = [
+            points[0],
+            points[Math.floor(points.length / 2)],
+            points[points.length - 1]
+          ];
+          const results = await Promise.all(
+            fallbackPoints.map(p => fetchTruckPOIs(p[1], p[0]).catch(() => []))
+          );
+          const flat = results.flat();
+          setPois(prev => {
+            const combined = [...prev, ...flat];
+            return Array.from(new Map(combined.map(item => [item.name + item.lat + item.lon, item])).values());
+          });
         }
-        
-        const uniquePois = Array.from(new Map(allRoutePois.map(item => [item.name + item.lat + item.lon, item])).values());
-        setPois(prev => {
-          const combined = [...prev, ...uniquePois];
-          const next = Array.from(new Map(combined.map(item => [item.name + item.lat + item.lon, item])).values());
-          if (next.length > 1000) return next.slice(next.length - 1000);
-          return next;
-        });
       };
       
       fetchRoutePOIs(coords, distMi).catch(err => console.error("Fetch route POIs failed:", err));
@@ -3616,22 +3612,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       .filter(poi => {
         if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
         
-        // Pre-filter: only POIs within 50 miles
+        // Pre-filter: corridor POIs get wider range (100mi), others 50mi
         const distToUser = calcDistMi(userLocation[0], userLocation[1], poi.lat, poi.lon);
-        if (distToUser > 50) return false;
+        const maxDist = poi.corridorPoi ? 100 : 50;
+        if (distToUser > maxDist) return false;
 
         const category = getPoiCategory(poi.type, poi.name);
         return poiFilters.has(category);
       })
-      .slice(0, 50) // Limit to first 50 POIs within range to avoid heavy calculation
+      .slice(0, 80) // Limit to first 80 POIs within range to avoid heavy calculation
       .map(poi => {
         // Find POI's closest point on route
         let poiMinDist = Infinity;
         let poiRouteIdx = 0;
         
-        // Optimization: search only a window ahead of the user (approx 100 miles / 1500 points)
+        // Optimization: search only a window ahead of the user (approx 150 miles / 2500 points)
         const searchStart = Math.max(0, userRouteIdx - 10);
-        const searchEnd = Math.min(routePoints.length, userRouteIdx + 1500);
+        const searchEnd = Math.min(routePoints.length, userRouteIdx + 2500);
         
         for (let i = searchStart; i < searchEnd; i++) {
           const d = Math.pow(routePoints[i][0] - poi.lat, 2) + Math.pow(routePoints[i][1] - poi.lon, 2);
@@ -3641,17 +3638,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         }
         
+        // Calculate corridor distance (distance from route line in miles)
+        const corridorDist = Math.sqrt(poiMinDist) * 69; // Rough deg to miles
         const distance = calcDistMi(userLocation[0], userLocation[1], poi.lat, poi.lon);
 
         return {
           ...poi,
           routeIdx: poiRouteIdx,
-          distance
+          distance,
+          corridorDist
         };
       })
-      .filter(poi => poi.routeIdx >= userRouteIdx - 5 && poi.distance > 0.5)
+      // Only show POIs ahead of user AND within 10mi of route line
+      .filter(poi => poi.routeIdx >= userRouteIdx - 5 && poi.distance > 0.5 && poi.corridorDist < 10)
       .sort((a, b) => a.distance - b.distance)
-      .slice(0, 4);
+      .slice(0, 6); // Show 6 upcoming POIs instead of 4
 
     setUpcomingPois(upcoming);
   }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(',')]);
@@ -4625,7 +4626,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
                   <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
                 </div>
-                <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">Upcoming POIs</span>
+                <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">Along Route</span>
               </div>
               <div className="flex flex-col gap-1 md:gap-1.5">
                 {upcomingPois.map((poi, idx) => {
