@@ -3715,16 +3715,33 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       <div className="absolute inset-0 z-0 h-full w-full bg-zinc-950">
         {is3DMode ? (
           /* 3D Mapbox Navigation */
-          <Navigation3DView
-            userLocation={userLocation}
-            route={routeCoordinates ? { coordinates: routeCoordinates } : undefined}
-            heading={telemetryContext?.headingRef.current || 0}
-            nextTurnDistance={milesRemaining > 0 ? (parseFloat(nextInstruction.distance) || undefined) : undefined}
-            nextTurnDirection={milesRemaining > 0 ? nextInstruction.text : undefined}
-            speedLimit={currentSpeedLimit ?? undefined}
-            currentSpeed={telemetryContext?.speedRef.current || 0}
-            trafficSigns={trafficInfrastructure.slice(0, 1)}
-          />
+          <>
+            <Navigation3DView
+              userLocation={userLocation}
+              route={routeCoordinates ? { coordinates: routeCoordinates } : undefined}
+              heading={telemetryContext?.headingRef.current || 0}
+              nextTurnDistance={milesRemaining > 0 ? (parseFloat(nextInstruction.distance) || undefined) : undefined}
+              nextTurnDirection={milesRemaining > 0 ? nextInstruction.text : undefined}
+              speedLimit={currentSpeedLimit ?? undefined}
+              currentSpeed={telemetryContext?.speedRef.current || 0}
+              trafficSigns={trafficInfrastructure.slice(0, 1)}
+              eta={eta}
+              milesRemaining={milesRemaining}
+              timeRemaining={remainingDuration}
+              streetName={nextInstruction.text || undefined}
+            />
+            {/* 3D Mode Route Controls */}
+            {isDriving && (
+              <div className="absolute bottom-20 right-4 z-[2020] flex flex-col gap-2 pointer-events-auto">
+                <button onClick={handleCancelRoute} className="p-3 rounded-xl bg-black/80 backdrop-blur-sm border border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-400/40 transition-all" title="Cancel Route">
+                  <X className="w-5 h-5" strokeWidth={3} />
+                </button>
+                <button onClick={handleReroute} className="p-3 rounded-xl bg-black/80 backdrop-blur-sm border border-zinc-700 text-zinc-400 hover:text-[#D4AF37] hover:border-[#D4AF37]/40 transition-all" title="Reroute">
+                  <RotateCcw className="w-5 h-5" strokeWidth={3} />
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           /* 2D Leaflet Map */
           <>
@@ -4338,7 +4355,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Modern Navigation HUD */}
-      {!isExploreMode && milesRemaining > 0 && (
+      {!isExploreMode && milesRemaining > 0 && !is3DMode && (
         <div className={`absolute top-0 left-0 right-0 z-[2100] transition-all duration-700 ease-in-out ${milesRemaining > 0 ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'}`}>
           <div className="bg-gradient-to-b from-black/95 to-black/60 backdrop-blur-3xl border-b border-[#D4AF37]/20 p-2 md:p-6 landscape:p-2 landscape:md:p-4 pt-[calc(0.5rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] landscape:pt-[calc(0.25rem+env(safe-area-inset-top))] shadow-2xl">
             <div className="flex flex-col md:flex-row landscape:flex-row items-start md:items-center landscape:items-center justify-between gap-2 md:gap-4 landscape:gap-2">
@@ -4887,7 +4904,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         <CompassRose isCompassMode={isCompassMode} />
       </div>
 
-      {isDriving && !isExploreMode && (
+      {isDriving && !isExploreMode && !is3DMode && (
         <div id="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-8 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[750px] px-2 md:px-6 pointer-events-none">
           <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] landscape:rounded-2xl p-2 md:p-6 landscape:p-2 flex items-center justify-between shadow-[0_40px_100px_rgba(0,0,0,0.8)] pointer-events-auto transition-all hover:scale-[1.005]">
             <div className="flex items-center gap-2 shrink-0">
