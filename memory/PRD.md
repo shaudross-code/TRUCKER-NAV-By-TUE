@@ -28,10 +28,20 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Audio speech alerts via Gemini TTS
 - Low Clearance POIs with animated warning icons
 
-### Phase 4 — 3D Navigation (DONE)
+### Phase 4 — 3D Navigation (DONE — Enhanced 2026-03-28)
 - Mapbox GL JS 3D driver perspective view (Navigation3DView.tsx)
+- Uses `navigation-night-v1` style for realistic dark road rendering (falls back to MapTiler dark)
+- 3D gold truck marker with cab/trailer detail
+- Glowing blue route line (3-layer: glow + main + center)
+- Gold turn instruction banner at top with direction arrow
+- Speed limit sign overlay
+- Current speed display (turns red when over limit)
+- Bottom navigation bar with Speed, Distance, Time, ETA, and street name
+- Cancel/Reroute buttons accessible in 3D mode
+- 3D buildings with fill-extrusion
+- Atmospheric fog and star effects
+- 2D HUD automatically hidden in 3D mode to prevent overlap
 - 2D/3D toggle button in map controls
-- Fixed routePoints → routeCoordinates mapping bug
 
 ### Phase 5 — Mobile Setup (DONE)
 - Capacitor v6.2.0 initialized for iOS + Android
@@ -53,18 +63,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - 3D Camera Tracking via TelemetryContext
 
 ### Phase 17 — Reputation Scoring System (DONE — 2026-03-26)
-- **Facility Reputation Score**: Calculated from crowd-sourced driver reports (loading speed, unloading speed, parking allowed, overnight parking). Weighted average on 0-5 star scale with confidence indicator (low/medium/high based on report count).
-- **Truck Stop Reputation Score**: Calculated from parking status data (light=4.5, medium=3.2, heavy=2.0, maxed=1.0) with amenity bonus. Includes "Driver Favorite" / "Solid Choice" / "Use with Caution" / "Avoid if Possible" labels.
-- **Backend**: `calcFacilityReputationScore()` in server.ts, reputation_score returned in `buildMajority()` and parking-status endpoint
-- **Frontend**: New `ReputationScore.tsx` component with `FacilityReputation` and `TruckStopReputation` sub-components
-- **UI**: Star rating display with partial fill, trend indicator (up/down/flat), confidence badges, breakdown grid for facilities
-- **Testing**: 13/13 backend tests passed, all data-testid attributes verified
+- Facility Reputation Score: Calculated from crowd-sourced driver reports (loading speed, unloading speed, parking allowed, overnight parking)
+- Truck Stop Reputation Score: Calculated from parking status data (light=4.5, medium=3.2, heavy=2.0, maxed=1.0)
+- Backend: `calcFacilityReputationScore()` in server.ts, returned in both facility and parking endpoints
+- Frontend: ReputationScore.tsx with star display, confidence badges, trend indicators
 
 ## Prioritized Backlog
 
 ### P1 — Upcoming
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
-- Validate Mapbox 3D camera tracking during active navigation
 
 ### P2 — Future
 - Final App Store (Apple) and Google Play submissions
@@ -73,15 +80,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Known Issues
 - Platform preview URL requires manual wake via Emergent Dashboard (ingress cache)
 - NavigationView.tsx is 5000+ lines — candidate for future refactor
-- Pre-existing: POI markers fetched but timing issue may prevent immediate rendering
+- Mapbox `navigation-night-v1` style may be blocked in Emergent preview sandbox — falls back to MapTiler dark style automatically
 
 ## Key Files
-- `/app/components/NavigationView.tsx` — core map + POI orchestration
-- `/app/components/FacilityPanel.tsx` — facility detail/reporting panel
+- `/app/components/Navigation3DView.tsx` — premium 3D navigation view (gold theme, truck marker, glowing route)
+- `/app/components/NavigationView.tsx` — core map + POI orchestration (2D mode + 3D wrapper)
 - `/app/components/ReputationScore.tsx` — reputation star rating components
+- `/app/components/FacilityPanel.tsx` — facility detail/reporting panel
 - `/app/components/MapControls.tsx` — filter panel + map buttons
-- `/app/components/PoiIcon.tsx` — brand icons + category detection
-- `/app/components/Navigation3DView.tsx` — Mapbox 3D mode
+- `/app/components/CompassRose.tsx` — compass overlay
 - `/app/services/geminiService.ts` — HERE API POI fetching
 - `/app/services/facilityService.ts` — facility API calls + types
 - `/app/services/trafficInfrastructure.ts` — traffic alerts
