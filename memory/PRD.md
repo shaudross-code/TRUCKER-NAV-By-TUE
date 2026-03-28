@@ -7,56 +7,43 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Stack**: React (Vite) + Express (server.ts) single-level fullstack — port 8001
 - **Maps**: Leaflet (2D) + Mapbox GL JS (3D perspective)
 - **Mobile**: Capacitor v6.2.0 (iOS + Android), locked to Node 20
-- **Data**: Firebase Firestore + localStorage for filters/waypoints + local JSON file DBs
+- **Data**: Firebase Firestore + localStorage + local JSON file DBs
 - **APIs**: HERE Maps (Browse + Discover), Google Maps Platform, MapTiler, Gemini, Mapbox
 
 ## What's Been Implemented
 
 ### Phase 1 — Core Navigation (DONE)
 - Truck-specific GPS routing via HERE Maps API
-- Turn-by-turn real-time updates (2s throttle)
-- Reroute & Clear buttons in navigation bar
-- North-up / heading-up toggle
+- Turn-by-turn real-time updates, Reroute & Clear
 
 ### Phase 2 — POI System (DONE — Enhanced 2026-03-28)
-- **HERE Browse API**: Fetches fueling stations, rest areas, weigh stations, truck service centers (categories: 700-7600-0116, 700-7600-0117, 700-7600-0322, 700-7900-0132)
-- **HERE Discover API**: Accurate keyword-based truck stop search + individual brand queries (Love's, Pilot/Flying J, Petro, TA, Cat Scale, Speedco, Blue Beacon)
-- POI count improved from 99 → 361 (3.6x more accurate truck-specific POIs)
-- Position-based deduplication (4-decimal precision ≈ 11m)
-- Enhanced type classification: `major_chains` (travel centers), `service` (truck services/Cat Scale), `rest_area`, `weigh_station`, `fuel`, `distribution`, `low_clearance`
-- Brand-specific amenity sets (Love's gets Diesel/DEF/Showers/Laundry/Scales/WiFi/Food)
-- Filter panel with toggle for all POI categories
+- HERE Browse API: Fuel stations, rest areas, weigh stations, truck services (100 results)
+- HERE Discover API: Keyword-based truck stop search + individual brand queries
+- **Route Corridor Search**: Samples every ~25 miles along active route, 16km radius per sample
+- POI count: 361+ (radius) + corridor POIs for 377+ total along route
+- Position-based deduplication, enhanced type classification
+- "Along Route" panel showing 6 upcoming corridor POIs with distance
 
 ### Phase 3 — Traffic Infrastructure (DONE)
-- Real-time traffic signs/lights alerts (trafficInfrastructure.ts)
-- Audio speech alerts via Gemini TTS
-- Low Clearance POIs with animated warning icons
+- Real-time traffic signs/lights alerts + audio speech alerts
 
 ### Phase 4 — 3D Navigation (DONE — Enhanced 2026-03-28)
-- Mapbox GL JS 3D driver perspective view (Navigation3DView.tsx)
-- `navigation-night-v1` Mapbox style for realistic dark road rendering (MapTiler dark fallback)
-- 3D gold truck marker with cab/trailer detail
-- Glowing blue route line (3-layer: glow + main + center)
-- Gold turn instruction banner at top with direction arrow
-- Speed limit sign overlay + current speed (turns red when over limit)
-- Bottom navigation bar with Speed, Distance, Time, ETA, and street name
-- Cancel/Reroute buttons accessible in 3D mode
-- 3D buildings with fill-extrusion, atmospheric fog
-- 2D HUD automatically hidden in 3D mode
+- Mapbox GL JS premium 3D view: gold truck marker, glowing route line, turn banner
+- navigation-night-v1 style, 3D buildings, atmospheric fog
+- Bottom nav bar with Speed/Distance/Time/ETA
+- Separate 2D/3D HUDs (no overlap)
 
 ### Phase 5 — Mobile Setup (DONE)
-- Capacitor v6.2.0 initialized for iOS + Android
+- Capacitor v6.2.0 for iOS + Android
 
 ### Phase 11 — Load Board (DONE)
-- Dynamic loads near GPS location with haversine filter
+- Dynamic loads near GPS with haversine filter
 
 ### Phase 16 — Facility POI System (DONE)
-- Facility POI (Shipper/Receiver/Warehouse) with crowd-sourced driver reports
-- CompassRose overlay, touch rotation, device compass mode
+- Crowd-sourced Shipper/Receiver reporting
 
 ### Phase 17 — Reputation Scoring System (DONE)
 - Facility + Truck Stop reputation scores (0-5 stars) in POI popups
-- Backend scoring: `calcFacilityReputationScore()` in server.ts
 
 ## Prioritized Backlog
 
@@ -67,10 +54,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - iOS/Android store submissions (blocked: user signing certificates)
 
 ## Key Files
-- `/app/server.ts` — Express server, Browse/Discover API proxy, facility/parking endpoints
-- `/app/services/geminiService.ts` — HERE API POI fetching (Browse + Discover), type classification
-- `/app/components/Navigation3DView.tsx` — Premium 3D navigation view
-- `/app/components/NavigationView.tsx` — Core map orchestration (2D + 3D wrapper)
-- `/app/components/ReputationScore.tsx` — Reputation star rating components
-- `/app/components/FacilityPanel.tsx` — Facility detail/reporting panel
-- `/app/components/MapControls.tsx` — Filter panel + map buttons
+- `/app/server.ts` — Express server, Browse/Discover API proxy
+- `/app/services/geminiService.ts` — fetchTruckPOIs, fetchCorridorPOIs
+- `/app/components/Navigation3DView.tsx` — Premium 3D navigation
+- `/app/components/NavigationView.tsx` — Core map orchestration
+- `/app/components/ReputationScore.tsx` — Reputation stars
+- `/app/components/FacilityPanel.tsx` — Facility reporting
