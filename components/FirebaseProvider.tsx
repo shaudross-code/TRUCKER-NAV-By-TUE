@@ -4,7 +4,7 @@ import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { FirebaseContext, UserProfile, FirebaseContextType } from '../types';
 import { auth, db } from '../firebase';
 
-const USE_MOCK_DATA = false; // Toggle this to switch between Mock and Firebase
+const USE_MOCK_DATA = true; // Toggle this to switch between Mock and Firebase
 
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const MOCK_USER = {

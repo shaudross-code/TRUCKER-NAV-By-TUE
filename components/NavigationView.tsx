@@ -67,6 +67,7 @@ interface Waypoint {
 import { AppContext, HOSContext, LocationContext, TelemetryContext, POI } from '../types';
 import { RouteHistoryItem, RestrictionAlert } from '../types';
 import { fetchTruckPOIs, fetchCorridorPOIs, searchPlaces, fetchAddressSuggestions, lookupPlace } from '../services/geminiService';
+import { fetchCorridorFuelPrices, matchFuelStationToPoi, findCheapestDiesel, FuelStation } from '../services/fuelPriceService';
 import { speak } from '../services/speechService';
 import { SpeedLimitSign, HighwayShield } from './MapUI';
 import { MapControls } from './MapControls';
@@ -487,6 +488,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // console.log("NavigationView rendering");
   const lastPoiUpdateLocationRef = useRef<[number, number] | null>(null);
   const [upcomingPois, setUpcomingPois] = useState<any[]>([]);
+  const [fuelStations, setFuelStations] = useState<FuelStation[]>([]);
 
   // Persistence Effects
   useEffect(() => {
@@ -2790,6 +2792,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       fetchRouteWeather(coords, distMi).catch(err => console.error("Fetch route weather failed:", err));
       fetchTrafficCams(coords, distMi);
       
+      // Fetch diesel fuel prices along the route corridor
+      fetchCorridorFuelPrices(coords, distMi)
+        .then(stations => {
+          console.log(`[Fuel] Loaded ${stations.length} fuel stations along route`);
+          setFuelStations(stations);
+        })
+        .catch(err => console.error("Fetch fuel prices failed:", err));
+      
       setSearchQuery('');
       
       const firstManeuverText = steps[0] ? (steps[0].maneuver.instruction || "Proceed to the highlighted road") : "Head towards route";
@@ -3652,10 +3662,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Only show POIs ahead of user AND within 10mi of route line
       .filter(poi => poi.routeIdx >= userRouteIdx - 5 && poi.distance > 0.5 && poi.corridorDist < 10)
       .sort((a, b) => a.distance - b.distance)
-      .slice(0, 6); // Show 6 upcoming POIs instead of 4
+      .slice(0, 6);
 
-    setUpcomingPois(upcoming);
-  }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(',')]);
+    // Match fuel prices to upcoming POIs
+    const withPrices = upcoming.map(poi => {
+      const matched = fuelStations.find(s => matchFuelStationToPoi(s, poi.lat, poi.lon));
+      return { ...poi, dieselPrice: matched?.dieselPrice || null };
+    });
+
+    setUpcomingPois(withPrices);
+  }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(','), fuelStations.length]);;
 
 
   const toggleDriving = () => {
@@ -4016,6 +4032,42 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
             
             <div className="p-4 md:p-8 landscape:p-4 space-y-4 md:space-y-8 landscape:space-y-3 overflow-y-auto custom-scrollbar">
+              {/* ── Diesel Price Banner ── */}
+              {(() => {
+                const matchedStation = fuelStations.find(s => matchFuelStationToPoi(s, selectedPoi.lat, selectedPoi.lon));
+                if (!matchedStation?.dieselPrice) return null;
+                const cheapest = findCheapestDiesel(fuelStations);
+                const isCheapest = cheapest && matchedStation.id === cheapest.id;
+                return (
+                  <div data-testid="poi-diesel-price" className={`flex items-center justify-between p-3 md:p-4 rounded-2xl landscape:rounded-xl border ${isCheapest ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-zinc-900/60 border-zinc-800'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-xl ${isCheapest ? 'bg-emerald-500/20' : 'bg-[#D4AF37]/15'}`}>
+                        <Fuel className={`w-5 h-5 ${isCheapest ? 'text-emerald-400' : 'text-[#D4AF37]'}`} />
+                      </div>
+                      <div>
+                        <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Diesel Price</div>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className={`text-2xl font-black tabular-nums ${isCheapest ? 'text-emerald-400' : 'text-white'}`}>
+                            ${matchedStation.dieselPrice.toFixed(3)}
+                          </span>
+                          <span className="text-[9px] text-zinc-500 font-bold">/gal</span>
+                        </div>
+                      </div>
+                    </div>
+                    {isCheapest && (
+                      <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-3 py-1.5 rounded-full">
+                        Best Price
+                      </span>
+                    )}
+                    {matchedStation.lastUpdated && (
+                      <span className="text-[7px] text-zinc-600 font-medium">
+                        {new Date(matchedStation.lastUpdated).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+
               {selectedPoi.amenities && selectedPoi.amenities.length > 0 && (
                 <div>
                   <h4 className="text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-widest mb-2 md:mb-4 landscape:mb-2 flex items-center gap-2">
@@ -4628,6 +4680,22 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 </div>
                 <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">Along Route</span>
               </div>
+              {/* Cheapest Fuel Banner */}
+              {(() => {
+                const cheapest = findCheapestDiesel(fuelStations);
+                if (!cheapest) return null;
+                return (
+                  <div data-testid="cheapest-fuel-banner" className="flex items-center gap-1.5 p-1.5 md:p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg mb-1.5 cursor-pointer hover:bg-emerald-500/15 transition-colors"
+                    onClick={() => {
+                      const matchedPoi = pois.find(p => matchFuelStationToPoi(cheapest, p.lat, p.lon));
+                      if (matchedPoi) setSelectedPoi(matchedPoi);
+                    }}>
+                    <Fuel className="w-3 h-3 text-emerald-400 shrink-0" />
+                    <span className="text-[7px] md:text-[8px] font-black text-emerald-400 truncate">Best: ${cheapest.dieselPrice?.toFixed(2)}</span>
+                    <span className="text-[6px] md:text-[7px] text-zinc-500 truncate ml-auto">{cheapest.name}</span>
+                  </div>
+                );
+              })()}
               <div className="flex flex-col gap-1 md:gap-1.5">
                 {upcomingPois.map((poi, idx) => {
                   const category = getPoiCategory(poi.type, poi.name);
@@ -4648,7 +4716,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         <Icon className={`w-3 h-3 md:w-4 md:h-4 ${iconColor} shrink-0`} />
                         <div className="flex flex-col overflow-hidden">
                           <span className="text-[8px] md:text-[10px] font-bold text-white truncate w-full">{poi.name}</span>
-                          <span className="text-[6px] md:text-[8px] font-black text-zinc-500 uppercase truncate w-full">{poi.type}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[6px] md:text-[8px] font-black text-zinc-500 uppercase truncate">{poi.type}</span>
+                            {poi.dieselPrice && (
+                              <span className="text-[7px] md:text-[9px] font-black text-emerald-400 tabular-nums">
+                                ${poi.dieselPrice.toFixed(2)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className="text-[7px] md:text-[9px] font-black text-[#D4AF37] whitespace-nowrap shrink-0 ml-1">

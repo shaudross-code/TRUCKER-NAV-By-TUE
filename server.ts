@@ -251,6 +251,47 @@ async function createServer() {
     }
   });
 
+  // ── HERE Fuel Prices API ──────────────────────────────────────────────────
+  app.post('/api/fuel-prices', async (req, res) => {
+    const { lat, lon, radius } = req.body;
+    try {
+      const r = radius || 50000; // Default 50km
+      const hereUrl = new URL('https://fuel.hereapi.com/v3/stations');
+      hereUrl.searchParams.append('in', `circle:${lat},${lon};r=${r}`);
+      hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
+      hereUrl.searchParams.append('limit', '100');
+      
+      const response = await fetch(hereUrl.toString());
+      const data = await response.json();
+      
+      // Extract diesel prices (fuelType 5) and map to a simpler format
+      const stations = (data.stations || []).map((s: any) => {
+        const dieselPrice = s.prices?.find((p: any) => p.fuelType === '5');
+        return {
+          id: s.id,
+          name: s.name,
+          brand: s.brand || '',
+          lat: s.position?.lat,
+          lng: s.position?.lng,
+          distance: s.distance,
+          dieselPrice: dieselPrice ? parseFloat(dieselPrice.price) : null,
+          currency: dieselPrice?.currency || 'USD',
+          unit: dieselPrice?.unit || 'gal',
+          lastUpdated: dieselPrice?.lastUpdated || s.modified,
+          address: s.address?.label,
+          phone: s.contacts?.phones?.[0]?.value,
+          open24x7: s.open24x7,
+        };
+      });
+      
+      res.json({ total: data.total || 0, stations });
+    } catch (error) {
+      console.error('Error fetching fuel prices:', error);
+      res.status(500).json({ error: 'Failed to fetch fuel prices' });
+    }
+  });
+
+
   app.post('/api/revgeocode', async (req, res) => {
     const { lat, lon } = req.body;
     try {
