@@ -306,13 +306,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      console.log("Touch start", e.touches.length);
       if (e.touches.length === 2) {
         e.preventDefault();
         isRotatingRef.current = true;
         initialAngleRef.current = getAngle(e.touches);
         initialRotationRef.current = manualRotationRef.current;
-        console.log("Rotation started, initial angle:", initialAngleRef.current);
       }
     };
 
@@ -321,13 +319,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         e.preventDefault();
         const currentAngle = getAngle(e.touches);
         const deltaAngle = currentAngle - initialAngleRef.current;
-        console.log("Rotating, delta angle:", deltaAngle);
         setManualRotation(initialRotationRef.current + deltaAngle);
       }
     };
 
     const handleTouchEnd = () => {
-      console.log("Touch end");
       isRotatingRef.current = false;
     };
 
@@ -415,7 +411,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [pois, setPois] = useState<any[]>(() => {
     // Clear any old fake POIs from localStorage
     localStorage.removeItem('truck_pois');
-    console.log('🧹 Cleared old POI cache - will fetch fresh real data from HERE Maps');
+    console.log('Cleared old POI cache - will fetch fresh real data from HERE Maps');
     return [];
   });
 
@@ -473,7 +469,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const str = safeStringify(pois);
     if (str && pois.length > 0) {
       localStorage.setItem('truck_pois', str);
-      console.log(`💾 Saved ${pois.length} real POIs to cache`);
     }
   }, [pois]);
   const isFetchingPoisRef = useRef(false);
@@ -645,17 +640,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           try {
             markerClusterGroupRef.current = L.layerGroup();
             map.addLayer(markerClusterGroupRef.current);
-            console.log("NavigationView: static POI layer group created and added to map");
           } catch (e) {
             console.error("NavigationView: POI layer group initialization failed", e);
           }
 
           clearTimeout(timeoutId);
-          console.log("NavigationView: timeout cleared");
           setIsMapReady(true);
-          console.log("NavigationView: isMapReady set to true");
           setTimeout(() => {
-            console.log("Invalidating map size after initialization");
             map.invalidateSize();
           }, 100);
         } catch (error) {
@@ -674,21 +665,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   useEffect(() => {
     if (!mapRef.current || !mapInstanceRef.current) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      console.log("Resize observer triggered");
-      mapInstanceRef.current?.invalidateSize();
+    const map = mapInstanceRef.current;
+    
+    const observer = new ResizeObserver(() => {
+      map.invalidateSize();
     });
-
-    resizeObserver.observe(mapRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-    };
+    
+    observer.observe(mapRef.current);
+    return () => observer.disconnect();
   }, [isMapReady]);
 
-
-
+  // Persist user preferences to localStorage
   useEffect(() => {
     localStorage.setItem('nav_north_up', isNorthUp.toString());
     localStorage.setItem('nav_avoid_tolls', avoidTolls.toString());
@@ -698,6 +685,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     localStorage.setItem('nav_show_pois', showPois.toString());
     localStorage.setItem('nav_show_truck_restrictions', showTruckRestrictions.toString());
   }, [isNorthUp, avoidTolls, avoidFerries, avoidUnpaved, isCarPlayMode, showPois, showTruckRestrictions]);
+
   
   const [nextInstruction, setNextInstruction] = useState({ 
     text: 'Ready for Route', 
@@ -1158,7 +1146,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const map = mapInstanceRef.current;
     
     const observer = new ResizeObserver(() => {
-      console.log("Map container resized, invalidating size");
       map.invalidateSize();
     });
     
@@ -3209,10 +3196,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     const etaInterval = setInterval(() => {
       if (userLocationRef.current) {
-        console.log("Calling updateNavigationState (periodic)", userLocationRef.current);
         updateNavigationState(userLocationRef.current).catch(err => console.error("Navigation periodic update failed:", err));
       }
-    }, 2000); // Every 2 seconds for real-time turn-by-turn updates
+    }, 5000); // Every 5 seconds for turn-by-turn updates
     
     return () => clearInterval(etaInterval);
   }, [isDriving, updateNavigationState]);
@@ -3235,15 +3221,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       try {
         const infrastructure = await fetchTrafficInfrastructure(userLocation[0], userLocation[1], 2000);
         setTrafficInfrastructure(infrastructure);
-        console.log(`Fetched ${infrastructure.length} traffic infrastructure items`);
       } catch (error) {
         console.error('Error fetching traffic infrastructure:', error);
       }
     };
 
-    // Fetch traffic infrastructure every 10 seconds
+    // Fetch traffic infrastructure every 30 seconds
     fetchTraffic();
-    const interval = setInterval(fetchTraffic, 10000);
+    const interval = setInterval(fetchTraffic, 30000);
     
     return () => clearInterval(interval);
   }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, showTrafficSigns, milesRemaining > 0 ? 1 : 0]);
@@ -3396,10 +3381,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return;
     }
 
-    // Throttling: only re-render if map moved > 1 mile or if it's the first render
+    // Throttling: only re-render if map moved > 2 miles or if it's the first render
     if (lastPoiRenderCenterRef.current) {
       const distMoved = calcDistMi(mapCenter[0], mapCenter[1], lastPoiRenderCenterRef.current[0], lastPoiRenderCenterRef.current[1]);
-      if (distMoved < 1.0) return;
+      if (distMoved < 2.0) return;
     }
     lastPoiRenderCenterRef.current = mapCenter;
 
@@ -3412,18 +3397,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const nearbyPois = pois.filter(poi => {
       if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
       const category = getPoiCategory(poi.type, poi.name);
-      const isFiltered = poiFilters.has(category);
-      if (!isFiltered) {
-        console.log(`POI ${poi.name} filtered out. Category: ${category}`);
-        return false;
-      }
+      if (!poiFilters.has(category)) return false;
       
       const distance = calcDistMi(mapCenter[0], mapCenter[1], poi.lat, poi.lon);
       return distance <= 100;
     });
-
-    console.log(`POIs filtered: ${nearbyPois.length} out of ${pois.length} total. Active filters: ${Array.from(poiFilters).join(', ')}`);
-    console.log('Total POIs:', pois.length);
 
     nearbyPois.forEach(poi => {
         try {

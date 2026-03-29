@@ -303,7 +303,7 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
     // Deduplicate by position (round to 4 decimal places ~11m precision)
     const seen = new Set<string>();
     const deduped = allItems.filter((item: any) => {
-      const pos = item.position || item.access?.[0]?.position;
+      const pos = item.access?.[0]?.position || item.position;
       if (!pos) return false;
       const key = `${pos.lat.toFixed(4)}_${pos.lng.toFixed(4)}`;
       if (seen.has(key)) return false;
@@ -313,7 +313,8 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
     
     // Map HERE results to our POI format
     return deduped.map((item: any) => {
-      const position = item.position || item.access?.[0]?.position;
+      // Prefer access point (road-accessible entry) over center position for accurate map placement
+      const position = item.access?.[0]?.position || item.position;
       if (!position) return null;
       
       const itemName = (item.title || "").toLowerCase();
@@ -553,7 +554,7 @@ export async function fetchCorridorPOIs(
   // Deduplicate by position (4 decimal places ≈ 11m precision)
   const seen = new Set<string>();
   const deduped = allItems.filter((item: any) => {
-    const pos = item.position || item.access?.[0]?.position;
+    const pos = item.access?.[0]?.position || item.position;
     if (!pos) return false;
     const key = `${pos.lat.toFixed(4)}_${pos.lng.toFixed(4)}`;
     if (seen.has(key)) return false;
@@ -565,7 +566,8 @@ export async function fetchCorridorPOIs(
 
   // Map to POI format (reuse the same mapping logic)
   return deduped.map((item: any) => {
-    const position = item.position || item.access?.[0]?.position;
+    // Prefer access point for accurate road-level placement
+    const position = item.access?.[0]?.position || item.position;
     if (!position) return null;
 
     const itemName = (item.title || "").toLowerCase();
