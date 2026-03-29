@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { safeStringify } from './utils';
 import admin from 'firebase-admin';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { GoogleAuth } from 'google-auth-library';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -46,6 +47,48 @@ try {
   console.error('Failed to initialize Firebase Admin:', error);
   console.error('Set FIREBASE_SERVICE_ACCOUNT env var or place serviceAccountKey.json in /app');
 }
+
+// Programmatically add authorized domains for Firebase Auth
+async function addAuthorizedDomains() {
+  const PROJECT_ID = 'project-4cbb6ad7-8e65-4988-ae7';
+  const domainsToAdd = [
+    'nav-corridor-live.preview.emergentagent.com',
+    'localhost',
+  ];
+  
+  try {
+    const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+    const auth = new GoogleAuth({
+      keyFile: keyPath,
+      scopes: ['https://www.googleapis.com/auth/identitytoolkit', 'https://www.googleapis.com/auth/cloud-platform'],
+    });
+    const client = await auth.getClient();
+    const url = `https://identitytoolkit.googleapis.com/admin/v2/projects/${PROJECT_ID}/config`;
+    
+    // Get current config
+    const getRes = await client.request({ url, method: 'GET' });
+    const config = getRes.data as any;
+    const current = config?.authorizedDomains || [];
+    
+    const missing = domainsToAdd.filter(d => !current.includes(d));
+    if (missing.length === 0) {
+      console.log('Firebase Auth: all domains already authorized');
+      return;
+    }
+    
+    const updated = [...current, ...missing];
+    await client.request({
+      url,
+      method: 'PATCH',
+      body: JSON.stringify({ authorizedDomains: updated }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    console.log(`Firebase Auth: added domains: ${missing.join(', ')}`);
+  } catch (err: any) {
+    console.error('Firebase Auth domain registration failed:', err?.message || err);
+  }
+}
+addAuthorizedDomains();
 
 async function createServer() {
   const app = express();
