@@ -25,20 +25,26 @@ function writeParkingStore(data: Record<string, any>) {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
-// Initialize Firebase Admin with service account file
+// Initialize Firebase Admin with service account (env var or file fallback)
 try {
-  const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
-  const serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+  let serviceAccount;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log('Firebase Admin: using FIREBASE_SERVICE_ACCOUNT env var');
+  } else {
+    const serviceAccountPath = path.join(__dirname, 'serviceAccountKey.json');
+    serviceAccount = JSON.parse(readFileSync(serviceAccountPath, 'utf8'));
+    console.log('Firebase Admin: using serviceAccountKey.json file');
+  }
   
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
   
-  console.log('✅ Firebase Admin initialized successfully from serviceAccountKey.json');
+  console.log('Firebase Admin initialized successfully');
 } catch (error) {
-  console.error('❌ Failed to initialize Firebase Admin:', error);
-  console.error('📝 Make sure serviceAccountKey.json exists in /app directory');
-  console.error('📥 Download it from: Firebase Console → Project Settings → Service Accounts');
+  console.error('Failed to initialize Firebase Admin:', error);
+  console.error('Set FIREBASE_SERVICE_ACCOUNT env var or place serviceAccountKey.json in /app');
 }
 
 async function createServer() {
@@ -646,8 +652,9 @@ async function seedFacilitiesFromGoogle(lat: number, lon: number, gk: string): P
     app.use(vite.middlewares);
   }
 
-  app.listen(8001, '0.0.0.0', () => {
-    console.log('Server is listening on port 8001...');
+  const PORT = parseInt(process.env.PORT || '8001', 10);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is listening on port ${PORT}...`);
   });
 }
 
