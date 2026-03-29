@@ -427,6 +427,40 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [is3DMode, setIs3DMode] = useState(() => 
     localStorage.getItem('nav_3d_mode') === 'true'
   );
+  const was3DRef = useRef(is3DMode);
+
+  // Re-initialize Leaflet map when switching from 3D back to 2D
+  useEffect(() => {
+    const wasIn3D = was3DRef.current;
+    was3DRef.current = is3DMode;
+    
+    // Only act when transitioning FROM 3D TO 2D (not on initial mount)
+    if (wasIn3D && !is3DMode) {
+      // Destroy old disconnected Leaflet instance
+      if (mapInstanceRef.current) {
+        try {
+          mapInstanceRef.current.off();
+          mapInstanceRef.current.remove();
+        } catch (e) { /* already disconnected from DOM */ }
+        mapInstanceRef.current = null;
+      }
+      // Reset all map-attached refs so they get recreated on the new instance
+      routeGroupRef.current = null;
+      markerClusterGroupRef.current = null;
+      userMarkerRef.current = null;
+      userMarkerElRef.current = null;
+      poiMarkersRef.current = [];
+      routeLineRef.current = null;
+      facilityLayerGroupRef.current = null;
+      facilityMarkersRef.current = new Map();
+      mapLayersRef.current = {};
+      setIsMapReady(false);
+      // Wait for the DOM div to mount, then initialize
+      setTimeout(() => {
+        initializeMap();
+      }, 150);
+    }
+  }, [is3DMode]);
 
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
   const [poiParkingStatus, setPoiParkingStatus] = useState<{ status: string | null; updatedAt: string | null; updateCount: number } | null>(null);
