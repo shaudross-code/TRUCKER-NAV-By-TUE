@@ -39,6 +39,7 @@
     "js-base64": "^3.7.8",
     "json-stringify-safe": "^5.0.1",
     "leaflet": "^1.9.4",
+    "leaflet-rotate": "^0.2.8",
     "leaflet.markercluster": "^1.5.3",
     "lucide-react": "^0.574.0",
     "mapbox-gl": "^3.20.0",

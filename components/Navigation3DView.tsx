@@ -148,6 +148,9 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       bearing: heading,
       antialias: true,
       fadeDuration: 0,
+      dragRotate: true,
+      touchZoomRotate: true,
+      touchPitch: true,
     });
 
     // Handle style load error — fallback to MapTiler
