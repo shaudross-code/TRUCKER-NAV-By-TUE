@@ -76,6 +76,23 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (USE_MOCK_DATA || !user) return;
 
+    // For anonymous users, skip Firestore entirely — use local profile
+    if (user.isAnonymous) {
+      const localProfile: UserProfile = {
+        uid: user.uid,
+        email: '',
+        displayName: 'Guest Driver',
+        truckProfile: {
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
+          hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
+          make: 'Volvo', model: 'VNL 660', year: 2026
+        }
+      };
+      setProfile(localProfile);
+      return;
+    }
+
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {

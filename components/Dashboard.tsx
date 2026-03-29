@@ -39,8 +39,14 @@ const chartData = [
 ];
 
 const PerformanceChart = React.memo(() => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setMounted(true), 100);
+    return () => clearTimeout(t);
+  }, []);
+  if (!mounted) return <div className="h-[300px] md:h-[400px] w-full" />;
   return (
-    <div className="h-[300px] md:h-[400px] w-full">
+    <div className="h-[300px] md:h-[400px] w-full min-h-[200px]">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
           <defs>

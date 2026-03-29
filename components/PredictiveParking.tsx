@@ -121,24 +121,39 @@ const PredictiveParking: React.FC = () => {
   const locationContext = useContext(LocationContext);
   const userLocation = locationContext?.userLocation;
   const [stops, setStops] = useState<ParkingData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!userLocation) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     async function getStops() {
-      if (!userLocation) return;
       try {
         setLoading(true);
-        const data = await fetchTruckStops(userLocation[0], userLocation[1]);
-        setStops(data);
+        setError(null);
+        // Add timeout to prevent indefinite hang
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Request timed out')), 15000)
+        );
+        const data = await Promise.race([
+          fetchTruckStops(userLocation[0], userLocation[1]),
+          timeoutPromise
+        ]);
+        if (!cancelled) setStops(data);
       } catch (err) {
-        console.error(err instanceof Error ? err.message : String(err));
-        setError('Failed to load parking data. Please try again later.');
+        if (!cancelled) {
+          console.warn("Fetch stops:", err instanceof Error ? err.message : String(err));
+          setError('Unable to load parking data. Try again later.');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    getStops().catch(err => console.error("Fetch stops failed:", err));
+    getStops();
+    return () => { cancelled = true; };
   }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   const handleCardClick = (stop: ParkingData) => {
@@ -171,13 +186,19 @@ const PredictiveParking: React.FC = () => {
             <div key={i} className="bg-[#0a0a0a] border border-zinc-900 rounded-[1.5rem] p-7 h-64 animate-pulse" />
           ))}
         </div>
-      ) : (
+      ) : stops.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {stops.map((stop, i) => (
             <ParkingCard key={i} {...stop} onClick={() => handleCardClick(stop)} />
           ))}
         </div>
-      )}
+      ) : !loading && !error ? (
+        <div className="text-center py-20">
+          <p className="text-zinc-500 font-bold uppercase tracking-widest italic text-sm">
+            {userLocation ? 'No truck stops found in your area.' : 'Waiting for location data...'}
+          </p>
+        </div>
+      ) : null}
       {error && (
         <div className="text-center py-20">
           <p className="text-rose-500 font-bold">{error}</p>

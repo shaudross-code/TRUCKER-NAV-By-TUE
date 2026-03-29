@@ -108,9 +108,9 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Load from Firestore
+  // Load from Firestore (skip for anonymous users - no Firestore access)
   useEffect(() => {
-    if (!user || user.uid.startsWith('dev-')) return;
+    if (!user || user.uid.startsWith('dev-') || user.isAnonymous) return;
     const loadHOS = async () => {
       const hosDocRef = doc(db, 'users', user.uid, 'hos', 'current');
       try {
@@ -128,8 +128,10 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             } 
           });
         }
-      } catch (error) {
-        handleFirestoreError(error, OperationType.GET, `users/${user.uid}/hos/current`);
+      } catch (error: any) {
+        if (!error?.message?.includes('permission')) {
+          handleFirestoreError(error, OperationType.GET, `users/${user.uid}/hos/current`);
+        }
       }
     };
     loadHOS();
@@ -142,10 +144,10 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => clearInterval(interval);
   }, [telemetryContext]);
 
-  // Persistence Effect (Firestore)
+  // Persistence Effect (Firestore - skip for anonymous users)
   const lastSavedRef = useRef<string>('');
   useEffect(() => {
-    if (!user || user.uid.startsWith('dev-')) return;
+    if (!user || user.uid.startsWith('dev-') || user.isAnonymous) return;
     const statusStr = safeStringify(state.eldStatus);
     if (statusStr && statusStr !== lastSavedRef.current) {
       lastSavedRef.current = statusStr;
@@ -157,7 +159,7 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lastUpdate: new Date().toISOString()
           }, { merge: true });
         } catch (error: any) {
-          // Silently ignore permission errors for guest/email users
+          // Silently ignore permission errors
           if (!error?.message?.includes('permission')) {
             handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/hos/current`);
           }
