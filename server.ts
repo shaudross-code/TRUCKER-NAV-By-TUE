@@ -94,9 +94,31 @@ async function createServer() {
   const app = express();
   app.use(express.json());
 
+  // Allow geolocation in iframes and set security headers
+  app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'geolocation=(self)');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    next();
+  });
+
   // Health check endpoint for platform monitoring (must be before Vite middleware)
   app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'trucker-nav' });
+  });
+
+  // IP-based geolocation fallback when browser geolocation fails
+  app.get('/api/ip-location', async (req, res) => {
+    try {
+      const response = await fetch('http://ip-api.com/json/?fields=lat,lon,city,regionName,country,status');
+      const data = await response.json();
+      if (data.status === 'success') {
+        res.json({ lat: data.lat, lon: data.lon, city: data.city, region: data.regionName, country: data.country });
+      } else {
+        res.status(500).json({ error: 'IP geolocation failed' });
+      }
+    } catch (err) {
+      res.status(500).json({ error: 'IP geolocation service unavailable' });
+    }
   });
 
   // API routes

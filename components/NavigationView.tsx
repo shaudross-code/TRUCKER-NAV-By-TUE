@@ -505,6 +505,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, [poiFilters]);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mapInitError, setMapInitError] = useState<string | null>(null);
   useEffect(() => {
     if (error) console.log("NavigationView: error state updated", error);
   }, [error]);
@@ -580,7 +581,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           timeoutId = setTimeout(() => {
             if (!isMapReady) {
               console.error("Map initialization timed out after 30 seconds");
-              setError("Map initialization timed out. Please check your connection or API key.");
+              setMapInitError("Map initialization timed out. Please check your connection or API key.");
             }
           }, 30000); // 30 seconds timeout
 
@@ -654,7 +655,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }, 100);
         } catch (error) {
           console.error("Map initialization caught error:", error);
-          setError(`Map initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+          setMapInitError(`Map initialization failed: ${error instanceof Error ? error.message : String(error)}`);
         }
       } else {
         console.log("NavigationView: container dimensions are 0, retrying...");
@@ -3743,11 +3744,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   return (
     <div className="h-full w-full relative bg-[#050505] overflow-hidden font-sans">
-      {error && (
+      {mapInitError && (
         <div className="absolute inset-0 z-[9999] flex items-center justify-center bg-red-950/95 p-4">
           <div className="bg-red-900 border-2 border-red-500 rounded-3xl p-8 shadow-2xl max-w-md w-full text-center">
             <h3 className="text-2xl font-black text-white mb-4 uppercase tracking-tight">Map Error</h3>
-            <p className="text-red-100 text-sm mb-6 whitespace-pre-wrap break-words">{error}</p>
+            <p className="text-red-100 text-sm mb-6 whitespace-pre-wrap break-words">{mapInitError}</p>
             <button 
               onClick={() => window.location.reload()}
               className="w-full bg-white text-red-900 font-bold py-3 rounded-xl hover:bg-red-50 transition-colors"
@@ -3803,7 +3804,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           </>
         )}
       </div>
-      {error && (
+      {mapInitError && (
         <div className="absolute inset-0 z-40 w-full h-full">
           <img
             src={`https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/static/${userLocation[1]},${userLocation[0]},12/800x600.webp?key=${MAPTILER_KEY}`}
@@ -3816,7 +3817,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           </div>
         </div>
       )}
-      {!isMapReady && !error && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black text-white">Loading Map...</div>}
+      {!isMapReady && !mapInitError && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black text-white">Loading Map...</div>}
 
       {/* Route Comparison Overlay */}
       {isRoutePreview && alternativeRoutes.length > 1 && (

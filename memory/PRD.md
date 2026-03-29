@@ -19,15 +19,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ### Phase 2 — POI System (DONE — Enhanced 2026-03-28)
 - HERE Browse + Discover APIs for 361+ truck-specific POIs
 - Route Corridor Search: samples every ~25 miles, 16km radius
-- Position-based deduplication, enhanced type classification
-- "Along Route" panel showing 6 upcoming corridor POIs
 
 ### Phase 3 — Traffic Infrastructure (DONE)
 - Real-time traffic signs/lights alerts + audio speech alerts
 
 ### Phase 4 — 3D Navigation (DONE — Enhanced 2026-03-28)
 - Premium Mapbox GL JS 3D view matching reference images
-- Gold truck marker, glowing route line, turn banner, bottom nav bar
 
 ### Phase 5 — Mobile Setup (DONE)
 - Capacitor v6.2.0 for iOS + Android
@@ -43,16 +40,21 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ### Phase 18 — Diesel Fuel Prices (DONE — 2026-03-28)
 - HERE Fuel Prices API: Real-time diesel prices
-- Backend `/api/fuel-prices` endpoint, corridor fuel search, POI popup pricing
-- 15-minute cache, 500m proximity matching
 
 ### Phase 19 — Deployment Build Fix (DONE — 2026-03-29)
-- Created `build-frontend-artifacts.sh` with relative path detection (fixes `/workspace/app` → `dirname $0`)
-- Cleaned corrupted `.gitignore` (removed duplicate entries)
-- Added env-var fallback for Firebase Admin SDK (`FIREBASE_SERVICE_ACCOUNT`)
-- Made server port configurable via `PORT` env var
-- Restored Nginx proxy (port 3000 → 8001) for Emergent platform routing
-- Verified Vite production build succeeds (2893 modules, dist/ output)
+- Created `build-frontend-artifacts.sh` with relative path detection
+- Cleaned corrupted `.gitignore`
+- Added env-var fallback for Firebase Admin SDK
+- Restored Nginx proxy (port 3000 → 8001)
+
+### Phase 20 — Location & Map Reliability Fixes (DONE — 2026-03-29)
+- **IP Geolocation Fallback**: Added `/api/ip-location` endpoint using ip-api.com
+  - When browser geolocation is denied/unavailable, app auto-falls back to IP-based location
+  - Shows approximate city/region instead of defaulting to Kansas center
+- **Permissions-Policy Header**: Server now sends `Permissions-Policy: geolocation=(self)` for proper iframe support
+- **3D→2D Map Switch Fix**: Added useEffect that detects 3D→2D transition, destroys stale Leaflet instance, resets all refs, re-initializes map
+- **Error State Separation**: Split `error` into `mapInitError` (fatal, full-screen) and `error` (dismissible toast) so navigation warnings don't block the entire map
+- **Firebase Auth Domain**: Auto-registers preview domain on server startup via Identity Toolkit API
 
 ## Prioritized Backlog
 
@@ -64,12 +66,10 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - iOS/Android store submissions (blocked: user signing certificates)
 
 ## Key Files
-- `/app/server.ts` — Express server, API proxy endpoints
+- `/app/server.ts` — Express server, API proxy endpoints, IP geolocation
 - `/app/build-frontend-artifacts.sh` — CI/CD frontend build script
+- `/app/App.tsx` — Location provider with IP fallback
+- `/app/components/NavigationView.tsx` — Core map orchestration (needs refactoring)
+- `/app/components/Navigation3DView.tsx` — Premium 3D navigation
 - `/app/services/geminiService.ts` — POI fetching (Browse + Discover)
 - `/app/services/fuelPriceService.ts` — Diesel fuel price fetching + matching
-- `/app/services/facilityService.ts` — Facility API calls
-- `/app/components/Navigation3DView.tsx` — Premium 3D navigation
-- `/app/components/NavigationView.tsx` — Core map orchestration (needs refactoring)
-- `/app/components/ReputationScore.tsx` — Reputation stars
-- `/app/components/FacilityPanel.tsx` — Facility reporting

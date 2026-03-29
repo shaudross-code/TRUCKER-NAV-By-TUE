@@ -56,78 +56,90 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   useEffect(() => {
+    // IP-based geolocation fallback
+    const fetchIpLocation = async () => {
+      try {
+        const res = await fetch('/api/ip-location');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.lat && data.lon) {
+            const loc: [number, number] = [data.lat, data.lon];
+            console.log(`IP geolocation fallback: ${data.city}, ${data.region} (${loc})`);
+            setUserLocation(prev => prev || loc);
+            setLocationError(prev => prev ? `${prev} (using approximate location)` : null);
+          }
+        }
+      } catch (e) {
+        console.warn('IP geolocation fallback failed:', e);
+      }
+    };
+
     if (!navigator.geolocation) {
       console.warn("Geolocation is not supported by this browser.");
-      // Load last known location as fallback when geolocation not supported
       const saved = localStorage.getItem('trucker_last_location');
       if (saved) {
         try {
           setUserLocation(JSON.parse(saved));
-          console.log('Geolocation not supported, using last known location');
-        } catch (e) {
-          console.warn('Failed to parse saved location:', e);
-        }
+        } catch (e) {}
       }
+      fetchIpLocation();
       return;
     }
+
+    let geoSucceeded = false;
 
     // First, try to get current position immediately
     console.log('Attempting to get current location...');
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        geoSucceeded = true;
         const { latitude, longitude } = position.coords;
         if (!isNaN(latitude) && !isNaN(longitude)) {
           const roundedLat = Math.round(latitude * 100000) / 100000;
           const roundedLon = Math.round(longitude * 100000) / 100000;
           const newLocation: [number, number] = [roundedLat, roundedLon];
           setUserLocation(newLocation);
+          setLocationError(null);
           try {
             localStorage.setItem('trucker_last_location', JSON.stringify(newLocation));
-          } catch (e) {
-            console.warn('Failed to save location:', e);
-          }
+          } catch (e) {}
           console.log('Current location acquired:', newLocation);
         }
       },
       (error) => {
         console.warn("getCurrentPosition failed:", error.message, "Code:", error.code);
-        setLocationError(error.message);
+        setLocationError(
+          error.code === 1 ? "Location permission denied. Using approximate location." :
+          error.code === 2 ? "Location unavailable. Using approximate location." :
+          "Location request timed out. Using approximate location."
+        );
         
-        // Error codes: 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
-        if (error.code === 1) {
-          console.error("Location permission denied by user");
-        } else if (error.code === 2) {
-          console.error("Location unavailable from device");
-        } else if (error.code === 3) {
-          console.error("Location request timed out");
-        }
-        
-        // Only use fallback if getCurrentPosition fails
+        // Try saved location first, then IP geolocation
         setUserLocation(prev => {
           if (!prev) {
             const saved = localStorage.getItem('trucker_last_location');
             if (saved) {
               try {
-                const parsed = JSON.parse(saved);
-                console.log('Using last known location as fallback:', parsed);
-                return parsed;
-              } catch (e) {
-                console.warn('Failed to parse saved location:', e);
-              }
+                return JSON.parse(saved);
+              } catch (e) {}
             }
           }
           return prev;
         });
+        // Always try IP fallback when getCurrentPosition fails
+        fetchIpLocation();
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
 
     // Then start watching for position updates
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        geoSucceeded = true;
         const { latitude, longitude, speed: geoSpeed, heading: geoHeading } = position.coords;
         if (isNaN(latitude) || isNaN(longitude)) return;
         
+        setLocationError(null);
         let telemetryChanged = false;
 
         if (geoSpeed !== null && !isNaN(geoSpeed)) {
@@ -159,39 +171,30 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
           const roundedLon = Math.round(longitude * 100000) / 100000;
           if (prev && prev[0] === roundedLat && prev[1] === roundedLon) return prev;
           
-          // Save last known location to localStorage
           const newLocation: [number, number] = [roundedLat, roundedLon];
           try {
             localStorage.setItem('trucker_last_location', JSON.stringify(newLocation));
-          } catch (e) {
-            console.warn('Failed to save last location:', e);
-          }
+          } catch (e) {}
           
           return newLocation;
         });
       },
       (error) => {
         console.error("watchPosition error:", error);
-        // Keep existing location if watch fails, don't override with fallback
         setUserLocation(prev => {
           if (!prev) {
-            // Only use fallback if we have no location at all
             const saved = localStorage.getItem('trucker_last_location');
             try {
-              if (saved) {
-                const parsed = JSON.parse(saved);
-                console.log('Using last known location (watch failed):', parsed);
-                return parsed;
-              }
-            } catch (e) {
-              console.warn('Failed to parse saved location:', e);
-            }
+              if (saved) return JSON.parse(saved);
+            } catch (e) {}
             return null;
           }
           return prev;
         });
+        // Try IP fallback if we still have no location
+        if (!geoSucceeded) fetchIpLocation();
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, [notifyListeners]);
