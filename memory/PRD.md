@@ -84,6 +84,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Human-friendly error messages for common auth failures (wrong password, weak password, email in use)
 - All tests pass: 13/13 backend, 8/8 frontend auth flows
 
+### Phase 25 — Dashboard Input Cards Bug Fix (DONE — 2026-03-29)
+- **Root cause**: Firestore security rules blocked writes for anonymous/email users, so `updateProfile()` failed silently and dashboard values never updated
+- **Fix**: Switched dashboard financial metrics (weeklyEarnings, milesThisWeek, fuelCost, truckCost, weekDeductions) to local state + localStorage as primary storage, with Firestore sync as background fallback
+- Added Firestore `onSnapshot` error handler in `FirebaseProvider.tsx` — falls back to local profile on permission denied
+- Silenced Firestore permission error spam in HOSProvider, FirebaseProvider, and global error handler
+- Attempted programmatic Firestore security rules update via Firebase Rules REST API
+- Dashboard inputs now work correctly for all user types (Google, email, guest)
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming

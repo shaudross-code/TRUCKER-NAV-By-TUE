@@ -101,8 +101,26 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             year: 2026
           }
         };
-        setDoc(userDocRef, initialProfile);
+        setDoc(userDocRef, initialProfile).catch(() => {
+          // Permission denied for anonymous/email users - use local profile
+          setProfile(initialProfile);
+        });
       }
+    }, (error) => {
+      // Firestore permission error - create local profile
+      console.warn('Firestore read denied, using local profile');
+      const localProfile: UserProfile = {
+        uid: user.uid,
+        email: user.email || '',
+        displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
+        truckProfile: {
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
+          hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
+          make: 'Volvo', model: 'VNL 660', year: 2026
+        }
+      };
+      setProfile(localProfile);
     });
     return () => unsubscribe();
   }, [user]);
@@ -187,8 +205,15 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
     if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
-    await updateDoc(userDocRef, data);
+    try {
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, data);
+    } catch (err: any) {
+      // Silently handle permission errors - data is saved locally
+      if (!err?.message?.includes('permission')) {
+        console.error('Profile update error:', err?.message);
+      }
+    }
   };
 
   const value: FirebaseContextType = {

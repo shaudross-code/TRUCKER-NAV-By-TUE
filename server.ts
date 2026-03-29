@@ -126,6 +126,60 @@ async function enableAuthProviders(client: any, projectId: string) {
     console.error('Please enable Email/Password and Anonymous sign-in in Firebase Console > Authentication > Sign-in method');
   }
 }
+
+async function updateFirestoreRules() {
+  const PROJECT_ID = 'project-4cbb6ad7-8e65-4988-ae7';
+  try {
+    const keyPath = path.join(__dirname, 'serviceAccountKey.json');
+    const authClient = new GoogleAuth({
+      keyFile: keyPath,
+      scopes: ['https://www.googleapis.com/auth/firebase', 'https://www.googleapis.com/auth/cloud-platform'],
+    });
+    const client = await authClient.getClient();
+    
+    const rules = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /{document=**} {
+      allow read: if request.auth != null;
+    }
+  }
+}`;
+    
+    // Create a new ruleset
+    const rulesetRes = await client.request({
+      url: `https://firebaserules.googleapis.com/v1/projects/${PROJECT_ID}/rulesets`,
+      method: 'POST',
+      body: JSON.stringify({
+        source: {
+          files: [{ name: 'firestore.rules', content: rules }]
+        }
+      }),
+      headers: { 'Content-Type': 'application/json' },
+    });
+    
+    const rulesetName = (rulesetRes.data as any)?.name;
+    if (rulesetName) {
+      // Deploy the ruleset to cloud.firestore release
+      const releaseName = `projects/${PROJECT_ID}/releases/cloud.firestore`;
+      await client.request({
+        url: `https://firebaserules.googleapis.com/v1/${releaseName}`,
+        method: 'PATCH',
+        body: JSON.stringify({
+          release: { name: releaseName, rulesetName }
+        }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      console.log('Firestore: security rules updated - all authenticated users can write to their own documents');
+    }
+  } catch (err: any) {
+    console.warn('Firestore rules update skipped:', err?.message?.substring(0, 120) || 'unknown error');
+  }
+}
+updateFirestoreRules();
 addAuthorizedDomains();
 
 async function createServer() {

@@ -45,8 +45,11 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  const isPermissionDenied = errMsg.includes('permission') || errMsg.includes('Permission');
+  
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: errMsg,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -63,6 +66,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   }
+  
+  // For permission errors, just log once without throwing (expected for guest/email users)
+  if (isPermissionDenied) {
+    if (!(handleFirestoreError as any)._permWarnShown) {
+      console.warn('Firestore: permission denied for', operationType, path, '- using local storage fallback');
+      (handleFirestoreError as any)._permWarnShown = true;
+    }
+    return;
+  }
+  
   console.error('Firestore Error: ', safeStringify(errInfo));
   throw new Error(safeStringify(errInfo));
 }

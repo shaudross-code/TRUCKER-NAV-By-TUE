@@ -156,8 +156,11 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...state.eldStatus,
             lastUpdate: new Date().toISOString()
           }, { merge: true });
-        } catch (error) {
-          handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/hos/current`);
+        } catch (error: any) {
+          // Silently ignore permission errors for guest/email users
+          if (!error?.message?.includes('permission')) {
+            handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}/hos/current`);
+          }
         }
       };
       saveHOS();

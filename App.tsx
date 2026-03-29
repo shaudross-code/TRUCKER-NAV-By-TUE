@@ -254,41 +254,92 @@ const AppContent: React.FC = React.memo(() => {
   const autoReroute = profile?.autoReroute ?? true;
   const setAutoReroute = useCallback((val: boolean) => updateProfile({ autoReroute: val }), [updateProfile]);
 
-  const weeklyEarnings = profile?.weeklyEarnings ?? 0;
+  // Dashboard financial metrics - use localStorage as primary store with Firestore sync
+  const loadLocal = (key: string, fallback: number) => {
+    try {
+      const v = localStorage.getItem(`trucker_${key}`);
+      return v !== null ? parseFloat(v) : (profile as any)?.[key] ?? fallback;
+    } catch { return fallback; }
+  };
+
+  const [weeklyEarnings, setWeeklyEarningsState] = useState(() => loadLocal('weeklyEarnings', 0));
+  const [milesThisWeek, setMilesThisWeekState] = useState(() => loadLocal('milesThisWeek', 0));
+  const [fuelCost, setFuelCostState] = useState(() => loadLocal('fuelCost', 0));
+  const [truckCost, setTruckCostState] = useState(() => loadLocal('truckCost', 0));
+  const [weekDeductions, setWeekDeductionsState] = useState(() => loadLocal('weekDeductions', 0));
+  const [takeHomePercentage, setTakeHomePercentageState] = useState(() => loadLocal('takeHomePercentage', 100));
+
+  // Sync from Firestore profile on initial load (only once per session)
+  const [profileSynced, setProfileSynced] = useState(false);
+  useEffect(() => {
+    if (profile && !profileSynced) {
+      if (profile.weeklyEarnings !== undefined) setWeeklyEarningsState(profile.weeklyEarnings);
+      if (profile.milesThisWeek !== undefined) setMilesThisWeekState(profile.milesThisWeek);
+      if (profile.fuelCost !== undefined) setFuelCostState(profile.fuelCost);
+      if (profile.truckCost !== undefined) setTruckCostState(profile.truckCost);
+      if (profile.weekDeductions !== undefined) setWeekDeductionsState(profile.weekDeductions);
+      if (profile.takeHomePercentage !== undefined) setTakeHomePercentageState(profile.takeHomePercentage);
+      setProfileSynced(true);
+    }
+  }, [profile, profileSynced]);
+
+  const saveLocal = (key: string, val: number) => {
+    try { localStorage.setItem(`trucker_${key}`, String(val)); } catch {}
+  };
+
   const setWeeklyEarnings = useCallback((val: any) => {
-    const newVal = typeof val === 'function' ? val(weeklyEarnings) : val;
-    updateProfile({ weeklyEarnings: newVal });
-  }, [weeklyEarnings, updateProfile]);
+    setWeeklyEarningsState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      saveLocal('weeklyEarnings', newVal);
+      updateProfile({ weeklyEarnings: newVal }).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
 
-  const milesThisWeek = profile?.milesThisWeek ?? 0;
   const setMilesThisWeek = useCallback((val: any) => {
-    const newVal = typeof val === 'function' ? val(milesThisWeek) : val;
-    updateProfile({ milesThisWeek: newVal });
-  }, [milesThisWeek, updateProfile]);
+    setMilesThisWeekState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      saveLocal('milesThisWeek', newVal);
+      updateProfile({ milesThisWeek: newVal }).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
 
-  const fuelCost = profile?.fuelCost ?? 0;
   const setFuelCost = useCallback((val: any) => {
-    const newVal = typeof val === 'function' ? val(fuelCost) : val;
-    updateProfile({ fuelCost: newVal });
-  }, [fuelCost, updateProfile]);
+    setFuelCostState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      saveLocal('fuelCost', newVal);
+      updateProfile({ fuelCost: newVal }).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
 
-  const truckCost = profile?.truckCost ?? 0;
   const setTruckCost = useCallback((val: any) => {
-    const newVal = typeof val === 'function' ? val(truckCost) : val;
-    updateProfile({ truckCost: newVal });
-  }, [truckCost, updateProfile]);
+    setTruckCostState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      saveLocal('truckCost', newVal);
+      updateProfile({ truckCost: newVal }).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
 
-  const weekDeductions = profile?.weekDeductions ?? 0;
   const setWeekDeductions = useCallback((val: any) => {
-    const newVal = typeof val === 'function' ? val(weekDeductions) : val;
-    updateProfile({ weekDeductions: newVal });
-  }, [weekDeductions, updateProfile]);
+    setWeekDeductionsState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      saveLocal('weekDeductions', newVal);
+      updateProfile({ weekDeductions: newVal }).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
 
-  const takeHomePercentage = profile?.takeHomePercentage ?? 100;
   const setTakeHomePercentage = useCallback((val: any) => {
-    const newVal = typeof val === 'function' ? val(takeHomePercentage) : val;
-    updateProfile({ takeHomePercentage: newVal });
-  }, [takeHomePercentage, updateProfile]);
+    setTakeHomePercentageState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      saveLocal('takeHomePercentage', newVal);
+      updateProfile({ takeHomePercentage: newVal }).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
 
   // Persistence Effects
   const [isDriving, setIsDriving] = useState(false);
@@ -313,8 +364,14 @@ const AppContent: React.FC = React.memo(() => {
       });
     };
     const handleRejection = (event: PromiseRejectionEvent) => {
+      // Suppress Firestore permission errors (expected for guest/email users)
+      const reason = String(event.reason);
+      if (reason.includes('permission') || reason.includes('Permission')) {
+        event.preventDefault();
+        return;
+      }
       console.error("Unhandled Rejection Detail:", {
-        reason: String(event.reason),
+        reason,
         stack: event.reason?.stack || 'No stack trace'
       });
     };
