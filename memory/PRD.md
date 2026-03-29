@@ -74,6 +74,16 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Fixed `maneuverIndex` scoping bug (added `currentManeuverIndex` state)
 - All backend API tests pass (13/13), frontend loads without React errors
 
+### Phase 24 — Multi-Method Authentication (DONE — 2026-03-29)
+- Added **Email/Password Login** — `signInWithEmailAndPassword` via Firebase Auth
+- Added **Email/Password Registration** — `createUserWithEmailAndPassword` with optional display name
+- Added **Guest/Anonymous Login** — `signInAnonymously` for instant access without credentials
+- Programmatically enabled Email/Password and Anonymous providers via Identity Toolkit API in `server.ts`
+- Created `LoginScreen.tsx` component with all 4 auth methods (Google, Email Login, Register, Guest)
+- Updated `FirebaseProvider.tsx` with `signInWithEmail`, `signUpWithEmail`, `signInAsGuest` methods
+- Human-friendly error messages for common auth failures (wrong password, weak password, email in use)
+- All tests pass: 13/13 backend, 8/8 frontend auth flows
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
