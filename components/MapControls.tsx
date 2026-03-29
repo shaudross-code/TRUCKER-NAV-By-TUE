@@ -251,7 +251,7 @@ export const MapControls: React.FC<any> = React.memo(({
           </button>
 
           <button 
-            onClick={() => setIsNorthUp(!isNorthUp)} 
+            onClick={() => setIsNorthUp()} 
             className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${!isNorthUp ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
             title={isNorthUp ? "Switch to Heading Up" : "Switch to North Up"}
             data-testid="orientation-btn"

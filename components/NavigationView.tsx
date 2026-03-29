@@ -281,14 +281,31 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isCompassMode, setIsCompassMode] = useState(false);
   const compassHeadingRef = useRef(0);
 
+  // Handle orientation mode changes and apply rotation
   useEffect(() => {
     manualRotationRef.current = manualRotation;
-    // Immediately apply CSS when manual rotation changes (telemetry handles heading-up on its own tick)
     const mapPane = mapInstanceRef.current?.getPane('mapPane');
-    if (mapPane && isNorthUp && !isCompassMode) {
+    if (!mapPane) return;
+
+    if (isNorthUp && !isCompassMode) {
+      // North-up mode: apply manual rotation (or 0 if just switched to north-up)
       mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
     }
   }, [manualRotation, isNorthUp, isCompassMode]);
+
+  // When switching TO north-up, reset rotation to 0
+  const handleToggleNorthUp = useCallback(() => {
+    const newVal = !isNorthUp;
+    setIsNorthUp(newVal);
+    if (newVal) {
+      // Switching to North Up — reset rotation to face north
+      setManualRotation(0);
+      const mapPane = mapInstanceRef.current?.getPane('mapPane');
+      if (mapPane) {
+        mapPane.style.setProperty('--map-rotation', '0deg');
+      }
+    }
+  }, [isNorthUp]);
 
   const isRotatingRef = useRef(false);
   const initialAngleRef = useRef(0);
@@ -1193,17 +1210,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     });
   }, [facilities, showFacilities]);
 
+  // When isNorthUp changes, reset map rotation accordingly
   useEffect(() => {
-    if (!mapRef.current) return;
     const map = mapInstanceRef.current;
     if (!map) return;
     const mapPane = map.getPane('mapPane');
     if (!mapPane) return;
 
-    if (!isNorthUp) {
-      mapPane.classList.add('map-heading-up');
-    } else {
-      mapPane.classList.remove('map-heading-up');
+    if (isNorthUp) {
+      // North-up: reset rotation to 0
+      mapPane.style.setProperty('--map-rotation', '0deg');
     }
     map.invalidateSize();
   }, [isNorthUp]);
@@ -5099,7 +5115,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         userLocation={userLocation}
         isFollowMode={isFollowMode}
         isNorthUp={isNorthUp}
-        setIsNorthUp={setIsNorthUp}
+        setIsNorthUp={handleToggleNorthUp}
         showTrafficSigns={showTrafficSigns}
         setShowTrafficSigns={setShowTrafficSigns}
         is3DMode={is3DMode}
