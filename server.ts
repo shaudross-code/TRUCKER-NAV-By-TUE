@@ -52,6 +52,7 @@ try {
 async function addAuthorizedDomains() {
   const PROJECT_ID = 'project-4cbb6ad7-8e65-4988-ae7';
   const domainsToAdd = [
+    'poi-fuel-tracker.preview.emergentagent.com',
     'nav-corridor-live.preview.emergentagent.com',
     'localhost',
   ];

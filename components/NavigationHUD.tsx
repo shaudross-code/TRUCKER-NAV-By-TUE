@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowUp } from 'lucide-react';
-import { HighwayShield } from './HighwayShield';
+import { HighwayShield } from './MapUI';
 
 interface NavigationHUDProps {
   nextInstruction: { icon: any; distance: string; text: string; lanes?: string[] };
