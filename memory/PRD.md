@@ -5,11 +5,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## Architecture
 - **Stack**: React (Vite) + Express (server.ts) single-level fullstack — port 8001
-- **Maps**: Leaflet (2D with rotation via leaflet-rotate) + Mapbox GL JS (3D perspective)
+- **Maps**: Leaflet (2D with CSS-based touch rotation) + Mapbox GL JS (3D perspective)
 - **Mobile**: Capacitor v6.2.0 (iOS + Android), locked to Node 20
 - **Data**: Firebase Auth (USE_MOCK_DATA=false) + localStorage + local JSON file DBs
 - **APIs**: HERE Maps (Browse + Discover + Fuel Prices), Google Maps Platform, MapTiler, Gemini, Mapbox
 - **Proxy**: Nginx on port 3000 -> Express on port 8001
+- **Preview URL**: https://poi-fuel-tracker.preview.emergentagent.com
 
 ## What's Been Implemented
 
@@ -37,7 +38,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Firebase Auth domain auto-registration
 
 ### Phase 21 — Touch Map Rotation (DONE — 2026-03-29)
-- leaflet-rotate plugin for 2D touch rotation
+- CSS-based 2D touch rotation (NOT leaflet-rotate plugin - conflicts with existing system)
 - Mapbox 3D explicit dragRotate + touchZoomRotate + touchPitch
 
 ### Phase 22 — POI Accuracy & Performance (DONE — 2026-03-29)
@@ -60,20 +61,36 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Removed 20+ console.log calls from hot paths (touch handlers, POI rendering, periodic updates)
 - Consolidated localStorage persistence into single useEffect
 
+### Phase 23 — Preview Fix & NavigationView Refactor (DONE — 2026-03-29)
+**Preview Environment Fix:**
+- Set up nginx proxy on port 3000 → Express port 8001 for Kubernetes ingress routing
+- Updated Firebase Auth domain registration for new preview URL (poi-fuel-tracker.preview.emergentagent.com)
+
+**NavigationView.tsx Refactor (5152 → 4656 lines, -528 lines):**
+- Extracted `PoiDetailModal.tsx` — POI detail popup with diesel prices, amenities, parking status, reputation
+- Extracted `RouteStepsModal.tsx` — Turn-by-turn route steps modal with lane guidance
+- Extracted `NavigationHUD.tsx` — Navigation heads-up display with highway shields
+- Extracted `WarningBanners.tsx` — Error, off-route, and HOS violation alert banners
+- Fixed `maneuverIndex` scoping bug (added `currentManeuverIndex` state)
+- All backend API tests pass (13/13), frontend loads without React errors
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
 - Map filtering for Reputation Scores (show only 4-star+ facilities)
 
 ### P2 — Future
-- Refactor `NavigationView.tsx` (>5000 lines -> smaller sub-components)
 - iOS/Android store submissions (blocked: user signing certificates)
 
 ## Key Files
 - `/app/server.ts` — Express server, API proxy, IP geolocation
 - `/app/build-frontend-artifacts.sh` — CI/CD frontend build script
 - `/app/App.tsx` — Location provider with IP fallback
-- `/app/components/NavigationView.tsx` — Core map orchestration
+- `/app/components/NavigationView.tsx` — Core map orchestration (refactored)
+- `/app/components/PoiDetailModal.tsx` — Extracted POI detail popup
+- `/app/components/RouteStepsModal.tsx` — Extracted route steps modal
+- `/app/components/NavigationHUD.tsx` — Extracted navigation HUD
+- `/app/components/WarningBanners.tsx` — Extracted warning banners
 - `/app/components/Navigation3DView.tsx` — Premium 3D navigation
 - `/app/services/geminiService.ts` — POI fetching with HERE access-point placement
 - `/app/services/fuelPriceService.ts` — Diesel fuel price fetching
