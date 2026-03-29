@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut as firebaseSignOut, browserPopupRedirectResolver } from 'firebase/auth';
+import { 
+  User, 
+  onAuthStateChanged, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  signOut as firebaseSignOut, 
+  browserPopupRedirectResolver,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signInAnonymously,
+  updateProfile as firebaseUpdateProfile
+} from 'firebase/auth';
 import { doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { FirebaseContext, UserProfile, FirebaseContextType } from '../types';
 import { auth, db } from '../firebase';
 
-const USE_MOCK_DATA = false; // Toggle this to switch between Mock and Firebase
+const USE_MOCK_DATA = false;
 
 export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const MOCK_USER = {
@@ -73,7 +84,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const initialProfile: UserProfile = {
           uid: user.uid,
           email: user.email || '',
-          displayName: user.displayName || '',
+          displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
           truckProfile: {
             height: 13.5,
             weight: 78500,
@@ -96,18 +107,68 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
+  // Google Sign-In
   const signIn = async () => {
     if (USE_MOCK_DATA) return;
     try {
       setAuthError(null);
       const provider = new GoogleAuthProvider();
-      // Add custom parameters if needed, e.g., prompt: 'select_account'
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
+      provider.setCustomParameters({ prompt: 'select_account' });
       await signInWithPopup(auth, provider, browserPopupRedirectResolver);
-    } catch (error) {
-      setAuthError((error as Error).message);
+    } catch (error: any) {
+      setAuthError(error.message);
+    }
+  };
+
+  // Email/Password Sign-In
+  const signInWithEmail = async (email: string, password: string) => {
+    if (USE_MOCK_DATA) return;
+    try {
+      setAuthError(null);
+      await signInWithEmailAndPassword(auth, email, password);
+    } catch (error: any) {
+      const code = error.code;
+      if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+        setAuthError('Invalid email or password.');
+      } else if (code === 'auth/too-many-requests') {
+        setAuthError('Too many attempts. Please try again later.');
+      } else {
+        setAuthError(error.message);
+      }
+    }
+  };
+
+  // Email/Password Registration
+  const signUpWithEmail = async (email: string, password: string, displayName?: string) => {
+    if (USE_MOCK_DATA) return;
+    try {
+      setAuthError(null);
+      const result = await createUserWithEmailAndPassword(auth, email, password);
+      if (displayName && result.user) {
+        await firebaseUpdateProfile(result.user, { displayName });
+      }
+    } catch (error: any) {
+      const code = error.code;
+      if (code === 'auth/email-already-in-use') {
+        setAuthError('An account with this email already exists.');
+      } else if (code === 'auth/weak-password') {
+        setAuthError('Password must be at least 6 characters.');
+      } else if (code === 'auth/invalid-email') {
+        setAuthError('Invalid email address.');
+      } else {
+        setAuthError(error.message);
+      }
+    }
+  };
+
+  // Anonymous/Guest Sign-In
+  const signInAsGuest = async () => {
+    if (USE_MOCK_DATA) return;
+    try {
+      setAuthError(null);
+      await signInAnonymously(auth);
+    } catch (error: any) {
+      setAuthError(error.message);
     }
   };
 
@@ -115,8 +176,8 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (USE_MOCK_DATA) return;
     try {
       await firebaseSignOut(auth);
-    } catch (error) {
-      setAuthError((error as Error).message);
+    } catch (error: any) {
+      setAuthError(error.message);
     }
   };
 
@@ -135,6 +196,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     profile,
     loading,
     signIn,
+    signInWithEmail,
+    signUpWithEmail,
+    signInAsGuest,
     signOut,
     updateProfile: updateProfileData,
     authError
@@ -146,8 +210,6 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     </FirebaseContext.Provider>
   );
 };
-
-
 
 export const useFirebase = () => {
   const context = React.useContext(FirebaseContext);

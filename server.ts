@@ -74,19 +74,56 @@ async function addAuthorizedDomains() {
     const missing = domainsToAdd.filter(d => !current.includes(d));
     if (missing.length === 0) {
       console.log('Firebase Auth: all domains already authorized');
-      return;
+    } else {
+      const updated = [...current, ...missing];
+      await client.request({
+        url,
+        method: 'PATCH',
+        body: JSON.stringify({ authorizedDomains: updated }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      console.log(`Firebase Auth: added domains: ${missing.join(', ')}`);
     }
-    
-    const updated = [...current, ...missing];
-    await client.request({
-      url,
-      method: 'PATCH',
-      body: JSON.stringify({ authorizedDomains: updated }),
-      headers: { 'Content-Type': 'application/json' },
-    });
-    console.log(`Firebase Auth: added domains: ${missing.join(', ')}`);
+
+    // Enable Email/Password and Anonymous sign-in providers
+    await enableAuthProviders(client, PROJECT_ID);
   } catch (err: any) {
     console.error('Firebase Auth domain registration failed:', err?.message || err);
+  }
+}
+
+async function enableAuthProviders(client: any, projectId: string) {
+  try {
+    // Enable Email/Password provider
+    const emailUrl = `https://identitytoolkit.googleapis.com/admin/v2/projects/${projectId}/config`;
+    const emailRes = await client.request({ url: emailUrl, method: 'GET' });
+    const emailConfig = emailRes.data as any;
+    
+    const signIn = emailConfig?.signIn || {};
+    const emailEnabled = signIn?.email?.enabled;
+    const anonEnabled = signIn?.anonymous?.enabled;
+    
+    if (!emailEnabled || !anonEnabled) {
+      const updatedSignIn = {
+        signIn: {
+          ...signIn,
+          email: { enabled: true, passwordRequired: true },
+          anonymous: { enabled: true },
+        }
+      };
+      await client.request({
+        url: emailUrl,
+        method: 'PATCH',
+        body: JSON.stringify(updatedSignIn),
+        headers: { 'Content-Type': 'application/json' },
+      });
+      console.log('Firebase Auth: enabled Email/Password and Anonymous providers');
+    } else {
+      console.log('Firebase Auth: Email/Password and Anonymous providers already enabled');
+    }
+  } catch (err: any) {
+    console.error('Firebase Auth: failed to enable providers:', err?.message || err);
+    console.error('Please enable Email/Password and Anonymous sign-in in Firebase Console > Authentication > Sign-in method');
   }
 }
 addAuthorizedDomains();
