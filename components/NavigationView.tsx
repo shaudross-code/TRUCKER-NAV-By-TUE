@@ -3,7 +3,6 @@ import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
-import 'leaflet-rotate';
 import { MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
 import 'leaflet/dist/leaflet.css';
 import { 
@@ -601,11 +600,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               zoom: 13,
               maxZoom: 20,
               zoomControl: false,
-              rotate: true,
-              touchRotate: true,
-              shiftKeyRotate: true,
-              bearing: 0,
-            } as any);
+            });
             // console.log("NavigationView: map initialized successfully");
           } catch (e) {
             console.error("NavigationView: L.map() failed", e);
