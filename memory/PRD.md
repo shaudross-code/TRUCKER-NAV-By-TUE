@@ -92,6 +92,23 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Attempted programmatic Firestore security rules update via Firebase Rules REST API
 - Dashboard inputs now work correctly for all user types (Google, email, guest)
 
+### Phase 26 — Bug Fix Sweep (DONE — 2026-03-29)
+**Bug 1: Firestore Write Spam (P0)** — FIXED
+- Skipped ALL Firestore operations (read/write/listen) for anonymous users in `FirebaseProvider.tsx` and `HOSProvider.tsx`
+- Permission error count: 44+ → 0 per session
+- Network ERR_ABORTED spam: 10+ → 1 (normal page navigation)
+
+**Bug 2: Truck Stops Stuck Loading (P1)** — FIXED
+- `PredictiveParking.tsx` had `loading` initialized to `true` but early-exit when no location skipped setting it to `false`
+- Added 15-second timeout on Gemini API calls to prevent indefinite hangs
+- Added proper empty state ("No truck stops found") and error state UI
+- Page now loads real truck stop data (Sapp Bros, Pilot, Love's, Flying J, etc.)
+
+**Bug 3: Chart Dimension Warning (P2)** — FIXED
+- `PerformanceChart` renders with -1 dimensions when CSS layout isn't complete
+- Added 250ms mount delay before rendering `ResponsiveContainer`
+- Also cleaned up server.ts Firestore rules update to not log noise on failure
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming

@@ -41,7 +41,7 @@ const chartData = [
 const PerformanceChart = React.memo(() => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
-    const t = setTimeout(() => setMounted(true), 100);
+    const t = setTimeout(() => setMounted(true), 250);
     return () => clearTimeout(t);
   }, []);
   if (!mounted) return <div className="h-[300px] md:h-[400px] w-full" />;
