@@ -259,7 +259,7 @@ export async function fetchMajorChains(lat: number, lon: number) {
 export async function fetchTruckPOIs(lat: number, lon: number) {
   try {
     // Fetch multiple types of truck-related POIs in parallel using HERE APIs
-    const [generalPOIs, servicePOIs, truckStopPOIs, ...brandResults] = await Promise.all([
+    const [generalPOIs, truckStopPOIs, ...brandResults] = await Promise.all([
       // General fueling stations, rest areas, weigh stations via Browse
       fetch('/api/browse', {
         method: 'POST',
@@ -271,17 +271,6 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         })
       }).then(r => r.ok ? r.json() : { items: [] }),
       
-      // Truck service centers via Browse (repair, tires, truck-specific services)
-      fetch('/api/browse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: safeStringify({ 
-          lat, 
-          lon, 
-          categories: '600-6300-0066,600-6100-0062,600-6300-0000,700-7900-0132'
-        })
-      }).then(r => r.ok ? r.json() : { items: [] }),
-      
       // Truck stops specifically via Discover API (most accurate)
       fetch('/api/discover', {
         method: 'POST',
@@ -290,7 +279,7 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       }).then(r => r.ok ? r.json() : { items: [] }),
       
       // Major brands via individual Discover calls (HERE doesn't support OR queries)
-      ...["Love's Travel Stop", "Pilot Flying J", "Petro Stopping Centers", "TA TravelCenters", "Cat Scale", "Speedco", "Blue Beacon Truck Wash"].map(brand =>
+      ...["Love's Travel Stop", "Pilot Flying J", "Petro Stopping Centers", "TA TravelCenters", "Cat Scale", "Blue Beacon Truck Wash"].map(brand =>
         fetch('/api/discover', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -302,7 +291,6 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
     // Combine all results
     const allItems = [
       ...(generalPOIs.items || []),
-      ...(servicePOIs.items || []),
       ...(truckStopPOIs.items || []),
       ...brandResults.flatMap((r: any) => r.items || [])
     ];
@@ -471,7 +459,13 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         place_id: item.id, // HERE place ID for lookup
         id: item.id,
       };
-    }).filter(Boolean);
+    }).filter(Boolean).filter((poi: any) => {
+      // Remove generic "service" type POIs (wrench icons)
+      if (poi.type === 'service') return false;
+      // Remove fuel stations without diesel that aren't truck stops/plazas
+      if (poi.type === 'fuel' && !poi.amenities.includes('Diesel')) return false;
+      return true;
+    });
   } catch (e) {
     console.warn("HERE API error, falling back to Overpass API:", e instanceof Error ? e.message : String(e));
     return fetchTruckPOIsFromOverpass(lat, lon);
@@ -540,7 +534,7 @@ export async function fetchCorridorPOIs(
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
           lat, lon: lng, 
-          categories: '700-7600-0116,700-7600-0117,700-7600-0322,700-7900-0132'
+          categories: '700-7600-0116,700-7600-0117,700-7600-0322'
         })
       }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }))
     ]);
@@ -609,7 +603,13 @@ export async function fetchCorridorPOIs(
       id: item.id,
       corridorPoi: true, // Flag for corridor-sourced POIs
     };
-  }).filter(Boolean);
+  }).filter(Boolean).filter((poi: any) => {
+    // Remove generic "service" type POIs
+    if (poi.type === 'service') return false;
+    // Remove fuel stations without diesel that aren't truck stops/plazas
+    if (poi.type === 'fuel' && !poi.amenities.includes('Diesel')) return false;
+    return true;
+  });
 }
 
 
@@ -626,12 +626,10 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
         way["highway"="weigh_station"](around:${radius},${lat},${lon});
         node["highway"="rest_area"](around:${radius},${lat},${lon});
         way["highway"="rest_area"](around:${radius},${lat},${lon});
-        node["highway"="services"](around:${radius},${lat},${lon});
-        way["highway"="services"](around:${radius},${lat},${lon});
-        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Speedco|Southern Tire Mart|Rush Truck Centers|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        node["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        way["name"~"Speedco|Southern Tire Mart|Rush Truck|Ryder|Penske|Freightliner|Cummins|Peterbilt|Volvo|Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        node["name"~"Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
+        way["name"~"Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
         node["brand"~"Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
         way["brand"~"Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
         node["name"~"Lowes|Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
@@ -745,7 +743,14 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
         lon: elLon,
         amenities
       };
-    }).filter((poi: any) => poi.lat && poi.lon);
+    }).filter((poi: any) => {
+      if (!poi.lat || !poi.lon) return false;
+      // Remove generic "service" type POIs
+      if (poi.type === 'service') return false;
+      // Remove fuel stations without diesel
+      if (poi.type === 'fuel' && !poi.amenities.includes('Diesel')) return false;
+      return true;
+    });
   } catch (e) {
     console.warn("Overpass API error, returning empty array:", e instanceof Error ? e.message : String(e));
     return [];
