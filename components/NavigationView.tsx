@@ -56,6 +56,10 @@ import {
 import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
 import { TrafficIcon } from './TrafficIcon';
 import { Navigation3DView } from './Navigation3DView';
+import { PoiDetailModal } from './PoiDetailModal';
+import { RouteStepsModal } from './RouteStepsModal';
+import { NavigationHUD } from './NavigationHUD';
+import { WarningBanners } from './WarningBanners';
 
 interface Waypoint {
   id: string;
