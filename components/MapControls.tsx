@@ -29,20 +29,6 @@ export const MapControls: React.FC<any> = React.memo(({
 }) => {
   return (
     <div id="nav-map-controls" className={`absolute right-2 md:right-4 z-[2010] flex flex-col items-end gap-1 md:gap-2 transition-all duration-700 top-1/2 scale-90 md:scale-100 origin-right ${className}`}>
-        {!isNorthUp && (
-          <button 
-            onClick={() => setIsNorthUp(true)}
-            className="bg-black/90 backdrop-blur-3xl border border-[#D4AF37]/30 rounded-full p-2 md:p-3 shadow-2xl transition-all animate-in fade-in zoom-in mb-1 hover:bg-white/10 group"
-            title="Reset to North Up"
-          >
-            <div 
-              className="transition-transform duration-500 ease-out"
-              style={{ transform: `rotate(var(--map-rotation, 0deg))` }}
-            >
-              <Compass className="w-5 h-5 md:w-7 md:h-7 text-[#D4AF37] group-hover:scale-110 transition-transform" />
-            </div>
-          </button>
-        )}
         
         <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-1.5 md:p-2 shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 md:gap-2 transition-all hover:scale-[1.005]">
           <div className="relative">
@@ -266,10 +252,13 @@ export const MapControls: React.FC<any> = React.memo(({
 
           <button 
             onClick={() => setIsNorthUp(!isNorthUp)} 
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${!isNorthUp ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
+            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${!isNorthUp ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
             title={isNorthUp ? "Switch to Heading Up" : "Switch to North Up"}
+            data-testid="orientation-btn"
           >
-            <NavIcon className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${!isNorthUp ? 'animate-pulse' : ''}`} strokeWidth={4} />
+            <div style={{ transform: !isNorthUp ? `rotate(var(--map-rotation, 0deg))` : 'none', transition: 'transform 0.5s ease-out' }}>
+              <NavIcon className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${!isNorthUp ? 'animate-pulse' : ''}`} strokeWidth={4} />
+            </div>
           </button>
 
           {/* Device Compass toggle */}
