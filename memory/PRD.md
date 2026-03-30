@@ -96,8 +96,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **3D follow mode**: Added `pitch: 70` to `flyTo` call, passed `isFollowMode`/`isOverviewMode` to Navigation3DView — camera now correctly zooms in and tracks the truck icon
 - **3D overview mode**: Properly toggles pitch between 0 (flat overview) and 70 (navigation tilt)
 
-### Phase 36 — 2D Heading-Up Mode Fix (DONE — 2026-03-30)
-- Fixed 2D map stuck in north-up by lowering speed gate for rotation and adding position-based heading fallback
+### Phase 36 — 2D Heading-Up Mode Fix v2 (DONE — 2026-03-30)
+- **Root cause**: `notifyListeners()` only fired when speed/heading CHANGED — at steady speed with null GPS heading, `updateRotationAndPan` never ran
+- **Fix 1**: Always call `notifyListeners()` on every GPS position update so rotation recalculates as user moves along route segments
+- **Fix 2**: Route heading fallback now handles `lastSimIdxRef = -1` by using first route segment as initial heading
+- **Fix 3**: Position-based heading is no longer blocked by `isDriving` condition (secondary `if` instead of `else-if`)
+- **Fix 4**: Smoothing factor increased from 0.15 to 0.35 for faster heading convergence (~3 updates vs ~7)
 
 ### Phase 37 — Speed Display + Instruction Units Bug Fix (DONE — 2026-03-30)
 - **Speed double-conversion fix**: `App.tsx` already converts GPS speed from m/s to mph in `speedRef`. NavigationView.tsx and Navigation3DView.tsx were converting AGAIN with `* 2.23694`, causing 67 mph to display as ~150 mph. Fixed all speed displays to use raw speed for imperial, `speed * 1.60934` for metric.
