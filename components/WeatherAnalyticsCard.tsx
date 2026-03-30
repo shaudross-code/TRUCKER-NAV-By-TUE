@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { CloudSun, Wind, Droplets, Cloud, Sun, CloudRain, Navigation } from 'lucide-react';
 import { isValidLatLng } from '../utils';
 
-import { LocationContext } from '../types';
+import { LocationContext, AppContext } from '../types';
 
 interface WeatherData {
   temp: number;
@@ -15,6 +15,8 @@ interface WeatherData {
 
 export const WeatherAnalyticsCard = React.memo(() => {
   const locationContext = React.useContext(LocationContext);
+  const appContext = React.useContext(AppContext);
+  const isMetric = appContext?.unitSystem === 'metric';
   const userLocation = locationContext?.userLocation || null;
   console.log("WeatherAnalyticsCard: Rendering with userLocation:", userLocation);
   const [weather, setWeather] = useState<WeatherData | null>(null);
@@ -122,7 +124,7 @@ export const WeatherAnalyticsCard = React.memo(() => {
               <div className="h-8 md:h-12 w-24 md:w-32 bg-white/5 rounded-xl md:rounded-2xl animate-pulse mb-1" />
             ) : weather ? (
               <div className="text-2xl md:text-4xl font-bold text-white tracking-tight flex items-baseline gap-2 md:gap-3 leading-none">
-                {weather.temp}°F
+                {isMetric ? Math.round((weather.temp - 32) * 5/9) : weather.temp}°{isMetric ? 'C' : 'F'}
                 <span className="text-[#D4AF37] font-bold text-[8px] md:text-xs uppercase tracking-widest">
                   {weather.condition}
                 </span>
@@ -143,7 +145,7 @@ export const WeatherAnalyticsCard = React.memo(() => {
               <div>
                 <div className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Wind</div>
                 <div className="text-xs font-bold text-white uppercase">
-                  {`${weather.windSpeed} mph ${weather.windDir}`}
+                  {isMetric ? `${Math.round(weather.windSpeed * 1.60934)} km/h ${weather.windDir}` : `${weather.windSpeed} mph ${weather.windDir}`}
                 </div>
               </div>
             </div>

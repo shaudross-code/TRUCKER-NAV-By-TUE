@@ -1911,10 +1911,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
           
           setWeather({
-            temp: `${Math.round(current.temperature_2m)}°`,
+            temp: context?.unitSystem === 'metric' ? `${Math.round((current.temperature_2m - 32) * 5/9)}°C` : `${Math.round(current.temperature_2m)}°`,
             condition: currentDetails.condition,
-            wind: `${Math.round(current.wind_speed_10m || 0)} MPH ${windDir}`,
-            visibility: `${visMiles} MI`,
+            wind: context?.unitSystem === 'metric' 
+              ? `${Math.round((current.wind_speed_10m || 0) * 1.60934)} KM/H ${windDir}`
+              : `${Math.round(current.wind_speed_10m || 0)} MPH ${windDir}`,
+            visibility: context?.unitSystem === 'metric'
+              ? `${(visMiles * 1.60934).toFixed(1)} KM`
+              : `${visMiles} MI`,
             icon: currentDetails.icon,
             forecast
           });
@@ -4540,12 +4544,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0 h-3">Speed</span>
                 <div className="flex items-center">
                   <span className={`text-lg md:text-4xl landscape:text-2xl font-bold tracking-tight leading-none ${currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-500' : 'text-[#D4AF37]'}`}>
-                    {Math.round(speed * 2.23694)}
-                    <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">mph</span>
+                    {context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)}
+                    <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km/h' : 'mph'}</span>
                   </span>
                   {currentSpeedLimit && (
                     <div className="ml-2">
-                      <SpeedLimitSign limit={currentSpeedLimit} currentSpeed={Math.round(speed * 2.23694)} compact />
+                      <SpeedLimitSign limit={context?.unitSystem === 'metric' ? Math.round(currentSpeedLimit * 1.60934) : currentSpeedLimit} currentSpeed={context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)} compact />
                     </div>
                   )}
                 </div>
@@ -4554,8 +4558,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               <div id="nav-stat-dist" className="flex flex-col shrink-0">
                 <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Target Dist</span>
                 <span className="text-xl md:text-5xl landscape:text-3xl font-bold text-[#D4AF37] tracking-tight leading-none">
-                  {milesRemaining > 0 ? milesRemaining.toFixed(1) : '---'}
-                  <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">mi</span>
+                  {context?.unitSystem === 'metric' 
+                    ? (milesRemaining > 0 ? (milesRemaining * 1.60934).toFixed(1) : '---')
+                    : (milesRemaining > 0 ? milesRemaining.toFixed(1) : '---')
+                  }
+                  <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km' : 'mi'}</span>
                 </span>
               </div>
               <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />

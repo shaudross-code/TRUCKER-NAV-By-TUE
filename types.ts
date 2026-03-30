@@ -146,6 +146,8 @@ export interface AppContextType {
   setWeekDeductions: React.Dispatch<React.SetStateAction<number>>;
   takeHomePercentage: number;
   setTakeHomePercentage: React.Dispatch<React.SetStateAction<number>>;
+  unitSystem: 'imperial' | 'metric';
+  setUnitSystem: React.Dispatch<React.SetStateAction<'imperial' | 'metric'>>;
 }
 
 export interface HOSContextType {

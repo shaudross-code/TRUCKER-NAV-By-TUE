@@ -254,6 +254,16 @@ const AppContent: React.FC = React.memo(() => {
   const autoReroute = profile?.autoReroute ?? true;
   const setAutoReroute = useCallback((val: boolean) => updateProfile({ autoReroute: val }), [updateProfile]);
 
+  // Unit system preference (imperial/metric) - persisted in localStorage
+  const [unitSystem, setUnitSystem] = useState<'imperial' | 'metric'>(() => {
+    try {
+      return (localStorage.getItem('trucker_unitSystem') as 'imperial' | 'metric') || 'imperial';
+    } catch { return 'imperial'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('trucker_unitSystem', unitSystem); } catch {}
+  }, [unitSystem]);
+
   // Dashboard financial metrics - use localStorage as primary store with Firestore sync
   const loadLocal = (key: string, fallback: number) => {
     try {
@@ -440,7 +450,9 @@ const AppContent: React.FC = React.memo(() => {
       weekDeductions,
       setWeekDeductions,
       takeHomePercentage,
-      setTakeHomePercentage
+      setTakeHomePercentage,
+      unitSystem,
+      setUnitSystem
     }), [
       activeView, 
       navTarget, 
@@ -452,7 +464,8 @@ const AppContent: React.FC = React.memo(() => {
       fuelCost,
       truckCost,
       weekDeductions,
-      takeHomePercentage
+      takeHomePercentage,
+      unitSystem
     ]);
 
   const mountTimeRef = useRef(Date.now());

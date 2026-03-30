@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { X, List, ArrowUp } from 'lucide-react';
+import { AppContext } from '../types';
 
 interface RouteStepsModalProps {
   showSteps: boolean;
@@ -13,6 +14,8 @@ interface RouteStepsModalProps {
 export const RouteStepsModal: React.FC<RouteStepsModalProps> = ({
   showSteps, onClose, routeSteps, maneuverIndex, getManeuverIcon, parseLane,
 }) => {
+  const context = useContext(AppContext);
+  const isMetric = context?.unitSystem === 'metric';
   if (!showSteps) return null;
 
   return (
@@ -56,7 +59,10 @@ export const RouteStepsModal: React.FC<RouteStepsModalProps> = ({
                         Step {idx + 1}
                       </span>
                       <span className="text-sm font-bold text-white italic">
-                        {(step.distance / 1609.34).toFixed(1)} mi
+                        {isMetric 
+                          ? `${(step.distance / 1000).toFixed(1)} km`
+                          : `${(step.distance / 1609.34).toFixed(1)} mi`
+                        }
                       </span>
                     </div>
                     <p className="text-base font-bold text-white leading-tight mb-2 uppercase italic tracking-tight">

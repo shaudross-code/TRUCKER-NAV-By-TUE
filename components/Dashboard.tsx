@@ -106,16 +106,20 @@ const PerformanceChart = React.memo(() => {
 
 const SpeedDisplay = React.memo(() => {
   const telemetryContext = useContext(TelemetryContext);
+  const appContext = useContext(AppContext);
+  const isMetric = appContext?.unitSystem === 'metric';
   
   const speed = React.useSyncExternalStore(
     telemetryContext?.subscribe || (() => () => {}),
     () => telemetryContext?.speedRef.current || 0
   );
 
+  const displaySpeed = isMetric ? Math.round(speed * 1.60934) : speed;
+
   return (
     <div className="flex flex-col items-center md:items-end">
       <span className="text-[8px] md:text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Current Speed</span>
-      <span className="text-lg md:text-xl font-bold text-[#D4AF37] leading-none">{speed} <span className="text-[10px] text-zinc-600">MPH</span></span>
+      <span className="text-lg md:text-xl font-bold text-[#D4AF37] leading-none">{displaySpeed} <span className="text-[10px] text-zinc-600">{isMetric ? 'KM/H' : 'MPH'}</span></span>
     </div>
   );
 });
@@ -495,9 +499,9 @@ const Dashboard: React.FC = React.memo(() => {
         <div className="relative">
           <MetricCard 
             icon={MapIcon} 
-            label="Miles This Week" 
-            value={formatNumber(milesThisWeek)} 
-            target="3,200 mi" 
+            label={context?.unitSystem === 'metric' ? 'KM This Week' : 'Miles This Week'} 
+            value={context?.unitSystem === 'metric' ? formatNumber(milesThisWeek * 1.60934) : formatNumber(milesThisWeek)} 
+            target={context?.unitSystem === 'metric' ? '5,150 km' : '3,200 mi'} 
             iconBg="bg-[#D4AF37]/10"
             iconColor="text-[#D4AF37]"
             isInteractive={true}

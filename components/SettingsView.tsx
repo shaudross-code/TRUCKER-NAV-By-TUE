@@ -11,7 +11,9 @@ import {
   Scale,
   RotateCcw,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  Gauge,
+  Ruler
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
@@ -149,7 +151,7 @@ const SettingsView: React.FC = () => {
 
   if (!context) return null;
 
-  const { truckProfile, setTruckProfile } = context;
+  const { truckProfile, setTruckProfile, unitSystem, setUnitSystem } = context;
 
   const handleEdit = (field: keyof typeof truckProfile) => {
     const current = truckProfile[field];
@@ -216,6 +218,70 @@ const SettingsView: React.FC = () => {
           </div>
         </section>
 
+        {/* Units & Display Section */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <Ruler className="w-4 h-4 text-[#D4AF37]" />
+            <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">Units & Display</h2>
+          </div>
+          <div className="space-y-4">
+            {/* Speed Units */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-800 rounded-xl">
+                    <Gauge className="w-4 h-4 text-[#D4AF37]" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-bold uppercase tracking-wider italic">Speed</p>
+                    <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Speedometer display unit</p>
+                  </div>
+                </div>
+                <div data-testid="speed-unit-toggle" className="flex bg-zinc-800 rounded-xl overflow-hidden border border-zinc-700">
+                  <button
+                    data-testid="speed-mph-btn"
+                    onClick={() => setUnitSystem('imperial')}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider transition-all ${unitSystem === 'imperial' ? 'bg-[#D4AF37] text-black' : 'text-zinc-400 hover:text-white'}`}
+                  >
+                    MPH
+                  </button>
+                  <button
+                    data-testid="speed-kmh-btn"
+                    onClick={() => setUnitSystem('metric')}
+                    className={`px-4 py-2 text-xs font-black uppercase tracking-wider transition-all ${unitSystem === 'metric' ? 'bg-[#D4AF37] text-black' : 'text-zinc-400 hover:text-white'}`}
+                  >
+                    KM/H
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* Distance Units */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-800 rounded-xl">
+                    <Ruler className="w-4 h-4 text-[#D4AF37]" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-bold uppercase tracking-wider italic">Distance</p>
+                    <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold">
+                      {unitSystem === 'imperial' ? 'Miles & Feet' : 'Kilometers & Meters'}
+                    </p>
+                  </div>
+                </div>
+                <div data-testid="distance-unit-display" className="flex items-center gap-2">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${unitSystem === 'imperial' ? 'text-[#D4AF37]' : 'text-zinc-500'}`}>MI</span>
+                  <div className="w-px h-4 bg-zinc-700" />
+                  <span className={`text-xs font-bold uppercase tracking-wider ${unitSystem === 'metric' ? 'text-[#D4AF37]' : 'text-zinc-500'}`}>KM</span>
+                </div>
+              </div>
+              <p className="text-zinc-600 text-[10px] mt-3 pl-11 uppercase tracking-wider">
+                Linked to speed setting — changes distance across navigation, routes, and dashboard
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Truck Profile Section */}
         <section>
           <div className="flex items-center gap-3 mb-6">
@@ -225,25 +291,25 @@ const SettingsView: React.FC = () => {
           <div className="space-y-3">
             <ProfileField 
               label="Current Height" 
-              value={`${truckProfile.height}' (Truck Height)`} 
+              value={unitSystem === 'imperial' ? `${truckProfile.height}' (Truck Height)` : `${(truckProfile.height * 0.3048).toFixed(1)} m (Truck Height)`}
               icon={ArrowUpCircle} 
               onEdit={() => handleEdit('height')}
             />
             <ProfileField 
               label="Gross Weight" 
-              value={`${truckProfile.weight.toLocaleString()} lbs (GVW)`} 
+              value={unitSystem === 'imperial' ? `${truckProfile.weight.toLocaleString()} lbs (GVW)` : `${Math.round(truckProfile.weight * 0.453592).toLocaleString()} kg (GVW)`}
               icon={Scale} 
               onEdit={() => handleEdit('weight')}
             />
             <ProfileField 
               label="Trailer Length" 
-              value={`${truckProfile.length}' (Trailer Length)`} 
+              value={unitSystem === 'imperial' ? `${truckProfile.length}' (Trailer Length)` : `${(truckProfile.length * 0.3048).toFixed(1)} m (Trailer Length)`}
               icon={RotateCcw} 
               onEdit={() => handleEdit('length')}
             />
             <ProfileField 
               label="Truck Width" 
-              value={`${truckProfile.width}' (Width)`} 
+              value={unitSystem === 'imperial' ? `${truckProfile.width}' (Width)` : `${(truckProfile.width * 0.3048).toFixed(1)} m (Width)`}
               icon={ArrowUpCircle} 
               onEdit={() => handleEdit('width')}
             />
@@ -255,7 +321,7 @@ const SettingsView: React.FC = () => {
             />
             <ProfileField 
               label="Axle Weight" 
-              value={`${truckProfile.axleWeight.toLocaleString()} lbs (Per Axle)`} 
+              value={unitSystem === 'imperial' ? `${truckProfile.axleWeight.toLocaleString()} lbs (Per Axle)` : `${Math.round(truckProfile.axleWeight * 0.453592).toLocaleString()} kg (Per Axle)`}
               icon={Scale} 
               onEdit={() => handleEdit('axleWeight')}
             />
