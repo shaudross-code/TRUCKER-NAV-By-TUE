@@ -7,7 +7,7 @@ import requests
 import os
 
 # Use the preview URL for testing
-BASE_URL = "https://poi-fuel-tracker.preview.emergentagent.com"
+BASE_URL = "https://trucker-dashboard-3.preview.emergentagent.com"
 
 
 class TestHealthEndpoint:

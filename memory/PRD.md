@@ -10,7 +10,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Data**: Firebase Auth (USE_MOCK_DATA=false) + localStorage + local JSON file DBs
 - **APIs**: HERE Maps (Browse + Discover + Fuel Prices), Google Maps Platform, MapTiler, Gemini, Mapbox
 - **Proxy**: Nginx on port 3000 -> Express on port 8001
-- **Preview URL**: https://poi-fuel-tracker.preview.emergentagent.com
+- **Preview URL**: https://trucker-dashboard-3.preview.emergentagent.com
 
 ## What's Been Implemented
 
