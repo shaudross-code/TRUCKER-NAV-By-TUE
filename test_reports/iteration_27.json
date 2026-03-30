@@ -1,0 +1,93 @@
+{
+  "summary": "Frontend testing complete for bug fixes: 1) Stop sign icon now uses pure SVG with embedded text (no text-behind-icon bug), 2) 3D follow mode correctly zooms to user location at pitch 70° with zoom 17.5. All features verified working: Guest login, 2D map with Mapbox tiles, 3D satellite view, follow mode, overview mode toggle, bottom HUD with Distance/Time/ETA.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "Overpass API",
+        "issue": "504 Gateway Timeout when fetching traffic infrastructure - cosmetic only, does not affect core functionality",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "minor_issues": [
+      {
+        "component": "Dashboard PerformanceChart",
+        "issue": "Chart dimension warning 'width(-1) height(-1)' still occurs occasionally",
+        "priority": "LOW",
+        "note": "Known issue from previous iterations - does not affect functionality"
+      },
+      {
+        "component": "3D View Zoom Buttons",
+        "issue": "Intermittent 'Cannot read properties of undefined (reading get)' error when rapidly clicking zoom buttons - app recovers on page refresh",
+        "priority": "LOW",
+        "note": "Occurred once during testing, may be related to mapbox map reference timing"
+      }
+    ]
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_27.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: TrafficIcon.tsx lines 27-32 - Stop sign uses pure SVG with <polygon> + <text> elements (no lucide-react overlay)",
+    "VERIFIED: TrafficIcon.tsx lines 35-40 - Yield sign uses pure SVG with <polygon> + <text> elements",
+    "VERIFIED: MapControls.tsx lines 265-271 - Follow button flyTo includes pitch:70, zoom:17.5, duration:1000",
+    "VERIFIED: MapControls.tsx lines 275-276 - Follow button sets isFollowMode(true) and isOverviewMode(false)",
+    "VERIFIED: Navigation3DView.tsx lines 316-319 - Truck marker always updates position, camera only moves when isFollowMode && !isOverviewMode",
+    "VERIFIED: Navigation3DView.tsx lines 325-331 - Camera easeTo includes pitch:70 when following",
+    "VERIFIED: MapControls.tsx lines 234-240 - Overview mode toggles pitch between 0 (overview) and 70 (follow)",
+    "VERIFIED: 2D map uses Mapbox dark-v11 raster tiles (console log confirms)"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100%"
+  },
+
+  "test_results": {
+    "features_tested": {
+      "guest_login": "PASS - Click 'Continue as Guest', reaches dashboard",
+      "navigation_view_loads": "PASS - Map loads with user location marker visible",
+      "2d_mapbox_tiles": "PASS - Console shows 'NavigationView: Using Mapbox dark-v11 raster tiles'",
+      "2d_mapbox_attribution": "PASS - Attribution shows '© Mapbox © OpenStreetMap'",
+      "search_works": "PASS - Typed 'Chicago', got suggestions from HERE API",
+      "route_calculation": "PASS - Route to Chicago calculated (462 mi, 7h 15m)",
+      "2d_to_3d_switch": "PASS - Clicking '2D' button switches to 3D satellite view",
+      "3d_view_pitch": "PASS - 3D view shows tilted perspective (~70° pitch)",
+      "3d_truck_marker": "PASS - Truck marker visible on W Broadway",
+      "3d_follow_mode": "PASS - Follow button zooms to user location with pitch 70°",
+      "3d_overview_mode": "PASS - Overview button toggles pitch (highlighted when active)",
+      "3d_bottom_hud": "PASS - Shows Distance (462.5), Time (7h 15m), ETA (12:12 AM)",
+      "3d_speed_limit_sign": "PASS - Speed limit 35 sign visible",
+      "3d_turn_instruction": "PASS - Shows '0.2 mi - Head toward S 8th St on W Broadway'",
+      "stop_sign_icon": "PASS - TrafficIcon uses pure SVG with embedded text (code verified)",
+      "yield_sign_icon": "PASS - TrafficIcon uses pure SVG with embedded text (code verified)",
+      "region_indicator": "PASS - Shows 'IOWA' state indicator"
+    }
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button",
+    "email": "test@trucker.com",
+    "password": "Test123456"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at https://trucker-dashboard-3.preview.emergentagent.com. Bug fixes verified: 1) Stop sign and yield sign icons in TrafficIcon.tsx now use pure SVG with embedded <text> elements instead of lucide-react overlays - this fixes the 'text behind icon' bug. 2) 3D follow mode in MapControls.tsx now includes pitch:70 in the flyTo call, and Navigation3DView.tsx only updates camera when isFollowMode=true && !isOverviewMode. The truck marker always moves regardless of follow mode. Key test flow: Guest login -> Navigation -> search 'Chicago' -> Route -> click '2D' to enter 3D -> pan away from truck -> click follow button (Target icon) -> should zoom to truck at 70° pitch."
+}

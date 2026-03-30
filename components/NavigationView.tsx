@@ -3847,6 +3847,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               restrictionAlerts={restrictionAlerts}
               truckProfile={truckProfile}
               onMapRef={(m) => { mapboxMapRef.current = m; }}
+              isFollowMode={isFollowMode}
+              isOverviewMode={isOverviewMode}
             />
             {/* 3D Mode Route Controls */}
             {isDriving && (

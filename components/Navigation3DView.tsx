@@ -36,6 +36,8 @@ interface Navigation3DViewProps {
   restrictionAlerts?: RestrictionAlert[];
   truckProfile?: TruckProfile;
   onMapRef?: (map: mapboxgl.Map | null) => void;
+  isFollowMode?: boolean;
+  isOverviewMode?: boolean;
 }
 
 // ─── Truck SVG ────────────────────────────────────────────────────────────────
@@ -138,6 +140,8 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   restrictionAlerts = [],
   truckProfile,
   onMapRef,
+  isFollowMode = true,
+  isOverviewMode = false,
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -304,8 +308,16 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     userLocationRef.current = userLocation;
   }, [userLocation]);
 
+  // Update camera + truck position
   useEffect(() => {
     if (!map.current || !userLocation) return;
+    
+    // Always update truck marker position
+    truckMarker.current?.setLngLat([userLocation[1], userLocation[0]]);
+
+    // Only move camera when following
+    if (!isFollowMode || isOverviewMode) return;
+
     const spd = currentSpeed || 0;
     const zoom = spd > 55 ? 16.2 : spd > 25 ? 17 : 17.5;
     const h = telemetry?.headingRef.current ?? heading;
@@ -317,20 +329,19 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       zoom,
       duration: 800,
     });
-    truckMarker.current?.setLngLat([userLocation[1], userLocation[0]]);
-  }, [userLocation, heading]);
+  }, [userLocation, heading, isFollowMode, isOverviewMode]);
 
   useEffect(() => {
     if (!telemetry) return;
     const unsub = telemetry.subscribe(() => {
-      if (!map.current || !userLocationRef.current) return;
+      if (!map.current || !userLocationRef.current || !isFollowMode || isOverviewMode) return;
       const h = telemetry.headingRef.current || 0;
       const spd = telemetry.speedRef.current || 0;
       const zoom = spd > 55 ? 16.2 : spd > 25 ? 17 : 17.5;
       map.current.easeTo({ bearing: h, zoom, pitch: 70, duration: 400 });
     });
     return unsub;
-  }, [telemetry]);
+  }, [telemetry, isFollowMode, isOverviewMode]);
 
   // Route line
   useEffect(() => {

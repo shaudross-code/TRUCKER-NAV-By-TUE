@@ -263,7 +263,12 @@ export const MapControls: React.FC<any> = React.memo(({
             onClick={() => { 
               if (isValidLatLng(userLocation)) {
                 if (is3DMode && mapboxMapRef?.current) {
-                  mapboxMapRef.current.flyTo({ center: [userLocation[1], userLocation[0]], zoom: 17.5 });
+                  mapboxMapRef.current.flyTo({ 
+                    center: [userLocation[1], userLocation[0]], 
+                    zoom: 17.5, 
+                    pitch: 70,
+                    duration: 1000 
+                  });
                 } else if (mapInstanceRef.current) {
                   mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17); 
                 }

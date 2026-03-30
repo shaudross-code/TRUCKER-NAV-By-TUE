@@ -25,22 +25,18 @@ export const TrafficIcon: React.FC<TrafficIconProps> = ({ type, signType, value,
     switch (signType) {
       case 'stop':
         return (
-          <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-            <Octagon className="w-full h-full fill-red-600 text-white stroke-white" strokeWidth={3} />
-            <span className="absolute inset-0 flex items-center justify-center text-white font-black text-[10px] leading-none">
-              STOP
-            </span>
-          </div>
+          <svg width={size} height={size} viewBox="0 0 20 20" className="shrink-0">
+            <polygon points="6,1 14,1 19,6 19,14 14,19 6,19 1,14 1,6" fill="#CC0000" stroke="#fff" strokeWidth="1.5"/>
+            <text x="10" y="12.5" textAnchor="middle" fill="#fff" fontFamily="Arial,Helvetica,sans-serif" fontSize={size >= 24 ? '7' : '5.5'} fontWeight="900">STOP</text>
+          </svg>
         );
       
       case 'yield':
         return (
-          <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-            <Triangle className="w-full h-full fill-white text-red-600 stroke-red-600 rotate-180" strokeWidth={4} />
-            <span className="absolute inset-0 flex items-center justify-center text-red-600 font-black text-[9px] leading-none mt-1">
-              YIELD
-            </span>
-          </div>
+          <svg width={size} height={size} viewBox="0 0 20 20" className="shrink-0">
+            <polygon points="10,1 19,18 1,18" fill="#fff" stroke="#CC0000" strokeWidth="2"/>
+            <text x="10" y="15" textAnchor="middle" fill="#CC0000" fontFamily="Arial,Helvetica,sans-serif" fontSize="4.5" fontWeight="900">YIELD</text>
+          </svg>
         );
       
       case 'speed_limit':
