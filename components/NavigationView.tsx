@@ -923,83 +923,158 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   };
 
   // Place highway shield markers along the route using HERE Map Image API
-  const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number }[]) => {
+  const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[]) => {
     if (!shieldLayerGroupRef.current || shields.length === 0) return;
     shieldLayerGroupRef.current.clearLayers();
     
     shields.forEach((shield) => {
-      const { label, routeLevel, type, coord } = shield;
+      const { label, routeLevel, type, coord, direction } = shield;
       if (!coord || !coord[0] || !coord[1]) return;
       
-      // Determine state code from currentRegion for more accurate shields
       const stateCode = currentRegion.state || '';
-      
-      // Build the icon URL pointing to our backend proxy
-      const params = new URLSearchParams({
-        label,
-        countryCode: 'USA',
-        routeLevel: String(routeLevel),
-        width: '64'
-      });
-      if (stateCode && stateCode.length === 2) {
-        params.append('stateCode', stateCode.toUpperCase());
-      }
+      const params = new URLSearchParams({ label, countryCode: 'USA', routeLevel: String(routeLevel), width: '64' });
+      if (stateCode && stateCode.length === 2) params.append('stateCode', stateCode.toUpperCase());
       const shieldUrl = `/api/road-shield?${params.toString()}`;
 
-      // Create a fallback SVG-based shield using the existing HighwayShield component style
+      // Direction arrow SVG
+      const dirArrows: Record<string, string> = {
+        north: 'M6 10L10 4L14 10', south: 'M6 6L10 12L14 6',
+        east: 'M6 6L12 10L6 14', west: 'M14 6L8 10L14 14'
+      };
+      const dirLabel: Record<string, string> = { north: 'N', south: 'S', east: 'E', west: 'W' };
+      const dirKey = (direction || '').toLowerCase();
+      const dirBadge = dirArrows[dirKey] ? `
+        <div style="position:absolute;top:-8px;right:-10px;width:20px;height:20px;border-radius:50%;background:#1a1a2e;border:1.5px solid #D4AF37;display:flex;align-items:center;justify-content:center;z-index:2">
+          <svg width="14" height="14" viewBox="0 0 20 16" fill="none"><path d="${dirArrows[dirKey]}" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>` : '';
+
       let fallbackHtml = '';
       if (type === 'interstate') {
-        fallbackHtml = `
-          <div style="width:40px;height:40px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-            <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%">
-              <path d="M50 5 L90 20 L90 60 C90 80 50 95 50 95 C50 95 10 80 10 60 L10 20 Z" fill="#003f87" stroke="white" stroke-width="4"/>
-              <path d="M10 20 L90 20 L50 5 Z" fill="#cf142b"/>
-            </svg>
-            <span style="position:relative;color:white;font-size:${label.length > 2 ? '12' : '16'}px;font-weight:900;margin-top:4px;text-shadow:0 1px 2px rgba(0,0,0,0.8)">${label}</span>
-          </div>`;
+        fallbackHtml = `<div style="width:40px;height:40px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+          <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%"><path d="M50 5 L90 20 L90 60 C90 80 50 95 50 95 C50 95 10 80 10 60 L10 20 Z" fill="#003f87" stroke="white" stroke-width="4"/><path d="M10 20 L90 20 L50 5 Z" fill="#cf142b"/></svg>
+          <span style="position:relative;color:white;font-size:${label.length > 2 ? '12' : '16'}px;font-weight:900;margin-top:4px;text-shadow:0 1px 2px rgba(0,0,0,0.8)">${label}</span></div>`;
       } else if (type === 'us') {
-        fallbackHtml = `
-          <div style="width:36px;height:36px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-            <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%">
-              <path d="M10 10 L90 10 L90 60 C90 85 50 95 50 95 C50 95 10 85 10 60 Z" fill="white" stroke="black" stroke-width="4"/>
-            </svg>
-            <span style="position:relative;color:black;font-size:${label.length > 2 ? '11' : '14'}px;font-weight:900;margin-top:2px">${label}</span>
-          </div>`;
+        fallbackHtml = `<div style="width:36px;height:36px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+          <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%"><path d="M10 10 L90 10 L90 60 C90 85 50 95 50 95 C50 95 10 85 10 60 Z" fill="white" stroke="black" stroke-width="4"/></svg>
+          <span style="position:relative;color:black;font-size:${label.length > 2 ? '11' : '14'}px;font-weight:900;margin-top:2px">${label}</span></div>`;
       } else {
-        fallbackHtml = `
-          <div style="width:32px;height:32px;border-radius:50%;background:white;border:2px solid black;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-            <span style="color:black;font-size:${label.length > 2 ? '10' : '13'}px;font-weight:900">${label}</span>
-          </div>`;
+        fallbackHtml = `<div style="width:32px;height:32px;border-radius:50%;background:white;border:2px solid black;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+          <span style="color:black;font-size:${label.length > 2 ? '10' : '13'}px;font-weight:900">${label}</span></div>`;
       }
 
-      // Create the marker with HERE API image, falling back to SVG
-      const iconHtml = `
-        <div data-testid="highway-shield-marker" style="position:relative;cursor:default">
-          <img 
-            src="${shieldUrl}" 
-            style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" 
-            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" 
-            alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"
-          />
-          <div style="display:none;align-items:center;justify-content:center">${fallbackHtml}</div>
-        </div>`;
+      const iconHtml = `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
+        ${dirBadge}
+        <img src="${shieldUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
+        <div style="display:none;align-items:center;justify-content:center">${fallbackHtml}</div>
+        ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+      </div>`;
 
-      const icon = L.divIcon({
-        html: iconHtml,
-        className: 'highway-shield-icon',
-        iconSize: [44, 44],
-        iconAnchor: [22, 22]
-      });
-
-      const marker = L.marker([coord[0], coord[1]], { 
-        icon, 
-        interactive: false,
-        zIndexOffset: 500
-      });
-      marker.addTo(shieldLayerGroupRef.current!);
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 500 }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Shields] Placed ${shields.length} highway shield markers on route`);
   }, [currentRegion.state]);
+
+  // Place exit signs along the route
+  const placeExitSigns = useCallback((exits: { name: string; exitNumber?: string; coord: [number, number] }[]) => {
+    if (!shieldLayerGroupRef.current || exits.length === 0) return;
+    
+    exits.forEach((exit) => {
+      const { name, exitNumber, coord } = exit;
+      if (!coord || !coord[0] || !coord[1]) return;
+      
+      const exitLabel = exitNumber ? `EXIT ${exitNumber}` : 'EXIT';
+      const roadName = name.length > 25 ? name.substring(0, 23) + '...' : name;
+      
+      const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7))">
+        <div style="background:#006b3f;border:2px solid #fff;border-radius:4px;padding:2px 6px;min-width:60px;text-align:center">
+          <div style="font-size:8px;font-weight:900;color:#fff;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.3);padding-bottom:1px;margin-bottom:1px">${exitLabel}</div>
+          <div style="font-size:7px;font-weight:700;color:#fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis">${roadName}</div>
+        </div>
+        <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #006b3f;margin:0 auto"></div>
+      </div>`;
+
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [80, 38], iconAnchor: [40, 38] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 400 }).addTo(shieldLayerGroupRef.current!);
+    });
+    console.log(`[Signs] Placed ${exits.length} exit signs on route`);
+  }, []);
+
+  // Place sharp curve warning signs
+  const placeCurveSigns = useCallback((curves: { severity: string; direction: string; coord: [number, number] }[]) => {
+    if (!shieldLayerGroupRef.current || curves.length === 0) return;
+    
+    curves.forEach((curve) => {
+      const { direction, coord } = curve;
+      if (!coord || !coord[0] || !coord[1]) return;
+      
+      const arrowPath = direction === 'left' 
+        ? 'M18 16L10 10L18 4 M10 10L22 10' 
+        : 'M6 4L14 10L6 16 M14 10L2 10';
+
+      const iconHtml = `<div class="counter-rotate" data-testid="curve-sign-marker" style="cursor:default;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6))">
+        <div style="width:32px;height:32px;background:#FFD700;border:2px solid #111;transform:rotate(45deg);display:flex;align-items:center;justify-content:center">
+          <div style="transform:rotate(-45deg);display:flex;align-items:center;justify-content:center">
+            <svg width="20" height="20" viewBox="0 0 24 20" fill="none"><path d="${arrowPath}" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>`;
+
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [36, 36], iconAnchor: [18, 18] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 450 }).addTo(shieldLayerGroupRef.current!);
+    });
+    console.log(`[Signs] Placed ${curves.length} curve warning signs on route`);
+  }, []);
+
+  // Place speed limit change signs
+  const placeSpeedLimitSigns = useCallback((signs: { speed: number; coord: [number, number] }[]) => {
+    if (!shieldLayerGroupRef.current || signs.length === 0) return;
+    
+    signs.forEach((sign) => {
+      const { speed, coord } = sign;
+      if (!coord || !coord[0] || !coord[1]) return;
+      
+      const iconHtml = `<div class="counter-rotate" data-testid="speed-limit-sign-marker" style="cursor:default;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6))">
+        <div style="width:34px;height:42px;background:#fff;border:3px solid #111;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1px">
+          <div style="font-size:6px;font-weight:900;color:#111;letter-spacing:0.5px;line-height:1">SPEED</div>
+          <div style="font-size:5px;font-weight:900;color:#111;letter-spacing:0.5px;line-height:1">LIMIT</div>
+          <div style="font-size:16px;font-weight:900;color:#111;line-height:1;margin-top:1px">${speed}</div>
+        </div>
+      </div>`;
+
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [38, 46], iconAnchor: [19, 23] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 460 }).addTo(shieldLayerGroupRef.current!);
+    });
+    console.log(`[Signs] Placed ${signs.length} speed limit signs on route`);
+  }, []);
+
+  // Place traffic slowdown markers
+  const placeTrafficSlowdowns = useCallback((slowdowns: { severity: string; message: string; coord: [number, number] }[]) => {
+    if (!shieldLayerGroupRef.current || slowdowns.length === 0) return;
+    
+    slowdowns.forEach((sd) => {
+      const { severity, message, coord } = sd;
+      if (!coord || !coord[0] || !coord[1]) return;
+      
+      const sevColor = severity === 'high' || severity === 'critical' ? '#dc2626' : severity === 'medium' ? '#f59e0b' : '#ef4444';
+      const shortMsg = message.length > 30 ? message.substring(0, 28) + '...' : message;
+      
+      const iconHtml = `<div class="counter-rotate" data-testid="traffic-slowdown-marker" style="cursor:default;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6))">
+        <div style="background:${sevColor};border:2px solid #fff;border-radius:4px;padding:2px 5px;text-align:center;max-width:90px">
+          <div style="display:flex;align-items:center;gap:2px;justify-content:center">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M4.93 19h14.14c1.34 0 2.17-1.46 1.49-2.63L13.49 4.63a1.7 1.7 0 0 0-2.98 0L3.44 16.37C2.76 17.54 3.59 19 4.93 19z" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
+            <span style="font-size:7px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:0.5px">Slowdown</span>
+          </div>
+          <div style="font-size:6px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px">${shortMsg}</div>
+        </div>
+        <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid ${sevColor};margin:0 auto"></div>
+      </div>`;
+
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [94, 34], iconAnchor: [47, 34] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 470 }).addTo(shieldLayerGroupRef.current!);
+    });
+    console.log(`[Signs] Placed ${slowdowns.length} traffic slowdown markers on route`);
+  }, []);
 
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
@@ -2443,7 +2518,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     restrictions: any[]; 
     trafficAlerts: any[]; 
     spans: any[];
-    highwayShields: any[]
+    highwayShields: any[];
+    exitSigns: any[];
+    curveSigns: any[];
+    speedLimitSigns: any[];
+    trafficSlowdowns: any[]
   }[] | null> => {
     if (!userLocation) return null;
 
@@ -2557,7 +2636,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         const restrictions: any[] = [];
         const trafficAlertsList: any[] = [];
-        const highwayShields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number }[] = [];
+        const highwayShields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[] = [];
+        const exitSigns: { name: string; exitNumber?: string; coord: [number, number] }[] = [];
+        const curveSigns: { severity: string; direction: string; coord: [number, number] }[] = [];
+        const speedLimitSigns: { speed: number; coord: [number, number] }[] = [];
+        const trafficSlowdowns: { severity: string; message: string; coord: [number, number] }[] = [];
         
         if (section.notices) {
           section.notices.forEach((notice: any) => {
@@ -2575,8 +2658,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         if (section.actions) {
           section.actions.forEach((action: any) => {
             const instruction = (action.instruction || '').toLowerCase();
+            const rawInstruction = action.instruction || '';
+            const actionOffset = action.offset ?? 0;
+            const coordIdx = Math.min(actionOffset, coords.length - 1);
+            const actionCoord = coords[coordIdx] || coords[Math.floor(actionOffset * (coords.length - 1) / (summary.length || 1))];
+            
             if (instruction.includes('stop sign') || action.action === 'stop') {
-              const progress = (action.offset ?? 0) / (summary.length || 1);
+              const progress = actionOffset / (summary.length || 1);
               trafficAlertsList.push({
                 type: 'STOP_SIGN',
                 message: 'Stop Sign',
@@ -2584,7 +2672,28 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 color: 'text-red-600',
                 bg: 'bg-red-600/10',
                 progress,
-                coords: coords[action.offset ?? 0] || coords[Math.floor((action.offset ?? 0) * (coords.length - 1) / (summary.length || 1))]
+                coords: actionCoord
+              });
+            }
+            
+            // Extract highway exit signs
+            if (action.action === 'exit' || instruction.includes('take exit') || instruction.includes('take the exit')) {
+              const exitNumMatch = rawInstruction.match(/exit\s+(\d+[A-Z]?)/i);
+              const towardMatch = rawInstruction.match(/(?:toward|towards|onto)\s+(.+?)(?:\.|$)/i);
+              exitSigns.push({
+                name: towardMatch ? towardMatch[1].trim() : rawInstruction.replace(/<[^>]*>/g, '').substring(0, 50),
+                exitNumber: exitNumMatch ? exitNumMatch[1] : undefined,
+                coord: actionCoord
+              });
+            }
+            
+            // Extract sharp curve warnings
+            const dir = (action.direction || '').toLowerCase();
+            if (dir.includes('sharpleft') || dir.includes('sharpright') || dir === 'sharp left' || dir === 'sharp right') {
+              curveSigns.push({
+                severity: 'sharp',
+                direction: dir.includes('left') ? 'left' : 'right',
+                coord: actionCoord
               });
             }
           });
@@ -2598,6 +2707,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let lastShieldName = '';
           let lastShieldPointIndex = -99999;
           const MIN_SHIELD_GAP = Math.max(30, Math.floor(totalPoints * 0.03)); // Min ~3% of route between shields
+          
+          // Track speed limit changes
+          let prevSpeedLimit = -1;
+          const MIN_SPEED_SIGN_GAP = Math.max(20, Math.floor(totalPoints * 0.015)); // Min gap between speed signs
+          let lastSpeedSignIdx = -99999;
 
           section.spans.forEach((span: any) => {
             const progress = currentPointIndex / totalPoints;
@@ -2736,7 +2850,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         routeLevel,
                         type: shieldType,
                         coord: coords[coordIdx],
-                        pointIndex: effectiveIdx
+                        pointIndex: effectiveIdx,
+                        direction: rn.direction || undefined
                       });
                       lastShieldName = routeValue;
                       lastShieldPointIndex = effectiveIdx;
@@ -2746,11 +2861,43 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 }
               }
             }
+            
+            // Detect speed limit changes
+            if (span.speedLimit !== undefined && span.speedLimit > 0) {
+              const mph = Math.round(span.speedLimit * 2.23694);
+              if (mph !== prevSpeedLimit && (currentPointIndex - lastSpeedSignIdx) > MIN_SPEED_SIGN_GAP) {
+                if (coords[currentPointIndex]) {
+                  speedLimitSigns.push({
+                    speed: mph,
+                    coord: coords[currentPointIndex]
+                  });
+                  lastSpeedSignIdx = currentPointIndex;
+                }
+                prevSpeedLimit = mph;
+              }
+            }
+            
+            // Detect traffic slowdowns from incident spans
+            if (span.incidents && Array.isArray(span.incidents)) {
+              for (const inc of span.incidents) {
+                if (inc && (inc.type === 'CONGESTION' || inc.type === 'CONSTRUCTION' || inc.type === 'LANE_RESTRICTION' || inc.type === 'SLOW_TRAFFIC' || inc.type === 'ROAD_CLOSURE')) {
+                  if (coords[currentPointIndex]) {
+                    trafficSlowdowns.push({
+                      severity: inc.severity || 'medium',
+                      message: inc.description?.value || inc.type || 'Traffic Slowdown',
+                      coord: coords[currentPointIndex]
+                    });
+                  }
+                  break;
+                }
+              }
+            }
+            
             currentPointIndex += (span.length || 0);
           });
         }
 
-        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields };
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns };
       }).filter(Boolean);
 
       if (processedRoutes.length === 0) return null;
@@ -3083,6 +3230,22 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         if (primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
           placeHighwayShields(primaryRoute.highwayShields);
         }
+        // Place exit signs
+        if (primaryRoute.exitSigns && primaryRoute.exitSigns.length > 0) {
+          placeExitSigns(primaryRoute.exitSigns);
+        }
+        // Place sharp curve warnings
+        if (primaryRoute.curveSigns && primaryRoute.curveSigns.length > 0) {
+          placeCurveSigns(primaryRoute.curveSigns);
+        }
+        // Place speed limit change signs
+        if (primaryRoute.speedLimitSigns && primaryRoute.speedLimitSigns.length > 0) {
+          placeSpeedLimitSigns(primaryRoute.speedLimitSigns);
+        }
+        // Place traffic slowdown markers
+        if (primaryRoute.trafficSlowdowns && primaryRoute.trafficSlowdowns.length > 0) {
+          placeTrafficSlowdowns(primaryRoute.trafficSlowdowns);
+        }
         
         // Fit map to route
         const bounds = L.latLngBounds(coords.map(c => [c[0], c[1]]));
@@ -3340,7 +3503,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (!alert.coords) return;
 
       const iconHtml = renderToStaticMarkup(
-        <div className="flex flex-col items-center group">
+        <div className="counter-rotate flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
             alert.type === 'BRIDGE' ? 'bg-red-600 border-red-400 text-white' : 'bg-orange-500 border-orange-300 text-white'
           }`}>
@@ -3398,7 +3561,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (!alert.coords) return;
 
       const iconHtml = renderToStaticMarkup(
-        <div className="flex flex-col items-center group">
+        <div className="counter-rotate flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
             alert.type === 'STOP_SIGN' ? 'bg-red-700 border-red-500 text-white' : 'bg-emerald-600 border-emerald-400 text-white'
           }`}>
@@ -3456,7 +3619,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const cacheKey = `${alert.type}-${alert.severity}`;
       if (!weatherIconsCacheRef.current[cacheKey]) {
         weatherIconsCacheRef.current[cacheKey] = renderToStaticMarkup(
-          <div className="flex flex-col items-center group">
+          <div className="counter-rotate flex flex-col items-center group">
             <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
               alert.severity === 'SEVERE' ? 'bg-red-600 border-red-400 text-white' : 'bg-amber-500 border-amber-300 text-black'
             }`}>
