@@ -2020,7 +2020,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
   };
 
-  const addWaypoint = (s: any, type: 'DEADHEAD' | 'PAID' = 'DEADHEAD') => {
+  const addWaypoint = (s: any, type: 'DEADHEAD' | 'PAID' = 'DEADHEAD', position?: number) => {
     const newWaypoint: Waypoint = {
       id: Math.random().toString(36).substr(2, 9),
       address: (s.display_name || s.name).split(',')[0],
@@ -2028,7 +2028,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       lon: parseFloat(s.lon),
       type
     };
-    setWaypoints(prev => [...prev, newWaypoint]);
+    setWaypoints(prev => {
+      if (position !== undefined && position >= 0 && position <= prev.length) {
+        const updated = [...prev];
+        updated.splice(position, 0, newWaypoint);
+        return updated;
+      }
+      return [...prev, newWaypoint];
+    });
     setSearchQuery('');
     setSuggestions([]);
     setIsSuggestionsVisible(false);
@@ -3572,21 +3579,44 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 >
                   View Details
                 </button>
-                <div class="flex flex-col gap-2">
+                <div class="flex flex-col gap-1.5">
                   <button 
-                    class="add-poi-stop-btn add-deadhead w-full py-2 bg-zinc-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-zinc-600 transition-colors flex items-center justify-center gap-2"
+                    class="add-poi-stop-btn add-next-stop w-full py-2 bg-[#D4AF37]/90 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#D4AF37] transition-colors"
                     data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
                     data-type="DEADHEAD"
+                    data-position="0"
                   >
-                    Add Deadhead
+                    Add as Next Stop
                   </button>
-                  <button 
-                    class="add-poi-stop-btn add-paid w-full py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
-                    data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
-                    data-type="PAID"
-                  >
-                    Add Paid
-                  </button>
+                  <div class="flex gap-1.5">
+                    <select class="stop-position-select flex-1 py-1.5 px-2 bg-zinc-100 border border-zinc-300 rounded-lg text-[9px] font-bold text-zinc-700" data-poi-id="${poi.name}-${poi.lat}-${poi.lon}">
+                      ${Array.from({length: Math.min(10, (waypoints.length || 0) + 1)}, (_, i) => `<option value="${i}">Stop #${i + 1}</option>`).join('')}
+                    </select>
+                    <button 
+                      class="add-poi-stop-btn add-at-position py-1.5 px-3 bg-zinc-600 text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-zinc-500 transition-colors whitespace-nowrap"
+                      data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
+                      data-type="DEADHEAD"
+                      data-use-select="true"
+                    >
+                      Add at #
+                    </button>
+                  </div>
+                  <div class="flex gap-1.5">
+                    <button 
+                      class="add-poi-stop-btn w-1/2 py-1.5 bg-zinc-500 text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-zinc-400 transition-colors"
+                      data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
+                      data-type="DEADHEAD"
+                    >
+                      + Deadhead
+                    </button>
+                    <button 
+                      class="add-poi-stop-btn w-1/2 py-1.5 bg-emerald-600 text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-emerald-500 transition-colors"
+                      data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
+                      data-type="PAID"
+                    >
+                      + Paid
+                    </button>
+                  </div>
                 </div>
               </div>
             `);
@@ -3641,7 +3671,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           const type = target.getAttribute('data-type') as 'DEADHEAD' | 'PAID';
           const poi = pois.find(p => `${p.name}-${p.lat}-${p.lon}` === poiId);
           if (poi) {
-            addWaypoint(poi, type);
+            // Check for explicit position attribute
+            const posAttr = target.getAttribute('data-position');
+            const useSelect = target.getAttribute('data-use-select');
+            let position: number | undefined;
+            if (posAttr !== null) {
+              position = parseInt(posAttr, 10);
+            } else if (useSelect) {
+              // Find the sibling select element
+              const selectEl = target.parentElement?.querySelector('.stop-position-select') as HTMLSelectElement;
+              if (selectEl) {
+                position = parseInt(selectEl.value, 10);
+              }
+            }
+            addWaypoint(poi, type, position);
             mapInstanceRef.current?.closePopup();
           }
         } else if (target.classList.contains('view-poi-details-btn')) {
@@ -4113,6 +4156,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         submitParkingStatus={submitParkingStatus}
         addWaypoint={addWaypoint}
         handleNavigate={handleNavigate}
+        waypointCount={waypoints.length}
       />
 
       <WarningBanners

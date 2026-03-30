@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, Fuel, Star, MapPin, Phone, Globe, Clock, GitMerge, CircleDollarSign, Navigation as NavIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Fuel, Star, MapPin, Phone, Globe, Clock, GitMerge, CircleDollarSign, Navigation as NavIcon, ListOrdered } from 'lucide-react';
 import { TruckStopReputation } from './ReputationScore';
 
 interface PoiDetailModalProps {
@@ -12,15 +12,17 @@ interface PoiDetailModalProps {
   isParkingLoading: boolean;
   parkingSubmitDone: string | null;
   submitParkingStatus: (status: string) => void;
-  addWaypoint: (poi: any, type: string) => void;
+  addWaypoint: (poi: any, type: string, position?: number) => void;
   handleNavigate: (query?: string, coords?: { lat: number; lon: number }) => Promise<void>;
+  waypointCount?: number;
 }
 
 export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
   selectedPoi, onClose, fuelStations, matchFuelStationToPoi, findCheapestDiesel,
   poiParkingStatus, isParkingLoading, parkingSubmitDone, submitParkingStatus,
-  addWaypoint, handleNavigate,
+  addWaypoint, handleNavigate, waypointCount = 0,
 }) => {
+  const [stopPosition, setStopPosition] = useState(0);
   if (!selectedPoi) return null;
 
   return (
@@ -272,17 +274,52 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-3 md:gap-4 landscape:gap-2">
-            <button onClick={() => { addWaypoint(selectedPoi, 'DEADHEAD'); onClose(); }}
-              className="flex flex-col items-center justify-center gap-2 md:gap-3 landscape:gap-1 p-4 md:p-6 landscape:p-3 bg-white/5 border border-white/5 rounded-2xl landscape:rounded-xl hover:border-zinc-500 hover:bg-zinc-500/10 transition-all group">
-              <GitMerge className="w-5 h-5 md:w-6 md:h-6 landscape:w-4 landscape:h-4 text-zinc-500 group-hover:scale-110 transition-transform" />
-              <span className="text-[9px] md:text-[10px] landscape:text-[8px] font-black text-white uppercase tracking-widest">Add Deadhead</span>
+          <div className="flex flex-col gap-2 md:gap-3 landscape:gap-1.5">
+            {/* Add as Next Stop — primary action */}
+            <button 
+              data-testid="poi-add-next-stop"
+              onClick={() => { addWaypoint(selectedPoi, 'DEADHEAD', 0); onClose(); }}
+              className="w-full py-3 md:py-4 landscape:py-2 bg-[#D4AF37]/90 hover:bg-[#D4AF37] text-black rounded-2xl landscape:rounded-xl text-xs landscape:text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 landscape:gap-2">
+              <MapPin className="w-4 h-4 landscape:w-3 landscape:h-3" /> Add as Next Stop
             </button>
-            <button onClick={() => { addWaypoint(selectedPoi, 'PAID'); onClose(); }}
-              className="flex flex-col items-center justify-center gap-2 md:gap-3 landscape:gap-1 p-4 md:p-6 landscape:p-3 bg-emerald-600/10 border border-emerald-600/20 rounded-2xl landscape:rounded-xl hover:bg-emerald-600 hover:border-emerald-600 transition-all group">
-              <CircleDollarSign className="w-5 h-5 md:w-6 md:h-6 landscape:w-4 landscape:h-4 text-emerald-500 group-hover:text-white group-hover:scale-110 transition-transform" />
-              <span className="text-[9px] md:text-[10px] landscape:text-[8px] font-black text-emerald-500 group-hover:text-white uppercase tracking-widest">Add Paid</span>
-            </button>
+
+            {/* Position selector row */}
+            <div className="flex items-center gap-2 md:gap-3 landscape:gap-1.5">
+              <select 
+                data-testid="poi-stop-position-select"
+                value={stopPosition}
+                onChange={(e) => setStopPosition(parseInt(e.target.value))}
+                className="flex-1 py-2.5 md:py-3 landscape:py-2 px-3 bg-white/5 border border-white/10 rounded-xl landscape:rounded-lg text-xs landscape:text-[10px] font-bold text-white appearance-none cursor-pointer hover:border-white/20 transition-colors"
+              >
+                {Array.from({ length: Math.min(10, waypointCount + 1) }, (_, i) => (
+                  <option key={i} value={i} className="bg-zinc-900 text-white">Stop #{i + 1}</option>
+                ))}
+              </select>
+              <button 
+                data-testid="poi-add-at-position"
+                onClick={() => { addWaypoint(selectedPoi, 'DEADHEAD', stopPosition); onClose(); }}
+                className="py-2.5 md:py-3 landscape:py-2 px-4 md:px-6 landscape:px-3 bg-white/5 border border-white/10 rounded-xl landscape:rounded-lg text-xs landscape:text-[10px] font-black text-white uppercase tracking-widest hover:bg-white/10 hover:border-white/20 transition-all flex items-center gap-2 landscape:gap-1 whitespace-nowrap">
+                <ListOrdered className="w-3.5 h-3.5 landscape:w-3 landscape:h-3" /> Add at #
+              </button>
+            </div>
+
+            {/* Deadhead / Paid row */}
+            <div className="grid grid-cols-2 gap-2 md:gap-3 landscape:gap-1.5">
+              <button 
+                data-testid="poi-add-deadhead"
+                onClick={() => { addWaypoint(selectedPoi, 'DEADHEAD'); onClose(); }}
+                className="flex flex-col items-center justify-center gap-1.5 md:gap-2 landscape:gap-1 p-3 md:p-4 landscape:p-2 bg-white/5 border border-white/5 rounded-xl landscape:rounded-lg hover:border-zinc-500 hover:bg-zinc-500/10 transition-all group">
+                <GitMerge className="w-4 h-4 md:w-5 md:h-5 landscape:w-3.5 landscape:h-3.5 text-zinc-500 group-hover:scale-110 transition-transform" />
+                <span className="text-[8px] md:text-[9px] landscape:text-[7px] font-black text-white uppercase tracking-widest">+ Deadhead</span>
+              </button>
+              <button 
+                data-testid="poi-add-paid"
+                onClick={() => { addWaypoint(selectedPoi, 'PAID'); onClose(); }}
+                className="flex flex-col items-center justify-center gap-1.5 md:gap-2 landscape:gap-1 p-3 md:p-4 landscape:p-2 bg-emerald-600/10 border border-emerald-600/20 rounded-xl landscape:rounded-lg hover:bg-emerald-600 hover:border-emerald-600 transition-all group">
+                <CircleDollarSign className="w-4 h-4 md:w-5 md:h-5 landscape:w-3.5 landscape:h-3.5 text-emerald-500 group-hover:text-white group-hover:scale-110 transition-transform" />
+                <span className="text-[8px] md:text-[9px] landscape:text-[7px] font-black text-emerald-500 group-hover:text-white uppercase tracking-widest">+ Paid</span>
+              </button>
+            </div>
           </div>
           <button onClick={() => { handleNavigate(selectedPoi.name, { lat: selectedPoi.lat, lon: selectedPoi.lon }); onClose(); }}
             className="w-full py-3 md:py-4 landscape:py-2 bg-[#D4AF37] hover:bg-[#B8860B] text-black rounded-2xl landscape:rounded-xl text-xs landscape:text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-[#D4AF37]/20 flex items-center justify-center gap-3 landscape:gap-2">
