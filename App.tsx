@@ -14,6 +14,20 @@ const RouteHistory = lazy(() => import('./components/RouteHistory'));
 const FuelNetwork = lazy(() => import('./components/FuelNetwork'));
 
 import { ViewType, AppContext, LocationContext, TelemetryContext } from './types';
+
+// Inline loading fallback matching the splash screen aesthetic
+const ContentLoader = () => (
+  <div className="flex-1 flex items-center justify-center bg-[#050505]">
+    <div className="flex flex-col items-center gap-4">
+      <div className="relative w-16 h-16">
+        <div className="absolute inset-0 rounded-full" style={{ border: '3px solid transparent', borderTopColor: '#D4AF37', borderRightColor: 'rgba(212,175,55,0.4)', animation: 'spin 1s linear infinite' }} />
+        <div className="absolute inset-2 rounded-full" style={{ border: '2px solid transparent', borderBottomColor: 'rgba(212,175,55,0.6)', animation: 'spin 1.5s linear infinite reverse' }} />
+      </div>
+      <p className="text-[10px] uppercase tracking-[0.25em] font-bold text-[#D4AF37]/60">Loading</p>
+    </div>
+    <style>{'@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }'}</style>
+  </div>
+);
 import { HOSProvider } from './components/HOSProvider';
 import { FirebaseProvider, useFirebase } from './components/FirebaseProvider';
 import { LoginScreen } from './components/LoginScreen';
@@ -398,26 +412,26 @@ const AppContent: React.FC = React.memo(() => {
     console.log("App: renderContent, activeView:", activeView);
     switch (activeView) {
       case ViewType.DASHBOARD:
-        return <Suspense fallback={<div>Loading...</div>}><Dashboard /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
       case ViewType.TRUCK_STOPS:
-        return <Suspense fallback={<div>Loading...</div>}><PredictiveParking /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><PredictiveParking /></Suspense>;
       case ViewType.LOAD_BOARD:
-        return <Suspense fallback={<div>Loading...</div>}><LoadBoard /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><LoadBoard /></Suspense>;
       case ViewType.MAINTENANCE:
-        return <Suspense fallback={<div>Loading...</div>}><Maintenance /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><Maintenance /></Suspense>;
       case ViewType.NAVIGATION:
         return null; // Handled separately to keep it mounted
       case ViewType.SETTINGS:
-        return <Suspense fallback={<div>Loading...</div>}><SettingsView /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><SettingsView /></Suspense>;
       case ViewType.ROUTE_HISTORY:
-        return <Suspense fallback={<div>Loading...</div>}><RouteHistory /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><RouteHistory /></Suspense>;
       case ViewType.PAY_SUMMARY:
-        return <Suspense fallback={<div>Loading...</div>}><PaySummary /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><PaySummary /></Suspense>;
       case ViewType.GITHUB_UPDATES:
       case ViewType.FUEL_NETWORK:
-        return <Suspense fallback={<div>Loading...</div>}><FuelNetwork /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><FuelNetwork /></Suspense>;
       default:
-        return <Suspense fallback={<div>Loading...</div>}><Dashboard /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
     }
   };
 
@@ -462,13 +476,24 @@ const AppContent: React.FC = React.memo(() => {
     ]);
 
   const mountTimeRef = useRef(Date.now());
-  const MIN_SPLASH_MS = 2800;
+  const MIN_SPLASH_MS = 3500;
 
   const [splashVisible, setSplashVisible] = useState(true);
   const [splashExiting, setSplashExiting] = useState(false);
+  const [contentReady, setContentReady] = useState(false);
+
+  // Preload the main lazy components during splash
+  useEffect(() => {
+    Promise.all([
+      import('./components/Dashboard'),
+      import('./components/NavigationView'),
+    ]).then(() => setContentReady(true))
+      .catch(() => setContentReady(true)); // Don't block on error
+  }, []);
 
   useEffect(() => {
-    if (!loading) {
+    // Wait for BOTH loading=false AND components preloaded
+    if (!loading && contentReady) {
       const elapsed = Date.now() - mountTimeRef.current;
       const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
       const exitTimer = setTimeout(() => {
@@ -478,7 +503,7 @@ const AppContent: React.FC = React.memo(() => {
       }, remaining);
       return () => clearTimeout(exitTimer);
     }
-  }, [loading]);
+  }, [loading, contentReady]);
 
   if (splashVisible) {
     return <LoadingScreen isExiting={splashExiting} />;

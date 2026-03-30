@@ -276,7 +276,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isFollowMode, setIsFollowMode] = useState(true);
   const [isMapReady, setIsMapReady] = useState(false);
 
-  const [isNorthUp, setIsNorthUp] = useState(() => localStorage.getItem('nav_north_up') === 'true'); // default: heading-up (false)
+  const [isNorthUp, setIsNorthUp] = useState(false); // Always start in heading-up mode
   const manualRotationRef = useRef(0);
   const [manualRotation, setManualRotation] = useState(0);
   const [isCompassMode, setIsCompassMode] = useState(false);
