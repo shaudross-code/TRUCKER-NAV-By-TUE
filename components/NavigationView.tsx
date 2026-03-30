@@ -123,11 +123,27 @@ const calcEuclideanDist = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
 };
 
+// Convert metric references in instruction text to imperial (miles/feet)
+const convertInstructionToImperial = (instruction: string): string => {
+  // Convert "X.X km" to "X.X mi"
+  let result = instruction.replace(/(\d+(?:\.\d+)?)\s*km\b/gi, (_match, num) => {
+    const miles = parseFloat(num) * 0.621371;
+    return miles < 0.1 ? `${Math.round(miles * 5280)} ft` : `${miles.toFixed(1)} mi`;
+  });
+  // Convert standalone "X m" (meters) to feet — match "X m" not followed by letters (avoids "mi", "min" etc.)
+  result = result.replace(/(\d+)\s*m(?=[,.\s)]|$)/gi, (_match, num) => {
+    const meters = parseInt(num);
+    return `${Math.round(meters * 3.28084)} ft`;
+  });
+  return result;
+};
+
 const SpeedLimitMarker = React.memo(({ currentSpeedLimit, speed, unitSystem }: { currentSpeedLimit: number | null; speed: number; unitSystem?: string }) => {
   if (!currentSpeedLimit) return null;
   const isMetric = unitSystem === 'metric';
   const displayLimit = isMetric ? Math.round(currentSpeedLimit * 1.60934) : currentSpeedLimit;
-  const displaySpeed = isMetric ? Math.round(speed * 3.6) : Math.round(speed * 2.23694);
+  // speed is already in mph (converted in App.tsx from m/s)
+  const displaySpeed = isMetric ? Math.round(speed * 1.60934) : speed;
   
   return (
     <div data-testid="speed-limit-overlay" className="absolute top-4 left-4 z-[1500] pointer-events-none">
@@ -2324,8 +2340,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const durationSec = summary.duration;
         
         const steps = section.actions.map((action: any) => {
-          const instruction = (action.instruction || '').replace(/\u003c/g, '<').replace(/\u003e/g, '>');
-          const hasTrafficLight = instruction.toLowerCase().includes('traffic light');
+          const rawInstruction = (action.instruction || '').replace(/\u003c/g, '<').replace(/\u003e/g, '>');
+          const instruction = convertInstructionToImperial(rawInstruction);          const hasTrafficLight = instruction.toLowerCase().includes('traffic light');
           return {
             maneuver: { 
               instruction, 
@@ -2570,7 +2586,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           const distMi = route.distance / 1609.34;
           const durationSec = route.duration;
           const steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => ({
-            maneuver: { instruction: step.maneuver.instruction, type: step.maneuver.type },
+            maneuver: { instruction: convertInstructionToImperial(step.maneuver.instruction), type: step.maneuver.type },
             distance: step.distance,
             duration: step.duration
           }));
@@ -2596,7 +2612,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const distMi = route.distance / 1609.34;
       const durationSec = route.duration;
       const steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => ({
-        maneuver: { instruction: step.maneuver.instruction, type: step.maneuver.type },
+        maneuver: { instruction: convertInstructionToImperial(step.maneuver.instruction), type: step.maneuver.type },
         distance: step.distance,
         duration: step.duration
       }));
@@ -3549,7 +3565,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     ${poi.amenities.map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-bold">${a}</span>`).join('')}
                   </div>
                 ` : ''}
-                ${poi.distance ? `<div class="text-[9px] text-zinc-500 mb-2">📍 ${(poi.distance / 1000).toFixed(1)} km away</div>` : ''}
+                ${poi.distance ? `<div class="text-[9px] text-zinc-500 mb-2">${(poi.distance / 1609.34).toFixed(1)} mi away</div>` : ''}
                 <button 
                   class="view-poi-details-btn w-full py-2 bg-[#D4AF37] text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#B8860B] transition-colors mb-2"
                   data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
@@ -4693,13 +4709,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Speed</span>
                   <div className="flex items-baseline gap-0.5">
                     <span className={`text-xl md:text-3xl landscape:text-xl font-[900] tracking-tighter leading-none tabular-nums ${currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-400' : 'text-white'}`}>
-                      {context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)}
+                      {context?.unitSystem === 'metric' ? Math.round(speed * 1.60934) : speed}
                     </span>
                     <span className="text-[7px] md:text-[9px] landscape:text-[7px] text-zinc-600 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km/h' : 'mph'}</span>
                   </div>
                   {currentSpeedLimit && (
                     <div className="mt-0.5 scale-[0.55] md:scale-[0.65] origin-top">
-                      <SpeedLimitSign limit={context?.unitSystem === 'metric' ? Math.round(currentSpeedLimit * 1.60934) : currentSpeedLimit} currentSpeed={context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)} compact />
+                      <SpeedLimitSign limit={context?.unitSystem === 'metric' ? Math.round(currentSpeedLimit * 1.60934) : currentSpeedLimit} currentSpeed={context?.unitSystem === 'metric' ? Math.round(speed * 1.60934) : speed} compact />
                     </div>
                   )}
                 </div>

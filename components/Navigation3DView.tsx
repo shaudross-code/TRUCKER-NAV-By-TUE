@@ -443,7 +443,8 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   const isMetric = unitSystem === 'metric';
   const speedUnit = isMetric ? 'km/h' : 'mph';
   const distUnit = isMetric ? 'km' : 'mi';
-  const displaySpeed = isMetric ? Math.round(speed * 3.6) : Math.round(speed * 2.23694);
+  // speed is already in mph (converted in App.tsx from m/s)
+  const displaySpeed = isMetric ? Math.round(speed * 1.60934) : speed;
   const displaySpeedLimit = speedLimit ? (isMetric ? Math.round(speedLimit * 1.60934) : speedLimit) : null;
   const displayDistance = milesRemaining !== undefined && milesRemaining > 0
     ? isMetric ? (milesRemaining * 1.60934).toFixed(1) : milesRemaining.toFixed(1) : '--';

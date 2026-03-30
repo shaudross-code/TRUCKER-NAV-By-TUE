@@ -97,5 +97,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://trucker-dashboard-3.preview.emergentagent.com. Bug fixes verified: (1) Firestore operations skipped for anonymous users - no permission error spam, (2) PredictiveParking has 15s timeout and proper loading/error states - not stuck forever, (3) Chart mount delay implemented but warning may still occur. All pages working: Dashboard, Navigation, Truck Stops, Pay Summary, Load Board. Backend test file: /app/backend/tests/test_api_endpoints.py"
+  "context_for_next_testing_agent": "App at https://truck-gps-demo.preview.emergentagent.com. Bug fixes verified: (1) Firestore operations skipped for anonymous users - no permission error spam, (2) PredictiveParking has 15s timeout and proper loading/error states - not stuck forever, (3) Chart mount delay implemented but warning may still occur. All pages working: Dashboard, Navigation, Truck Stops, Pay Summary, Load Board. Backend test file: /app/backend/tests/test_api_endpoints.py"
 }

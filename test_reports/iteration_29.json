@@ -1,0 +1,73 @@
+{
+  "summary": "Frontend testing complete for speed display and instruction unit conversion bug fixes. All fixes verified: 1) Speed display no longer double-converts (uses raw speed for imperial, speed*1.60934 for metric), 2) convertInstructionToImperial() function correctly converts km→mi and m→ft in instruction text, 3) POI popup distances show miles, 4) OSRM/OSM fallback instructions converted to imperial, 5) 3D view speed display uses correct formula.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_29.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: NavigationView.tsx line 127-139 - convertInstructionToImperial() correctly converts km→mi (num*0.621371) and m→ft (num*3.28084)",
+    "VERIFIED: NavigationView.tsx line 146 - SpeedLimitMarker displaySpeed uses speed*1.60934 for metric, raw speed for imperial",
+    "VERIFIED: NavigationView.tsx line 4712 - Bottom bar speed display uses speed*1.60934 for metric, raw speed for imperial",
+    "VERIFIED: NavigationView.tsx line 4718 - SpeedLimitSign currentSpeed uses correct conversion",
+    "VERIFIED: NavigationView.tsx line 2344 - HERE API instruction text converted via convertInstructionToImperial()",
+    "VERIFIED: NavigationView.tsx line 3568 - POI popup shows distance in miles: (poi.distance/1609.34).toFixed(1) mi away",
+    "VERIFIED: NavigationView.tsx line 2589 - OSRM fallback instruction converted via convertInstructionToImperial()",
+    "VERIFIED: NavigationView.tsx line 2615 - OSM fallback instruction converted via convertInstructionToImperial()",
+    "VERIFIED: Navigation3DView.tsx line 447 - 3D view displaySpeed uses speed*1.60934 for metric, raw speed for imperial",
+    "VERIFIED: App.tsx line 147 - Speed converted once from m/s to mph (geoSpeed*2.23694)",
+    "VERIFIED: Dashboard.tsx line 117 - Dashboard displaySpeed uses speed*1.60934 for metric, raw speed for imperial"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100%"
+  },
+
+  "test_results": {
+    "features_tested": {
+      "speed_display_bottom_bar": "PASS - Shows '0 MPH' (no double conversion, correct unit)",
+      "speed_display_3d_view": "PASS - Shows '0 MPH' in 3D view",
+      "speed_limit_marker": "PASS - Speed limit sign shows '35' correctly",
+      "instruction_text_imperial": "PASS - Shows '1312 FT' instead of meters in instruction",
+      "poi_distance_miles": "PASS - POIs show distances in miles (1.6 mi, 2.0 mi, etc.)",
+      "route_distance_miles": "PASS - Route shows 463.9 miles",
+      "osrm_fallback_conversion": "PASS - Code verified: convertInstructionToImperial() called on OSRM instructions",
+      "osm_fallback_conversion": "PASS - Code verified: convertInstructionToImperial() called on OSM instructions",
+      "dashboard_speed": "PASS - Dashboard shows 'CURRENT SPEED: 0 MPH'",
+      "app_loads": "PASS - App loads correctly",
+      "guest_login": "PASS - Continue as Guest works",
+      "navigation_view": "PASS - Leaflet map loads correctly",
+      "3d_view": "PASS - Mapbox GL 3D view loads correctly",
+      "route_calculation": "PASS - Route to Chicago calculated (463.9 mi, 7h 13m)"
+    }
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button",
+    "email": "test@trucker.com",
+    "password": "Test123456"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at https://truck-gps-demo.preview.emergentagent.com. Bug fixes verified for speed display and instruction unit conversion: 1) Speed no longer double-converted - App.tsx converts geoSpeed from m/s to mph once (line 147), NavigationView.tsx and Navigation3DView.tsx use raw speed for imperial display. 2) convertInstructionToImperial() function (lines 127-139) converts km→mi and m→ft in instruction text using regex. 3) POI popup distances show miles (line 3568). 4) OSRM/OSM fallback instructions also converted (lines 2589, 2615). Key test flow: Guest login -> Navigation -> search 'Chicago' -> ROUTE -> verify instruction shows feet (not meters), speed shows MPH (not double-converted). 3D view accessible via '2D' button on right side."
+}
