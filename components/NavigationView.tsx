@@ -1389,8 +1389,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const lastSpokenRef = useRef('');
   const spokenDistancesRef = useRef<Set<string>>(new Set());
   const lastLaneSpokenRef = useRef('');
-  // Fuel Network: track spoken alerts per POI category to avoid repeats
-  const fuelNetworkSpokenRef = useRef<Set<string>>(new Set());
+  // Fuel Network: track last announced POI per category to avoid repeat spam
+  const fuelNetworkLastRef = useRef<Map<string, { poiName: string; lastDist: number; lastTime: number }>>(new Map());
   const lastFuelNetworkCheckRef = useRef(0);
   useEffect(() => {
     if (!isDriving || nextInstruction.text === 'Ready for Route') {
@@ -1672,11 +1672,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         // Fuel Network Voice Alerts — announce distance to nearest POI from each selected category
         const fuelNetworkNow = Date.now();
-        if (fuelNetworkNow - lastFuelNetworkCheckRef.current > 15000) { // Check every 15s
+        if (fuelNetworkNow - lastFuelNetworkCheckRef.current > 20000) { // Check every 20s
           lastFuelNetworkCheckRef.current = fuelNetworkNow;
           const networkSelections = getFuelNetworkSelections();
           if (networkSelections.length > 0 && poisRef.current.length > 0) {
-            // For each selection, find the nearest POI AHEAD on the route
             for (const categoryId of networkSelections) {
               const matchingPois = poisRef.current.filter(p => {
                 const cat = getPoiCategory(p.type, p.name);
@@ -1691,35 +1690,24 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 const dLon = (p.lon - currentLocation[1]) * Math.PI / 180;
                 const a = Math.sin(dLat/2)**2 + Math.cos(currentLocation[0]*Math.PI/180) * Math.cos(p.lat*Math.PI/180) * Math.sin(dLon/2)**2;
                 const distMi = 3958.8 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                if (distMi < nearestDistMi && distMi > 0.3) { // Only ahead (> 0.3mi away)
+                if (distMi < nearestDistMi && distMi > 0.3) {
                   nearestDistMi = distMi;
                   nearestPoi = p;
                 }
               }
               if (!nearestPoi) continue;
-              // Voice thresholds: 25mi, 10mi, 5mi, 2mi
-              const alertKey = `fn_${categoryId}`;
               const poiLabel = nearestPoi.name?.split(',')[0] || categoryId.replace(/_/g, ' ');
-              if (nearestDistMi <= 25 && nearestDistMi > 20 && !fuelNetworkSpokenRef.current.has(`${alertKey}_25`)) {
-                speak(`Next ${poiLabel} is about ${Math.round(nearestDistMi)} miles ahead.`);
-                fuelNetworkSpokenRef.current.add(`${alertKey}_25`);
-              } else if (nearestDistMi <= 10 && nearestDistMi > 7 && !fuelNetworkSpokenRef.current.has(`${alertKey}_10`)) {
-                speak(`${poiLabel} in ${Math.round(nearestDistMi)} miles.`);
-                fuelNetworkSpokenRef.current.add(`${alertKey}_10`);
-              } else if (nearestDistMi <= 5 && nearestDistMi > 3 && !fuelNetworkSpokenRef.current.has(`${alertKey}_5`)) {
-                speak(`${poiLabel} coming up in ${Math.round(nearestDistMi)} miles.`);
-                fuelNetworkSpokenRef.current.add(`${alertKey}_5`);
-              } else if (nearestDistMi <= 2 && nearestDistMi > 1 && !fuelNetworkSpokenRef.current.has(`${alertKey}_2`)) {
-                speak(`${poiLabel} in about ${nearestDistMi.toFixed(1)} miles.`);
-                fuelNetworkSpokenRef.current.add(`${alertKey}_2`);
-              }
-              // Reset alerts when past the POI (< 0.3mi)
-              if (nearestDistMi <= 0.3) {
-                // Clear all alerts for this category so it re-triggers for the NEXT POI
-                fuelNetworkSpokenRef.current.delete(`${alertKey}_25`);
-                fuelNetworkSpokenRef.current.delete(`${alertKey}_10`);
-                fuelNetworkSpokenRef.current.delete(`${alertKey}_5`);
-                fuelNetworkSpokenRef.current.delete(`${alertKey}_2`);
+              const prev = fuelNetworkLastRef.current.get(categoryId);
+              const isNewPoi = !prev || prev.poiName !== poiLabel;
+              // Announce when: new POI detected, OR distance changed by ≥3mi, OR 60s since last announce
+              const distDelta = prev ? Math.abs(prev.lastDist - nearestDistMi) : Infinity;
+              const timeDelta = prev ? fuelNetworkNow - prev.lastTime : Infinity;
+              if (isNewPoi || distDelta >= 3 || timeDelta >= 60000) {
+                const distText = nearestDistMi < 1
+                  ? `${nearestDistMi.toFixed(1)} miles`
+                  : `${Math.round(nearestDistMi)} miles`;
+                speak(`Next ${poiLabel}, ${distText} ahead.`);
+                fuelNetworkLastRef.current.set(categoryId, { poiName: poiLabel, lastDist: nearestDistMi, lastTime: fuelNetworkNow });
               }
             }
           }
@@ -3029,7 +3017,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       lastSpokenRef.current = firstManeuverText;
       spokenDistancesRef.current.clear();
-      fuelNetworkSpokenRef.current.clear();
+      fuelNetworkLastRef.current.clear();
       if (firstDistNum <= 2) spokenDistancesRef.current.add('2');
       if (firstDistNum <= 1) spokenDistancesRef.current.add('1');
       if (firstDistNum <= 0.2) spokenDistancesRef.current.add('0.2');
