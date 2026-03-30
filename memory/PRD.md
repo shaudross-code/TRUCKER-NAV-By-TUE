@@ -96,6 +96,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **3D follow mode**: Added `pitch: 70` to `flyTo` call, passed `isFollowMode`/`isOverviewMode` to Navigation3DView — camera now correctly zooms in and tracks the truck icon
 - **3D overview mode**: Properly toggles pitch between 0 (flat overview) and 70 (navigation tilt)
 
+### Phase 36 — 2D Heading-Up Mode Fix (DONE — 2026-03-30)
+- Fixed 2D map stuck in north-up by lowering speed gate for rotation and adding position-based heading fallback
+
+### Phase 37 — Speed Display + Instruction Units Bug Fix (DONE — 2026-03-30)
+- **Speed double-conversion fix**: `App.tsx` already converts GPS speed from m/s to mph in `speedRef`. NavigationView.tsx and Navigation3DView.tsx were converting AGAIN with `* 2.23694`, causing 67 mph to display as ~150 mph. Fixed all speed displays to use raw speed for imperial, `speed * 1.60934` for metric.
+- **Instruction text imperial conversion**: Added `convertInstructionToImperial()` utility that regex-replaces "X km" → "X mi" and "X m" → "X ft" in HERE API instruction text. Applied to HERE route parsing, OSRM fallback, and OSM fallback.
+- **POI popup distance**: Changed from "X.X km away" to "X.X mi away" using `poi.distance / 1609.34`.
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
