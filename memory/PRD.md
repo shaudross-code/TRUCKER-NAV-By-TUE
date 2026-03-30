@@ -96,12 +96,11 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **3D follow mode**: Added `pitch: 70` to `flyTo` call, passed `isFollowMode`/`isOverviewMode` to Navigation3DView — camera now correctly zooms in and tracks the truck icon
 - **3D overview mode**: Properly toggles pitch between 0 (flat overview) and 70 (navigation tilt)
 
-### Phase 36 — 2D Heading-Up Mode Fix v2 (DONE — 2026-03-30)
-- **Root cause**: `notifyListeners()` only fired when speed/heading CHANGED — at steady speed with null GPS heading, `updateRotationAndPan` never ran
-- **Fix 1**: Always call `notifyListeners()` on every GPS position update so rotation recalculates as user moves along route segments
-- **Fix 2**: Route heading fallback now handles `lastSimIdxRef = -1` by using first route segment as initial heading
-- **Fix 3**: Position-based heading is no longer blocked by `isDriving` condition (secondary `if` instead of `else-if`)
-- **Fix 4**: Smoothing factor increased from 0.15 to 0.35 for faster heading convergence (~3 updates vs ~7)
+### Phase 36 — 2D Heading-Up Mode Fix v3 (DONE — 2026-03-30)
+- **ROOT CAUSE FOUND**: Leaflet's inline `style="transform: translate3d()"` on mapPane was overriding the CSS class rule `.leaflet-rotate-pane { transform: rotate() }`. Inline styles have higher specificity than class rules, so the rotation NEVER applied.
+- **Fix**: Switched from CSS `transform: rotate()` to CSS `rotate:` property. The `rotate` property composes independently with `transform`, so both Leaflet's panning (translate3d) and our heading rotation work simultaneously.
+- **Corner coverage**: Added dynamic `scale` CSS property based on rotation angle (√2 factor at 45°) to prevent blank corners when map is rotated.
+- **Previous fixes preserved**: notifyListeners() on every position update, route heading fallback, faster smoothing (0.35).
 
 ### Phase 37 — Speed Display + Instruction Units Bug Fix (DONE — 2026-03-30)
 - **Speed double-conversion fix**: `App.tsx` already converts GPS speed from m/s to mph in `speedRef`. NavigationView.tsx and Navigation3DView.tsx were converting AGAIN with `* 2.23694`, causing 67 mph to display as ~150 mph. Fixed all speed displays to use raw speed for imperial, `speed * 1.60934` for metric.

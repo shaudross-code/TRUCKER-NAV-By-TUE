@@ -287,6 +287,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (isNorthUp) {
       // North-up mode: apply manual rotation (user can still rotate with touch)
       mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
+      mapPane.style.setProperty('--map-scale', '1');
     }
     // Heading-up mode rotation is handled by the telemetry subscription (updateRotationAndPan)
   }, [manualRotation, isNorthUp, isCompassMode]);
@@ -304,6 +305,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       manualRotationRef.current = 0;
       if (mapPane) {
         mapPane.style.setProperty('--map-rotation', '0deg');
+        mapPane.style.setProperty('--map-scale', '1');
       }
     } else {
       // Switching TO Heading Up — apply current heading immediately
@@ -329,9 +331,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (heading > 0) {
         smoothedHeadingRef.current = heading;
       }
-      const rotation = -heading + manualRotationRef.current;
+      const totalRotation = -heading + manualRotationRef.current;
       if (mapPane) {
-        mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
+        mapPane.style.setProperty('--map-rotation', `${totalRotation}deg`);
+        // Scale to cover blank corners
+        const absAngle = Math.abs(totalRotation % 360);
+        const normalizedAngle = absAngle > 180 ? 360 - absAngle : absAngle;
+        const radians = (normalizedAngle % 90) * Math.PI / 180;
+        const scale = Math.abs(Math.sin(radians)) * 0.42 + 1;
+        mapPane.style.setProperty('--map-scale', `${scale.toFixed(3)}`);
       }
     }
   }, [isNorthUp, telemetryContext]);
@@ -3532,10 +3540,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const rotation = manualRotationRef.current;
         if (!isNorthUp) {
           // Heading-up mode: rotate map opposite to heading
-          mapPane.style.setProperty('--map-rotation', `${-currentHeading + rotation}deg`);
+          const totalRotation = -currentHeading + rotation;
+          mapPane.style.setProperty('--map-rotation', `${totalRotation}deg`);
+          // Scale up to cover blank corners during rotation (√2 ≈ 1.42 at 45°)
+          const absAngle = Math.abs(totalRotation % 360);
+          const normalizedAngle = absAngle > 180 ? 360 - absAngle : absAngle;
+          const radians = (normalizedAngle % 90) * Math.PI / 180;
+          const scale = Math.abs(Math.sin(radians)) * 0.42 + 1;
+          mapPane.style.setProperty('--map-scale', `${scale.toFixed(3)}`);
         } else if (!isCompassMode) {
           // North-up mode: apply only manual rotation
           mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
+          mapPane.style.setProperty('--map-scale', '1');
         }
       }
 

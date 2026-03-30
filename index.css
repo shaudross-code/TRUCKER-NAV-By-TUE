@@ -22,12 +22,13 @@
 
 
 .leaflet-rotate-pane {
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: rotate 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: center center !important;
 }
 
 .leaflet-rotate-pane {
-  transform: rotate(var(--map-rotation, 0deg));
+  rotate: var(--map-rotation, 0deg);
+  scale: var(--map-scale, 1);
 }
 
 .user-marker-container {
@@ -41,8 +42,8 @@
 }
 
 .counter-rotate {
-  transform: rotate(calc(var(--map-rotation, 0deg) * -1));
-  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  rotate: calc(var(--map-rotation, 0deg) * -1);
+  transition: rotate 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .map-interaction-disabled {
