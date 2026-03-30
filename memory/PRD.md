@@ -115,6 +115,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Existing buttons kept**: "+ Deadhead" and "+ Paid" still append to end; "Navigate Directly" unchanged
 - **Event delegation updated**: Leaflet popup click handler reads `data-position` and `data-use-select` attributes for position-based insertion
 
+### Phase 39 — Fuel Network Tab + Heading-Up Default + Touch Orientation (DONE — 2026-03-30)
+- **Fuel Network tab**: Replaced GitHub/Updates tab in sidebar. New `FuelNetwork.tsx` component lets users select up to 5 POI categories (truck stop chains, services, amenities) for voice distance alerts during navigation.
+- **Voice distance alerts**: During active navigation, the app checks every 15s for the nearest POI from each selected fuel network category. Voice prompts fire at distance thresholds: 25mi, 10mi, 5mi, 2mi. Alerts reset when passing a POI so the next one in the category triggers fresh alerts.
+- **Heading-up mode default**: `isNorthUp` explicitly defaults to `false` (heading-up mode) for all new users.
+- **Touch orientation**: Two-finger rotation already implemented and verified working with both north-up and heading-up modes.
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
