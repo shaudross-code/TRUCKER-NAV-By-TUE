@@ -121,44 +121,17 @@ const calcEuclideanDist = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return Math.sqrt(Math.pow(lat1 - lat2, 2) + Math.pow(lon1 - lon2, 2));
 };
 
-const SpeedLimitMarker = React.memo(({ mapInstance, currentSpeedLimit, userLocation }: { mapInstance: any, currentSpeedLimit: number | null, userLocation: [number, number] | null }) => {
-  const telemetryContext = useContext(TelemetryContext);
-  const speed = React.useSyncExternalStore(
-    telemetryContext?.subscribe || (() => () => {}),
-    () => telemetryContext?.speedRef.current || 0
-  );
+const SpeedLimitMarker = React.memo(({ currentSpeedLimit, speed, unitSystem }: { currentSpeedLimit: number | null; speed: number; unitSystem?: string }) => {
+  if (!currentSpeedLimit) return null;
+  const isMetric = unitSystem === 'metric';
+  const displayLimit = isMetric ? Math.round(currentSpeedLimit * 1.60934) : currentSpeedLimit;
+  const displaySpeed = isMetric ? Math.round(speed * 3.6) : Math.round(speed * 2.23694);
   
-  const speedLimitMarkerRef = useRef<L.Marker | null>(null);
-
-  useEffect(() => {
-    if (!mapInstance || !currentSpeedLimit) {
-      if (speedLimitMarkerRef.current && mapInstance) {
-        mapInstance.removeLayer(speedLimitMarkerRef.current);
-      }
-      if (!currentSpeedLimit) {
-        speedLimitMarkerRef.current = null;
-      }
-      return;
-    }
-
-    const el = document.createElement('div');
-    el.className = 'speed-limit-marker';
-    el.innerHTML = `<div class="counter-rotate">${renderToStaticMarkup(<SpeedLimitSign limit={currentSpeedLimit} currentSpeed={speed} />)}</div>`;
-
-    if (!speedLimitMarkerRef.current) {
-      if (isValidLatLng(userLocation)) {
-        speedLimitMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }) });
-        speedLimitMarkerRef.current.addTo(mapInstance);
-      }
-    } else {
-      if (isValidLatLng(userLocation)) {
-        speedLimitMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
-        speedLimitMarkerRef.current.setIcon(L.divIcon({ html: el, className: 'speed-limit-marker', iconAnchor: [12, 12] }));
-      }
-    }
-  }, [mapInstance, currentSpeedLimit, speed, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
-
-  return null;
+  return (
+    <div data-testid="speed-limit-overlay" className="absolute top-4 left-4 z-[1500] pointer-events-none">
+      <SpeedLimitSign limit={displayLimit} currentSpeed={displaySpeed} />
+    </div>
+  );
 });
 
 const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLocation: propUserLocation, activeView }) => {
@@ -291,25 +264,36 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const mapPane = mapInstanceRef.current?.getPane('mapPane');
     if (!mapPane) return;
 
-    if (isNorthUp && !isCompassMode) {
-      // North-up mode: apply manual rotation (or 0 if just switched to north-up)
+    if (isNorthUp) {
+      // North-up mode: apply manual rotation (user can still rotate with touch)
       mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
     }
+    // Heading-up mode rotation is handled by the telemetry subscription (updateRotationAndPan)
   }, [manualRotation, isNorthUp, isCompassMode]);
 
-  // When switching TO north-up, reset rotation to 0
+  // When switching modes, reset rotation properly
   const handleToggleNorthUp = useCallback(() => {
     const newVal = !isNorthUp;
     setIsNorthUp(newVal);
+    localStorage.setItem('nav_north_up', String(newVal));
+    
+    const mapPane = mapInstanceRef.current?.getPane('mapPane');
     if (newVal) {
-      // Switching to North Up — reset rotation to face north
+      // Switching TO North Up — reset rotation to face north
       setManualRotation(0);
-      const mapPane = mapInstanceRef.current?.getPane('mapPane');
+      manualRotationRef.current = 0;
       if (mapPane) {
         mapPane.style.setProperty('--map-rotation', '0deg');
       }
+    } else {
+      // Switching TO Heading Up — apply current heading immediately
+      const heading = telemetryContext?.headingRef?.current || 0;
+      const rotation = -heading + manualRotationRef.current;
+      if (mapPane) {
+        mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
+      }
     }
-  }, [isNorthUp]);
+  }, [isNorthUp, telemetryContext]);
 
   const isRotatingRef = useRef(false);
   const initialAngleRef = useRef(0);
@@ -3345,13 +3329,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${currentHeading}deg`);
       }
 
-      // Update map rotation if in follow mode
+      // Update map rotation based on mode
       const mapPane = mapInstanceRef.current?.getPane('mapPane');
       if (mapPane) {
         const rotation = manualRotationRef.current;
-        if (isFollowMode && !isNorthUp) {
+        if (!isNorthUp) {
+          // Heading-up mode: rotate map opposite to heading
           mapPane.style.setProperty('--map-rotation', `${-currentHeading + rotation}deg`);
-        } else {
+        } else if (!isCompassMode) {
+          // North-up mode: apply only manual rotation
           mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
         }
       }
@@ -3806,7 +3792,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             <div id="nav-map-container" ref={mapRef} className={`h-full w-full transition-opacity duration-500`}>
               {/* The contents of this div are dynamically generated by Leaflet at runtime */}
             </div>
-            <SpeedLimitMarker mapInstance={isMapReady ? mapInstanceRef.current : null} currentSpeedLimit={currentSpeedLimit} userLocation={userLocation} />
+            <SpeedLimitMarker currentSpeedLimit={currentSpeedLimit} speed={speed} unitSystem={context?.unitSystem} />
           </>
         )}
       </div>
