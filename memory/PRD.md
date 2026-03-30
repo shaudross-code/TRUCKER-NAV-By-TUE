@@ -78,6 +78,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **2D restriction panel**: Updated to render TUNNEL and HAZMAT types alongside existing BRIDGE/WEIGHT
 - **Settings integration**: Existing Hazmat Routing toggle, Tunnel Category (ADR), and Hazmat Classes settings drive the restriction detection logic
 
+### Phase 33 — 3D Map Controls Fix + 2D Mapbox Migration (DONE — 2026-03-30)
+- **3D map controls fixed**: Zoom +/-, follow user, and overview buttons now work in 3D mode by routing to the Mapbox GL map instance via `mapboxMapRef`
+- **2D map switched to Mapbox**: `dark-v11` raster tiles via Leaflet's `L.tileLayer`, replacing MapTiler. Falls back to MapTiler then OSM if no Mapbox token
+- **Navigation3DView exposes map**: New `onMapRef` callback prop passes the Mapbox GL map instance up to the parent
+- **Overview mode in 3D**: Toggles pitch between 0 (flat overview) and 70 (navigation perspective)
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
