@@ -54,6 +54,13 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Suggestions dropdown: matched styling with backdrop blur
 - All interactive elements have data-testid attributes for testing
 
+### Phase 30 — 3D View Bug Fixes (DONE — 2026-03-30)
+- **CRITICAL FIX: Time display** — `formatTime()` was treating seconds as minutes (3600s showed as "60h" → now correctly shows "1h 0m")
+- **Unit system support** — 3D view now respects user's imperial/metric preference for speed, distance, speed limit
+- **Street name** — Bottom bar now shows actual road name (e.g. "W BROADWAY") instead of full instruction text
+- **Region indicator** — Added road + state strip to 3D bottom HUD matching 2D view design (e.g. "W BROADWAY | IOWA")
+- **Props fix** — 3D view now receives reactive `speed`, `currentRoad`, `unitSystem`, and `currentRegion` from parent
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
