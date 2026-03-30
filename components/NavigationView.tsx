@@ -51,7 +51,8 @@ import {
   Globe,
   Clock,
   X,
-  Mic
+  Mic,
+  MapPinned
 } from 'lucide-react';
 import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
 import { TrafficIcon } from './TrafficIcon';
@@ -716,6 +717,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [currentRoad, setCurrentRoad] = useState<string | null>(null);
   const [currentSpeedLimit, setCurrentSpeedLimit] = useState<number | null>(null);
   const routeSpansRef = useRef<any[]>([]);
+
+  // ─── State/Country Boundary Tracking ──────────────────────────────────────
+  const [currentRegion, setCurrentRegion] = useState<{ state: string | null; country: string | null; city: string | null }>(() => {
+    try {
+      const saved = localStorage.getItem('trucker_current_region');
+      return saved ? JSON.parse(saved) : { state: null, country: null, city: null };
+    } catch { return { state: null, country: null, city: null }; }
+  });
+  const lastGeocodeFetchRef = useRef<{ time: number; lat: number; lon: number } | null>(null);
+  const prevRegionRef = useRef<{ state: string | null; country: string | null }>({ state: null, country: null });
 
   const lastViolationRef = useRef(false);
   const playedAlertsRef = useRef<Record<string, Set<number>>>({});
@@ -1925,6 +1936,73 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }, 60 * 1000);
     
     return () => clearInterval(interval);
+  }, []);
+
+  // ─── State/Country Boundary Voice Prompts ────────────────────────────────
+  useEffect(() => {
+    const loc = userLocation;
+    if (!loc || !isValidLatLng(loc)) return;
+    const [lat, lon] = loc;
+
+    // Throttle: only reverse-geocode every 20s or if moved >3km
+    const now = Date.now();
+    if (lastGeocodeFetchRef.current) {
+      const { time, lat: pLat, lon: pLon } = lastGeocodeFetchRef.current;
+      const elapsed = now - time;
+      const dist = calcDist(lat, lon, pLat, pLon);
+      if (elapsed < 20000 && dist < 3000) return;
+    }
+
+    lastGeocodeFetchRef.current = { time: now, lat, lon };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=8`, {
+      headers: { 'User-Agent': 'TruckersNav/1.0', 'Accept-Language': 'en' },
+      signal: controller.signal
+    })
+      .then(r => r.json())
+      .then(data => {
+        clearTimeout(timeout);
+        if (!data?.address) return;
+        const newState = data.address.state || data.address.province || data.address.region || null;
+        const newCountry = data.address.country || null;
+        const newCity = data.address.city || data.address.town || data.address.village || null;
+
+        setCurrentRegion(prev => {
+          const updated = { state: newState, country: newCountry, city: newCity };
+          try { localStorage.setItem('trucker_current_region', JSON.stringify(updated)); } catch {}
+          return updated;
+        });
+
+        // Voice announcement on state or country change
+        const prevState = prevRegionRef.current.state;
+        const prevCountry = prevRegionRef.current.country;
+
+        if (newState && prevState && newState !== prevState) {
+          speak(`Now entering ${newState}.`);
+        } else if (newCountry && prevCountry && newCountry !== prevCountry) {
+          speak(`Now entering ${newCountry}.`);
+        }
+
+        prevRegionRef.current = { state: newState, country: newCountry };
+      })
+      .catch(err => {
+        clearTimeout(timeout);
+        if (err.name !== 'AbortError') {
+          console.warn('Reverse geocoding failed:', err);
+        }
+      });
+
+    return () => { clearTimeout(timeout); controller.abort(); };
+  }, [userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+
+  // Initialize prevRegionRef from stored region on mount
+  useEffect(() => {
+    if (currentRegion.state || currentRegion.country) {
+      prevRegionRef.current = { state: currentRegion.state, country: currentRegion.country };
+    }
   }, []);
 
   useEffect(() => {
@@ -4270,12 +4348,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* Search HUD - Gold Bordered */}
+      {/* Search HUD */}
       {isSearchFocused && (
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-[2004] transition-all duration-500" />
+        <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px] z-[2004] transition-all duration-500" />
       )}
       {!isExploreMode && (
-        <div id="nav-search-container" className={`absolute transition-all duration-700 z-[2005] left-1/2 -translate-x-1/2 w-full max-w-[650px] px-2 md:px-6 ${milesRemaining > 0 ? 'top-[180px] md:top-[280px] opacity-0 pointer-events-none' : 'top-[calc(1rem+env(safe-area-inset-top))] landscape:top-[calc(0.5rem+env(safe-area-inset-top))] opacity-100'}`}>
+        <div id="nav-search-container" data-testid="nav-search-container" className={`absolute transition-all duration-700 z-[2005] left-1/2 -translate-x-1/2 w-full max-w-[650px] px-2 md:px-6 ${milesRemaining > 0 ? 'top-[180px] md:top-[280px] opacity-0 pointer-events-none' : 'top-[calc(1rem+env(safe-area-inset-top))] landscape:top-[calc(0.5rem+env(safe-area-inset-top))] opacity-100'}`}>
           {/* Waypoints List */}
           {waypoints.length > 0 && (
             <div className="flex flex-col gap-1.5 md:gap-2 landscape:gap-1 mb-2 md:mb-4 landscape:mb-2 animate-in fade-in slide-in-from-top-4 duration-500">
@@ -4289,8 +4367,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 </button>
               </div>
               {waypoints.map((wp, index) => (
-                <div key={wp.id} className="bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 flex items-center justify-between shadow-lg">
-                  <div className="flex items-center gap-4">
+                <div key={wp.id} className="bg-zinc-900/90 backdrop-blur-xl border border-zinc-800 rounded-xl md:rounded-2xl p-3 md:p-4 flex items-center justify-between shadow-lg">
+                  <div className="flex items-center gap-3 md:gap-4">
                     <div className="flex flex-col gap-1">
                       <button 
                         onClick={(e) => { e.stopPropagation(); moveWaypoint(index, 'up'); }}
@@ -4307,29 +4385,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         <ArrowUp className="w-3 h-3 rotate-180" />
                       </button>
                     </div>
-                    <div className={`p-3 rounded-xl ${wp.type === 'PAID' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-zinc-500/10 text-zinc-500'}`}>
-                      {wp.type === 'PAID' ? <CircleDollarSign className="w-5 h-5" /> : <Truck className="w-5 h-5" />}
+                    <div className={`p-2.5 md:p-3 rounded-xl ${wp.type === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
+                      {wp.type === 'PAID' ? <CircleDollarSign className="w-4 h-4 md:w-5 md:h-5" /> : <Truck className="w-4 h-4 md:w-5 md:h-5" />}
                     </div>
                     <div className="flex flex-col">
-                      <span className="text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-0.5">{wp.type} STOP {index + 1}</span>
-                      <span className="text-sm font-bold text-white truncate max-w-[250px]">{wp.address}</span>
+                      <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em] mb-0.5">{wp.type} STOP {index + 1}</span>
+                      <span className="text-xs md:text-sm font-bold text-white truncate max-w-[200px] md:max-w-[250px]">{wp.address}</span>
                     </div>
                   </div>
                   <button 
                     onClick={() => removeWaypoint(wp.id)} 
-                    className="p-2 rounded-xl bg-white/5 text-zinc-500 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90"
+                    className="p-2 rounded-xl bg-white/5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all active:scale-90"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}
               <button 
+                data-testid="start-route-button"
                 onClick={() => handleNavigate().catch(err => {
                   console.error("Navigation failed from start route button:", err instanceof Error ? err.message : String(err));
                   setError("Failed to calculate route. Please try again.");
                 })}
                 disabled={isCalculating || !isMapReady}
-                className="w-full py-4 bg-[#D4AF37] hover:bg-[#B8860B] text-black rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg shadow-[#D4AF37]/20 flex items-center justify-center gap-3 mt-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 md:py-4 bg-[#D4AF37] hover:bg-[#C4A030] text-black rounded-xl md:rounded-2xl text-xs md:text-sm font-black uppercase tracking-widest transition-all shadow-[0_8px_30px_rgba(212,175,55,0.25)] flex items-center justify-center gap-3 mt-1.5 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isCalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <NavIcon className="w-5 h-5" />}
                 <span>Start Route</span>
@@ -4337,14 +4416,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           )}
 
-          <div className={`w-full bg-black ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-2xl md:rounded-t-[2.5rem]' : 'rounded-2xl md:rounded-[2.5rem]'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37] shadow-[0_40px_100px_rgba(212,175,55,0.4)] scale-[1.01]' : 'border-white/10 shadow-[0_40px_100px_rgba(0,0,0,0.8)]'}`}>
-            <div className="flex items-center p-2 pl-6">
-              <Search className={`w-5 h-5 mr-4 transition-colors ${isSearchFocused ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
+          <div className={`w-full bg-black/95 backdrop-blur-xl ${isSuggestionsVisible && suggestions.length > 0 ? 'rounded-t-2xl md:rounded-t-3xl' : 'rounded-2xl md:rounded-3xl'} border transition-all duration-500 ${isSearchFocused ? 'border-[#D4AF37]/60 shadow-[0_20px_80px_rgba(212,175,55,0.15)]' : 'border-zinc-800 shadow-[0_20px_60px_rgba(0,0,0,0.6)]'}`}>
+            <div className="flex items-center p-2 md:p-2.5 pl-4 md:pl-5">
+              <Search className={`w-4 h-4 md:w-5 md:h-5 mr-3 md:mr-4 transition-colors ${isSearchFocused ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
               <input 
                 id="nav-search-input"
+                data-testid="nav-search-input"
                 type="text" 
-                placeholder={!isMapReady ? "System Booting..." : isCalculating ? "Mapping Path..." : "Search Address or POI..."} 
-                className="flex-1 bg-transparent border-none outline-none text-white text-lg font-medium placeholder:text-zinc-700 tracking-tight py-4" 
+                placeholder={!isMapReady ? "Initializing..." : isCalculating ? "Calculating Route..." : "Search address, city, or POI..."} 
+                className="flex-1 bg-transparent border-none outline-none text-white text-sm md:text-base font-medium placeholder:text-zinc-600 tracking-tight py-3 md:py-3.5" 
                 value={searchQuery} 
                 disabled={isCalculating || !isMapReady} 
                 onChange={(e) => setSearchQuery(e.target.value)} 
@@ -4401,21 +4481,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               >
                 <Plus className="w-5 h-5" />
               </button>
-              <button id="nav-search-button" onClick={() => {
+              <button id="nav-search-button" data-testid="nav-search-button" onClick={() => {
                 setIsSearchFocused(false);
                 setIsSuggestionsVisible(false);
                 handleNavigate().catch(err => {
                   console.error("Navigation failed from search button:", err instanceof Error ? err.message : String(err));
                   setError("Failed to calculate route. Please try again.");
                 });
-              }} disabled={!isMapReady} className={`flex items-center gap-3 px-8 py-4 rounded-2xl transition-all active:scale-95 ${searchQuery.trim() && !isCalculating ? 'bg-[#D4AF37] text-black shadow-lg shadow-[#D4AF37]/20' : 'bg-zinc-900 text-zinc-700'}`}>
-                {isCalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <NavIcon className="w-5 h-5" />}
-                <span className="font-black uppercase tracking-widest italic">{isCalculating ? 'Mapping' : 'Route'}</span>
+              }} disabled={!isMapReady} className={`flex items-center gap-2 md:gap-3 px-5 md:px-7 py-2.5 md:py-3 rounded-xl md:rounded-2xl transition-all active:scale-95 ${searchQuery.trim() && !isCalculating ? 'bg-[#D4AF37] text-black shadow-[0_4px_20px_rgba(212,175,55,0.25)]' : 'bg-zinc-900 text-zinc-700 border border-zinc-800'}`}>
+                {isCalculating ? <Loader2 className="w-4 h-4 md:w-5 md:h-5 animate-spin" /> : <NavIcon className="w-4 h-4 md:w-5 md:h-5" />}
+                <span className="font-black uppercase tracking-widest text-xs md:text-sm">{isCalculating ? 'Routing' : 'Route'}</span>
               </button>
             </div>
           </div>
           {isSuggestionsVisible && suggestions.length > 0 && (
-            <div className={`w-full bg-black rounded-b-2xl md:rounded-b-[2.5rem] landscape:rounded-b-2xl border-x border-b border-[#D4AF37]/40 shadow-[0_40px_100px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-300 ${milesRemaining > 0 ? 'max-h-[150px] md:max-h-[200px] landscape:max-h-[100px]' : 'max-h-[250px] md:max-h-[400px] landscape:max-h-[200px]'} overflow-y-auto custom-scrollbar`}>
+            <div className={`w-full bg-black/95 backdrop-blur-xl rounded-b-2xl md:rounded-b-3xl landscape:rounded-b-2xl border-x border-b border-[#D4AF37]/30 shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-in slide-in-from-top-2 duration-300 ${milesRemaining > 0 ? 'max-h-[150px] md:max-h-[200px] landscape:max-h-[100px]' : 'max-h-[250px] md:max-h-[400px] landscape:max-h-[200px]'} overflow-y-auto custom-scrollbar`}>
               <ul className="py-1 md:py-2 landscape:py-1">
                 {suggestions.map((s, idx) => {
                   const isFirstRecommended = s.isRecommended && idx === 0;
@@ -4513,97 +4593,133 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>
 
       {isDriving && !isExploreMode && !is3DMode && (
-        <div id="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-8 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[750px] px-2 md:px-6 pointer-events-none">
-          <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] landscape:rounded-2xl p-2 md:p-6 landscape:p-2 flex items-center justify-between shadow-[0_40px_100px_rgba(0,0,0,0.8)] pointer-events-auto transition-all hover:scale-[1.005]">
-            <div className="flex items-center gap-2 shrink-0">
-              <button id="nav-exit-button" onClick={handleCancelRoute} className="p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[1.5rem] landscape:rounded-xl bg-zinc-900 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 transition-all active:scale-90" title="Clear Route">
-                <X className="w-4 h-4 md:w-7 md:h-7 landscape:w-5 landscape:h-5" strokeWidth={5} />
-              </button>
-              
-              <button id="nav-reroute-button" onClick={handleReroute} className="p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-[1.5rem] landscape:rounded-xl bg-zinc-900 text-zinc-600 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-all active:scale-90" title="Recalculate Route">
-                <RotateCcw className="w-4 h-4 md:w-7 md:h-7 landscape:w-5 landscape:h-5" strokeWidth={5} />
-              </button>
-            </div>
+        <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-6 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none">
+          <div className="bg-black/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl md:rounded-3xl landscape:rounded-2xl shadow-[0_-8px_60px_rgba(0,0,0,0.9),0_0_40px_rgba(212,175,55,0.08)] pointer-events-auto transition-all">
+            {/* Region Bar — top strip showing current state/road */}
+            {(currentRegion.state || currentRoad) && (
+              <div data-testid="region-indicator" className="flex items-center justify-between px-3 md:px-5 py-1 md:py-1.5 border-b border-white/5">
+                <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                  <MapPinned className="w-3 h-3 md:w-3.5 md:h-3.5 text-[#D4AF37] shrink-0" />
+                  {currentRoad && (
+                    <span className="text-[9px] md:text-[11px] font-black text-white uppercase tracking-wider truncate">
+                      {currentRoad}
+                    </span>
+                  )}
+                  {currentRoad && (() => {
+                    const highwayMatch = currentRoad.match(/(I-|US-|SR-|Hwy|Route|State Route)\s*(\d+[A-Z]?)/i);
+                    return highwayMatch ? (
+                      <div className="scale-[0.6] md:scale-75 origin-left shrink-0 -ml-1">
+                        <HighwayShield roadName={highwayMatch[0]} />
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {currentRegion.state && (
+                    <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37]/80 uppercase tracking-[0.15em]">
+                      {currentRegion.state}
+                    </span>
+                  )}
+                  <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-700'}`} />
+                </div>
+              </div>
+            )}
+            {/* Main Stats Row */}
+            <div className="flex items-center p-2 md:p-4 landscape:p-2 gap-1 md:gap-3">
+              {/* Controls cluster */}
+              <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
+                <button id="nav-exit-button" data-testid="nav-exit-button" onClick={handleCancelRoute} className="p-2 md:p-3 landscape:p-2 rounded-xl bg-zinc-900/80 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/30 transition-all active:scale-90" title="Clear Route">
+                  <X className="w-4 h-4 md:w-5 md:h-5 landscape:w-4 landscape:h-4" strokeWidth={3} />
+                </button>
+                <button id="nav-reroute-button" data-testid="nav-reroute-button" onClick={handleReroute} className="p-2 md:p-3 landscape:p-2 rounded-xl bg-zinc-900/80 text-zinc-500 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 border border-zinc-800 hover:border-[#D4AF37]/30 transition-all active:scale-90" title="Recalculate Route">
+                  <RotateCcw className="w-4 h-4 md:w-5 md:h-5 landscape:w-4 landscape:h-4" strokeWidth={3} />
+                </button>
+              </div>
 
-            <div className="flex items-center gap-2 md:gap-12 landscape:gap-4 overflow-x-auto no-scrollbar px-1 md:px-2">
-              <div id="nav-stat-speed" className="flex flex-col items-center shrink-0">
-                <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0 h-3">Speed</span>
-                <div className="flex items-center">
-                  <span className={`text-lg md:text-4xl landscape:text-2xl font-bold tracking-tight leading-none ${currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-500' : 'text-[#D4AF37]'}`}>
-                    {context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)}
-                    <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km/h' : 'mph'}</span>
-                  </span>
+              {/* Divider */}
+              <div className="h-8 md:h-12 landscape:h-8 w-px bg-zinc-800 shrink-0" />
+
+              {/* Stats */}
+              <div className="flex items-center gap-3 md:gap-6 landscape:gap-3 overflow-x-auto no-scrollbar flex-1 px-1">
+                {/* Speed */}
+                <div id="nav-stat-speed" data-testid="nav-stat-speed" className="flex flex-col items-center shrink-0 min-w-[52px] md:min-w-[72px]">
+                  <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Speed</span>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className={`text-xl md:text-3xl landscape:text-xl font-[900] tracking-tighter leading-none tabular-nums ${currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-400' : 'text-white'}`}>
+                      {context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)}
+                    </span>
+                    <span className="text-[7px] md:text-[9px] landscape:text-[7px] text-zinc-600 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km/h' : 'mph'}</span>
+                  </div>
                   {currentSpeedLimit && (
-                    <div className="ml-2">
+                    <div className="mt-0.5 scale-[0.55] md:scale-[0.65] origin-top">
                       <SpeedLimitSign limit={context?.unitSystem === 'metric' ? Math.round(currentSpeedLimit * 1.60934) : currentSpeedLimit} currentSpeed={context?.unitSystem === 'metric' ? Math.round(speed * 3.6) : Math.round(speed * 2.23694)} compact />
                     </div>
                   )}
                 </div>
-              </div>
-              <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
-              <div id="nav-stat-dist" className="flex flex-col shrink-0">
-                <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Target Dist</span>
-                <span className="text-xl md:text-5xl landscape:text-3xl font-bold text-[#D4AF37] tracking-tight leading-none">
-                  {context?.unitSystem === 'metric' 
-                    ? (milesRemaining > 0 ? (milesRemaining * 1.60934).toFixed(1) : '---')
-                    : (milesRemaining > 0 ? milesRemaining.toFixed(1) : '---')
-                  }
-                  <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km' : 'mi'}</span>
-                </span>
-              </div>
-              <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
-              <div id="nav-stat-duration" className="flex flex-col shrink-0">
-                <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Time</span>
-                <span className="text-xl md:text-5xl landscape:text-3xl font-bold text-[#D4AF37] tracking-tight leading-none">
-                  {remainingDuration > 0 ? `${Math.floor(remainingDuration / 3600)}h ${Math.floor((remainingDuration % 3600) / 60)}m` : '---'}
-                </span>
-              </div>
-              <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
-              {waypoints.length > 0 && (
-                <>
-                  <div id="nav-stat-stops" className="flex flex-col items-center shrink-0">
-                    <span className="text-[7px] md:text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-[0.25em] mb-0.5 md:mb-1 landscape:mb-0">Stops</span>
-                    <span className="text-lg md:text-4xl landscape:text-2xl font-bold text-[#D4AF37] tracking-tight leading-none">
-                      {waypoints.length}
-                      <span className="text-[8px] md:text-xs landscape:text-[9px] text-zinc-600 ml-0.5 md:ml-1 font-bold uppercase">pts</span>
+
+                <div className="h-8 md:h-10 landscape:h-8 w-px bg-zinc-800/60 shrink-0" />
+
+                {/* Distance */}
+                <div id="nav-stat-dist" data-testid="nav-stat-dist" className="flex flex-col items-center shrink-0 min-w-[52px] md:min-w-[72px]">
+                  <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Distance</span>
+                  <div className="flex items-baseline gap-0.5">
+                    <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#D4AF37] tracking-tighter leading-none tabular-nums">
+                      {context?.unitSystem === 'metric' 
+                        ? (milesRemaining > 0 ? (milesRemaining * 1.60934).toFixed(1) : '---')
+                        : (milesRemaining > 0 ? milesRemaining.toFixed(1) : '---')
+                      }
                     </span>
+                    <span className="text-[7px] md:text-[9px] landscape:text-[7px] text-zinc-600 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km' : 'mi'}</span>
                   </div>
-                  <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
-                </>
-              )}
-              <div id="nav-stat-eta" className="flex flex-col items-end shrink-0">
-                <div className="flex items-center gap-1 md:gap-3 landscape:gap-1.5">
-                  <div className={`w-1.5 h-1.5 md:w-4 md:h-4 landscape:w-2 landscape:h-2 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_10px_#D4AF37]' : 'bg-zinc-800'}`} />
-                  <span className="text-lg md:text-4xl landscape:text-2xl font-bold text-white tracking-tight leading-none">{eta}</span>
                 </div>
-                <span className="text-[6px] md:text-[10px] landscape:text-[7px] font-bold text-zinc-500 uppercase tracking-[0.25em] mt-0.5 md:mt-1.5 landscape:mt-0.5">Verified ETA • LIVE</span>
-              </div>
-              {currentDestination !== 'Standby' && currentRoad && (
-                <>
-                  <div className="h-6 md:h-14 landscape:h-8 w-px bg-[#D4AF37]/20 shrink-0" />
-                  <div className="flex items-center gap-4 md:gap-6 pr-2 md:pr-4 shrink-0">
-                    <div className="flex flex-col items-end">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse" />
-                        <span className="text-[#D4AF37] text-[10px] md:text-xs font-bold uppercase tracking-widest opacity-60">Current Road</span>
-                      </div>
-                      <span className="text-white font-black text-sm md:text-2xl uppercase tracking-widest truncate max-w-[150px] md:max-w-md">
-                        {currentRoad}
-                      </span>
+
+                <div className="h-8 md:h-10 landscape:h-8 w-px bg-zinc-800/60 shrink-0" />
+
+                {/* Duration */}
+                <div id="nav-stat-duration" data-testid="nav-stat-duration" className="flex flex-col items-center shrink-0 min-w-[52px] md:min-w-[72px]">
+                  <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Time</span>
+                  <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#D4AF37] tracking-tighter leading-none tabular-nums">
+                    {remainingDuration > 0 ? `${Math.floor(remainingDuration / 3600)}h ${Math.floor((remainingDuration % 3600) / 60)}m` : '---'}
+                  </span>
+                </div>
+
+                <div className="h-8 md:h-10 landscape:h-8 w-px bg-zinc-800/60 shrink-0" />
+
+                {/* Stops count (if waypoints) */}
+                {waypoints.length > 0 && (
+                  <>
+                    <div id="nav-stat-stops" data-testid="nav-stat-stops" className="flex flex-col items-center shrink-0">
+                      <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Stops</span>
+                      <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#D4AF37] tracking-tighter leading-none tabular-nums">{waypoints.length}</span>
                     </div>
-                    
-                    {(() => {
-                      const highwayMatch = currentRoad.match(/(I-|US-|SR-|Hwy|Route|State Route)\s*(\d+[A-Z]?)/i);
-                      return highwayMatch ? (
-                        <div className="scale-75 md:scale-110 origin-right">
-                          <HighwayShield roadName={highwayMatch[0]} />
-                        </div>
-                      ) : null;
-                    })()}
+                    <div className="h-8 md:h-10 landscape:h-8 w-px bg-zinc-800/60 shrink-0" />
+                  </>
+                )}
+
+                {/* ETA */}
+                <div id="nav-stat-eta" data-testid="nav-stat-eta" className="flex flex-col items-center shrink-0 min-w-[60px] md:min-w-[80px]">
+                  <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">ETA</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]' : 'bg-zinc-800'}`} />
+                    <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-white tracking-tighter leading-none">{eta}</span>
                   </div>
-                </>
-              )}
+                  <span className="text-[6px] md:text-[8px] landscape:text-[6px] font-bold text-emerald-500/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
+                </div>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Region/State Indicator (idle mode — not driving) ── */}
+      {!isDriving && !isExploreMode && currentRegion.state && (
+        <div data-testid="idle-region-indicator" className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-24 left-1/2 -translate-x-1/2 z-[2005] pointer-events-none">
+          <div className="flex items-center gap-2 bg-black/80 backdrop-blur-xl border border-zinc-800 rounded-full px-3 py-1.5 md:px-4 md:py-2 shadow-lg">
+            <MapPinned className="w-3 h-3 md:w-3.5 md:h-3.5 text-[#D4AF37]" />
+            <span className="text-[9px] md:text-[11px] font-black text-white/90 uppercase tracking-wider">
+              {currentRegion.city ? `${currentRegion.city}, ` : ''}{currentRegion.state}
+            </span>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
           </div>
         </div>
       )}
