@@ -1117,10 +1117,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log("NavigationView: map container style", (map.getContainer() as HTMLElement).style.cssText);
     console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
 
-    // Use Mapbox raster tiles for the 2D view (dark-v11 style)
+    // Use Mapbox raster tiles for the 2D view (satellite-streets-v12 style)
     if (MAPBOX_TOKEN) {
-      console.log("NavigationView: Using Mapbox dark-v11 raster tiles");
-      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
+      console.log("NavigationView: Using Mapbox satellite-streets-v12 raster tiles");
+      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
         attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         tileSize: 512,
         zoomOffset: -1,
