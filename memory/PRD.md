@@ -69,6 +69,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Voice alerts**: `speak()` announces approaching restrictions (e.g. "Caution. Low bridge immediately ahead. Low Bridge: 12.5ft.")
 - **Restriction count badge**: Shows total route restrictions at top-right when not near one
 
+### Phase 32 — Hazmat Route Avoidance Mode (DONE — 2026-03-30)
+- **Tunnel restriction detection**: Parses `tunnelCategory` from HERE API route spans; creates TUNNEL-type alerts with purple color when truck's ADR category is exceeded
+- **Hazmat prohibited zone detection**: Parses `permittedHazardousGoods`/`hazardousGoods` from spans; creates HAZMAT-type alerts with yellow color when truck carries hazmat
+- **3D map markers**: Tunnel restrictions show purple markers, hazmat zones show yellow markers with popup details
+- **Active warning overlay**: Handles all 4 types (BRIDGE=red, WEIGHT=orange, TUNNEL=purple, HAZMAT=yellow) with type-specific icons, messages, and truck comparison info
+- **Voice alerts**: Type-specific announcements ("Tunnel restriction ahead — check ADR classification", "Hazmat prohibited zone — seek alternate route")
+- **2D restriction panel**: Updated to render TUNNEL and HAZMAT types alongside existing BRIDGE/WEIGHT
+- **Settings integration**: Existing Hazmat Routing toggle, Tunnel Category (ADR), and Hazmat Classes settings drive the restriction detection logic
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
