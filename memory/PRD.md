@@ -119,6 +119,17 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Rebuilt `NavigationHUD.tsx` with highway-sign-style lane guidance panel
 - Lane numbers below each arrow, "USE LANE X" / "USE LANES X-Y" label, gold dots on active lanes, total lane count indicator
 
+### Phase 28 — Speed Limit & Map Orientation Fixes (DONE — 2026-03-30)
+**Speed Limit Sign Position Fix:**
+- Converted SpeedLimitMarker from Leaflet map marker to fixed UI overlay (`absolute top-4 left-4 z-[1500]`)
+- No longer overlaps with user location arrow on the map
+- Only renders when speed limit data is available during active navigation
+
+**Map Orientation/Heading Up Fix:**
+- `handleToggleNorthUp` now properly resets rotation to 0° when switching to North Up, and applies current heading when switching to Heading Up
+- Heading-up rotation no longer requires `isFollowMode` — works when user pans away too
+- North Up mode applies manual rotation only; Heading Up mode auto-rotates based on GPS heading
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
