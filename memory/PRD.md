@@ -109,6 +109,16 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Added 250ms mount delay before rendering `ResponsiveContainer`
 - Also cleaned up server.ts Firestore rules update to not log noise on failure
 
+### Phase 27 — Units & Display + Professional Lane Guidance (DONE — 2026-03-30)
+**Speed & Distance Metrics Toggle:**
+- Added `unitSystem` ('imperial' | 'metric') to AppContext, persisted in localStorage
+- Added "Units & Display" section in Settings with MPH/KM/H toggle buttons
+- Applied unit conversions across entire app: Dashboard, Navigation HUD, Route Steps, Weather, Settings Truck Specs, Speed limit signs
+
+**Professional Lane Guidance Header:**
+- Rebuilt `NavigationHUD.tsx` with highway-sign-style lane guidance panel
+- Lane numbers below each arrow, "USE LANE X" / "USE LANES X-Y" label, gold dots on active lanes, total lane count indicator
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
@@ -124,7 +134,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - `/app/components/NavigationView.tsx` — Core map orchestration (refactored)
 - `/app/components/PoiDetailModal.tsx` — Extracted POI detail popup
 - `/app/components/RouteStepsModal.tsx` — Extracted route steps modal
-- `/app/components/NavigationHUD.tsx` — Extracted navigation HUD
+- `/app/components/NavigationHUD.tsx` — Navigation HUD with professional lane guidance
+- `/app/components/SettingsView.tsx` — Settings with Units & Display section
+- `/app/components/LoginScreen.tsx` — Multi-method login (Google, Email, Guest)
 - `/app/components/WarningBanners.tsx` — Extracted warning banners
 - `/app/components/Navigation3DView.tsx` — Premium 3D navigation
 - `/app/services/geminiService.ts` — POI fetching with HERE access-point placement
