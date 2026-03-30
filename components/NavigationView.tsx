@@ -208,6 +208,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
   const userMarkerElRef = useRef<HTMLElement | null>(null);
+  // Smooth marker interpolation
+  const markerTargetRef = useRef<[number, number] | null>(null);
+  const markerCurrentRef = useRef<[number, number] | null>(null);
+  const markerAnimFrameRef = useRef<number>(0);
   const mapLayersRef = useRef<Record<string, L.Polyline>>({});
   const poiMarkersRef = useRef<L.Marker[]>([]);
   const userLocation = useMemo(() => {
@@ -3372,9 +3376,42 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return () => clearInterval(etaInterval);
   }, [isDriving, updateNavigationState]);
 
+  // Smooth marker interpolation loop
   useEffect(() => {
-    if (isValidLatLng(userLocation) && userMarkerRef.current) {
-      userMarkerRef.current.setLatLng([userLocation[0], userLocation[1]]);
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    const animate = () => {
+      if (markerTargetRef.current && markerCurrentRef.current && userMarkerRef.current) {
+        const [cLat, cLon] = markerCurrentRef.current;
+        const [tLat, tLon] = markerTargetRef.current;
+        const dLat = Math.abs(tLat - cLat);
+        const dLon = Math.abs(tLon - cLon);
+        // Only interpolate if close enough (avoid teleporting across the map)
+        if (dLat < 0.01 && dLon < 0.01) {
+          const t = 0.15; // Smooth factor: higher = faster convergence
+          const nLat = lerp(cLat, tLat, t);
+          const nLon = lerp(cLon, tLon, t);
+          markerCurrentRef.current = [nLat, nLon];
+          userMarkerRef.current.setLatLng([nLat, nLon]);
+        } else {
+          // Large jump (new route, teleport) — snap immediately
+          markerCurrentRef.current = [...markerTargetRef.current];
+          userMarkerRef.current.setLatLng(markerTargetRef.current);
+        }
+      }
+      markerAnimFrameRef.current = requestAnimationFrame(animate);
+    };
+    markerAnimFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(markerAnimFrameRef.current);
+  }, []);
+
+  // Update target position (NOT marker directly) on GPS changes
+  useEffect(() => {
+    if (isValidLatLng(userLocation)) {
+      markerTargetRef.current = [userLocation[0], userLocation[1]];
+      // Initialize current position on first GPS fix
+      if (!markerCurrentRef.current) {
+        markerCurrentRef.current = [userLocation[0], userLocation[1]];
+      }
     }
     if (isDriving && userLocation) {
       updateNavigationState(userLocation).catch(err => console.error("Navigation update failed:", err));
@@ -3540,7 +3577,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       if (isFollowMode && mapInstanceRef.current) { 
         const now = Date.now();
-        if (now - lastPanRef.current > 500) { // Further reduced throttle for even smoother tracking
+        if (now - lastPanRef.current > 1200) { // Throttle panning to avoid competing animations
           lastPanRef.current = now;
           try {
             // In Heading Up mode, we offset the center slightly to see more ahead
@@ -3560,7 +3597,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               center = [unprojected.lat, unprojected.lng];
             }
             
-            mapInstanceRef.current.panTo(center, { animate: true, duration: 0.8, easeLinearity: 0.25 }); 
+            mapInstanceRef.current.panTo(center, { animate: true, duration: 1.2, easeLinearity: 0.15 }); 
           } catch (e) {
             console.error("PanTo error:", e instanceof Error ? e.message : String(e));
           }

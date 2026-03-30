@@ -32,7 +32,7 @@
 }
 
 .user-marker-container {
-  transition: transform 0.3s ease-out;
+  transition: none;
   z-index: 1000 !important;
 }
 
