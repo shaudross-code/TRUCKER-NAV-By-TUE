@@ -87,5 +87,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://truck-gps-demo.preview.emergentagent.com. Map UI controls fix verified working. Key changes: 1) 2D map now uses Mapbox dark-v11 raster tiles (line 1077 in NavigationView.tsx), 2) mapboxMapRef stores 3D Mapbox GL instance (line 188), 3) MapControls receives mapboxMapRef prop and uses it for zoom/follow/overview in 3D mode. Test data-testids: zoom-in-btn, zoom-out-btn, follow-user-btn, overview-btn. 3D HUD testids: 3d-turn-banner, 3d-nav-bar, 3d-speed-limit, 3d-current-speed, 3d-stat-dist, 3d-stat-time, 3d-stat-eta."
+  "context_for_next_testing_agent": "App at https://nav-emblem-display.preview.emergentagent.com. Map UI controls fix verified working. Key changes: 1) 2D map now uses Mapbox dark-v11 raster tiles (line 1077 in NavigationView.tsx), 2) mapboxMapRef stores 3D Mapbox GL instance (line 188), 3) MapControls receives mapboxMapRef prop and uses it for zoom/follow/overview in 3D mode. Test data-testids: zoom-in-btn, zoom-out-btn, follow-user-btn, overview-btn. 3D HUD testids: 3d-turn-banner, 3d-nav-bar, 3d-speed-limit, 3d-current-speed, 3d-stat-dist, 3d-stat-time, 3d-stat-eta."
 }
