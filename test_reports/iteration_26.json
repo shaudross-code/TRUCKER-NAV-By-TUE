@@ -1,0 +1,87 @@
+{
+  "summary": "Frontend testing complete for Tesla/EV POI filtering and CAT Scale separation. All features verified working: 1) Tesla/EV POIs are filtered out from the app (no Tesla, Supercharger, EV Charging, ChargePoint, Electrify America in filter menu or Along Route panel), 2) CAT Scales and Weigh Stations are separate POI types with distinct filter options, 3) CAT Scale icon is cyan (#0891b2) vs green weigh station icon, 4) 2D map uses Mapbox dark-v11 tiles, 5) Guest login works, 6) Search and route calculation work correctly.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "Overpass API",
+        "issue": "504 Gateway Timeout when fetching traffic infrastructure - cosmetic only, does not affect core functionality",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "minor_issues": [
+      {
+        "component": "Dashboard PerformanceChart",
+        "issue": "Chart dimension warning 'width(-1) height(-1)' still occurs occasionally",
+        "priority": "LOW",
+        "note": "Known issue from previous iterations - does not affect functionality"
+      }
+    ]
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_26.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: geminiService.ts lines 360-371 - EV/Tesla POIs filtered with isEVCharging check returning null",
+    "VERIFIED: geminiService.ts lines 374-375 - CAT Scale as separate type 'cat_scale' distinct from 'weigh_station'",
+    "VERIFIED: geminiService.ts lines 599-605 - Corridor POI EV filter also returns null for Tesla/EV",
+    "VERIFIED: MapControls.tsx lines 125-126 - 'Weigh Stations' and 'CAT Scales' as separate filter entries",
+    "VERIFIED: MapControls.tsx line 71 - 'cat_scale' added to allIds array",
+    "VERIFIED: PoiIcon.tsx lines 319-330 - CAT Scale icon with cyan fill (#0891b2) and 'CAT' text",
+    "VERIFIED: PoiIcon.tsx lines 308-318 - Weigh Station icon with green fill (#059669)",
+    "VERIFIED: PoiIcon.tsx lines 411-417 - getPoiCategory returns 'ev_charging' for Tesla/EV names (filtered from display)",
+    "VERIFIED: PoiIcon.tsx lines 449-452 - cat_scale category detection",
+    "VERIFIED: NavigationView.tsx line 498 - 'cat_scale' in default poiFilters",
+    "VERIFIED: 2D map attribution shows 'Mapbox' (not MapTiler)"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100%"
+  },
+
+  "test_results": {
+    "features_tested": {
+      "guest_login": "PASS - Click 'Continue as Guest', reaches dashboard",
+      "navigation_view_loads": "PASS - Map loads with user location marker visible",
+      "2d_mapbox_tiles": "PASS - Console shows 'NavigationView: Using Mapbox dark-v11 raster tiles'",
+      "2d_mapbox_attribution": "PASS - Attribution shows '© Mapbox © OpenStreetMap'",
+      "filter_menu_opens": "PASS - Filter button opens POI filter menu",
+      "weigh_stations_filter": "PASS - 'Weigh Stations' is a separate filter option",
+      "cat_scales_filter": "PASS - 'CAT Scales' is a separate filter option",
+      "no_ev_filters": "PASS - No Tesla/EV/Supercharger/ChargePoint/Electrify America in filter menu",
+      "search_works": "PASS - Typed 'Chicago', got suggestions from HERE API",
+      "route_calculation": "PASS - Route to Chicago calculated (462 mi, 7h 15m)",
+      "along_route_panel": "PASS - Shows trucking-relevant POIs (Phillips 66, Pilot Flying J, Pilot, Cenex, Shell, Kwik Store)",
+      "no_ev_in_along_route": "PASS - No Tesla/EV charging stations in Along Route panel",
+      "bottom_hud": "PASS - Shows road name, distance, time, ETA",
+      "region_indicator": "PASS - Shows 'IOWA' state indicator"
+    }
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button",
+    "email": "test@trucker.com",
+    "password": "Test123456"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at https://trucker-dashboard-3.preview.emergentagent.com. Tesla/EV POI filtering verified working. Key changes: 1) geminiService.ts filters out Tesla/EV POIs by returning null (lines 370-371, 605), 2) 'cat_scale' is a new POI type distinct from 'weigh_station', 3) MapControls filter menu has both 'Weigh Stations' and 'CAT Scales' as separate entries, 4) PoiIcon has a cyan-colored CAT Scale icon (#0891b2) with 'CAT' text. POI Filters in console: loves, pilot, flying_j, petro, ta, road_ranger, kwik_trip, bucees, speedway, caseys, wawa, sheetz, quiktrip, racetrac, conoco, exxon, shell, bp, marathon, circle_k, seven_eleven, walmart, lowes, home_depot, truck_wash, fuel, parking, rest_area, weigh_station, cat_scale, food, distribution, low_clearance, other."
+}

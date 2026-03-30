@@ -68,7 +68,7 @@ export const MapControls: React.FC<any> = React.memo(({
                       const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
                       const allIds = [
                         ...brandIds, 'fuel', 'parking', 'rest_area', 
-                        'weigh_station', 'food', 'service', 'distribution', 'low_clearance', 'other'
+                        'weigh_station', 'cat_scale', 'food', 'service', 'distribution', 'low_clearance', 'other'
                       ];
                       setPoiFilters(new Set(allIds));
                     }}
@@ -122,7 +122,8 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'fuel',          label: 'Fuel (Other)',  divider: true },
                     { id: 'parking',       label: 'Parking' },
                     { id: 'rest_area',     label: 'Rest Areas' },
-                    { id: 'weigh_station', label: 'Scales' },
+                    { id: 'weigh_station', label: 'Weigh Stations' },
+                    { id: 'cat_scale',    label: 'CAT Scales' },
                     { id: 'low_clearance', label: 'Low Clearance' },
                     { id: 'food',          label: 'Food' },
                     { id: 'service',       label: 'Service (Other)' },

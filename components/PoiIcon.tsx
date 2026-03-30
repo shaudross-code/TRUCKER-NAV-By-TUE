@@ -316,6 +316,18 @@ export const getPoiFilterIcon = (id: string) => {
           <circle cx="13" cy="10" r="1.5" fill="#fff"/>
         </svg>
       );
+    case 'cat_scale':
+      return (
+        <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="shrink-0">
+          <circle cx="10" cy="10" r="9.5" fill="#0891b2" stroke="#fff" strokeWidth="1"/>
+          <rect x="4" y="13" width="12" height="2" rx="1" fill="#fff"/>
+          <line x1="10" y1="6" x2="10" y2="13" stroke="#fff" strokeWidth="1.5"/>
+          <line x1="5" y1="9" x2="15" y2="9" stroke="#fff" strokeWidth="1"/>
+          <circle cx="6" cy="9" r="1.5" fill="#fff"/>
+          <circle cx="14" cy="9" r="1.5" fill="#fff"/>
+          <text x="10" y="8" textAnchor="middle" fill="#fff" fontFamily="Arial,sans-serif" fontSize="4" fontWeight="900">CAT</text>
+        </svg>
+      );
     case 'low_clearance':
       return (
         <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="shrink-0">
@@ -396,6 +408,14 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   if (lowerName.includes("circle k")) return 'circle_k';
   if (lowerName.includes("7-eleven") || lowerName.includes("7 eleven") || lowerName.includes("seven-eleven") || lowerName.includes("seven eleven")) return 'seven_eleven';
 
+  // EV charging — not trucking relevant, skip
+  if (lowerName.includes("tesla") || lowerName.includes("supercharger") || 
+      lowerName.includes("chargepoint") || lowerName.includes("ev charging") ||
+      lowerName.includes("electrify america") || lowerName.includes("blink charging") ||
+      lowerName.includes("electric vehicle")) {
+    return 'ev_charging'; // Will be filtered out by POI display logic
+  }
+
   // Retail with truck parking
   if (lowerName.includes("lowe's") || lowerName.includes("lowes")) return 'lowes';
   if (lowerName.includes("home depot")) return 'home_depot';
@@ -426,7 +446,12 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
     return 'truck_wash';
   }
 
-  if (normalizedType.includes('weigh station') || normalizedType.includes('scale') || normalizedType.includes('weigh')) {
+  // CAT Scales (certified truck scales — distinct from DOT weigh stations)
+  if (lowerName.includes("cat scale") || lowerName.includes("catscale") || normalizedType.includes('cat_scale')) {
+    return 'cat_scale';
+  }
+
+  if (normalizedType.includes('weigh station') || normalizedType.includes('weigh')) {
     return 'weigh_station';
   }
 

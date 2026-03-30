@@ -495,10 +495,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const saved = localStorage.getItem('poi_filters');
     const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
     try {
-      return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'distribution', 'low_clearance', 'other']);
+      return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'distribution', 'low_clearance', 'other']);
     } catch (e) {
       console.error("Failed to parse poi_filters from localStorage", e);
-      return new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'food', 'distribution', 'low_clearance', 'other']);
+      return new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'distribution', 'low_clearance', 'other']);
     }
   });
 
@@ -4321,6 +4321,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   else if (category === 'service') { Icon = Wrench; iconColor = "text-red-400"; }
                   else if (category === 'distribution') { Icon = Box; iconColor = "text-indigo-400"; }
                   else if (category === 'weigh_station') { Icon = Scale; iconColor = "text-emerald-400"; }
+                  else if (category === 'cat_scale') { Icon = Scale; iconColor = "text-cyan-400"; }
 
                   return (
                     <div key={idx} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setSelectedPoi(poi)}>

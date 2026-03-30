@@ -356,9 +356,23 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
                           itemName.includes('sheetz') || itemName.includes('racetrac') ||
                           itemName.includes('speedway');
       const isLowClearance = itemName.includes('low clearance') || itemName.includes('low bridge');
+
+      // EV charging / Tesla — not trucking-relevant, skip entirely
+      const isEVCharging = itemName.includes('tesla') || itemName.includes('supercharger') ||
+                           itemName.includes('ev charging') || itemName.includes('chargepoint') ||
+                           itemName.includes('electrify america') || itemName.includes('ev station') ||
+                           itemName.includes('electric vehicle') || itemName.includes('blink charging') ||
+                           catIds.some((id: string) => id === '700-7600-0325' || id === '700-7600-0330');
       
-      if (isTruckStop) {
+      // CAT Scales are separate from weigh stations
+      const isCatScale = itemName.includes('cat scale') || itemName.includes('catscale');
+      
+      if (isEVCharging) {
+        return null; // Remove non-trucking EV POIs entirely
+      } else if (isTruckStop) {
         type = "major_chains"; // Full-service truck stops
+      } else if (isCatScale) {
+        type = "cat_scale"; // Certified truck weighing (distinct from DOT weigh stations)
       } else if (isTruckService) {
         type = "service"; // Truck service/repair
       } else if (isWalmart || isRetail) {
@@ -579,10 +593,18 @@ export async function fetchCorridorPOIs(
                         itemName.includes('pilot') || itemName.includes('flying j') ||
                         itemName.includes('petro stopping') || itemName.includes('sapp bros') ||
                         itemName.includes('buc-ee');
-    const isTruckService = itemName.includes('cat scale') || itemName.includes('speedco') ||
+    const isTruckService = itemName.includes('speedco') ||
                            itemName.includes('blue beacon') || itemName.includes('rush truck');
+    const isCatScale = itemName.includes('cat scale') || itemName.includes('catscale');
+    const isEVCharging = itemName.includes('tesla') || itemName.includes('supercharger') ||
+                         itemName.includes('ev charging') || itemName.includes('chargepoint') ||
+                         itemName.includes('electrify america') || itemName.includes('ev station') ||
+                         itemName.includes('electric vehicle') || itemName.includes('blink charging') ||
+                         catIds.some((id: string) => id === '700-7600-0325' || id === '700-7600-0330');
 
+    if (isEVCharging) return null; // Remove non-trucking EV POIs
     if (isTruckStop) type = "major_chains";
+    else if (isCatScale) type = "cat_scale";
     else if (isTruckService || catIds.includes('700-7900-0132')) type = "service";
     else if (catIds.includes('700-7600-0117')) type = "rest_area";
     else if (catIds.includes('700-7600-0322')) type = "weigh_station";
