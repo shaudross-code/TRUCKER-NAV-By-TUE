@@ -1701,15 +1701,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               const poiLabel = nearestPoi.name?.split(',')[0] || categoryId.replace(/_/g, ' ');
               const prev = fuelNetworkLastRef.current.get(categoryId);
               const isNewPoi = !prev || prev.poiName !== poiLabel;
-              // Announce when: new POI detected, OR distance changed by ≥3mi, OR 60s since last announce
-              const distDelta = prev ? Math.abs(prev.lastDist - nearestDistMi) : Infinity;
-              const timeDelta = prev ? fuelNetworkNow - prev.lastTime : Infinity;
-              if (isNewPoi || distDelta >= 3 || timeDelta >= 60000) {
+              // Only announce when a NEW poi is detected (previous was passed or first time)
+              if (isNewPoi) {
                 const distText = nearestDistMi < 1
                   ? `${nearestDistMi.toFixed(1)} miles`
                   : `${Math.round(nearestDistMi)} miles`;
                 speak(`Next ${poiLabel}, ${distText} ahead.`);
                 fuelNetworkLastRef.current.set(categoryId, { poiName: poiLabel, lastDist: nearestDistMi, lastTime: fuelNetworkNow });
+              } else if (prev) {
+                // Update tracked distance silently (no voice) so we detect when passed
+                prev.lastDist = nearestDistMi;
               }
             }
           }
