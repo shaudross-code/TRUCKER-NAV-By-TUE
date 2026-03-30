@@ -15,7 +15,7 @@ import {
   History,
   DollarSign,
   LogOut,
-  Github
+  Fuel
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { speak } from '../services/speechService';
@@ -45,7 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ViewType.PAY_SUMMARY, icon: DollarSign, label: 'Pay Summary' },
     { id: ViewType.MAINTENANCE, icon: Wrench, label: 'Maintenance' },
     { id: ViewType.ROUTE_HISTORY, icon: History, label: 'History' },
-    { id: ViewType.GITHUB_UPDATES, icon: Github, label: 'Updates' },
+    { id: ViewType.FUEL_NETWORK, icon: Fuel, label: 'Fuel Network' },
     { id: ViewType.SETTINGS, icon: Settings, label: 'Settings' },
   ];
 
