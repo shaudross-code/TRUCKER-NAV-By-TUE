@@ -1,138 +1,44 @@
-# TRUCKERS NAV By TUE — PRD
+# TRUCKERS NAV By TUE — Product Requirements Document
 
 ## Original Problem Statement
-Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using HERE Maps API, remove static fake data, consolidate amenities, fix UI/map bugs, add specific truck service POIs, turn-by-turn navigation, real-time traffic/infrastructure alerts, premium 3D and 2D map views, interactive Load Board, fuel price tracking, and a robust crowd-sourced data system for parking statuses and shipper/receiver facilities. Mobile readiness for iOS and Android deployment.
+Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using HERE Maps API, remove static fake data, consolidate amenities, add specific truck service POIs, turn-by-turn navigation, real-time traffic/infrastructure alerts, 3D/2D satellite maps. High-quality professional trucking GPS interface, dynamic map switching, real-time hazard alerts, custom fuel network POI tracking, smooth GPS interpolation, and highway road shields/emblems on route overlays.
 
 ## Architecture
-- **Stack**: React (Vite) + Express (server.ts) single-level fullstack — port 8001
-- **Maps**: Leaflet (2D with CSS-based touch rotation) + Mapbox GL JS (3D perspective)
-- **Mobile**: Capacitor v6.2.0 (iOS + Android), locked to Node 20
-- **Data**: Firebase Auth (USE_MOCK_DATA=false) + localStorage + local JSON file DBs
-- **APIs**: HERE Maps (Browse + Discover + Fuel Prices), Google Maps Platform, MapTiler, Gemini, Mapbox, Nominatim (reverse geocoding)
-- **Proxy**: Nginx on port 3000 -> Express on port 8001
+- **Stack**: React (Vite) + Express.js backend (single-process on port 8001)
+- **Mapping**: Leaflet (2D heading-up) + Mapbox GL JS (3D satellite), Mapbox satellite-streets-v12 tiles
+- **APIs**: HERE Maps (Routing, Discover, Road Shields), Google Maps (Places), Mapbox (tiles), Gemini (AI), Firebase (Auth/Firestore)
+- **Key Pattern**: 150% oversized map container with CSS `rotate:` for heading-up mode without blank tiles
 - **Preview URL**: https://nav-emblem-display.preview.emergentagent.com
 
-## What's Been Implemented
+## Completed Features
+- Real POI integration (HERE Discover + Google Places)
+- Turn-by-turn truck routing with HERE API
+- 2D heading-up map rotation (oversized container hack)
+- 3D satellite view with Mapbox GL JS
+- Smooth GPS marker interpolation (requestAnimationFrame lerping)
+- Speed display & instruction units (imperial conversion)
+- POI stop position insertion
+- Fuel Network tab (voice alerts for distance to selected POIs)
+- Loading screen masking component render gaps
+- Satellite tiles for 2D view (Mapbox satellite-streets-v12)
+- **Highway Road Shield Emblems on Route Overlay** (2025-03-30)
+  - Backend: `/api/road-shield` proxy with in-memory caching to HERE Map Image API v3
+  - Frontend: Extracts `routeNumbers` from HERE routing spans, places official shield PNGs as Leaflet DivIcon markers along route
+  - Supports Interstate (I-XX), US Highway (US-XX), and State Route shields
+  - SVG fallback if HERE API fails
+  - Shield markers cleared on route clear/cancel
 
-### Core Features (All DONE)
-- Truck-specific GPS routing via HERE Maps API, turn-by-turn, reroute
-- HERE Browse + Discover APIs for truck-specific POIs with corridor search
-- Real-time traffic signs/lights alerts + audio speech alerts
-- Premium Mapbox GL JS 3D view with night mode, gold truck, HUD
-- Capacitor v6.2.0 for iOS + Android
-- Dynamic Load Board near GPS with haversine filter
-- Crowd-sourced Shipper/Receiver reporting
-- Reputation scoring (0-5 stars) in POI popups
-- HERE Fuel Prices API: Real-time diesel prices, corridor matching
-- Firebase Auth (live)
+## Upcoming Tasks (P1)
+- Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
 
-### Phase 19-28 (Previously Completed)
-- Deployment Build Fix, Location & Map Reliability, Touch Map Rotation
-- POI Accuracy & Performance, Preview Fix & NavigationView Refactor
-- Multi-Method Authentication (Google, Email/Password, Guest)
-- Dashboard Input Cards Bug Fix (localStorage primary + Firestore sync)
-- Bug Fix Sweep (Firestore spam, Truck Stops loading, Chart dimensions)
-- Units & Display + Professional Lane Guidance
-- Speed Limit & Map Orientation Fixes
+## Future/Backlog (P2)
+- Route comparison view (alternate routes with toll costs/fuel estimates)
+- Fuel cost calculator (live diesel prices)
+- Driver fatigue alert (DOT Hours of Service)
+- iOS/Android Store Submission (requires user signing certs via /app/SIGNING_GUIDE.md)
+- **Refactoring**: Break down NavigationView.tsx (~5000 lines) into hooks and sub-components
 
-### Phase 29 — State/Country Voice Prompts & Navigation UI Polish (DONE — 2026-03-30)
-**State/Country Boundary Voice Prompts:**
-- Added reverse geocoding via Nominatim API to detect current state/country/city
-- Throttled to every 20 seconds or 3km of movement to respect rate limits
-- Voice announcements via `speak()` when state or country changes: "Now entering {state}."
-- Region data persisted in localStorage for continuity across sessions
-- Previous region tracked in ref to prevent false positives on mount
-
-**Navigation UI Polish:**
-- Redesigned bottom arrival HUD with professional 2-row layout:
-  - Top row: Region bar showing current road + highway shield + state indicator with green live dot
-  - Bottom row: Clean stats — Speed, Distance, Time, ETA with tabular-nums font, compact speed limit sign
-- Added idle-mode region indicator pill at bottom center (city, state + green dot)
-- Polished search bar: cleaner border styling, backdrop blur, updated placeholder
-- Waypoint cards: improved spacing, border accents, better typography
-- Route button: conditional gold/dark styling, shadow effects
-- Suggestions dropdown: matched styling with backdrop blur
-- All interactive elements have data-testid attributes for testing
-
-### Phase 30 — 3D View Bug Fixes (DONE — 2026-03-30)
-- **CRITICAL FIX: Time display** — `formatTime()` was treating seconds as minutes (3600s showed as "60h" → now correctly shows "1h 0m")
-- **Unit system support** — 3D view now respects user's imperial/metric preference for speed, distance, speed limit
-- **Street name** — Bottom bar now shows actual road name (e.g. "W BROADWAY") instead of full instruction text
-- **Region indicator** — Added road + state strip to 3D bottom HUD matching 2D view design (e.g. "W BROADWAY | IOWA")
-- **Props fix** — 3D view now receives reactive `speed`, `currentRoad`, `unitSystem`, and `currentRegion` from parent
-
-### Phase 31 — 3D Satellite Map + Truck Restriction Warnings (DONE — 2026-03-30)
-- **Satellite map**: Switched 3D from `navigation-night-v1` to `satellite-streets-v12` with real aerial imagery, street labels, and 3D terrain elevation (mapbox-terrain-dem-v1)
-- **Gold route line**: Route line changed from blue to gold (#D4AF37) for satellite visibility
-- **Truck restriction warnings**: Active warning overlay pops up within 800m of low bridges or weight-restricted roads, showing restriction value, truck comparison, and distance
-- **Restriction markers**: Red (bridge) / orange (weight) markers on 3D map with popups
-- **Voice alerts**: `speak()` announces approaching restrictions (e.g. "Caution. Low bridge immediately ahead. Low Bridge: 12.5ft.")
-- **Restriction count badge**: Shows total route restrictions at top-right when not near one
-
-### Phase 32 — Hazmat Route Avoidance Mode (DONE — 2026-03-30)
-- **Tunnel restriction detection**: Parses `tunnelCategory` from HERE API route spans; creates TUNNEL-type alerts with purple color when truck's ADR category is exceeded
-- **Hazmat prohibited zone detection**: Parses `permittedHazardousGoods`/`hazardousGoods` from spans; creates HAZMAT-type alerts with yellow color when truck carries hazmat
-- **3D map markers**: Tunnel restrictions show purple markers, hazmat zones show yellow markers with popup details
-- **Active warning overlay**: Handles all 4 types (BRIDGE=red, WEIGHT=orange, TUNNEL=purple, HAZMAT=yellow) with type-specific icons, messages, and truck comparison info
-- **Voice alerts**: Type-specific announcements ("Tunnel restriction ahead — check ADR classification", "Hazmat prohibited zone — seek alternate route")
-- **2D restriction panel**: Updated to render TUNNEL and HAZMAT types alongside existing BRIDGE/WEIGHT
-- **Settings integration**: Existing Hazmat Routing toggle, Tunnel Category (ADR), and Hazmat Classes settings drive the restriction detection logic
-
-### Phase 33 — 3D Map Controls Fix + 2D Mapbox Migration (DONE — 2026-03-30)
-- **3D map controls fixed**: Zoom +/-, follow user, and overview buttons now work in 3D mode by routing to the Mapbox GL map instance via `mapboxMapRef`
-- **2D map switched to Mapbox**: `dark-v11` raster tiles via Leaflet's `L.tileLayer`, replacing MapTiler. Falls back to MapTiler then OSM if no Mapbox token
-- **Navigation3DView exposes map**: New `onMapRef` callback prop passes the Mapbox GL map instance up to the parent
-- **Overview mode in 3D**: Toggles pitch between 0 (flat overview) and 70 (navigation perspective)
-
-### Phase 34 — POI Cleanup: Tesla/EV Removal + CAT Scale Separation (DONE — 2026-03-30)
-- **Tesla/EV POIs removed**: Filters out Tesla Superchargers, ChargePoint, Electrify America, and all EV charging stations from both nearby and corridor POI lists — not relevant for trucking
-- **CAT Scales separated**: New `cat_scale` POI type distinct from `weigh_station` (DOT weigh stations). Cyan icon (#0891b2) with "CAT" label vs green weigh station icon
-- **Filter menu updated**: "Weigh Stations" and "CAT Scales" are now separate filter checkboxes
-- **Both geminiService functions updated**: Local POIs (line 371) and corridor POIs (line 605) both filter out EV charging
-
-### Phase 35 — Stop Sign Icon Fix + 3D Follow Mode Fix (DONE — 2026-03-30)
-- **Stop sign icon**: Replaced lucide-react `Octagon` overlay with pure SVG `<polygon>` + `<text>` — text no longer renders behind the icon
-- **Yield sign icon**: Same fix applied (pure SVG triangle with embedded text)
-- **3D follow mode**: Added `pitch: 70` to `flyTo` call, passed `isFollowMode`/`isOverviewMode` to Navigation3DView — camera now correctly zooms in and tracks the truck icon
-- **3D overview mode**: Properly toggles pitch between 0 (flat overview) and 70 (navigation tilt)
-
-### Phase 36 — 2D Heading-Up Mode Fix v3 (DONE — 2026-03-30)
-- **ROOT CAUSE FOUND**: Leaflet's inline `style="transform: translate3d()"` on mapPane was overriding the CSS class rule `transform: rotate()`. Inline styles have higher specificity.
-- **Fix v1**: Switched from CSS `transform: rotate()` to CSS `rotate:` property — composes independently with Leaflet's `transform`.
-- **Fix v2**: Moved rotation from mapPane to the map container div (`#nav-map-container`). Made container 150% of viewport (positioned at -25% offset) so Leaflet loads extra tiles. Parent clips with `overflow: hidden`. No more blank corners at any rotation angle.
-- **Previous fixes preserved**: notifyListeners() on every position update, route heading fallback, faster smoothing (0.35).
-
-### Phase 37 — Speed Display + Instruction Units Bug Fix (DONE — 2026-03-30)
-- **Speed double-conversion fix**: `App.tsx` already converts GPS speed from m/s to mph in `speedRef`. NavigationView.tsx and Navigation3DView.tsx were converting AGAIN with `* 2.23694`, causing 67 mph to display as ~150 mph. Fixed all speed displays to use raw speed for imperial, `speed * 1.60934` for metric.
-- **Instruction text imperial conversion**: Added `convertInstructionToImperial()` utility that regex-replaces "X km" → "X mi" and "X m" → "X ft" in HERE API instruction text. Applied to HERE route parsing, OSRM fallback, and OSM fallback.
-- **POI popup distance**: Changed from "X.X km away" to "X.X mi away" using `poi.distance / 1609.34`.
-
-### Phase 38 — POI Stop Position Insertion (DONE — 2026-03-30)
-- **"Add as Next Stop" button**: New primary gold button in both Leaflet popup and PoiDetailModal — inserts waypoint at position 0 (first stop after current location)
-- **Position selector**: Dropdown (Stop #1 through #10) + "Add at #" button — inserts waypoint at chosen position using `Array.splice()`
-- **addWaypoint enhanced**: Now accepts optional `position` parameter for insertion at specific index instead of always appending
-- **Existing buttons kept**: "+ Deadhead" and "+ Paid" still append to end; "Navigate Directly" unchanged
-- **Event delegation updated**: Leaflet popup click handler reads `data-position` and `data-use-select` attributes for position-based insertion
-
-### Phase 39 — Fuel Network Tab + Heading-Up Default + Touch Orientation (DONE — 2026-03-30)
-- **Fuel Network tab**: Replaced GitHub/Updates tab in sidebar. New `FuelNetwork.tsx` component lets users select up to 5 POI categories (truck stop chains, services, amenities) for voice distance alerts during navigation.
-- **Voice distance alerts**: During active navigation, the app checks every 15s for the nearest POI from each selected fuel network category. Voice prompts fire at distance thresholds: 25mi, 10mi, 5mi, 2mi. Alerts reset when passing a POI so the next one in the category triggers fresh alerts.
-- **Heading-up mode default**: `isNorthUp` explicitly defaults to `false` (heading-up mode) for all new users.
-- **Touch orientation**: Two-finger rotation already implemented and verified working with both north-up and heading-up modes.
-
-## Prioritized Backlog
-
-### P1 — Upcoming
-- Map filtering for Reputation Scores (show only 4-star+ facilities)
-
-### P2 — Future
-- iOS/Android store submissions (blocked: user signing certificates)
-
-## Key Files
-- `/app/server.ts` — Express server, API proxy, IP geolocation
-- `/app/App.tsx` — Location provider with IP fallback
-- `/app/components/NavigationView.tsx` — Core map orchestration (state tracking + polished UI)
-- `/app/components/NavigationHUD.tsx` — Navigation HUD with professional lane guidance
-- `/app/components/SettingsView.tsx` — Settings with Units & Display section
-- `/app/components/LoginScreen.tsx` — Multi-method login (Google, Email, Guest)
-- `/app/services/speechService.ts` — Text-to-speech with queue system
+## Key Technical Notes
+- DO NOT TOUCH map container scaling/clipping logic
+- User icon: black circle with gold border + ping animation (DO NOT CHANGE)
+- Nginx proxy on port 3000 sometimes drops — recreate if needed

@@ -2750,7 +2750,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
         }
 
-        console.log(`[Route ${routeIdx}] Found ${highwayShields.length} highway shields from spans`);
         return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields };
       }).filter(Boolean);
 
