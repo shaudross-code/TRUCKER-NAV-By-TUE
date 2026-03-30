@@ -260,7 +260,7 @@ async function createServer() {
       
       hereUrl.searchParams.append('destination', destination);
       hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions');
-      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names');
+      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names,routeNumbers');
       hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
       hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
       hereUrl.searchParams.append('vehicle[length]', lengthCm.toString());
@@ -451,6 +451,55 @@ async function createServer() {
     }
   });
 
+
+  // ── HERE Road Shield Icon Proxy (cached) ────────────────────────────────
+  const shieldCache = new Map<string, Buffer>();
+
+  app.get('/api/road-shield', async (req, res) => {
+    const { label, countryCode, stateCode, routeLevel, width } = req.query;
+    if (!label || !countryCode) {
+      return res.status(400).json({ error: 'label and countryCode required' });
+    }
+    if (!process.env.HERE_API_KEY) {
+      return res.status(500).json({ error: 'HERE API key not configured' });
+    }
+
+    const cacheKey = `${label}_${countryCode}_${stateCode || ''}_${routeLevel || 1}_${width || 64}`;
+    if (shieldCache.has(cacheKey)) {
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400');
+      return res.send(shieldCache.get(cacheKey));
+    }
+
+    try {
+      const url = new URL('https://image.maps.hereapi.com/mia/v3/icons/roadShield/png');
+      url.searchParams.append('label', String(label));
+      url.searchParams.append('countryCode', String(countryCode));
+      if (stateCode) url.searchParams.append('stateCode', String(stateCode));
+      url.searchParams.append('routeLevel', String(routeLevel || 1));
+      url.searchParams.append('width', String(width || 64));
+      url.searchParams.append('apiKey', process.env.HERE_API_KEY!);
+
+      const response = await fetch(url.toString());
+      if (response.status === 204) {
+        return res.status(204).send();
+      }
+      if (!response.ok) {
+        console.error('HERE Shield API error:', response.status, response.statusText);
+        return res.status(response.status).json({ error: 'HERE Shield API error' });
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      shieldCache.set(cacheKey, buffer);
+
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'public, max-age=86400');
+      res.send(buffer);
+    } catch (err) {
+      console.error('Road shield fetch error:', err);
+      res.status(500).json({ error: 'Failed to fetch road shield' });
+    }
+  });
 
   app.post('/api/revgeocode', async (req, res) => {
     const { lat, lon } = req.body;

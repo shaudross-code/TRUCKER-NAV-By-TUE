@@ -204,6 +204,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const mapInstanceRef = useRef<any>(null);
   const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
+  const shieldLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -494,6 +495,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
       // Reset all map-attached refs so they get recreated on the new instance
       routeGroupRef.current = null;
+      shieldLayerGroupRef.current = null;
       markerClusterGroupRef.current = null;
       userMarkerRef.current = null;
       userMarkerElRef.current = null;
@@ -676,6 +678,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           
           // Initialize routeGroup
           routeGroupRef.current = L.layerGroup().addTo(map);
+          shieldLayerGroupRef.current = L.layerGroup().addTo(map);
 
           // Add rotation class to the main pane
           map.getPane('mapPane')?.classList.add('leaflet-rotate-pane');
@@ -918,6 +921,85 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     polyline.addTo(map);
     mapLayersRef.current[id] = polyline;
   };
+
+  // Place highway shield markers along the route using HERE Map Image API
+  const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number }[]) => {
+    if (!shieldLayerGroupRef.current || shields.length === 0) return;
+    shieldLayerGroupRef.current.clearLayers();
+    
+    shields.forEach((shield) => {
+      const { label, routeLevel, type, coord } = shield;
+      if (!coord || !coord[0] || !coord[1]) return;
+      
+      // Determine state code from currentRegion for more accurate shields
+      const stateCode = currentRegion.state || '';
+      
+      // Build the icon URL pointing to our backend proxy
+      const params = new URLSearchParams({
+        label,
+        countryCode: 'USA',
+        routeLevel: String(routeLevel),
+        width: '64'
+      });
+      if (stateCode && stateCode.length === 2) {
+        params.append('stateCode', stateCode.toUpperCase());
+      }
+      const shieldUrl = `/api/road-shield?${params.toString()}`;
+
+      // Create a fallback SVG-based shield using the existing HighwayShield component style
+      let fallbackHtml = '';
+      if (type === 'interstate') {
+        fallbackHtml = `
+          <div style="width:40px;height:40px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+            <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%">
+              <path d="M50 5 L90 20 L90 60 C90 80 50 95 50 95 C50 95 10 80 10 60 L10 20 Z" fill="#003f87" stroke="white" stroke-width="4"/>
+              <path d="M10 20 L90 20 L50 5 Z" fill="#cf142b"/>
+            </svg>
+            <span style="position:relative;color:white;font-size:${label.length > 2 ? '12' : '16'}px;font-weight:900;margin-top:4px;text-shadow:0 1px 2px rgba(0,0,0,0.8)">${label}</span>
+          </div>`;
+      } else if (type === 'us') {
+        fallbackHtml = `
+          <div style="width:36px;height:36px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+            <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%">
+              <path d="M10 10 L90 10 L90 60 C90 85 50 95 50 95 C50 95 10 85 10 60 Z" fill="white" stroke="black" stroke-width="4"/>
+            </svg>
+            <span style="position:relative;color:black;font-size:${label.length > 2 ? '11' : '14'}px;font-weight:900;margin-top:2px">${label}</span>
+          </div>`;
+      } else {
+        fallbackHtml = `
+          <div style="width:32px;height:32px;border-radius:50%;background:white;border:2px solid black;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
+            <span style="color:black;font-size:${label.length > 2 ? '10' : '13'}px;font-weight:900">${label}</span>
+          </div>`;
+      }
+
+      // Create the marker with HERE API image, falling back to SVG
+      const iconHtml = `
+        <div data-testid="highway-shield-marker" style="position:relative;cursor:default">
+          <img 
+            src="${shieldUrl}" 
+            style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" 
+            onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" 
+            alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"
+          />
+          <div style="display:none;align-items:center;justify-content:center">${fallbackHtml}</div>
+        </div>`;
+
+      const icon = L.divIcon({
+        html: iconHtml,
+        className: 'highway-shield-icon',
+        iconSize: [44, 44],
+        iconAnchor: [22, 22]
+      });
+
+      const marker = L.marker([coord[0], coord[1]], { 
+        icon, 
+        interactive: false,
+        zIndexOffset: 500
+      });
+      marker.addTo(shieldLayerGroupRef.current!);
+    });
+    console.log(`[Shields] Placed ${shields.length} highway shield markers on route`);
+  }, [currentRegion.state]);
 
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
@@ -2145,6 +2227,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
     
     clearRouteMarkers();
+    // Clear highway shield markers
+    if (shieldLayerGroupRef.current) {
+      shieldLayerGroupRef.current.clearLayers();
+    }
     currentSegmentLineRef.current = null;
     if (context) context.setNavTarget(null);
   };
@@ -2356,7 +2442,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     alerts: any[]; 
     restrictions: any[]; 
     trafficAlerts: any[]; 
-    spans: any[] 
+    spans: any[];
+    highwayShields: any[]
   }[] | null> => {
     if (!userLocation) return null;
 
@@ -2470,6 +2557,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         const restrictions: any[] = [];
         const trafficAlertsList: any[] = [];
+        const highwayShields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number }[] = [];
         
         if (section.notices) {
           section.notices.forEach((notice: any) => {
@@ -2506,6 +2594,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let currentPointIndex = 0;
           const totalPoints = decoded.polyline.length;
           
+          // Track highway shields for route overlay
+          let lastShieldName = '';
+          let lastShieldPointIndex = -99999;
+          const MIN_SHIELD_GAP = Math.max(30, Math.floor(totalPoints * 0.03)); // Min ~3% of route between shields
+
           section.spans.forEach((span: any) => {
             const progress = currentPointIndex / totalPoints;
 
@@ -2598,11 +2691,67 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 }
               }
             }
+            // Extract highway names from span for shield markers
+            if (span.routeNumbers && Array.isArray(span.routeNumbers) && span.routeNumbers.length > 0) {
+              const coordIdx = Math.min(span.offset ?? currentPointIndex, coords.length - 1);
+              if (coords[coordIdx]) {
+                for (const rn of span.routeNumbers) {
+                  const routeValue = rn.value || '';
+                  if (!routeValue) continue;
+                  
+                  // Parse highway label from route number value (e.g., "I-95" -> label="95", "US-30" -> label="30", "PA-611" -> label="611")
+                  const interstateMatch = routeValue.match(/^I[- ]?(\d+[A-Z]?)/i);
+                  const usMatch = routeValue.match(/^US[- ]?(\d+[A-Z]?)/i);
+                  const stateMatch = routeValue.match(/^([A-Z]{2})[- ]?(\d+[A-Z]?)/i);
+                  const rtMatch = routeValue.match(/^(?:RT|Rt|Route)[- ]?(\d+[A-Z]?)/i);
+                  
+                  let shieldLabel = '';
+                  let routeLevel = rn.routeType || 4;
+                  let shieldType = 'other';
+                  
+                  if (interstateMatch) {
+                    shieldLabel = interstateMatch[1];
+                    routeLevel = 1;
+                    shieldType = 'interstate';
+                  } else if (usMatch) {
+                    shieldLabel = usMatch[1];
+                    routeLevel = 2;
+                    shieldType = 'us';
+                  } else if (stateMatch && !interstateMatch) {
+                    shieldLabel = stateMatch[2];
+                    routeLevel = 3;
+                    shieldType = 'state';
+                  } else if (rtMatch) {
+                    shieldLabel = rtMatch[1];
+                    routeLevel = rn.routeType || 3;
+                    shieldType = 'state';
+                  }
+                  
+                  if (shieldLabel) {
+                    const effectiveIdx = span.offset ?? currentPointIndex;
+                    // Only add if road changed or sufficient distance since last shield of same type
+                    if (routeValue !== lastShieldName || (effectiveIdx - lastShieldPointIndex) > MIN_SHIELD_GAP) {
+                      highwayShields.push({
+                        label: shieldLabel,
+                        routeLevel,
+                        type: shieldType,
+                        coord: coords[coordIdx],
+                        pointIndex: effectiveIdx
+                      });
+                      lastShieldName = routeValue;
+                      lastShieldPointIndex = effectiveIdx;
+                    }
+                    break; // Only use first matching route number per span
+                  }
+                }
+              }
+            }
             currentPointIndex += (span.length || 0);
           });
         }
 
-        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans };
+        console.log(`[Route ${routeIdx}] Found ${highwayShields.length} highway shields from spans`);
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields };
       }).filter(Boolean);
 
       if (processedRoutes.length === 0) return null;
@@ -2930,6 +3079,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Draw route polyline using updateMapLine for consistency
         updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
+        
+        // Place highway shield markers on the route
+        if (primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
+          placeHighwayShields(primaryRoute.highwayShields);
+        }
         
         // Fit map to route
         const bounds = L.latLngBounds(coords.map(c => [c[0], c[1]]));
