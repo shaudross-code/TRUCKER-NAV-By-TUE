@@ -4,6 +4,7 @@ import { getPoiFilterIcon } from './PoiIcon';
 
 export const MapControls: React.FC<any> = React.memo(({ 
   mapInstanceRef, 
+  mapboxMapRef,
   isFilterMenuOpen, 
   setIsFilterMenuOpen, 
   poiFilters, 
@@ -204,22 +205,43 @@ export const MapControls: React.FC<any> = React.memo(({
           
           <div className="h-px bg-[#D4AF37]/10 mx-1" />
           
-          <button onClick={() => mapInstanceRef.current?.zoomIn()} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10">
+          <button onClick={() => {
+            if (is3DMode && mapboxMapRef?.current) {
+              mapboxMapRef.current.zoomIn();
+            } else {
+              mapInstanceRef.current?.zoomIn();
+            }
+          }} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10" data-testid="zoom-in-btn">
             <Plus className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>
-          <button onClick={() => mapInstanceRef.current?.zoomOut()} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10">
+          <button onClick={() => {
+            if (is3DMode && mapboxMapRef?.current) {
+              mapboxMapRef.current.zoomOut();
+            } else {
+              mapInstanceRef.current?.zoomOut();
+            }
+          }} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10" data-testid="zoom-out-btn">
             <Minus className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>
           
           <button 
             onClick={() => { 
-              setIsOverviewMode(!isOverviewMode);
-              if (!isOverviewMode) {
+              const newOverviewMode = !isOverviewMode;
+              setIsOverviewMode(newOverviewMode);
+              if (newOverviewMode) {
                 setIsFollowMode(false);
+                if (is3DMode && mapboxMapRef?.current) {
+                  mapboxMapRef.current.easeTo({ pitch: 0, zoom: 12, duration: 800 });
+                }
+              } else {
+                if (is3DMode && mapboxMapRef?.current && isValidLatLng(userLocation)) {
+                  mapboxMapRef.current.flyTo({ center: [userLocation[1], userLocation[0]], zoom: 17.5, pitch: 70, duration: 800 });
+                }
               }
             }} 
             className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${isOverviewMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
             title="Toggle Route Overview"
+            data-testid="overview-btn"
           >
             <MapIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>
@@ -238,14 +260,19 @@ export const MapControls: React.FC<any> = React.memo(({
 
           <button 
             onClick={() => { 
-              if (isValidLatLng(userLocation) && mapInstanceRef.current) { 
-                mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17); 
+              if (isValidLatLng(userLocation)) {
+                if (is3DMode && mapboxMapRef?.current) {
+                  mapboxMapRef.current.flyTo({ center: [userLocation[1], userLocation[0]], zoom: 17.5 });
+                } else if (mapInstanceRef.current) {
+                  mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17); 
+                }
                 setIsFollowMode(true); 
                 setIsOverviewMode(false);
-              } 
+              }
             }} 
             className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${!isFollowMode || isOverviewMode ? 'bg-red-600/20 text-red-500 border border-red-500/50 animate-pulse' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
             title="Follow User"
+            data-testid="follow-user-btn"
           >
             <Target className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>

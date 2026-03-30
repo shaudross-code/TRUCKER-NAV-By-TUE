@@ -94,6 +94,7 @@ interface NavigationViewProps {
 
 const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '';
 const HERE_API_KEY = process.env.HERE_API_KEY || '';
+const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || '';
 const MAPTILER_STYLE_ID = '019cd801-e446-7ed9-b765-d542688d7f3e';
 const MAPTILER_STYLE = {
   url: `https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/{z}/{x}/{y}.jpg?key=${MAPTILER_KEY}`,
@@ -184,6 +185,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     () => telemetryContext?.speedRef.current || 0
   );
   const mapInstanceRef = useRef<any>(null);
+  const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
@@ -1069,9 +1071,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log("NavigationView: map container style", (map.getContainer() as HTMLElement).style.cssText);
     console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
 
-    if (showTruckRestrictions && HERE_API_KEY) {
-      console.log("Adding MapTiler truck/roads layer (HERE tiles deprecated)");
-      // HERE Maps v1 tile API deprecated — use MapTiler truck-friendly style as base
+    // Use Mapbox raster tiles for the 2D view (dark-v11 style)
+    if (MAPBOX_TOKEN) {
+      console.log("NavigationView: Using Mapbox dark-v11 raster tiles");
+      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
+        attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        tileSize: 512,
+        zoomOffset: -1,
+        maxZoom: 22,
+        crossOrigin: true
+      }).addTo(map);
+    } else if (MAPTILER_KEY) {
+      console.log("NavigationView: Falling back to MapTiler tiles");
       try {
         if (typeof MaptilerLayer === 'function') {
           new MaptilerLayer({ apiKey: MAPTILER_KEY, style: MAPTILER_STYLE_ID }).addTo(map);
@@ -1087,68 +1098,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         }).addTo(map);
       }
     } else {
-      console.log("Adding MapTiler vector layer");
-      try {
-        let _mtLayer;
-        // Try direct import first
-        if (typeof MaptilerLayer === 'function') {
-          console.log("NavigationView: Using imported MaptilerLayer");
-          _mtLayer = new MaptilerLayer({
-            apiKey: MAPTILER_KEY,
-            style: MAPTILER_STYLE_ID,
-          }).addTo(map);
-        } else {
-          // Fallback to L.maptilerLayer or L.MaptilerLayer
-          const L_any = L as any;
-          const maptilerLayer = L_any.maptilerLayer || L_any.MaptilerLayer || (window as any).L?.maptilerLayer || (window as any).L?.MaptilerLayer;
-          
-          if (typeof maptilerLayer === 'function') {
-            console.log("NavigationView: Using L.maptilerLayer");
-            _mtLayer = new (maptilerLayer as any)({
-              apiKey: MAPTILER_KEY,
-              style: MAPTILER_STYLE_ID,
-            }).addTo(map);
-          } else {
-            // Check for L.maptiler.MaptilerLayer (some versions)
-            const maptilerObj = L_any.maptiler || (window as any).L?.maptiler;
-            if (maptilerObj && (maptilerObj.MaptilerLayer || maptilerObj.maptilerLayer)) {
-              const constructor = maptilerObj.MaptilerLayer || maptilerObj.maptilerLayer;
-              console.log("NavigationView: Using L.maptiler.MaptilerLayer");
-              _mtLayer = new constructor({
-                apiKey: MAPTILER_KEY,
-                style: MAPTILER_STYLE_ID,
-              }).addTo(map);
-            } else {
-              throw new Error("MaptilerLayer is not available on L or window.L");
-            }
-          }
-        }
-        console.log("MapTiler layer added successfully");
-      } catch (e) {
-        console.error("Failed to add MapTiler layer, falling back to raster", e);
-        // Fallback logic...
-        const styleRasterUrl = `https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
-        const fallbackRasterUrl = `https://api.maptiler.com/maps/streets-v2/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`;
-        const osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-        
-        console.log("NavigationView: falling back to raster");
-        L.tileLayer(styleRasterUrl, { 
-          attribution: MAPTILER_STYLE.attribution,
-          maxZoom: 20
-        }).addTo(map).on('tileerror', () => {
-          console.warn("MapTiler custom raster failed, falling back to streets-v2");
-          L.tileLayer(fallbackRasterUrl, {
-            attribution: MAPTILER_STYLE.attribution,
-            maxZoom: 20
-          }).addTo(map).on('tileerror', (err) => {
-            console.warn("MapTiler fallback raster failed, falling back to OSM", err);
-            L.tileLayer(osmUrl, {
-              attribution: '&copy; OpenStreetMap contributors',
-              maxZoom: 19
-            }).addTo(map);
-          });
-        });
-      }
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
+      }).addTo(map);
     }
     map.invalidateSize();
   }, [isMapReady, showTruckRestrictions]);
@@ -3894,6 +3846,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               currentRegion={currentRegion}
               restrictionAlerts={restrictionAlerts}
               truckProfile={truckProfile}
+              onMapRef={(m) => { mapboxMapRef.current = m; }}
             />
             {/* 3D Mode Route Controls */}
             {isDriving && (
@@ -4775,6 +4728,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       <MapControls
         mapInstanceRef={mapInstanceRef}
+        mapboxMapRef={mapboxMapRef}
         isFilterMenuOpen={isFilterMenuOpen}
         setIsFilterMenuOpen={setIsFilterMenuOpen}
         poiFilters={poiFilters}

@@ -1,0 +1,91 @@
+{
+  "summary": "Frontend testing complete for Map UI controls fix in 3D mode and 2D Mapbox migration. All features verified working: 2D map now uses Mapbox dark-v11 raster tiles (dark theme with gray roads), 3D map controls (zoom in/out, follow user, overview mode) all work correctly with the Mapbox GL map instance, 2D/3D mode switching works correctly.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "minor_issues": [
+      {
+        "component": "Overpass API",
+        "issue": "504 Gateway Timeout when fetching traffic infrastructure - cosmetic only, does not affect core functionality",
+        "priority": "LOW"
+      },
+      {
+        "component": "Dashboard PerformanceChart",
+        "issue": "Chart dimension warning 'width(-1) height(-1)' still occurs occasionally",
+        "priority": "LOW",
+        "note": "Known issue from previous iterations - does not affect functionality"
+      }
+    ]
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_25.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: NavigationView.tsx line 97 - MAPBOX_TOKEN defined from process.env.REACT_APP_MAPBOX_TOKEN",
+    "VERIFIED: NavigationView.tsx lines 1073-1095 - 2D map uses Mapbox dark-v11 raster tiles via L.tileLayer with correct URL pattern",
+    "VERIFIED: NavigationView.tsx line 188 - mapboxMapRef created to store 3D Mapbox GL map instance",
+    "VERIFIED: MapControls.tsx line 7 - mapboxMapRef prop added to component",
+    "VERIFIED: MapControls.tsx lines 208-225 - Zoom buttons check is3DMode and use mapboxMapRef.current.zoomIn()/zoomOut() for 3D mode",
+    "VERIFIED: MapControls.tsx lines 227-246 - Overview button uses mapboxMapRef.current.easeTo() to toggle pitch between 0 and 70",
+    "VERIFIED: MapControls.tsx lines 261-278 - Follow user button uses mapboxMapRef.current.flyTo() for 3D mode",
+    "VERIFIED: Navigation3DView.tsx line 235 - onMapRef callback exposes Mapbox GL map instance on load",
+    "VERIFIED: 2D map attribution shows 'Mapbox' instead of 'MapTiler'",
+    "VERIFIED: 3D map still uses satellite-streets-v12 style"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100%"
+  },
+
+  "test_results": {
+    "features_tested": {
+      "guest_login": "PASS - Click 'Continue as Guest', reaches dashboard",
+      "navigation_view_loads": "PASS - Map loads with user location marker visible",
+      "2d_mapbox_tiles": "PASS - Console shows 'NavigationView: Using Mapbox dark-v11 raster tiles'",
+      "2d_mapbox_attribution": "PASS - Attribution shows '© Mapbox © OpenStreetMap' (not MapTiler)",
+      "2d_dark_theme": "PASS - Map displays dark theme with gray roads and city labels",
+      "route_calculation": "PASS - Route to Chicago calculated (462 mi, 7h 19m)",
+      "3d_mode_switch": "PASS - Clicked 2D button to switch to 3D mode",
+      "3d_zoom_in_btn": "PASS - data-testid='zoom-in-btn' clicked, map zoomed in",
+      "3d_zoom_out_btn": "PASS - data-testid='zoom-out-btn' clicked, map zoomed out",
+      "3d_follow_user_btn": "PASS - data-testid='follow-user-btn' clicked, map centered on user",
+      "3d_overview_btn": "PASS - data-testid='overview-btn' clicked, pitch toggled to 0 (overview mode)",
+      "3d_overview_toggle_back": "PASS - Overview button clicked again, pitch toggled back to 70 (navigation mode)",
+      "3d_satellite_style": "PASS - 3D view shows satellite imagery with street labels (satellite-streets-v12)",
+      "3d_turn_banner": "PASS - data-testid='3d-turn-banner' found with turn instruction",
+      "3d_nav_bar": "PASS - data-testid='3d-nav-bar' found with Distance, Time, ETA",
+      "3d_speed_limit": "PASS - data-testid='3d-speed-limit' found (35 mph)",
+      "3d_current_speed": "PASS - data-testid='3d-current-speed' found",
+      "3d_sat_label": "PASS - '3D SAT' label visible at bottom-right",
+      "2d_3d_switching": "PASS - Mode switching works correctly in both directions",
+      "back_to_2d": "PASS - After switching back to 2D, Mapbox tiles reload correctly"
+    }
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button",
+    "email": "test@trucker.com",
+    "password": "Test123456"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at https://trucker-dashboard-3.preview.emergentagent.com. Map UI controls fix verified working. Key changes: 1) 2D map now uses Mapbox dark-v11 raster tiles (line 1077 in NavigationView.tsx), 2) mapboxMapRef stores 3D Mapbox GL instance (line 188), 3) MapControls receives mapboxMapRef prop and uses it for zoom/follow/overview in 3D mode. Test data-testids: zoom-in-btn, zoom-out-btn, follow-user-btn, overview-btn. 3D HUD testids: 3d-turn-banner, 3d-nav-bar, 3d-speed-limit, 3d-current-speed, 3d-stat-dist, 3d-stat-time, 3d-stat-eta."
+}

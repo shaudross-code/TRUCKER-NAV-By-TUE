@@ -35,6 +35,7 @@ interface Navigation3DViewProps {
   currentRegion?: { state: string | null; country: string | null; city: string | null };
   restrictionAlerts?: RestrictionAlert[];
   truckProfile?: TruckProfile;
+  onMapRef?: (map: mapboxgl.Map | null) => void;
 }
 
 // ─── Truck SVG ────────────────────────────────────────────────────────────────
@@ -136,6 +137,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   currentRegion,
   restrictionAlerts = [],
   truckProfile,
+  onMapRef,
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
@@ -230,6 +232,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
 
     map.current.on('load', () => {
       setMapLoaded(true);
+      onMapRef?.(map.current);
       try {
         const layers = map.current!.getStyle().layers;
         const labelLayerId = layers?.find(
@@ -291,6 +294,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       restrictionMarkersRef.current.forEach(m => m.remove());
       truckMarker.current?.remove();
+      onMapRef?.(null);
       map.current?.remove();
       map.current = null;
     };
