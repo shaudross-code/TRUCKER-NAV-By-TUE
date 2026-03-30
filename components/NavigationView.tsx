@@ -306,21 +306,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
     } else {
       // Switching TO Heading Up — apply current heading immediately
-      // Use best available heading: GPS → position-based → route-based → smoothed
+      // Use best available heading: GPS → route-based → position-based → smoothed
       let heading = telemetryContext?.headingRef?.current || 0;
+      // Route-based heading: use current segment or first segment
+      if (!heading && routeCoordsRef.current.length > 1) {
+        const currentIdx = lastSimIdxRef.current;
+        const idx = currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1 ? currentIdx : 0;
+        const p1 = routeCoordsRef.current[idx];
+        const p2 = routeCoordsRef.current[idx + 1];
+        const dy = p2[0] - p1[0];
+        const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+        heading = (90 - Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+      }
       if (!heading && positionHeadingRef.current > 0) {
         heading = positionHeadingRef.current;
       }
       if (!heading && smoothedHeadingRef.current > 0) {
         heading = smoothedHeadingRef.current;
-      }
-      // If we have a route, use the first segment bearing as fallback
-      if (!heading && routeCoordsRef.current.length > 1) {
-        const p1 = routeCoordsRef.current[0];
-        const p2 = routeCoordsRef.current[1];
-        const dy = p2[0] - p1[0];
-        const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
-        heading = (90 - Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
       }
       // Initialize smoothed heading so it doesn't snap back to 0
       if (heading > 0) {
@@ -3434,6 +3436,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       // If no GPS heading, use position-based heading or route-based heading
       if (!rawHeading || rawHeading === 0) {
+        // Try route-based heading first (most reliable when actively navigating)
         if (isDriving && routeCoordsRef.current.length > 1) {
           const currentIdx = lastSimIdxRef.current;
           if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
@@ -3443,18 +3446,29 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
             const angle = Math.atan2(dy, dx) * 180 / Math.PI;
             rawHeading = (90 - angle + 360) % 360;
+          } else if (routeCoordsRef.current.length > 1) {
+            // lastSimIdx not set yet — use first route segment as initial heading
+            const p1 = routeCoordsRef.current[0];
+            const p2 = routeCoordsRef.current[1];
+            const dy = p2[0] - p1[0];
+            const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            rawHeading = (90 - angle + 360) % 360;
           }
-        } else if (positionHeadingRef.current > 0) {
+        }
+        // Fall back to position-based heading if route heading unavailable
+        if ((!rawHeading || rawHeading === 0) && positionHeadingRef.current > 0) {
           rawHeading = positionHeadingRef.current;
         }
       }
 
-      // Smooth the heading — lowered speed threshold to 0.3 m/s (~0.7 mph)
+      // Smooth the heading — speed is in mph (already converted in App.tsx)
       if (speed > 0.3 || rawHeading !== 0) {
         const diff = rawHeading - smoothedHeadingRef.current;
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
-        smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * 0.15 + 360) % 360;
+        // Faster convergence (0.35) so heading-up responds promptly
+        smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * 0.35 + 360) % 360;
       }
 
       const currentHeading = smoothedHeadingRef.current;

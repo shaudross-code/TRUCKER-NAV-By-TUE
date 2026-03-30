@@ -141,31 +141,23 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
         if (isNaN(latitude) || isNaN(longitude)) return;
         
         setLocationError(null);
-        let telemetryChanged = false;
 
         if (geoSpeed !== null && !isNaN(geoSpeed)) {
           const mph = Math.round(geoSpeed * 2.23694);
           if (speedRef.current !== mph) {
             speedRef.current = mph;
-            telemetryChanged = true;
           }
         } else {
-          if (speedRef.current !== 0) {
-            speedRef.current = 0;
-            telemetryChanged = true;
-          }
+          speedRef.current = 0;
         }
 
         if (geoHeading !== null && !isNaN(geoHeading)) {
-          if (headingRef.current !== geoHeading) {
-            headingRef.current = geoHeading;
-            telemetryChanged = true;
-          }
+          headingRef.current = geoHeading;
         }
 
-        if (telemetryChanged) {
-          notifyListeners();
-        }
+        // Always notify on every position update so heading-up
+        // rotation recalculates from route segments as user moves
+        notifyListeners();
 
         setUserLocation(prev => {
           const roundedLat = Math.round(latitude * 100000) / 100000;
