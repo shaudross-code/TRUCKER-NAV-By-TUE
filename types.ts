@@ -221,7 +221,7 @@ export interface RouteHistoryItem {
 }
 
 export interface RestrictionAlert {
-  type: 'BRIDGE' | 'WEIGHT' | 'RESTRICTION';
+  type: 'BRIDGE' | 'WEIGHT' | 'TUNNEL' | 'HAZMAT' | 'RESTRICTION';
   message: string;
   icon: any;
   color: string;

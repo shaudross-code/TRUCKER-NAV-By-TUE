@@ -175,6 +175,10 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       speak(`Caution. Low bridge ${distText}. ${activeWarning.message}.`);
     } else if (activeWarning.type === 'WEIGHT') {
       speak(`Warning. ${activeWarning.message} ${distText}.`);
+    } else if (activeWarning.type === 'TUNNEL') {
+      speak(`Warning. Tunnel restriction ${distText}. ${activeWarning.message}. Check your hazmat classification.`);
+    } else if (activeWarning.type === 'HAZMAT') {
+      speak(`Alert. Hazmat prohibited zone ${distText}. Seek alternate route immediately.`);
     } else {
       speak(`Truck restriction ${distText}. ${activeWarning.message}.`);
     }
@@ -375,28 +379,40 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     restrictionAlerts.forEach((alert) => {
       if (!alert.coords || !map.current) return;
       const isBridge = alert.type === 'BRIDGE';
+      const isTunnel = alert.type === 'TUNNEL';
+      const isHazmat = alert.type === 'HAZMAT';
+      const bgColor = isBridge ? 'rgba(239,68,68,0.9)' : isTunnel ? 'rgba(168,85,247,0.9)' : isHazmat ? 'rgba(234,179,8,0.9)' : 'rgba(249,115,22,0.9)';
+      const borderColor = isBridge ? '#fca5a5' : isTunnel ? '#c4b5fd' : isHazmat ? '#fde68a' : '#fdba74';
+      const shadowColor = isBridge ? 'rgba(239,68,68,0.5)' : isTunnel ? 'rgba(168,85,247,0.5)' : isHazmat ? 'rgba(234,179,8,0.5)' : 'rgba(249,115,22,0.5)';
+      const iconPath = isTunnel
+        ? '<path d="M12 22v-2M2 22h20M4 22V8a8 8 0 0 1 16 0v14" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>'
+        : isHazmat
+          ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="white" stroke-width="2.5" fill="none"/><circle cx="12" cy="16" r="1" fill="white"/><line x1="12" y1="9" x2="12" y2="13" stroke="white" stroke-width="2.5"/>'
+          : isBridge
+            ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+            : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>';
+      const label = isBridge ? 'Low Bridge' : isTunnel ? 'Tunnel Restriction' : isHazmat ? 'Hazmat Prohibited' : 'Weight Limit';
+
       const el = document.createElement('div');
       el.innerHTML = `
         <div style="
           display:flex;align-items:center;justify-content:center;
           width:36px;height:36px;border-radius:8px;
-          background:${isBridge ? 'rgba(239,68,68,0.9)' : 'rgba(249,115,22,0.9)'};
-          border:2px solid ${isBridge ? '#fca5a5' : '#fdba74'};
-          box-shadow:0 0 12px ${isBridge ? 'rgba(239,68,68,0.5)' : 'rgba(249,115,22,0.5)'};
+          background:${bgColor};
+          border:2px solid ${borderColor};
+          box-shadow:0 0 12px ${shadowColor};
           cursor:pointer;
         ">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            ${isBridge
-              ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
-              : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'}
+            ${iconPath}
           </svg>
         </div>
       `;
       const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
         .setLngLat([alert.coords[1], alert.coords[0]])
         .setPopup(new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(
-          `<div style="background:#111;color:white;padding:8px 12px;border-radius:8px;font-family:system-ui;border:1px solid ${isBridge ? '#ef4444' : '#f97316'};">
-            <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:${isBridge ? '#fca5a5' : '#fdba74'};letter-spacing:0.1em;margin-bottom:2px;">${isBridge ? 'Low Bridge' : 'Weight Limit'}</div>
+          `<div style="background:#111;color:white;padding:8px 12px;border-radius:8px;font-family:system-ui;border:1px solid ${borderColor};">
+            <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:${borderColor};letter-spacing:0.1em;margin-bottom:2px;">${label}</div>
             <div style="font-weight:700;font-size:13px;">${alert.message}</div>
           </div>`
         ))
@@ -449,66 +465,69 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       {/* ─── Truck Restriction Warning Overlay ─── */}
       {activeWarning && (
         <div data-testid="3d-truck-warning" className="absolute top-1/4 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-90 duration-300">
-          <div className={`flex flex-col items-center gap-3 p-5 md:p-6 rounded-2xl border-2 backdrop-blur-xl shadow-2xl ${
-            activeWarning.type === 'BRIDGE'
-              ? 'bg-red-950/90 border-red-500/60'
-              : 'bg-orange-950/90 border-orange-500/60'
-          }`} style={{
-            boxShadow: activeWarning.type === 'BRIDGE'
-              ? '0 0 60px rgba(239,68,68,0.4), 0 0 120px rgba(239,68,68,0.15)'
-              : '0 0 60px rgba(249,115,22,0.4), 0 0 120px rgba(249,115,22,0.15)',
-          }}>
-            {/* Warning Icon */}
-            <div className={`p-3 rounded-xl ${
-              activeWarning.type === 'BRIDGE' ? 'bg-red-500/20' : 'bg-orange-500/20'
-            }`}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={activeWarning.type === 'BRIDGE' ? '#fca5a5' : '#fdba74'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
+          {(() => {
+            const typeStyles: Record<string, { bg: string; border: string; shadow: string; iconBg: string; iconStroke: string; labelColor: string; label: string }> = {
+              BRIDGE: { bg: 'bg-red-950/90', border: 'border-red-500/60', shadow: '0 0 60px rgba(239,68,68,0.4), 0 0 120px rgba(239,68,68,0.15)', iconBg: 'bg-red-500/20', iconStroke: '#fca5a5', labelColor: 'text-red-400', label: 'Low Bridge Ahead' },
+              WEIGHT: { bg: 'bg-orange-950/90', border: 'border-orange-500/60', shadow: '0 0 60px rgba(249,115,22,0.4), 0 0 120px rgba(249,115,22,0.15)', iconBg: 'bg-orange-500/20', iconStroke: '#fdba74', labelColor: 'text-orange-400', label: 'Weight Restriction' },
+              TUNNEL: { bg: 'bg-purple-950/90', border: 'border-purple-500/60', shadow: '0 0 60px rgba(168,85,247,0.4), 0 0 120px rgba(168,85,247,0.15)', iconBg: 'bg-purple-500/20', iconStroke: '#c4b5fd', labelColor: 'text-purple-400', label: 'Tunnel Restriction' },
+              HAZMAT: { bg: 'bg-yellow-950/90', border: 'border-yellow-500/60', shadow: '0 0 60px rgba(234,179,8,0.4), 0 0 120px rgba(234,179,8,0.15)', iconBg: 'bg-yellow-500/20', iconStroke: '#fde68a', labelColor: 'text-yellow-400', label: 'Hazmat Prohibited Zone' },
+            };
+            const s = typeStyles[activeWarning.type] || typeStyles.BRIDGE;
+            const isTunnel = activeWarning.type === 'TUNNEL';
+            const isHazmat = activeWarning.type === 'HAZMAT';
+            return (
+              <div className={`flex flex-col items-center gap-3 p-5 md:p-6 rounded-2xl border-2 backdrop-blur-xl shadow-2xl ${s.bg} ${s.border}`}
+                style={{ boxShadow: s.shadow }}>
+                <div className={`p-3 rounded-xl ${s.iconBg}`}>
+                  {isTunnel ? (
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={s.iconStroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 22v-2M2 22h20M4 22V8a8 8 0 0 1 16 0v14"/>
+                    </svg>
+                  ) : isHazmat ? (
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={s.iconStroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <circle cx="12" cy="16" r="1" fill={s.iconStroke}/>
+                      <line x1="12" y1="9" x2="12" y2="13"/>
+                    </svg>
+                  ) : (
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={s.iconStroke} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  )}
+                </div>
+                <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${s.labelColor}`}>{s.label}</span>
+                <span className="text-2xl md:text-3xl font-black text-white tracking-tight">{activeWarning.message}</span>
 
-            {/* Type Label */}
-            <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${
-              activeWarning.type === 'BRIDGE' ? 'text-red-400' : 'text-orange-400'
-            }`}>
-              {activeWarning.type === 'BRIDGE' ? 'Low Bridge Ahead' : 'Weight Restriction'}
-            </span>
+                {truckProfile && (activeWarning.type === 'BRIDGE' || activeWarning.type === 'WEIGHT') && (
+                  <div className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold ${s.iconBg} ${s.labelColor} border ${s.border}`}>
+                    <span>Your truck:</span>
+                    <span className="font-black text-white">
+                      {activeWarning.type === 'BRIDGE' ? `${truckProfile.height} ft tall` : `${truckProfile.weight.toLocaleString()} lbs`}
+                    </span>
+                  </div>
+                )}
 
-            {/* Main Value */}
-            <span className="text-2xl md:text-3xl font-black text-white tracking-tight">
-              {activeWarning.message}
-            </span>
+                {truckProfile?.hazmat && (activeWarning.type === 'TUNNEL' || activeWarning.type === 'HAZMAT') && (
+                  <div className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold ${s.iconBg} ${s.labelColor} border ${s.border}`}>
+                    <span>Hazmat load:</span>
+                    <span className="font-black text-white">
+                      {activeWarning.type === 'TUNNEL' ? `ADR Category ${truckProfile.tunnelCategory || 'N/A'}` : 'Active — Seek alternate route'}
+                    </span>
+                  </div>
+                )}
 
-            {/* Truck info comparison */}
-            {truckProfile && (
-              <div className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold ${
-                activeWarning.type === 'BRIDGE'
-                  ? 'bg-red-500/10 text-red-300 border border-red-500/20'
-                  : 'bg-orange-500/10 text-orange-300 border border-orange-500/20'
-              }`}>
-                <span>Your truck:</span>
-                <span className="font-black text-white">
-                  {activeWarning.type === 'BRIDGE'
-                    ? `${truckProfile.height} ft tall`
-                    : `${truckProfile.weight.toLocaleString()} lbs`
-                  }
-                </span>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full animate-pulse ${s.labelColor.replace('text-', 'bg-')}`} />
+                  <span className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">
+                    {activeWarning.distM < 100 ? 'Immediately ahead' :
+                      isMetric ? `${Math.round(activeWarning.distM)} m ahead` : `${Math.round(activeWarning.distM * 3.28084)} ft ahead`}
+                  </span>
+                </div>
               </div>
-            )}
-
-            {/* Distance badge */}
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${
-                activeWarning.type === 'BRIDGE' ? 'bg-red-400' : 'bg-orange-400'
-              }`} />
-              <span className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">
-                {activeWarning.distM < 100 ? 'Immediately ahead' :
-                  isMetric ? `${Math.round(activeWarning.distM)} m ahead` : `${Math.round(activeWarning.distM * 3.28084)} ft ahead`}
-              </span>
-            </div>
-          </div>
+            );
+          })()}
         </div>
       )}
 

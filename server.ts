@@ -260,7 +260,7 @@ async function createServer() {
       
       hereUrl.searchParams.append('destination', destination);
       hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions');
-      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes');
+      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names');
       hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
       hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
       hereUrl.searchParams.append('vehicle[length]', lengthCm.toString());
