@@ -104,6 +104,13 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Instruction text imperial conversion**: Added `convertInstructionToImperial()` utility that regex-replaces "X km" → "X mi" and "X m" → "X ft" in HERE API instruction text. Applied to HERE route parsing, OSRM fallback, and OSM fallback.
 - **POI popup distance**: Changed from "X.X km away" to "X.X mi away" using `poi.distance / 1609.34`.
 
+### Phase 38 — POI Stop Position Insertion (DONE — 2026-03-30)
+- **"Add as Next Stop" button**: New primary gold button in both Leaflet popup and PoiDetailModal — inserts waypoint at position 0 (first stop after current location)
+- **Position selector**: Dropdown (Stop #1 through #10) + "Add at #" button — inserts waypoint at chosen position using `Array.splice()`
+- **addWaypoint enhanced**: Now accepts optional `position` parameter for insertion at specific index instead of always appending
+- **Existing buttons kept**: "+ Deadhead" and "+ Paid" still append to end; "Navigate Directly" unchanged
+- **Event delegation updated**: Leaflet popup click handler reads `data-position` and `data-use-select` attributes for position-based insertion
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
