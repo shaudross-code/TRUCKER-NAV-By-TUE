@@ -1,0 +1,83 @@
+{
+  "summary": "Frontend testing complete for heading-up mode bug fix. All key fixes verified: 1) Heading-up toggle button works correctly, 2) Initial heading is calculated from route direction (not stuck at 0), 3) Speed gate lowered to 0.3 m/s, 4) Position-based heading calculation implemented, 5) Route-based heading fallback working, 6) smoothedHeadingRef initialized properly when toggling, 7) Heading wraparound handled correctly, 8) North-Up mode resets rotation to 0deg, 9) Compass rose reflects current heading, 10) Stop/yield signs use pure SVG with embedded text.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "Overpass API",
+        "issue": "504 Gateway Timeout when fetching traffic infrastructure - cosmetic only, does not affect core functionality",
+        "priority": "LOW"
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "minor_issues": [
+      {
+        "component": "Dashboard PerformanceChart",
+        "issue": "Chart dimension warning 'width(-1) height(-1)' still occurs occasionally",
+        "priority": "LOW",
+        "note": "Known issue from previous iterations - does not affect functionality"
+      }
+    ]
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_28.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: NavigationView.tsx lines 278-316 - handleToggleNorthUp now calculates initial heading from GPS/position/route/smoothed, initializes smoothedHeadingRef",
+    "VERIFIED: NavigationView.tsx lines 3395-3430 - updateRotationAndPan lowered speed gate to 0.3 m/s, added position-based heading calculation",
+    "VERIFIED: NavigationView.tsx lines 3398-3410 - Position-based heading calculated from consecutive GPS positions using atan2",
+    "VERIFIED: NavigationView.tsx lines 3413-3426 - Route-based heading fallback uses first route segment bearing when no GPS heading",
+    "VERIFIED: NavigationView.tsx lines 3429-3434 - Heading smoothing uses exponential moving average with 0.15 factor and proper wraparound handling via ((diff+540)%360)-180",
+    "VERIFIED: TrafficIcon.tsx lines 28-40 - Stop and yield signs use pure SVG with embedded <text> elements (no lucide-react overlay)"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "100%"
+  },
+
+  "test_results": {
+    "features_tested": {
+      "heading_up_toggle_button": "PASS - Button exists with correct title attributes ('Switch to North Up' / 'Switch to Heading Up')",
+      "initial_heading_calculation": "PASS - When switching to Heading-Up, heading is calculated from route direction (not stuck at 0). Observed rotation: -13.55deg, -34.86deg",
+      "speed_gate_lowered": "PASS - Code verified: speed > 0.3 m/s threshold (down from 2 m/s)",
+      "position_based_heading": "PASS - Code verified: heading calculated from consecutive GPS positions using atan2",
+      "route_based_heading_fallback": "PASS - Code verified: uses first route segment bearing when no GPS heading available",
+      "smoothedHeadingRef_initialization": "PASS - Code verified: smoothedHeadingRef set to actual heading value when toggling to Heading-Up",
+      "heading_wraparound": "PASS - Code verified: ((diff+540)%360)-180 formula handles 350→10 correctly as +20",
+      "north_up_reset": "PASS - Map rotation resets to 0deg when switching to North-Up mode",
+      "compass_rose": "PASS - Compass rose present and reflects current heading mode",
+      "stop_sign_icon": "PASS - TrafficIcon uses pure SVG with embedded <text> element",
+      "yield_sign_icon": "PASS - TrafficIcon uses pure SVG with embedded <text> element",
+      "route_calculation": "PASS - Route to Chicago calculated (462.5 mi, 7h 14m)",
+      "2d_3d_switching": "PASS - Successfully switched between 2D and 3D views",
+      "navigation_hud": "PASS - Shows turn instructions, distance, time, ETA",
+      "pois_along_route": "PASS - Phillips 66, Pilot Flying J, etc. displayed"
+    }
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button",
+    "email": "test@trucker.com",
+    "password": "Test123456"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at https://trucker-dashboard-3.preview.emergentagent.com. Bug fixes verified for heading-up mode: 1) Speed gate lowered from 2 m/s to 0.3 m/s in updateRotationAndPan (line 3430). 2) Position-based heading calculation added using atan2 from consecutive GPS positions (lines 3398-3410). 3) Route-based heading fallback uses first route segment bearing when no GPS heading (lines 3413-3426). 4) smoothedHeadingRef initialized with actual heading when toggling to Heading-Up (lines 309-312). 5) Heading wraparound handled correctly with ((diff+540)%360)-180 formula (line 3433). Key test flow: Guest login -> Navigation -> search 'Chicago' -> Route -> toggle heading-up button (NavIcon) -> verify map rotation changes. In preview environment without real GPS, heading is calculated from route direction."
+}

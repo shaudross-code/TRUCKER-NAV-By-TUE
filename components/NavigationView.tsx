@@ -290,7 +290,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
     } else {
       // Switching TO Heading Up — apply current heading immediately
-      const heading = telemetryContext?.headingRef?.current || 0;
+      // Use best available heading: GPS → position-based → route-based → smoothed
+      let heading = telemetryContext?.headingRef?.current || 0;
+      if (!heading && positionHeadingRef.current > 0) {
+        heading = positionHeadingRef.current;
+      }
+      if (!heading && smoothedHeadingRef.current > 0) {
+        heading = smoothedHeadingRef.current;
+      }
+      // If we have a route, use the first segment bearing as fallback
+      if (!heading && routeCoordsRef.current.length > 1) {
+        const p1 = routeCoordsRef.current[0];
+        const p2 = routeCoordsRef.current[1];
+        const dy = p2[0] - p1[0];
+        const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+        heading = (90 - Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
+      }
+      // Initialize smoothed heading so it doesn't snap back to 0
+      if (heading > 0) {
+        smoothedHeadingRef.current = heading;
+      }
       const rotation = -heading + manualRotationRef.current;
       if (mapPane) {
         mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
@@ -481,6 +500,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const isFetchingPoisRef = useRef(false);
   const lastPoiFetchRef = useRef<{ time: number, lat: number, lon: number } | null>(null);
   const smoothedHeadingRef = useRef(0);
+  const prevLocationRef = useRef<[number, number] | null>(null);
+  const positionHeadingRef = useRef(0); // heading calculated from position changes
   const [showPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
 
   // ─── Facility state ──────────────────────────────────────────────────────
@@ -3374,22 +3395,43 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       let rawHeading = telemetryContext.headingRef.current || 0;
       const speed = telemetryContext.speedRef.current || 0;
 
-      // If simulating, calculate heading from route
-      if (isDriving && !telemetryContext.headingRef.current) {
-        const currentIdx = lastSimIdxRef.current;
-        if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
-          const p1 = routeCoordsRef.current[currentIdx];
-          const p2 = routeCoordsRef.current[currentIdx + 1];
-          const dy = p2[0] - p1[0];
-          const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
-          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-          rawHeading = (90 - angle + 360) % 360;
+      // Calculate heading from position changes as fallback
+      if (prevLocationRef.current && currentLoc) {
+        const [pLat, pLon] = prevLocationRef.current;
+        const [cLat, cLon] = currentLoc;
+        const dLat = cLat - pLat;
+        const dLon = (cLon - pLon) * Math.cos(pLat * Math.PI / 180);
+        const dist = Math.sqrt(dLat * dLat + dLon * dLon);
+        if (dist > 0.00001) { // ~1m movement threshold
+          const posHeading = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
+          positionHeadingRef.current = posHeading;
+        }
+      }
+      prevLocationRef.current = currentLoc ? [currentLoc[0], currentLoc[1]] : null;
+
+      // If no GPS heading, use position-based heading or route-based heading
+      if (!rawHeading || rawHeading === 0) {
+        if (isDriving && routeCoordsRef.current.length > 1) {
+          const currentIdx = lastSimIdxRef.current;
+          if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
+            const p1 = routeCoordsRef.current[currentIdx];
+            const p2 = routeCoordsRef.current[currentIdx + 1];
+            const dy = p2[0] - p1[0];
+            const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            rawHeading = (90 - angle + 360) % 360;
+          }
+        } else if (positionHeadingRef.current > 0) {
+          rawHeading = positionHeadingRef.current;
         }
       }
 
-      // Smooth the heading and lock at low speeds
-      if (speed > 2) { // Only update if speed > 2 m/s (~4.5 mph)
-        smoothedHeadingRef.current = 0.9 * smoothedHeadingRef.current + 0.1 * rawHeading;
+      // Smooth the heading — lowered speed threshold to 0.3 m/s (~0.7 mph)
+      if (speed > 0.3 || rawHeading !== 0) {
+        const diff = rawHeading - smoothedHeadingRef.current;
+        // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
+        const normalizedDiff = ((diff + 540) % 360) - 180;
+        smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * 0.15 + 360) % 360;
       }
 
       const currentHeading = smoothedHeadingRef.current;
