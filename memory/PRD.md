@@ -61,6 +61,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Region indicator** — Added road + state strip to 3D bottom HUD matching 2D view design (e.g. "W BROADWAY | IOWA")
 - **Props fix** — 3D view now receives reactive `speed`, `currentRoad`, `unitSystem`, and `currentRegion` from parent
 
+### Phase 31 — 3D Satellite Map + Truck Restriction Warnings (DONE — 2026-03-30)
+- **Satellite map**: Switched 3D from `navigation-night-v1` to `satellite-streets-v12` with real aerial imagery, street labels, and 3D terrain elevation (mapbox-terrain-dem-v1)
+- **Gold route line**: Route line changed from blue to gold (#D4AF37) for satellite visibility
+- **Truck restriction warnings**: Active warning overlay pops up within 800m of low bridges or weight-restricted roads, showing restriction value, truck comparison, and distance
+- **Restriction markers**: Red (bridge) / orange (weight) markers on 3D map with popups
+- **Voice alerts**: `speak()` announces approaching restrictions (e.g. "Caution. Low bridge immediately ahead. Low Bridge: 12.5ft.")
+- **Restriction count badge**: Shows total route restrictions at top-right when not near one
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
