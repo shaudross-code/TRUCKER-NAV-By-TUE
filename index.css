@@ -22,13 +22,13 @@
 
 
 .leaflet-rotate-pane {
-  transition: rotate 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   transform-origin: center center !important;
 }
 
-.leaflet-rotate-pane {
+#nav-map-container {
   rotate: var(--map-rotation, 0deg);
-  scale: var(--map-scale, 1);
+  transition: rotate 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
 }
 
 .user-marker-container {

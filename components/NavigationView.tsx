@@ -281,13 +281,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // Handle orientation mode changes and apply rotation
   useEffect(() => {
     manualRotationRef.current = manualRotation;
-    const mapPane = mapInstanceRef.current?.getPane('mapPane');
-    if (!mapPane) return;
+    const el = mapRef.current;
+    if (!el) return;
 
     if (isNorthUp) {
       // North-up mode: apply manual rotation (user can still rotate with touch)
-      mapPane.style.setProperty('--map-rotation', `${manualRotation}deg`);
-      mapPane.style.setProperty('--map-scale', '1');
+      el.style.setProperty('--map-rotation', `${manualRotation}deg`);
     }
     // Heading-up mode rotation is handled by the telemetry subscription (updateRotationAndPan)
   }, [manualRotation, isNorthUp, isCompassMode]);
@@ -298,14 +297,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setIsNorthUp(newVal);
     localStorage.setItem('nav_north_up', String(newVal));
     
-    const mapPane = mapInstanceRef.current?.getPane('mapPane');
+    const el = mapRef.current;
     if (newVal) {
       // Switching TO North Up — reset rotation to face north
       setManualRotation(0);
       manualRotationRef.current = 0;
-      if (mapPane) {
-        mapPane.style.setProperty('--map-rotation', '0deg');
-        mapPane.style.setProperty('--map-scale', '1');
+      if (el) {
+        el.style.setProperty('--map-rotation', '0deg');
       }
     } else {
       // Switching TO Heading Up — apply current heading immediately
@@ -332,14 +330,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         smoothedHeadingRef.current = heading;
       }
       const totalRotation = -heading + manualRotationRef.current;
-      if (mapPane) {
-        mapPane.style.setProperty('--map-rotation', `${totalRotation}deg`);
-        // Scale to cover blank corners
-        const absAngle = Math.abs(totalRotation % 360);
-        const normalizedAngle = absAngle > 180 ? 360 - absAngle : absAngle;
-        const radians = (normalizedAngle % 90) * Math.PI / 180;
-        const scale = Math.abs(Math.sin(radians)) * 0.42 + 1;
-        mapPane.style.setProperty('--map-scale', `${scale.toFixed(3)}`);
+      if (el) {
+        el.style.setProperty('--map-rotation', `${totalRotation}deg`);
       }
     }
   }, [isNorthUp, telemetryContext]);
@@ -414,11 +406,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${bearing}deg`);
       }
 
-      // Rotate map pane
-      const mapPane = mapInstanceRef.current?.getPane('mapPane');
-      if (mapPane) {
+      // Rotate map container
+      const el = mapRef.current;
+      if (el) {
         const rotation = manualRotationRef.current;
-        mapPane.style.setProperty('--map-rotation', `${-bearing + rotation}deg`);
+        el.style.setProperty('--map-rotation', `${-bearing + rotation}deg`);
       }
     };
 
@@ -1216,12 +1208,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
-    const mapPane = map.getPane('mapPane');
-    if (!mapPane) return;
 
-    if (isNorthUp) {
+    if (isNorthUp && mapRef.current) {
       // North-up: reset rotation to 0
-      mapPane.style.setProperty('--map-rotation', '0deg');
+      mapRef.current.style.setProperty('--map-rotation', '0deg');
     }
     map.invalidateSize();
   }, [isNorthUp]);
@@ -3534,24 +3524,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${currentHeading}deg`);
       }
 
-      // Update map rotation based on mode
-      const mapPane = mapInstanceRef.current?.getPane('mapPane');
-      if (mapPane) {
+      // Update map rotation based on mode — apply to container div, not mapPane
+      const el = mapRef.current;
+      if (el) {
         const rotation = manualRotationRef.current;
         if (!isNorthUp) {
           // Heading-up mode: rotate map opposite to heading
           const totalRotation = -currentHeading + rotation;
-          mapPane.style.setProperty('--map-rotation', `${totalRotation}deg`);
-          // Scale up to cover blank corners during rotation (√2 ≈ 1.42 at 45°)
-          const absAngle = Math.abs(totalRotation % 360);
-          const normalizedAngle = absAngle > 180 ? 360 - absAngle : absAngle;
-          const radians = (normalizedAngle % 90) * Math.PI / 180;
-          const scale = Math.abs(Math.sin(radians)) * 0.42 + 1;
-          mapPane.style.setProperty('--map-scale', `${scale.toFixed(3)}`);
+          el.style.setProperty('--map-rotation', `${totalRotation}deg`);
         } else if (!isCompassMode) {
           // North-up mode: apply only manual rotation
-          mapPane.style.setProperty('--map-rotation', `${rotation}deg`);
-          mapPane.style.setProperty('--map-scale', '1');
+          el.style.setProperty('--map-rotation', `${rotation}deg`);
         }
       }
 
@@ -4045,8 +4028,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         ) : (
           /* 2D Leaflet Map */
           <>
-            <div id="nav-map-container" ref={mapRef} className={`h-full w-full transition-opacity duration-500`}>
-              {/* The contents of this div are dynamically generated by Leaflet at runtime */}
+            <div className="w-full h-full overflow-hidden relative">
+              <div id="nav-map-container" ref={mapRef} className={`absolute transition-opacity duration-500`}
+                style={{ width: '150%', height: '150%', top: '-25%', left: '-25%' }}>
+                {/* The contents of this div are dynamically generated by Leaflet at runtime */}
+              </div>
             </div>
             <SpeedLimitMarker currentSpeedLimit={currentSpeedLimit} speed={speed} unitSystem={context?.unitSystem} />
           </>
