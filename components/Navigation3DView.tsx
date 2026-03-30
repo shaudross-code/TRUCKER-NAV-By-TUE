@@ -1,12 +1,22 @@
-import React, { useEffect, useRef, useState, useContext, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useContext, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { TelemetryContext } from '../types';
+import { TelemetryContext, RestrictionAlert } from '../types';
+import { speak } from '../services/speechService';
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN || '';
 const MAPTILER_KEY = process.env.MAPTILER_API_KEY || '';
 
 if (MAPBOX_TOKEN) mapboxgl.accessToken = MAPBOX_TOKEN;
+
+interface TruckProfile {
+  height: number;
+  weight: number;
+  length: number;
+  width: number;
+  hazmat: boolean;
+  axleCount: number;
+}
 
 interface Navigation3DViewProps {
   userLocation: [number, number] | null;
@@ -23,9 +33,11 @@ interface Navigation3DViewProps {
   streetName?: string;
   unitSystem?: 'imperial' | 'metric';
   currentRegion?: { state: string | null; country: string | null; city: string | null };
+  restrictionAlerts?: RestrictionAlert[];
+  truckProfile?: TruckProfile;
 }
 
-// ─── Truck SVG for Map Marker ─────────────────────────────────────────────────
+// ─── Truck SVG ────────────────────────────────────────────────────────────────
 const TRUCK_SVG = `<svg width="48" height="64" viewBox="0 0 48 64" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <filter id="glow"><feGaussianBlur stdDeviation="2" result="c"/><feMerge><feMergeNode in="c"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -78,7 +90,6 @@ function getTurnArrowSVG(direction: string): string {
   </svg>`;
 }
 
-// ─── Format distance (respects unit system) ───────────────────────────────────
 function formatDist(miles: number | undefined, unitSystem: string): string {
   if (miles === undefined || miles <= 0) return '';
   if (unitSystem === 'metric') {
@@ -90,13 +101,21 @@ function formatDist(miles: number | undefined, unitSystem: string): string {
   return `${miles.toFixed(1)} mi`;
 }
 
-// FIX: timeRemaining is in SECONDS, not minutes
 function formatTime(seconds: number | undefined): string {
   if (!seconds || seconds <= 0) return '--';
   const h = Math.floor(seconds / 3600);
   const m = Math.round((seconds % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+}
+
+// Haversine distance in meters
+function haversineM(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -115,16 +134,58 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   streetName,
   unitSystem = 'imperial',
   currentRegion,
+  restrictionAlerts = [],
+  truckProfile,
 }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const truckMarker = useRef<mapboxgl.Marker | null>(null);
+  const restrictionMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const telemetry = useContext(TelemetryContext);
   const userLocationRef = useRef(userLocation);
   const animFrameRef = useRef<number>(0);
+  const spokenAlertsRef = useRef<Set<string>>(new Set());
 
-  // Initialize 3D map
+  // Compute nearby restriction alerts (within 2km of user)
+  const nearbyRestrictions = useMemo(() => {
+    if (!userLocation || restrictionAlerts.length === 0) return [];
+    return restrictionAlerts
+      .filter(a => a.coords)
+      .map(a => ({
+        ...a,
+        distM: haversineM(userLocation[0], userLocation[1], a.coords![0], a.coords![1])
+      }))
+      .filter(a => a.distM < 2000)
+      .sort((a, b) => a.distM - b.distM);
+  }, [userLocation, restrictionAlerts]);
+
+  // Active warning = closest restriction within 800m
+  const activeWarning = nearbyRestrictions.length > 0 && nearbyRestrictions[0].distM < 800
+    ? nearbyRestrictions[0] : null;
+
+  // Voice alert for approaching restrictions
+  useEffect(() => {
+    if (!activeWarning) return;
+    const key = `${activeWarning.type}_${activeWarning.coords?.[0]}_${activeWarning.coords?.[1]}`;
+    if (spokenAlertsRef.current.has(key)) return;
+    spokenAlertsRef.current.add(key);
+    const distText = activeWarning.distM < 200 ? 'immediately ahead' : `in ${Math.round(activeWarning.distM)} meters`;
+    if (activeWarning.type === 'BRIDGE') {
+      speak(`Caution. Low bridge ${distText}. ${activeWarning.message}.`);
+    } else if (activeWarning.type === 'WEIGHT') {
+      speak(`Warning. ${activeWarning.message} ${distText}.`);
+    } else {
+      speak(`Truck restriction ${distText}. ${activeWarning.message}.`);
+    }
+  }, [activeWarning]);
+
+  // Reset spoken alerts when route changes
+  useEffect(() => {
+    spokenAlertsRef.current.clear();
+  }, [route]);
+
+  // Initialize 3D map with SATELLITE style
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -132,11 +193,12 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       ? [userLocation[1], userLocation[0]] as [number, number]
       : [-83.0458, 42.3314] as [number, number];
 
+    // Use Mapbox satellite-streets for 3D view
     const style = MAPBOX_TOKEN
-      ? 'mapbox://styles/mapbox/navigation-night-v1'
+      ? 'mapbox://styles/mapbox/satellite-streets-v12'
       : MAPTILER_KEY
-        ? `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
-        : 'mapbox://styles/mapbox/dark-v11';
+        ? `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`
+        : 'mapbox://styles/mapbox/satellite-streets-v12';
 
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -156,7 +218,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       if (e?.error?.status === 403 || e?.error?.message?.includes('style')) {
         if (MAPTILER_KEY && map.current) {
           map.current.setStyle(
-            `https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${MAPTILER_KEY}`
+            `https://api.maptiler.com/maps/hybrid/style.json?key=${MAPTILER_KEY}`
           );
         }
       }
@@ -177,21 +239,34 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
           type: 'fill-extrusion',
           minzoom: 14,
           paint: {
-            'fill-extrusion-color': '#111111',
+            'fill-extrusion-color': '#2a2a2a',
             'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'height']],
             'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'min_height']],
-            'fill-extrusion-opacity': 0.7,
+            'fill-extrusion-opacity': 0.6,
           },
         }, labelLayerId);
       } catch {}
       try {
         map.current!.setFog({
-          color: '#0a0a0a',
-          'high-color': '#111827',
-          'horizon-blend': 0.04,
-          'space-color': '#000000',
-          'star-intensity': 0.2,
+          color: '#1a1a2e',
+          'high-color': '#1a1a3e',
+          'horizon-blend': 0.06,
+          'space-color': '#0a0a1a',
+          'star-intensity': 0.15,
         } as any);
+      } catch {}
+
+      // Add terrain for 3D satellite
+      try {
+        if (!map.current!.getSource('mapbox-dem')) {
+          map.current!.addSource('mapbox-dem', {
+            type: 'raster-dem',
+            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
+            tileSize: 512,
+            maxzoom: 14,
+          });
+          map.current!.setTerrain({ source: 'mapbox-dem', exaggeration: 1.3 });
+        }
       } catch {}
     });
 
@@ -210,6 +285,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
 
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      restrictionMarkersRef.current.forEach(m => m.remove());
       truckMarker.current?.remove();
       map.current?.remove();
       map.current = null;
@@ -220,7 +296,6 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     userLocationRef.current = userLocation;
   }, [userLocation]);
 
-  // Update camera + truck position
   useEffect(() => {
     if (!map.current || !userLocation) return;
     const spd = currentSpeed || 0;
@@ -234,11 +309,9 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       zoom,
       duration: 800,
     });
-
     truckMarker.current?.setLngLat([userLocation[1], userLocation[0]]);
   }, [userLocation, heading]);
 
-  // Telemetry subscription for smooth heading
   useEffect(() => {
     if (!telemetry) return;
     const unsub = telemetry.subscribe(() => {
@@ -254,7 +327,6 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   // Route line
   useEffect(() => {
     if (!map.current || !mapLoaded || !route?.coordinates?.length) return;
-
     ['route-glow', 'route-line', 'route-arrows'].forEach(id => {
       if (map.current!.getLayer(id)) map.current!.removeLayer(id);
     });
@@ -274,23 +346,64 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#1e90ff', 'line-width': 18, 'line-opacity': 0.25, 'line-blur': 8 },
+      paint: { 'line-color': '#D4AF37', 'line-width': 16, 'line-opacity': 0.3, 'line-blur': 6 },
     });
     map.current.addLayer({
       id: 'route-line',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#4da6ff', 'line-width': 8, 'line-opacity': 0.9 },
+      paint: { 'line-color': '#D4AF37', 'line-width': 7, 'line-opacity': 0.95 },
     });
     map.current.addLayer({
       id: 'route-arrows',
       type: 'line',
       source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#a0d4ff', 'line-width': 3, 'line-opacity': 0.7 },
+      paint: { 'line-color': '#F5D76E', 'line-width': 2.5, 'line-opacity': 0.8 },
     });
   }, [route, mapLoaded]);
+
+  // Add restriction markers on the 3D map
+  useEffect(() => {
+    if (!map.current || !mapLoaded) return;
+
+    // Clear old markers
+    restrictionMarkersRef.current.forEach(m => m.remove());
+    restrictionMarkersRef.current = [];
+
+    restrictionAlerts.forEach((alert) => {
+      if (!alert.coords || !map.current) return;
+      const isBridge = alert.type === 'BRIDGE';
+      const el = document.createElement('div');
+      el.innerHTML = `
+        <div style="
+          display:flex;align-items:center;justify-content:center;
+          width:36px;height:36px;border-radius:8px;
+          background:${isBridge ? 'rgba(239,68,68,0.9)' : 'rgba(249,115,22,0.9)'};
+          border:2px solid ${isBridge ? '#fca5a5' : '#fdba74'};
+          box-shadow:0 0 12px ${isBridge ? 'rgba(239,68,68,0.5)' : 'rgba(249,115,22,0.5)'};
+          cursor:pointer;
+        ">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            ${isBridge
+              ? '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+              : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'}
+          </svg>
+        </div>
+      `;
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'bottom' })
+        .setLngLat([alert.coords[1], alert.coords[0]])
+        .setPopup(new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(
+          `<div style="background:#111;color:white;padding:8px 12px;border-radius:8px;font-family:system-ui;border:1px solid ${isBridge ? '#ef4444' : '#f97316'};">
+            <div style="font-weight:900;font-size:11px;text-transform:uppercase;color:${isBridge ? '#fca5a5' : '#fdba74'};letter-spacing:0.1em;margin-bottom:2px;">${isBridge ? 'Low Bridge' : 'Weight Limit'}</div>
+            <div style="font-weight:700;font-size:13px;">${alert.message}</div>
+          </div>`
+        ))
+        .addTo(map.current);
+      restrictionMarkersRef.current.push(marker);
+    });
+  }, [restrictionAlerts, mapLoaded]);
 
   const isUpcomingTurn = nextTurnDirection && nextTurnDistance !== undefined && nextTurnDistance > 0;
   const speed = currentSpeed ?? 0;
@@ -302,12 +415,10 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
   const displaySpeed = isMetric ? Math.round(speed * 3.6) : Math.round(speed * 2.23694);
   const displaySpeedLimit = speedLimit ? (isMetric ? Math.round(speedLimit * 1.60934) : speedLimit) : null;
   const displayDistance = milesRemaining !== undefined && milesRemaining > 0
-    ? isMetric ? (milesRemaining * 1.60934).toFixed(1) : milesRemaining.toFixed(1)
-    : '--';
+    ? isMetric ? (milesRemaining * 1.60934).toFixed(1) : milesRemaining.toFixed(1) : '--';
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden">
-      {/* 3D Map */}
       <div ref={mapContainer} className="w-full h-full" />
 
       {/* ─── Top Turn Instruction Banner ─── */}
@@ -335,6 +446,88 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
         </div>
       )}
 
+      {/* ─── Truck Restriction Warning Overlay ─── */}
+      {activeWarning && (
+        <div data-testid="3d-truck-warning" className="absolute top-1/4 left-1/2 -translate-x-1/2 z-30 pointer-events-none animate-in zoom-in-90 duration-300">
+          <div className={`flex flex-col items-center gap-3 p-5 md:p-6 rounded-2xl border-2 backdrop-blur-xl shadow-2xl ${
+            activeWarning.type === 'BRIDGE'
+              ? 'bg-red-950/90 border-red-500/60'
+              : 'bg-orange-950/90 border-orange-500/60'
+          }`} style={{
+            boxShadow: activeWarning.type === 'BRIDGE'
+              ? '0 0 60px rgba(239,68,68,0.4), 0 0 120px rgba(239,68,68,0.15)'
+              : '0 0 60px rgba(249,115,22,0.4), 0 0 120px rgba(249,115,22,0.15)',
+          }}>
+            {/* Warning Icon */}
+            <div className={`p-3 rounded-xl ${
+              activeWarning.type === 'BRIDGE' ? 'bg-red-500/20' : 'bg-orange-500/20'
+            }`}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={activeWarning.type === 'BRIDGE' ? '#fca5a5' : '#fdba74'} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+
+            {/* Type Label */}
+            <span className={`text-[10px] font-black uppercase tracking-[0.3em] ${
+              activeWarning.type === 'BRIDGE' ? 'text-red-400' : 'text-orange-400'
+            }`}>
+              {activeWarning.type === 'BRIDGE' ? 'Low Bridge Ahead' : 'Weight Restriction'}
+            </span>
+
+            {/* Main Value */}
+            <span className="text-2xl md:text-3xl font-black text-white tracking-tight">
+              {activeWarning.message}
+            </span>
+
+            {/* Truck info comparison */}
+            {truckProfile && (
+              <div className={`flex items-center gap-3 px-4 py-2 rounded-xl text-xs font-bold ${
+                activeWarning.type === 'BRIDGE'
+                  ? 'bg-red-500/10 text-red-300 border border-red-500/20'
+                  : 'bg-orange-500/10 text-orange-300 border border-orange-500/20'
+              }`}>
+                <span>Your truck:</span>
+                <span className="font-black text-white">
+                  {activeWarning.type === 'BRIDGE'
+                    ? `${truckProfile.height} ft tall`
+                    : `${truckProfile.weight.toLocaleString()} lbs`
+                  }
+                </span>
+              </div>
+            )}
+
+            {/* Distance badge */}
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full animate-pulse ${
+                activeWarning.type === 'BRIDGE' ? 'bg-red-400' : 'bg-orange-400'
+              }`} />
+              <span className="text-[11px] font-black text-zinc-400 uppercase tracking-wider">
+                {activeWarning.distM < 100 ? 'Immediately ahead' :
+                  isMetric ? `${Math.round(activeWarning.distM)} m ahead` : `${Math.round(activeWarning.distM * 3.28084)} ft ahead`}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Restriction Count Badge (when restrictions on route) ─── */}
+      {restrictionAlerts.length > 0 && !activeWarning && (
+        <div data-testid="3d-restriction-count" className="absolute top-28 right-4 md:right-6 z-10 pointer-events-none">
+          <div className="bg-black/80 backdrop-blur-md rounded-xl border border-orange-500/30 px-3 py-2 shadow-xl flex flex-col items-center gap-1"
+            style={{ boxShadow: '0 0 16px rgba(249,115,22,0.15)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span className="text-sm font-black text-orange-400 tabular-nums">{restrictionAlerts.length}</span>
+            <span className="text-[7px] font-bold text-zinc-500 uppercase tracking-wider">Alerts</span>
+          </div>
+        </div>
+      )}
+
       {/* ─── Traffic Sign Alert ─── */}
       {isStopSign && (
         <div data-testid="3d-stop-sign" className="absolute top-1/3 left-1/2 -translate-x-1/2 z-20 pointer-events-none animate-in zoom-in-75 duration-500">
@@ -354,7 +547,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
         </div>
       )}
 
-      {/* ─── Speed Limit Sign (Top-Left) ─── */}
+      {/* ─── Speed Limit Sign ─── */}
       {displaySpeedLimit && (
         <div data-testid="3d-speed-limit" className="absolute top-28 left-4 md:left-6 z-10 pointer-events-none">
           <div className="flex flex-col items-center gap-1">
@@ -368,7 +561,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
         </div>
       )}
 
-      {/* ─── Current Speed Display (Bottom-Left) ─── */}
+      {/* ─── Current Speed ─── */}
       <div data-testid="3d-current-speed" className="absolute bottom-24 left-4 md:left-6 z-10 pointer-events-none">
         <div className="bg-black/80 backdrop-blur-md rounded-2xl border border-[#D4AF37]/30 px-4 py-3 shadow-xl flex flex-col items-center"
           style={{ boxShadow: '0 0 20px rgba(212,175,55,0.15)' }}>
@@ -411,39 +604,25 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
             </div>
           )}
 
-          {/* Stats Row */}
           <div className="flex items-center justify-between px-4 py-3 md:px-6 md:py-4 gap-3">
-            {/* Distance */}
             <div data-testid="3d-stat-dist" className="flex flex-col items-center flex-1">
               <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Distance</span>
               <div className="flex items-baseline gap-0.5">
-                <span className="text-xl md:text-2xl font-[900] text-[#D4AF37] tabular-nums tracking-tighter leading-none">
-                  {displayDistance}
-                </span>
+                <span className="text-xl md:text-2xl font-[900] text-[#D4AF37] tabular-nums tracking-tighter leading-none">{displayDistance}</span>
                 <span className="text-[8px] text-zinc-600 font-bold">{distUnit}</span>
               </div>
             </div>
-
             <div className="h-8 w-px bg-zinc-800/60" />
-
-            {/* Time */}
             <div data-testid="3d-stat-time" className="flex flex-col items-center flex-1">
               <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Time</span>
-              <span className="text-xl md:text-2xl font-[900] text-[#D4AF37] tabular-nums tracking-tighter leading-none">
-                {formatTime(timeRemaining)}
-              </span>
+              <span className="text-xl md:text-2xl font-[900] text-[#D4AF37] tabular-nums tracking-tighter leading-none">{formatTime(timeRemaining)}</span>
             </div>
-
             <div className="h-8 w-px bg-zinc-800/60" />
-
-            {/* ETA */}
             <div data-testid="3d-stat-eta" className="flex flex-col items-center flex-1">
               <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-[0.2em]">ETA</span>
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]' : 'bg-zinc-800'}`} />
-                <span className="text-xl md:text-2xl font-[900] text-white tabular-nums tracking-tighter leading-none">
-                  {eta || '--:--'}
-                </span>
+                <span className="text-xl md:text-2xl font-[900] text-white tabular-nums tracking-tighter leading-none">{eta || '--:--'}</span>
               </div>
               <span className="text-[6px] font-bold text-emerald-500/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
             </div>
@@ -451,10 +630,10 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
         </div>
       </div>
 
-      {/* ─── 3D Label ─── */}
+      {/* ─── 3D SAT Label ─── */}
       <div className="absolute bottom-2 right-2 z-10 pointer-events-auto">
         <div className="bg-black/60 backdrop-blur-sm text-[#D4AF37] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-[#D4AF37]/20">
-          3D
+          3D SAT
         </div>
       </div>
     </div>

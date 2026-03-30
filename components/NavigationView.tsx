@@ -3853,6 +3853,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               streetName={currentRoad || undefined}
               unitSystem={context?.unitSystem || 'imperial'}
               currentRegion={currentRegion}
+              restrictionAlerts={restrictionAlerts}
+              truckProfile={truckProfile}
             />
             {/* 3D Mode Route Controls */}
             {isDriving && (
