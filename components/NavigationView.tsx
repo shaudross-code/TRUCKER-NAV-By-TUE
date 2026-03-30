@@ -3845,12 +3845,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               nextTurnDistance={milesRemaining > 0 ? (parseFloat(nextInstruction.distance) || undefined) : undefined}
               nextTurnDirection={milesRemaining > 0 ? nextInstruction.text : undefined}
               speedLimit={currentSpeedLimit ?? undefined}
-              currentSpeed={telemetryContext?.speedRef.current || 0}
+              currentSpeed={speed}
               trafficSigns={trafficInfrastructure.slice(0, 1)}
               eta={eta}
               milesRemaining={milesRemaining}
               timeRemaining={remainingDuration}
-              streetName={nextInstruction.text || undefined}
+              streetName={currentRoad || undefined}
+              unitSystem={context?.unitSystem || 'imperial'}
+              currentRegion={currentRegion}
             />
             {/* 3D Mode Route Controls */}
             {isDriving && (
