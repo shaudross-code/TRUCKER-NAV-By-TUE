@@ -1031,15 +1031,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const el = document.createElement('div');
     el.className = 'user-marker-wrapper';
     el.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
-      <div class="absolute w-14 h-14 bg-[#D4AF37]/10 rounded-full animate-ping"></div>
-      <div class="absolute w-10 h-10 bg-[#D4AF37]/20 rounded-full animate-pulse"></div>
-      <div class="w-10 h-10 bg-black rounded-full shadow-[0_0_25px_rgba(212,175,55,0.8)] flex items-center justify-center border-[2.5px] border-[#D4AF37] z-10 overflow-visible">
-        <div class="relative w-full h-full flex items-center justify-center vehicle-pointer transition-transform duration-300" style="transform: rotate(var(--vehicle-rotation, 0deg))">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="#D4AF37" class="drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">
-            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-          </svg>
-          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#D4AF37]/30 blur-md rounded-full"></div>
-        </div>
+      <div class="relative w-full h-full flex items-center justify-center vehicle-pointer" style="transform: rotate(var(--vehicle-rotation, 0deg))">
+        <svg viewBox="0 0 80 80" width="60" height="60" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-[0_2px_8px_rgba(212,175,55,0.6)]">
+          <!-- Direction cone (field of view) -->
+          <defs>
+            <linearGradient id="cone-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#D4AF37" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+            </linearGradient>
+            <filter id="arrow-shadow">
+              <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#D4AF37" flood-opacity="0.5"/>
+            </filter>
+          </defs>
+          <path d="M40 8 L26 40 L40 40 L54 40 Z" fill="url(#cone-grad)" />
+          <!-- Main arrow body -->
+          <path d="M40 18 L28 48 L40 42 L52 48 Z" fill="#D4AF37" stroke="#A0841C" stroke-width="1" stroke-linejoin="round" filter="url(#arrow-shadow)"/>
+          <!-- Inner highlight -->
+          <path d="M40 24 L33 44 L40 40 L47 44 Z" fill="#E8C84A" opacity="0.5"/>
+          <!-- Center precision dot -->
+          <circle cx="40" cy="40" r="3" fill="white" stroke="#D4AF37" stroke-width="1.5"/>
+        </svg>
       </div>
     </div>`;
     
