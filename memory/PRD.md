@@ -84,6 +84,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Navigation3DView exposes map**: New `onMapRef` callback prop passes the Mapbox GL map instance up to the parent
 - **Overview mode in 3D**: Toggles pitch between 0 (flat overview) and 70 (navigation perspective)
 
+### Phase 34 — POI Cleanup: Tesla/EV Removal + CAT Scale Separation (DONE — 2026-03-30)
+- **Tesla/EV POIs removed**: Filters out Tesla Superchargers, ChargePoint, Electrify America, and all EV charging stations from both nearby and corridor POI lists — not relevant for trucking
+- **CAT Scales separated**: New `cat_scale` POI type distinct from `weigh_station` (DOT weigh stations). Cyan icon (#0891b2) with "CAT" label vs green weigh station icon
+- **Filter menu updated**: "Weigh Stations" and "CAT Scales" are now separate filter checkboxes
+- **Both geminiService functions updated**: Local POIs (line 371) and corridor POIs (line 605) both filter out EV charging
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
