@@ -90,6 +90,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Filter menu updated**: "Weigh Stations" and "CAT Scales" are now separate filter checkboxes
 - **Both geminiService functions updated**: Local POIs (line 371) and corridor POIs (line 605) both filter out EV charging
 
+### Phase 35 — Stop Sign Icon Fix + 3D Follow Mode Fix (DONE — 2026-03-30)
+- **Stop sign icon**: Replaced lucide-react `Octagon` overlay with pure SVG `<polygon>` + `<text>` — text no longer renders behind the icon
+- **Yield sign icon**: Same fix applied (pure SVG triangle with embedded text)
+- **3D follow mode**: Added `pitch: 70` to `flyTo` call, passed `isFollowMode`/`isOverviewMode` to Navigation3DView — camera now correctly zooms in and tracks the truck icon
+- **3D overview mode**: Properly toggles pitch between 0 (flat overview) and 70 (navigation tilt)
+
 ## Prioritized Backlog
 
 ### P1 — Upcoming
