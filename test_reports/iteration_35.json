@@ -1,0 +1,118 @@
+{
+  "summary": "Tested CMV essential warning sign types (rollover risk, steep hill, downgrade ahead, winding road) and counter-rotate functionality. All CMV warning types implemented correctly. Fixed bug where markers weren't cleared on route cancel.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_road_shield.py",
+    "/app/test_reports/pytest/road_shield_cmv_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: NavigationView.tsx line 1079-1148 - placeCmvWarnings() creates yellow diamond signs with truck SVG icons for STEEP_DOWNGRADE, STEEP_HILL, ROLLOVER_RISK, WINDING_ROAD",
+    "VERIFIED: NavigationView.tsx line 2973-3147 - CMV elevation grade detection using 3D polyline data with 400m sliding window, haversine distance, bearing calculation",
+    "VERIFIED: NavigationView.tsx line 3091-3117 - Winding road detection from bearing change frequency (>30° per ~200m)",
+    "VERIFIED: NavigationView.tsx line 3120-3146 - Rollover risk detection (sharp curve + steep grade >3%)",
+    "VERIFIED: NavigationView.tsx line 3498-3501 - placeCmvWarnings called in handleNavigate after route drawn",
+    "VERIFIED: index.css line 44-47 - .counter-rotate CSS class uses 'rotate: calc(var(--map-rotation, 0deg) * -1)' for upright signs",
+    "VERIFIED: All CMV warning marker HTML includes class='counter-rotate' wrapper div and data-testid='cmv-warning-marker' with data-warning-type attribute",
+    "FIXED: NavigationView.tsx line 3288-3328 - handleCancelRoute now clears shieldLayerGroupRef to remove all sign markers on route cancel"
+  ],
+
+  "updated_files": [
+    "/app/components/NavigationView.tsx"
+  ],
+
+  "success_rate": {
+    "backend": "100% (10/10 tests passed)",
+    "frontend": "100%"
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button",
+    "email": "test@trucker.com",
+    "password": "Test123456"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "All CMV warning features implemented and tested. Route from Council Bluffs, IA to Vail, CO produces: 27 highway shields, 3 exit signs, 5 speed limit signs, 10 CMV warnings (4 STEEP_DOWNGRADE, 5 STEEP_HILL, 1 WINDING_ROAD, 0 ROLLOVER_RISK - no sharp curves on this route). All signs use counter-rotate CSS class for upright display. Fixed bug in handleCancelRoute that wasn't clearing shield layer group.",
+
+  "features_tested": {
+    "cmv_warning_markers": {
+      "status": "PASS",
+      "details": "Found 10 CMV warning markers with data-testid='cmv-warning-marker' and data-warning-type attribute. Breakdown: STEEP_DOWNGRADE=4, STEEP_HILL=5, WINDING_ROAD=1, ROLLOVER_RISK=0 (expected - no sharp curves on Vail route)"
+    },
+    "cmv_warning_types": {
+      "STEEP_DOWNGRADE": "PASS - 4 markers found, yellow diamond with truck on descending slope SVG",
+      "STEEP_HILL": "PASS - 5 markers found, yellow diamond with truck on ascending slope SVG",
+      "WINDING_ROAD": "PASS - 1 marker found, yellow diamond with S-curve SVG",
+      "ROLLOVER_RISK": "PASS (0 expected) - Requires sharp curve + steep grade combination, none on this route"
+    },
+    "highway_shield_markers": {
+      "status": "PASS",
+      "details": "Found 27 highway shield markers with data-testid='highway-shield-marker' and direction badges"
+    },
+    "exit_sign_markers": {
+      "status": "PASS",
+      "details": "Found 3 exit sign markers with data-testid='exit-sign-marker'"
+    },
+    "speed_limit_sign_markers": {
+      "status": "PASS",
+      "details": "Found 5 speed limit sign markers with data-testid='speed-limit-sign-marker'"
+    },
+    "counter_rotate_css_class": {
+      "status": "PASS",
+      "details": "Found 120 elements with .counter-rotate class. CSS rule verified: 'rotate: calc(var(--map-rotation, 0deg) * -1)' for upright signs during map rotation"
+    },
+    "backend_road_shield_endpoint": {
+      "status": "PASS",
+      "details": "10/10 pytest tests pass. Returns valid PNG images for interstate, US highway, and state route shields"
+    },
+    "backend_route_elevation_parameter": {
+      "status": "PASS",
+      "details": "Route API includes 'elevation' in return parameter for 3D polyline data. Verified in server.ts line 262"
+    },
+    "markers_cleared_on_route_cancel": {
+      "status": "PASS (after fix)",
+      "details": "Fixed handleCancelRoute to call shieldLayerGroupRef.current.clearLayers(). Before: markers remained. After fix: all markers cleared (CMV=0, Shields=0, Exits=0, Speed=0)"
+    },
+    "app_loads_correctly": {
+      "status": "PASS",
+      "details": "App loads with splash screen, then login page"
+    },
+    "guest_login_works": {
+      "status": "PASS",
+      "details": "Continue as Guest button works, navigates to Command Center"
+    },
+    "navigation_page_loads_with_map": {
+      "status": "PASS",
+      "details": "Navigation view shows map with satellite imagery, search input, and controls"
+    },
+    "route_calculation_works": {
+      "status": "PASS",
+      "details": "Route from Council Bluffs to Vail calculated successfully: 638.4 mi, 9h 9m"
+    }
+  },
+
+  "bug_fixed": {
+    "description": "handleCancelRoute function was not clearing shield layer group, causing sign markers to remain on map after route cancellation",
+    "root_cause": "handleCancelRoute (line 3288) was missing the call to shieldLayerGroupRef.current.clearLayers() that exists in clearRoute (line 2378)",
+    "fix_applied": "Added shieldLayerGroupRef.current.clearLayers() call to handleCancelRoute function and also added routeDistancesRef.current = [] to clear distance data",
+    "verification": "Tested route cancel - before fix markers remained (CMV=10, Shields=27, Exits=3, Speed=5), after fix all cleared (CMV=0, Shields=0, Exits=0, Speed=0)"
+  }
+}

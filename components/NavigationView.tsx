@@ -1076,6 +1076,77 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log(`[Signs] Placed ${slowdowns.length} traffic slowdown markers on route`);
   }, []);
 
+  // Place CMV warning signs (steep grade, rollover risk, winding road, steep hill)
+  const placeCmvWarnings = useCallback((warnings: { type: string; severity: string; message: string; grade?: number; coord: [number, number] }[]) => {
+    if (!shieldLayerGroupRef.current || warnings.length === 0) return;
+    
+    warnings.forEach((w) => {
+      const { type, severity, message, coord } = w;
+      if (!coord || !coord[0] || !coord[1]) return;
+      
+      const sevBorder = severity === 'critical' ? '#dc2626' : severity === 'high' ? '#f59e0b' : '#eab308';
+      
+      // SVG icons for each CMV warning type
+      let signSvg = '';
+      if (type === 'STEEP_DOWNGRADE') {
+        // Truck on descending slope
+        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <line x1="4" y1="20" x2="20" y2="8" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="12" y="6" width="8" height="5" rx="1" fill="#111"/>
+          <rect x="8" y="8" width="5" height="3" rx="0.5" fill="#111"/>
+          <circle cx="11" cy="13" r="1.5" fill="#111"/><circle cx="18" cy="13" r="1.5" fill="#111"/>
+        </svg>`;
+      } else if (type === 'STEEP_HILL') {
+        // Truck on ascending slope
+        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <line x1="4" y1="8" x2="20" y2="20" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+          <rect x="4" y="6" width="8" height="5" rx="1" fill="#111"/>
+          <rect x="11" y="8" width="5" height="3" rx="0.5" fill="#111"/>
+          <circle cx="6" cy="13" r="1.5" fill="#111"/><circle cx="13" cy="13" r="1.5" fill="#111"/>
+        </svg>`;
+      } else if (type === 'ROLLOVER_RISK') {
+        // Tipping truck
+        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <g transform="rotate(-20 12 12)">
+            <rect x="5" y="8" width="10" height="6" rx="1" fill="#111"/>
+            <rect x="14" y="10" width="5" height="4" rx="0.5" fill="#111"/>
+            <circle cx="8" cy="16" r="1.5" fill="#111"/><circle cx="16" cy="16" r="1.5" fill="#111"/>
+          </g>
+          <path d="M20 4L22 8L18 8Z" fill="#dc2626"/>
+        </svg>`;
+      } else if (type === 'WINDING_ROAD') {
+        // S-curve
+        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M12 4 C6 4 6 10 12 12 C18 14 18 20 12 20" stroke="#111" stroke-width="3" stroke-linecap="round" fill="none"/>
+        </svg>`;
+      }
+      
+      // Warning label
+      const labelMap: Record<string, string> = {
+        'STEEP_DOWNGRADE': 'STEEP GRADE',
+        'STEEP_HILL': 'HILL',
+        'ROLLOVER_RISK': 'ROLLOVER',
+        'WINDING_ROAD': 'WINDING'
+      };
+
+      const iconHtml = `<div class="counter-rotate" data-testid="cmv-warning-marker" data-warning-type="${type}" style="cursor:default;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7))">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div style="width:38px;height:38px;background:#FFD700;border:3px solid ${sevBorder};transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(0,0,0,0.15)">
+            <div style="transform:rotate(-45deg)">${signSvg}</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.85);border:1px solid ${sevBorder};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:80px">
+            <div style="font-size:6px;font-weight:900;color:${sevBorder};letter-spacing:0.5px;white-space:nowrap">${labelMap[type] || type}</div>
+            <div style="font-size:5px;color:rgba(255,255,255,0.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:76px">${message}</div>
+          </div>
+        </div>
+      </div>`;
+
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 60], iconAnchor: [22, 30] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 550 }).addTo(shieldLayerGroupRef.current!);
+    });
+    console.log(`[CMV] Placed ${warnings.length} CMV warning signs on route`);
+  }, []);
+
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -2522,7 +2593,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     exitSigns: any[];
     curveSigns: any[];
     speedLimitSigns: any[];
-    trafficSlowdowns: any[]
+    trafficSlowdowns: any[];
+    cmvWarnings: any[]
   }[] | null> => {
     if (!userLocation) return null;
 
@@ -2641,6 +2713,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const curveSigns: { severity: string; direction: string; coord: [number, number] }[] = [];
         const speedLimitSigns: { speed: number; coord: [number, number] }[] = [];
         const trafficSlowdowns: { severity: string; message: string; coord: [number, number] }[] = [];
+        const cmvWarnings: { type: string; severity: string; message: string; grade?: number; coord: [number, number] }[] = [];
         
         if (section.notices) {
           section.notices.forEach((notice: any) => {
@@ -2897,7 +2970,183 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
         }
 
-        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns };
+        // ── CMV Warning Detection from 3D Elevation Data ──────────────────
+        const rawPoints = decoded.polyline;
+        const has3D = rawPoints.length > 0 && rawPoints[0].length >= 3;
+        
+        if (has3D) {
+          // Helper: haversine distance between two points (meters)
+          const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+            const R = 6371000;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+            return 2 * R * Math.asin(Math.sqrt(a));
+          };
+          
+          // Helper: bearing between two points (degrees)
+          const bearing = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+            const dLng = (lng2 - lng1) * Math.PI / 180;
+            const y = Math.sin(dLng) * Math.cos(lat2 * Math.PI / 180);
+            const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) - Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLng);
+            return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+          };
+          
+          // Compute smoothed grades over sliding windows (~400m)
+          const WINDOW = 400; // meters
+          const MIN_GRADE_THRESHOLD = 5; // % grade to trigger warning
+          const MIN_STEEP_DISTANCE = 300; // meters of sustained grade
+          const MIN_CMV_GAP = Math.max(50, Math.floor(rawPoints.length * 0.02)); // Min gap between warnings
+          
+          let lastCmvIdx = -99999;
+          let gradeRunStart = -1;
+          let gradeRunType = ''; // 'downgrade' or 'upgrade'
+          let gradeRunMaxGrade = 0;
+          
+          for (let i = 1; i < rawPoints.length; i++) {
+            // Smoothed grade: look ahead WINDOW meters
+            let totalElev = 0;
+            let totalDist = 0;
+            let j = i;
+            while (j < rawPoints.length - 1 && totalDist < WINDOW) {
+              const d = haversine(rawPoints[j][0], rawPoints[j][1], rawPoints[j + 1][0], rawPoints[j + 1][1]);
+              totalDist += d;
+              totalElev += rawPoints[j + 1][2] - rawPoints[j][2];
+              j++;
+            }
+            if (totalDist < 50) continue;
+            
+            const grade = (totalElev / totalDist) * 100;
+            
+            if (Math.abs(grade) >= MIN_GRADE_THRESHOLD) {
+              const currentType = grade < 0 ? 'downgrade' : 'upgrade';
+              if (gradeRunStart === -1 || currentType !== gradeRunType) {
+                // End previous run if it was long enough
+                if (gradeRunStart !== -1 && gradeRunType) {
+                  const runDist = haversine(rawPoints[gradeRunStart][0], rawPoints[gradeRunStart][1], rawPoints[i - 1][0], rawPoints[i - 1][1]);
+                  if (runDist >= MIN_STEEP_DISTANCE && (gradeRunStart - lastCmvIdx) > MIN_CMV_GAP) {
+                    const absGrade = Math.abs(gradeRunMaxGrade);
+                    const severity = absGrade >= 8 ? 'critical' : absGrade >= 6 ? 'high' : 'medium';
+                    cmvWarnings.push({
+                      type: gradeRunType === 'downgrade' ? 'STEEP_DOWNGRADE' : 'STEEP_HILL',
+                      severity,
+                      message: gradeRunType === 'downgrade' 
+                        ? `Steep Downgrade ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`
+                        : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
+                      grade: gradeRunMaxGrade,
+                      coord: coords[gradeRunStart]
+                    });
+                    lastCmvIdx = gradeRunStart;
+                  }
+                }
+                gradeRunStart = i;
+                gradeRunType = currentType;
+                gradeRunMaxGrade = grade;
+              } else {
+                if (Math.abs(grade) > Math.abs(gradeRunMaxGrade)) gradeRunMaxGrade = grade;
+              }
+            } else {
+              // Grade dropped below threshold — finalize run
+              if (gradeRunStart !== -1 && gradeRunType) {
+                const runDist = haversine(rawPoints[gradeRunStart][0], rawPoints[gradeRunStart][1], rawPoints[i][0], rawPoints[i][1]);
+                if (runDist >= MIN_STEEP_DISTANCE && (gradeRunStart - lastCmvIdx) > MIN_CMV_GAP) {
+                  const absGrade = Math.abs(gradeRunMaxGrade);
+                  const severity = absGrade >= 8 ? 'critical' : absGrade >= 6 ? 'high' : 'medium';
+                  cmvWarnings.push({
+                    type: gradeRunType === 'downgrade' ? 'STEEP_DOWNGRADE' : 'STEEP_HILL',
+                    severity,
+                    message: gradeRunType === 'downgrade'
+                      ? `Steep Downgrade ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`
+                      : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
+                    grade: gradeRunMaxGrade,
+                    coord: coords[gradeRunStart]
+                  });
+                  lastCmvIdx = gradeRunStart;
+                }
+              }
+              gradeRunStart = -1;
+              gradeRunType = '';
+              gradeRunMaxGrade = 0;
+            }
+          }
+          // Finalize any remaining run
+          if (gradeRunStart !== -1 && gradeRunType) {
+            const endIdx = rawPoints.length - 1;
+            const runDist = haversine(rawPoints[gradeRunStart][0], rawPoints[gradeRunStart][1], rawPoints[endIdx][0], rawPoints[endIdx][1]);
+            if (runDist >= MIN_STEEP_DISTANCE && (gradeRunStart - lastCmvIdx) > MIN_CMV_GAP) {
+              const absGrade = Math.abs(gradeRunMaxGrade);
+              const severity = absGrade >= 8 ? 'critical' : absGrade >= 6 ? 'high' : 'medium';
+              cmvWarnings.push({
+                type: gradeRunType === 'downgrade' ? 'STEEP_DOWNGRADE' : 'STEEP_HILL',
+                severity,
+                message: gradeRunType === 'downgrade'
+                  ? `Steep Downgrade ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`
+                  : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
+                grade: gradeRunMaxGrade,
+                coord: coords[gradeRunStart]
+              });
+            }
+          }
+          
+          // ── Winding Road Detection ──
+          // Detect segments with frequent bearing changes (>30° per ~200m)
+          const WIND_WINDOW = 15; // points to look at 
+          const MIN_BEARING_CHANGES = 4; // min direction changes in window
+          const BEARING_THRESHOLD = 30; // degrees
+          let lastWindIdx = -99999;
+          
+          for (let i = WIND_WINDOW; i < rawPoints.length - WIND_WINDOW; i += Math.floor(WIND_WINDOW / 2)) {
+            let bearingChanges = 0;
+            for (let k = i - WIND_WINDOW; k < i + WIND_WINDOW - 1; k++) {
+              if (k + 2 >= rawPoints.length) break;
+              const b1 = bearing(rawPoints[k][0], rawPoints[k][1], rawPoints[k + 1][0], rawPoints[k + 1][1]);
+              const b2 = bearing(rawPoints[k + 1][0], rawPoints[k + 1][1], rawPoints[k + 2][0], rawPoints[k + 2][1]);
+              let diff = Math.abs(b2 - b1);
+              if (diff > 180) diff = 360 - diff;
+              if (diff > BEARING_THRESHOLD) bearingChanges++;
+            }
+            
+            if (bearingChanges >= MIN_BEARING_CHANGES && (i - lastWindIdx) > MIN_CMV_GAP * 2) {
+              cmvWarnings.push({
+                type: 'WINDING_ROAD',
+                severity: bearingChanges >= 8 ? 'high' : 'medium',
+                message: 'Winding Road Ahead',
+                coord: coords[i]
+              });
+              lastWindIdx = i;
+            }
+          }
+          
+          // ── Rollover Risk Detection ──
+          // Sharp curve + steep grade = rollover risk
+          // Check curves that coincide with >3% grade
+          for (const curve of curveSigns) {
+            // Find nearest polyline point to this curve
+            let nearestIdx = 0;
+            let nearestDist = Infinity;
+            for (let k = 0; k < Math.min(rawPoints.length, 2000); k += 3) {
+              const d = Math.abs(rawPoints[k][0] - curve.coord[0]) + Math.abs(rawPoints[k][1] - curve.coord[1]);
+              if (d < nearestDist) { nearestDist = d; nearestIdx = k; }
+            }
+            // Check grade at that point
+            if (nearestIdx > 0 && nearestIdx < rawPoints.length - 1) {
+              const localDist = haversine(rawPoints[Math.max(0, nearestIdx - 5)][0], rawPoints[Math.max(0, nearestIdx - 5)][1], rawPoints[Math.min(rawPoints.length - 1, nearestIdx + 5)][0], rawPoints[Math.min(rawPoints.length - 1, nearestIdx + 5)][1]);
+              const localElev = rawPoints[Math.min(rawPoints.length - 1, nearestIdx + 5)][2] - rawPoints[Math.max(0, nearestIdx - 5)][2];
+              const localGrade = localDist > 0 ? Math.abs((localElev / localDist) * 100) : 0;
+              if (localGrade > 3) {
+                cmvWarnings.push({
+                  type: 'ROLLOVER_RISK',
+                  severity: localGrade > 6 ? 'critical' : 'high',
+                  message: `Rollover Risk — ${curve.direction} curve on ${localGrade.toFixed(0)}% grade`,
+                  grade: localGrade,
+                  coord: curve.coord
+                });
+              }
+            }
+          }
+        }
+
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings };
       }).filter(Boolean);
 
       if (processedRoutes.length === 0) return null;
@@ -3039,6 +3288,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const handleCancelRoute = useCallback(() => {
     setRoutePoints([]);
     routeCoordsRef.current = [];
+    routeDistancesRef.current = [];
     setRouteSteps([]);
     setMilesRemaining(0);
     setCurrentDestination('');
@@ -3070,6 +3320,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       mapLayersRef.current = {};
     }
     currentSegmentLineRef.current = null;
+    
+    // Clear highway shield and sign markers
+    if (shieldLayerGroupRef.current) {
+      shieldLayerGroupRef.current.clearLayers();
+    }
     
     if (context) context.setNavTarget(null);
   }, [context]);
@@ -3245,6 +3500,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Place traffic slowdown markers
         if (primaryRoute.trafficSlowdowns && primaryRoute.trafficSlowdowns.length > 0) {
           placeTrafficSlowdowns(primaryRoute.trafficSlowdowns);
+        }
+        // Place CMV warning signs (steep grades, rollover risk, winding roads)
+        if (primaryRoute.cmvWarnings && primaryRoute.cmvWarnings.length > 0) {
+          placeCmvWarnings(primaryRoute.cmvWarnings);
         }
         
         // Fit map to route
