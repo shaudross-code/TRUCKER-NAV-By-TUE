@@ -286,6 +286,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isCompassMode, setIsCompassMode] = useState(false);
   const compassHeadingRef = useRef(0);
 
+  // Zoom tracking and auto-zoom for maneuvers
+  const [currentZoom, setCurrentZoom] = useState<number>(17);
+  const userPreferredZoomRef = useRef<number>(17); // The zoom level the user manually set
+  const isManeuverZoomActiveRef = useRef<boolean>(false); // Whether auto-zoom is currently engaged
+
   // Handle orientation mode changes and apply rotation
   useEffect(() => {
     manualRotationRef.current = manualRotation;
@@ -677,6 +682,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           map.on('moveend', () => {
             const center = map.getCenter();
             setMapCenter([center.lat, center.lng]);
+          });
+          map.on('zoomend', () => {
+            const z = map.getZoom();
+            setCurrentZoom(z);
+            // If user manually zoomed (not auto-zoom), save as preferred level
+            if (!isManeuverZoomActiveRef.current) {
+              userPreferredZoomRef.current = z;
+            }
           });
           // console.log("Map created successfully");
 
@@ -2119,6 +2132,34 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               } : null
             });
 
+            // Auto-zoom for upcoming maneuvers
+            // Zoom in when within 0.3 mi (~480m), zoom back when past 0.5 mi (~800m)
+            if (mapInstanceRef.current && isFollowMode && !isOverviewMode) {
+              const distMi = distanceToManeuver / 1609.34;
+              const maneuverType = currentStep.maneuver.type || '';
+              const isComplexManeuver = ['exit', 'fork', 'turn', 'roundabout', 'merge'].some(t => maneuverType.includes(t));
+              const zoomThreshold = isComplexManeuver ? 0.4 : 0.3; // Complex maneuvers get zoom earlier
+              const maneuverZoomLevel = Math.min(19, userPreferredZoomRef.current + 2);
+              
+              if (distMi <= zoomThreshold && !isManeuverZoomActiveRef.current) {
+                // Zoom in for the upcoming maneuver
+                isManeuverZoomActiveRef.current = true;
+                mapInstanceRef.current.flyTo(
+                  mapInstanceRef.current.getCenter(),
+                  maneuverZoomLevel,
+                  { duration: 1.2, easeLinearity: 0.25 }
+                );
+              } else if (distMi > 0.6 && isManeuverZoomActiveRef.current) {
+                // Maneuver passed — zoom back to user's preferred level
+                isManeuverZoomActiveRef.current = false;
+                mapInstanceRef.current.flyTo(
+                  mapInstanceRef.current.getCenter(),
+                  userPreferredZoomRef.current,
+                  { duration: 1.5, easeLinearity: 0.25 }
+                );
+              }
+            }
+
             // Update ETA based on remaining steps
             let remainingDuration = 0;
             for (let i = maneuverIndex; i < routeStepsRef.current.length; i++) {
@@ -2467,6 +2508,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     clearRouteMarkers();
     // Clear highway shield markers
+    isManeuverZoomActiveRef.current = false; // Reset auto-zoom state
     if (shieldLayerGroupRef.current) {
       shieldLayerGroupRef.current.clearLayers();
     }
@@ -5850,6 +5892,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         showFacilities={showFacilities}
         setShowFacilities={setShowFacilities}
         onAddFacility={() => setShowAddFacility(true)}
+        currentZoom={currentZoom}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
       />
               <RouteSettingsModal

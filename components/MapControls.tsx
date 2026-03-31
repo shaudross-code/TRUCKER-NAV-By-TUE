@@ -26,6 +26,7 @@ export const MapControls: React.FC<any> = React.memo(({
   showFacilities,
   setShowFacilities,
   onAddFacility,
+  currentZoom,
   className = ""
 }) => {
   return (
@@ -215,6 +216,12 @@ export const MapControls: React.FC<any> = React.memo(({
           }} className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-white/10" data-testid="zoom-in-btn">
             <Plus className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>
+
+          {/* Zoom Level Indicator */}
+          <div data-testid="zoom-level-indicator" className="flex items-center justify-center w-full" title={`Zoom: ${currentZoom ?? '—'}`}>
+            <span className="text-[9px] md:text-[11px] font-black text-zinc-400 tabular-nums tracking-tight select-none">{currentZoom != null ? Math.round(currentZoom) : '—'}</span>
+          </div>
+
           <button onClick={() => {
             if (is3DMode && mapboxMapRef?.current) {
               mapboxMapRef.current.zoomOut();
