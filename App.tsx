@@ -54,6 +54,7 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   
   const speedRef = useRef<number>(0);
   const headingRef = useRef<number>(0);
+  const gpsAccuracyRef = useRef<number | null>(null);
   const listenersRef = useRef<Set<() => void>>(new Set());
 
   const notifyListeners = useCallback(() => {
@@ -151,10 +152,15 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
         geoSucceeded = true;
-        const { latitude, longitude, speed: geoSpeed, heading: geoHeading } = position.coords;
+        const { latitude, longitude, speed: geoSpeed, heading: geoHeading, accuracy } = position.coords;
         if (isNaN(latitude) || isNaN(longitude)) return;
         
         setLocationError(null);
+        
+        // Track GPS accuracy for signal quality indicator
+        if (accuracy !== undefined && !isNaN(accuracy)) {
+          gpsAccuracyRef.current = accuracy;
+        }
 
         if (geoSpeed !== null && !isNaN(geoSpeed)) {
           const mph = Math.round(geoSpeed * 2.23694);
@@ -214,6 +220,7 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
   const telemetryValue = useMemo(() => ({
     speedRef,
     headingRef,
+    gpsAccuracyRef,
     subscribe: (callback: () => void) => {
       listenersRef.current.add(callback);
       return () => {
@@ -276,6 +283,16 @@ const AppContent: React.FC = React.memo(() => {
   useEffect(() => {
     try { localStorage.setItem('trucker_dataSaver', String(dataSaver)); } catch {}
   }, [dataSaver]);
+
+  // Network status monitoring for reliability
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
+  }, []);
 
   // Dashboard financial metrics - use localStorage as primary store with Firestore sync
   const loadLocal = (key: string, fallback: number) => {
@@ -468,7 +485,9 @@ const AppContent: React.FC = React.memo(() => {
       unitSystem,
       setUnitSystem,
       dataSaver,
-      setDataSaver
+      setDataSaver,
+      gpsAccuracy: null, // Read from TelemetryContext.gpsAccuracyRef in NavigationView
+      isOnline
     }), [
       activeView, 
       navTarget, 
@@ -482,7 +501,8 @@ const AppContent: React.FC = React.memo(() => {
       weekDeductions,
       takeHomePercentage,
       unitSystem,
-      dataSaver
+      dataSaver,
+      isOnline
     ]);
 
   const mountTimeRef = useRef(Date.now());

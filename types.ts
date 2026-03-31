@@ -151,6 +151,8 @@ export interface AppContextType {
   setUnitSystem: React.Dispatch<React.SetStateAction<'imperial' | 'metric'>>;
   dataSaver: boolean;
   setDataSaver: React.Dispatch<React.SetStateAction<boolean>>;
+  gpsAccuracy: number | null;
+  isOnline: boolean;
 }
 
 export interface HOSContextType {

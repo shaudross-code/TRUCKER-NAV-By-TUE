@@ -682,7 +682,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
           mapInstanceRef.current = map;
           
-          // Initialize routeGroup
+          // Create custom Leaflet panes for proper z-ordering:
+          // Route line renders BELOW signs and markers
+          const routePane = map.createPane('routePane');
+          routePane.style.zIndex = '420';  // Above tiles (200), below markers (600)
+          routePane.style.pointerEvents = 'none';
+          
+          // Sign pane renders ABOVE the route line
+          const signPane = map.createPane('signPane');
+          signPane.style.zIndex = '630';  // Above default marker pane (600)
+          signPane.style.pointerEvents = 'none';
+
+          // Initialize layer groups on custom panes
           routeGroupRef.current = L.layerGroup().addTo(map);
           shieldLayerGroupRef.current = L.layerGroup().addTo(map);
 
@@ -901,7 +912,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         weight: 18, 
         opacity: 0.8, 
         lineCap: 'round', 
-        lineJoin: 'round' 
+        lineJoin: 'round',
+        pane: 'routePane'
       }).addTo(routeGroupRef.current);
 
       // 2. Inner gold route line (the main navigation path)
@@ -910,7 +922,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         weight: 12, 
         opacity: 1, 
         lineCap: 'round', 
-        lineJoin: 'round' 
+        lineJoin: 'round',
+        pane: 'routePane'
       }).addTo(routeGroupRef.current);
       return;
     }
@@ -932,7 +945,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // Place highway shield markers along the route using HERE Map Image API
   const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[]) => {
     if (!shieldLayerGroupRef.current || shields.length === 0) return;
-    shieldLayerGroupRef.current.clearLayers();
     
     shields.forEach((shield) => {
       const { label, routeLevel, type, coord, direction } = shield;
@@ -984,7 +996,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 500 }).addTo(shieldLayerGroupRef.current!);
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 500, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Shields] Placed ${shields.length} highway shield markers on route${dataSaver ? ' (data saver)' : ''}`);
   }, [currentRegion.state, dataSaver]);
@@ -1009,7 +1021,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [80, 38], iconAnchor: [40, 38] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 400 }).addTo(shieldLayerGroupRef.current!);
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 400, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Signs] Placed ${exits.length} exit signs on route`);
   }, []);
@@ -1035,7 +1047,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [36, 36], iconAnchor: [18, 18] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 450 }).addTo(shieldLayerGroupRef.current!);
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 450, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Signs] Placed ${curves.length} curve warning signs on route`);
   }, []);
@@ -1057,7 +1069,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [38, 46], iconAnchor: [19, 23] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 460 }).addTo(shieldLayerGroupRef.current!);
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 460, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Signs] Placed ${signs.length} speed limit signs on route`);
   }, []);
@@ -1085,7 +1097,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [94, 34], iconAnchor: [47, 34] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 470 }).addTo(shieldLayerGroupRef.current!);
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 470, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Signs] Placed ${slowdowns.length} traffic slowdown markers on route`);
   }, []);
@@ -1156,7 +1168,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 60], iconAnchor: [22, 30] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 550 }).addTo(shieldLayerGroupRef.current!);
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 550, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[CMV] Placed ${warnings.length} CMV warning signs on route`);
   }, []);
@@ -2700,10 +2712,78 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           return null;
         }
 
-        const section = route.sections[0];
+        // Merge multi-section routes (waypoint legs) into a unified section
+        // This ensures exits, shields, and other signs work correctly across all legs
+        const mergedSection = (() => {
+          if (route.sections.length === 1) return route.sections[0];
+          
+          const merged: any = {
+            summary: { length: 0, duration: 0 },
+            polyline: null,
+            actions: [],
+            spans: [],
+            incidents: [],
+            notices: []
+          };
+          
+          let pointOffset = 0;
+          let distOffset = 0;
+          
+          for (let si = 0; si < route.sections.length; si++) {
+            const sec = route.sections[si];
+            if (!sec.summary) continue;
+            
+            merged.summary.length += sec.summary.length;
+            merged.summary.duration += sec.summary.duration;
+            
+            // Merge actions with adjusted offsets
+            if (sec.actions) {
+              sec.actions.forEach((a: any) => {
+                merged.actions.push({ ...a, offset: (a.offset ?? 0) + pointOffset });
+              });
+            }
+            
+            // Merge spans with adjusted offsets
+            if (sec.spans) {
+              sec.spans.forEach((s: any) => {
+                merged.spans.push({ ...s, offset: s.offset != null ? s.offset + pointOffset : undefined });
+              });
+            }
+            
+            // Merge incidents
+            if (sec.incidents) {
+              sec.incidents.forEach((inc: any) => {
+                const adj = { ...inc };
+                if (adj.from?.offset != null) adj.from = { ...adj.from, offset: adj.from.offset + pointOffset };
+                merged.incidents.push(adj);
+              });
+            }
+            
+            if (sec.notices) merged.notices.push(...sec.notices);
+            
+            // Track polyline point count for offset adjustment
+            if (sec.polyline) {
+              // @ts-expect-error: Polyline decoding library type definition is missing
+              const d = decode(sec.polyline);
+              if (d?.polyline) {
+                const skip = si > 0 ? 1 : 0; // Skip duplicate boundary point
+                pointOffset += d.polyline.length - skip;
+              }
+              // Use first section's polyline; we'll decode all together below
+              if (si === 0) merged.polyline = sec.polyline;
+            }
+          }
+          
+          // Build the merged polyline string by re-encoding concatenated points
+          // Actually, we'll handle multi-decode below in the polyline processing
+          merged._allSections = route.sections;
+          return merged;
+        })();
+
+        const section = mergedSection;
         const summary = section.summary;
         if (!summary || isNaN(summary.length) || isNaN(summary.duration)) {
-          console.warn(`Frontend: Route ${routeIdx} section 0 has invalid summary`, summary);
+          console.warn(`Frontend: Route ${routeIdx} has invalid merged summary`, summary);
           return null;
         }
 
@@ -2730,19 +2810,36 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           };
         });
 
-        if (!section.polyline) {
-          console.error(`Frontend: Route ${routeIdx} section 0 has no polyline`);
-          return null;
+        // Decode polyline — handle multi-section routes by merging polylines
+        let decoded: any;
+        let allSectionPolylines: any[] = [];
+        
+        if (section._allSections) {
+          // Multi-section route: decode and merge all section polylines
+          const mergedPoints: any[] = [];
+          for (let si = 0; si < section._allSections.length; si++) {
+            const sec = section._allSections[si];
+            if (!sec.polyline) continue;
+            // @ts-expect-error: Polyline decoding library type definition is missing
+            const d = decode(sec.polyline);
+            if (d?.polyline?.length > 0) {
+              const skip = si > 0 && mergedPoints.length > 0 ? 1 : 0; // De-dupe boundary point
+              for (let i = skip; i < d.polyline.length; i++) {
+                mergedPoints.push(d.polyline[i]);
+              }
+            }
+          }
+          decoded = { polyline: mergedPoints };
+        } else if (section.polyline) {
+          // @ts-expect-error: Polyline decoding library type definition is missing
+          decoded = decode(section.polyline);
         }
-
-        // @ts-expect-error: Polyline decoding library type definition is missing
-        const decoded = decode(section.polyline);
-        console.log(`Frontend: Decoded polyline for route ${routeIdx}`, decoded);
         
         if (!decoded || !decoded.polyline || decoded.polyline.length === 0) {
           console.error(`Frontend: Decoded polyline for route ${routeIdx} is empty or invalid`);
           return null;
         }
+        console.log(`Frontend: Decoded ${decoded.polyline.length} points for route ${routeIdx} (${section._allSections ? section._allSections.length + ' sections merged' : '1 section'})`);
 
         const coords = decoded.polyline.map((c: any) => [c[0], c[1]]);
         console.log(`Frontend: Processed ${coords.length} coordinates for route ${routeIdx}`);
@@ -3561,6 +3658,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
         
+        // Clear all previous route overlay signs before placing new ones
+        if (shieldLayerGroupRef.current) {
+          shieldLayerGroupRef.current.clearLayers();
+        }
         // Place highway shield markers on the route
         if (primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
           placeHighwayShields(primaryRoute.highwayShields);
@@ -4939,6 +5040,31 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
 
       {/* Map Controls consolidated in nav-map-controls below */}
+
+      {/* Network Offline Banner — Critical for professional truck use */}
+      {context && !context.isOnline && (
+        <div data-testid="network-offline-banner" className="absolute top-2 left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-2 fade-in duration-300">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/95 backdrop-blur-md rounded-lg shadow-[0_4px_20px_rgba(220,38,38,0.4)] pointer-events-auto">
+            <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+            <span className="text-[10px] font-black text-white uppercase tracking-wider">No Network — Using Cached Data</span>
+          </div>
+        </div>
+      )}
+
+      {/* GPS Signal Quality Indicator */}
+      {isDriving && !isExploreMode && telemetryContext?.gpsAccuracyRef?.current != null && telemetryContext.gpsAccuracyRef.current > 50 && (
+        <div data-testid="gps-weak-signal" className="absolute top-2 right-2 z-[2100] animate-in fade-in duration-300">
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-600/90 backdrop-blur-md rounded-lg shadow-lg">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0">
+              <path d="M12 2a7 7 0 017 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 017-7z" stroke="white" strokeWidth="2"/>
+              <circle cx="12" cy="9" r="2" fill="white"/>
+            </svg>
+            <span className="text-[9px] font-black text-white uppercase tracking-wider">
+              Weak GPS {telemetryContext.gpsAccuracyRef.current > 100 ? '— Low Accuracy' : ''}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Weather & Restriction Overlay */}
       {!selectedPoi && !isExploreMode && (
