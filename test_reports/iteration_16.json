@@ -75,5 +75,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://nav-emblem-display.preview.emergentagent.com. Single-stack Express+Vite on port 8001 (not standard React+FastAPI). Firebase Google Auth required for login - can't test beyond login page without real Google credentials. NavigationView.tsx refactor complete: 4 components extracted (PoiDetailModal, RouteStepsModal, NavigationHUD, WarningBanners). Fixed maneuverIndex bug by adding currentManeuverIndex state. All backend APIs working. Test file: /app/backend/tests/test_api_endpoints.py"
+  "context_for_next_testing_agent": "App at https://navigation-staging.preview.emergentagent.com. Single-stack Express+Vite on port 8001 (not standard React+FastAPI). Firebase Google Auth required for login - can't test beyond login page without real Google credentials. NavigationView.tsx refactor complete: 4 components extracted (PoiDetailModal, RouteStepsModal, NavigationHUD, WarningBanners). Fixed maneuverIndex bug by adding currentManeuverIndex state. All backend APIs working. Test file: /app/backend/tests/test_api_endpoints.py"
 }

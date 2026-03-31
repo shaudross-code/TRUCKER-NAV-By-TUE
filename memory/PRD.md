@@ -9,7 +9,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **APIs**: HERE Maps (Routing w/ elevation, Discover, Road Shields), Google Maps (Places), Mapbox (tiles), Gemini (AI + TTS), Firebase (Auth/Firestore)
 - **Key Pattern**: 150% oversized map container with CSS `rotate:` for heading-up mode without blank tiles
 - **Counter-Rotate**: All map markers use `.counter-rotate` CSS class to stay upright during heading-up rotation
-- **Preview URL**: https://nav-emblem-display.preview.emergentagent.com
+- **Preview URL**: https://navigation-staging.preview.emergentagent.com
 
 ## Completed Features
 - Real POI integration (HERE Discover + Google Places)

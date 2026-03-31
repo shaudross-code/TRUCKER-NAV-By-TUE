@@ -93,5 +93,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://nav-emblem-display.preview.emergentagent.com. All navigation UI polish features verified working. State boundary detection uses Nominatim reverse geocoding API with 20s/3km throttling. Voice prompts implemented via speak() function in speechService.ts. Key data-testids: nav-arrival-hud, region-indicator, idle-region-indicator, nav-stat-speed, nav-stat-dist, nav-stat-duration, nav-stat-eta, nav-exit-button, nav-reroute-button, nav-search-container, nav-search-input, nav-search-button, compass-rose-container. IP geolocation fallback places user in Council Bluffs, Iowa."
+  "context_for_next_testing_agent": "App at https://navigation-staging.preview.emergentagent.com. All navigation UI polish features verified working. State boundary detection uses Nominatim reverse geocoding API with 20s/3km throttling. Voice prompts implemented via speak() function in speechService.ts. Key data-testids: nav-arrival-hud, region-indicator, idle-region-indicator, nav-stat-speed, nav-stat-dist, nav-stat-duration, nav-stat-eta, nav-exit-button, nav-reroute-button, nav-search-container, nav-search-input, nav-search-button, compass-rose-container. IP geolocation fallback places user in Council Bluffs, Iowa."
 }

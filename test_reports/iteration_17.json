@@ -87,5 +87,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://nav-emblem-display.preview.emergentagent.com. Single-stack Express+Vite on port 8001. Firebase Auth with 4 methods: Google Sign-In, Email/Password Login, Email/Password Registration, Anonymous/Guest Login. Test account: test@trucker.com / Test123456. All auth flows working. Pre-existing Firestore permission issue for HOS data (users/{uid}/hos/current) - not blocking auth functionality. Backend test file: /app/backend/tests/test_api_endpoints.py"
+  "context_for_next_testing_agent": "App at https://navigation-staging.preview.emergentagent.com. Single-stack Express+Vite on port 8001. Firebase Auth with 4 methods: Google Sign-In, Email/Password Login, Email/Password Registration, Anonymous/Guest Login. Test account: test@trucker.com / Test123456. All auth flows working. Pre-existing Firestore permission issue for HOS data (users/{uid}/hos/current) - not blocking auth functionality. Backend test file: /app/backend/tests/test_api_endpoints.py"
 }

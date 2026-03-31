@@ -100,5 +100,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://nav-emblem-display.preview.emergentagent.com. All 3D satellite map features verified working. Key data-testids for 3D view: 3d-turn-banner, 3d-stop-sign, 3d-speed-limit, 3d-current-speed, 3d-nav-bar, 3d-stat-dist, 3d-stat-time, 3d-stat-eta, 3d-restriction-count, 3d-truck-warning. The restriction warning overlay (3d-truck-warning) only appears when within 800m of a truck restriction. The restriction count badge (3d-restriction-count) only appears when there are restrictions on the route but user is not near one. IP geolocation fallback places user in Council Bluffs, Iowa."
+  "context_for_next_testing_agent": "App at https://navigation-staging.preview.emergentagent.com. All 3D satellite map features verified working. Key data-testids for 3D view: 3d-turn-banner, 3d-stop-sign, 3d-speed-limit, 3d-current-speed, 3d-nav-bar, 3d-stat-dist, 3d-stat-time, 3d-stat-eta, 3d-restriction-count, 3d-truck-warning. The restriction warning overlay (3d-truck-warning) only appears when within 800m of a truck restriction. The restriction count badge (3d-restriction-count) only appears when there are restrictions on the route but user is not near one. IP geolocation fallback places user in Council Bluffs, Iowa."
 }
