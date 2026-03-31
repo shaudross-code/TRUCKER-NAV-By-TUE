@@ -260,7 +260,7 @@ async function createServer() {
       }
       
       hereUrl.searchParams.append('destination', destination);
-      hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions,elevation');
+      hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions,elevation,tolls');
       hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names,routeNumbers,notices,functionalClass,maxSpeed,countryCode');
       hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
       hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());

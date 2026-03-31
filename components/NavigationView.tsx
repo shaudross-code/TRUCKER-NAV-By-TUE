@@ -86,6 +86,10 @@ import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { getFuelNetworkSelections } from './FuelNetwork';
 import { decode } from '@here/flexpolyline';
+import { RouteComparisonPanel } from './RouteComparisonPanel';
+import { FuelCostCalculator } from './FuelCostCalculator';
+import { DriverFatigueAlert } from './DriverFatigueAlert';
+import { useLaneVisualization } from '../hooks/useLaneVisualization';
 
 import { ViewType } from '../types';
 
@@ -461,6 +465,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   const [alternativeRoutes, setAlternativeRoutes] = useState<any[]>([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
+  const [showRouteComparison, setShowRouteComparison] = useState(false);
+  const [fuelPricePerGallon, setFuelPricePerGallon] = useState(3.52);
+  const [truckMpg, setTruckMpg] = useState(6.5);
+  const { drawLaneVisualization, clearLanes } = useLaneVisualization();
   const [isCarPlayMode, setIsCarPlayMode] = useState(() => localStorage.getItem('nav_carplay_mode') === 'true');
   const [isRouteSettingsOpen, setIsRouteSettingsOpen] = useState(false);
   const [isRoutePreview, setIsRoutePreview] = useState(false);
@@ -2703,6 +2711,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (shieldLayerGroupRef.current) {
       shieldLayerGroupRef.current.clearLayers();
     }
+    // Clear lane visualization
+    if (mapInstanceRef.current) {
+      clearLanes(mapInstanceRef.current);
+    }
     currentSegmentLineRef.current = null;
     if (context) context.setNavTarget(null);
   };
@@ -3601,7 +3613,29 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         }
 
-        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings };
+        // Extract toll information
+        let tolls: any = null;
+        if (route.sections) {
+          for (const sec of route.sections) {
+            if (sec.tolls) {
+              if (!tolls) tolls = { fares: [], total: { cost: { value: 0, currency: 'USD' } } };
+              if (sec.tolls.fares) tolls.fares.push(...sec.tolls.fares);
+              if (sec.tolls.estimatedPrice) {
+                for (const price of sec.tolls.estimatedPrice) {
+                  tolls.total.cost.value += price.price || 0;
+                  if (price.currency) tolls.total.cost.currency = price.currency;
+                }
+              }
+            }
+            // Also check section-level toll summaries
+            if (sec.summary?.tollCost) {
+              if (!tolls) tolls = { fares: [], total: { cost: { value: 0, currency: 'USD' } } };
+              tolls.total.cost.value += sec.summary.tollCost;
+            }
+          }
+        }
+
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings, tolls };
       }).filter(Boolean);
 
       if (processedRoutes.length === 0) return null;
@@ -3976,6 +4010,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Place truck restriction warning signs (low bridges, weight limits, tunnel, etc.)
         if (primaryRoute.restrictions && primaryRoute.restrictions.length > 0) {
           placeTruckWarnings(primaryRoute.restrictions);
+        }
+
+        // Draw lane count visualization on highway segments
+        if (primaryRoute.spans && primaryRoute.spans.length > 0) {
+          drawLaneVisualization(mapInstanceRef.current, coords, primaryRoute.spans, 'routePane');
         }
         
         // Fit map to route
@@ -5192,67 +5231,40 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Route Comparison Overlay */}
       {isRoutePreview && alternativeRoutes.length > 1 && (
-        <div className="absolute top-20 left-4 right-4 z-[2000] flex flex-col gap-3 pointer-events-auto">
-          <div className="bg-zinc-900/95 backdrop-blur-md border border-[#D4AF37]/30 rounded-2xl p-4 shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-[#D4AF37] font-bold text-sm uppercase tracking-widest">Select Route</h3>
-              <button onClick={() => setIsRoutePreview(false)} className="text-zinc-400 hover:text-white">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-              {alternativeRoutes.map((route, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setSelectedRouteIndex(idx);
-                    setRoutePoints(route.coords);
-                    setRouteSteps(route.steps);
-                    setMilesRemaining(route.distMi);
-                    setInitialMiles(route.distMi);
-                    setEta(new Date(Date.now() + route.durationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                    setRemainingDuration(route.durationSec);
-                    
-                    if (mapInstanceRef.current) {
-                      clearRouteMarkers();
-                      currentSegmentLineRef.current = null;
-                      updateMapLine(mapInstanceRef.current, 'route', route.coords, idx === selectedRouteIndex ? '#D4AF37' : '#555', 8);
-                      routeLineRef.current = { id: 'route', color: idx === selectedRouteIndex ? '#D4AF37' : '#555' };
-                    }
-                  }}
-                  className={`flex-shrink-0 w-48 p-4 rounded-xl border-2 transition-all ${
-                    idx === selectedRouteIndex 
-                      ? 'bg-[#D4AF37]/10 border-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.2)]' 
-                      : 'bg-black/40 border-zinc-800 hover:border-zinc-600'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <span className={`text-[10px] font-black uppercase tracking-widest ${idx === selectedRouteIndex ? 'text-[#D4AF37]' : 'text-zinc-500'}`}>
-                      {idx === 0 ? 'Fastest' : `Alt ${idx}`}
-                    </span>
-                    <span className="text-xs font-bold text-white">{route.distMi.toFixed(1)} mi</span>
-                  </div>
-                  <div className="text-xl font-bold text-white mb-1">
-                    {Math.floor(route.durationSec / 3600)}h {Math.floor((route.durationSec % 3600) / 60)}m
-                  </div>
-                  <div className="text-[10px] text-zinc-400 font-medium">
-                    {route.alerts.length} alerts • {route.steps.length} steps
-                  </div>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => {
-                setIsRoutePreview(false);
-                setIsDriving(true);
-                speak("Starting navigation.");
-              }}
-              className="w-full mt-4 py-3 rounded-xl bg-[#D4AF37] text-black font-bold uppercase tracking-widest hover:bg-[#F3E5AB] transition-colors active:scale-95"
-            >
-              Start Navigation
-            </button>
-          </div>
-        </div>
+        <>
+          <RouteComparisonPanel
+            routes={alternativeRoutes}
+            selectedIndex={selectedRouteIndex}
+            onSelectRoute={(idx) => {
+              const route = alternativeRoutes[idx];
+              setSelectedRouteIndex(idx);
+              setRoutePoints(route.coords);
+              setRouteSteps(route.steps);
+              setMilesRemaining(route.distMi);
+              setInitialMiles(route.distMi);
+              setEta(new Date(Date.now() + route.durationSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+              setRemainingDuration(route.durationSec);
+              
+              if (mapInstanceRef.current) {
+                clearRouteMarkers();
+                currentSegmentLineRef.current = null;
+                updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 8);
+                routeLineRef.current = { id: 'route', color: '#D4AF37' };
+                // Update lane visualization for selected route
+                if (route.spans) {
+                  drawLaneVisualization(mapInstanceRef.current, route.coords, route.spans, 'routePane');
+                }
+              }
+            }}
+            fuelPricePerGallon={fuelPricePerGallon}
+            truckMpg={truckMpg}
+            onClose={() => {
+              setIsRoutePreview(false);
+              setIsDriving(true);
+              speak("Starting navigation.");
+            }}
+          />
+        </>
       )}
 
       {/* Route Steps Modal */}
@@ -5679,6 +5691,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Fuel Cost & HOS Panel — Right side when driving */}
+      {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
+        <div data-testid="trip-info-panel" className="absolute right-2 md:right-4 z-[2000] flex flex-col gap-2 transition-all duration-700 -translate-y-1/2 top-[55%] scale-90 md:scale-100 origin-right w-44 md:w-56">
+          <FuelCostCalculator
+            routeDistanceMi={milesRemaining}
+            initialFuelPrice={fuelPricePerGallon}
+            initialMpg={truckMpg}
+            onFuelPriceChange={setFuelPricePerGallon}
+            onMpgChange={setTruckMpg}
+          />
+          <DriverFatigueAlert isDriving={isDriving} />
         </div>
       )}
 
