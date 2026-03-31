@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useRef, useEffect } from 'react';
 import { 
   Map, 
   Shield, 
@@ -13,7 +13,9 @@ import {
   Download,
   CheckCircle2,
   Gauge,
-  Ruler
+  Ruler,
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
@@ -145,9 +147,128 @@ const MapDownloadItem: React.FC<{ region: string, size: string, isDownloaded: bo
   );
 };
 
+const FIELD_CONFIG: Record<string, { label: string; unit?: string; hint?: string; type: 'number' | 'select' | 'tags'; options?: string[] }> = {
+  height: { label: 'Truck Height', unit: 'feet', type: 'number' },
+  weight: { label: 'Gross Vehicle Weight', unit: 'lbs', type: 'number' },
+  length: { label: 'Trailer Length', unit: 'feet', type: 'number' },
+  width: { label: 'Truck Width', unit: 'feet', type: 'number' },
+  axleCount: { label: 'Axle Count', type: 'number' },
+  axleWeight: { label: 'Per-Axle Weight', unit: 'lbs', type: 'number' },
+  trailerCount: { label: 'Trailer Count', type: 'number' },
+  tunnelCategory: { label: 'Tunnel Category (ADR)', type: 'select', options: ['NONE', 'A', 'B', 'C', 'D', 'E'] },
+  hazmatClasses: { label: 'Hazmat Classes', type: 'tags', hint: 'Comma-separated: explosive, gas, flammable, etc.' },
+};
+
+const EditModal: React.FC<{
+  field: string;
+  currentValue: string;
+  onSave: (val: string) => void;
+  onClose: () => void;
+}> = ({ field, currentValue, onSave, onClose }) => {
+  const [value, setValue] = useState(currentValue);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const config = FIELD_CONFIG[field];
+  const isSelect = config?.type === 'select';
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    if (inputRef.current && !isSelect) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isSelect]);
+
+  const handleSave = () => {
+    if (config?.type === 'number') {
+      const n = parseFloat(value);
+      if (isNaN(n) || n < 0) return;
+    }
+    onSave(value);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
+      <div
+        data-testid="truck-profile-edit-modal"
+        className="bg-[#0d0d0d] border border-zinc-800 rounded-2xl w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-200"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/60">
+          <h3 className="text-sm font-black text-white uppercase tracking-wider">{config?.label || field}</h3>
+          <button data-testid="edit-modal-close" onClick={onClose} className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5">
+          {isSelect ? (
+            <div className="relative">
+              <button
+                data-testid="edit-modal-select"
+                onClick={() => setDropdownOpen(!dropdownOpen)}
+                className="w-full flex items-center justify-between bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white text-base font-bold focus:border-[#D4AF37] transition-colors"
+              >
+                <span>{value || 'Select...'}</span>
+                <ChevronDown className={`w-4 h-4 text-zinc-500 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-700 rounded-xl overflow-hidden z-10 shadow-xl">
+                  {config.options?.map(opt => (
+                    <button
+                      key={opt}
+                      data-testid={`edit-option-${opt}`}
+                      onClick={() => { setValue(opt); setDropdownOpen(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-colors ${value === opt ? 'bg-[#D4AF37]/15 text-[#D4AF37]' : 'text-zinc-300 hover:bg-zinc-800'}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <input
+              ref={inputRef}
+              data-testid="edit-modal-input"
+              type={config?.type === 'number' ? 'number' : 'text'}
+              min={config?.type === 'number' ? 0 : undefined}
+              step={config?.type === 'number' ? 'any' : undefined}
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-white text-base font-bold outline-none focus:border-[#D4AF37] transition-colors placeholder:text-zinc-600"
+              placeholder={config?.hint || `Enter ${config?.label || field}`}
+            />
+          )}
+          {config?.unit && (
+            <p className="text-[11px] text-zinc-500 font-bold uppercase tracking-wider mt-2 ml-1">Unit: {config.unit}</p>
+          )}
+          {config?.hint && config.type === 'tags' && (
+            <p className="text-[11px] text-zinc-500 mt-2 ml-1">{config.hint}</p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center gap-3 px-5 py-4 border-t border-zinc-800/60">
+          <button data-testid="edit-modal-cancel" onClick={onClose} className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-zinc-400 text-xs font-black uppercase tracking-widest hover:bg-zinc-700 transition-colors">
+            Cancel
+          </button>
+          <button data-testid="edit-modal-save" onClick={handleSave} className="flex-1 py-2.5 rounded-xl bg-[#D4AF37] text-black text-xs font-black uppercase tracking-widest hover:bg-[#C4A030] transition-colors shadow-[0_4px_20px_rgba(212,175,55,0.3)]">
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SettingsView: React.FC = () => {
   const context = useContext(AppContext);
   const [downloadedMaps, setDownloadedMaps] = useState<string[]>(['California']);
+  const [editField, setEditField] = useState<string | null>(null);
+  const [editInitialValue, setEditInitialValue] = useState('');
 
   if (!context) return null;
 
@@ -155,31 +276,32 @@ const SettingsView: React.FC = () => {
 
   const handleEdit = (field: keyof typeof truckProfile) => {
     const current = truckProfile[field];
-    let promptMsg = `Enter new ${field}:`;
-    
-    if (field === 'hazmatClasses') promptMsg = "Enter Hazmat Classes (comma separated, e.g. explosive,gas,flammable):";
-    if (field === 'tunnelCategory') promptMsg = "Enter Tunnel Category (A, B, C, D, E, or NONE):";
+    setEditField(field);
+    setEditInitialValue(Array.isArray(current) ? current.join(', ') : current.toString());
+  };
 
-    const newValue = prompt(promptMsg, Array.isArray(current) ? current.join(',') : current.toString());
-    
-    if (newValue !== null) {
-      if (field === 'hazmat') {
-        setTruckProfile(prev => ({ ...prev, [field]: newValue.toLowerCase() === 'true' }));
-      } else if (field === 'hazmatClasses') {
-        const classes = newValue.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
-        setTruckProfile(prev => ({ ...prev, [field]: classes }));
-      } else if (field === 'tunnelCategory') {
-        const cat = newValue.toUpperCase().trim();
-        setTruckProfile(prev => ({ ...prev, [field]: cat }));
-      } else if (typeof current === 'number') {
-        const num = parseFloat(newValue);
-        if (!isNaN(num)) {
-          setTruckProfile(prev => ({ ...prev, [field]: num }));
-        }
-      } else {
-        setTruckProfile(prev => ({ ...prev, [field]: newValue }));
+  const handleSave = (newValue: string) => {
+    if (!editField) return;
+    const field = editField as keyof typeof truckProfile;
+    const current = truckProfile[field];
+
+    if (field === 'hazmat') {
+      setTruckProfile(prev => ({ ...prev, [field]: newValue.toLowerCase() === 'true' }));
+    } else if (field === 'hazmatClasses') {
+      const classes = newValue.split(',').map(s => s.trim().toLowerCase()).filter(s => s.length > 0);
+      setTruckProfile(prev => ({ ...prev, [field]: classes }));
+    } else if (field === 'tunnelCategory') {
+      const cat = newValue.toUpperCase().trim();
+      setTruckProfile(prev => ({ ...prev, [field]: cat }));
+    } else if (typeof current === 'number') {
+      const num = parseFloat(newValue);
+      if (!isNaN(num) && num >= 0) {
+        setTruckProfile(prev => ({ ...prev, [field]: num }));
       }
+    } else {
+      setTruckProfile(prev => ({ ...prev, [field]: newValue }));
     }
+    setEditField(null);
   };
 
   return (
@@ -452,6 +574,16 @@ const SettingsView: React.FC = () => {
           </div>
         </section>
       </div>
+
+      {/* Truck Profile Edit Modal */}
+      {editField && (
+        <EditModal
+          field={editField}
+          currentValue={editInitialValue}
+          onSave={handleSave}
+          onClose={() => setEditField(null)}
+        />
+      )}
     </div>
   );
 };

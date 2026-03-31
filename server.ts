@@ -54,6 +54,7 @@ async function addAuthorizedDomains() {
   const domainsToAdd = [
     'poi-fuel-tracker.preview.emergentagent.com',
     'nav-corridor-live.preview.emergentagent.com',
+    'navigation-staging.preview.emergentagent.com',
     'localhost',
   ];
   

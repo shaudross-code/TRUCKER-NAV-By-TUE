@@ -52,7 +52,9 @@ import {
   Clock,
   X,
   Mic,
-  MapPinned
+  MapPinned,
+  CheckCircle2,
+  SkipForward
 } from 'lucide-react';
 import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
 import { TrafficIcon } from './TrafficIcon';
@@ -5449,6 +5451,57 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       >
         <CompassRose isCompassMode={isCompassMode} />
       </div>
+
+      {isDriving && !isExploreMode && !is3DMode && waypoints.length > 0 && (
+        <div
+          data-testid="waypoint-action-panel"
+          className="absolute bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-[calc(6.5rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2008] w-full max-w-[650px] px-3 md:px-5 pointer-events-none"
+        >
+          <div className="bg-black/95 backdrop-blur-xl border border-zinc-700/60 rounded-xl md:rounded-2xl shadow-[0_-4px_30px_rgba(0,0,0,0.7)] pointer-events-auto animate-in slide-in-from-bottom-4 fade-in duration-300">
+            <div className="flex items-center gap-3 p-2.5 md:p-3">
+              {/* Waypoint info */}
+              <div className={`p-2 rounded-lg shrink-0 ${waypoints[0].type === 'PAID' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
+                {waypoints[0].type === 'PAID' ? <CircleDollarSign className="w-4 h-4" /> : <Truck className="w-4 h-4" />}
+              </div>
+              <div className="flex flex-col flex-1 min-w-0">
+                <span className="text-[8px] md:text-[9px] font-black text-zinc-500 uppercase tracking-[0.2em]">Next Stop</span>
+                <span data-testid="next-waypoint-name" className="text-xs md:text-sm font-bold text-white truncate">{waypoints[0].address}</span>
+              </div>
+              {/* Action buttons */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  data-testid="waypoint-arrived-btn"
+                  onClick={() => {
+                    speak(`Arrived at ${waypoints[0].address}.`);
+                    removeWaypoint(waypoints[0].id);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25 hover:border-emerald-500/40 transition-all active:scale-95 text-[10px] md:text-xs font-black uppercase tracking-wider"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Arrived</span>
+                </button>
+                <button
+                  data-testid="waypoint-skip-btn"
+                  onClick={() => {
+                    speak(`Skipping ${waypoints[0].address}.`);
+                    removeWaypoint(waypoints[0].id);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/25 transition-all active:scale-95 text-[10px] md:text-xs font-black uppercase tracking-wider"
+                >
+                  <SkipForward className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Skip</span>
+                </button>
+              </div>
+            </div>
+            {/* Remaining stops indicator */}
+            {waypoints.length > 1 && (
+              <div className="px-3 pb-2 -mt-0.5">
+                <span className="text-[8px] font-bold text-zinc-600 uppercase tracking-widest">{waypoints.length - 1} more stop{waypoints.length > 2 ? 's' : ''} after this</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isDriving && !isExploreMode && !is3DMode && (
         <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-6 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none">
