@@ -41,6 +41,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Route Fetch Retry** (2026-03-31): Added exponential backoff retry (2 retries, 1s/2s delay) for route API calls. Handles network flakes gracefully.
 - **Network & GPS Monitoring** (2026-03-31): Added offline banner ("No Network — Using Cached Data") and weak GPS signal indicator for professional reliability. Added isOnline and gpsAccuracy to AppContext.
 - **Centralized Sign Clearing** (2026-03-31): Moved sign clearing to a single point before all sign placement, preventing stale sign accumulation.
+- **Lane Guidance Overlay** (2026-03-31): Rewrote NavigationHUD with proper LaneData type (direction+matches object). Lane guidance panel appears within 2 miles of maneuver with road-style visualization — active lanes highlighted in blue (#4285F4), dashed lane separators, top indicator bars, lane numbering.
+- **HERE-Style Navigation Chevron** (2026-03-31): Replaced gold circle+arrow user icon with professional blue gradient chevron (SVG with linearGradient #4285F4→#1A73E8, white stroke, glow filter). Matches HERE/Google Maps navigation aesthetic.
+- **Route Snapping** (2026-03-31): User marker position is projected onto the nearest route polyline segment during active navigation. Uses orthogonal sub-segment interpolation for smooth placement between vertices. Snap threshold ~100m — falls back to raw GPS when off-route.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
