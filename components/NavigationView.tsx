@@ -791,6 +791,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [restrictionAlerts, setRestrictionAlerts] = useState<RestrictionAlert[]>([]);
   const [trafficAlerts, setTrafficAlerts] = useState<any[]>([]);
   const cmvWarningsRef = useRef<{ type: string; severity: string; message: string; grade?: number; coord: [number, number]; progress: number }[]>([]);
+  const routeSignsRef = useRef<{ speedLimitSigns: any[]; exitSigns: any[]; restrictions: any[] }>({ speedLimitSigns: [], exitSigns: [], restrictions: [] });
   const restrictionAlertMarkersRef = useRef<L.Marker[]>([]);
   const trafficAlertMarkersRef = useRef<L.Marker[]>([]);
   const weatherAlertMarkersRef = useRef<L.Marker[]>([]);
@@ -1056,7 +1057,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     });
   }, [currentRegion.state, dataSaver, getShieldBlobUrl]);
 
-  // Place exit signs along the route
+  // Place exit signs along the route (MUTCD-style static green highway exit signs)
   const placeExitSigns = useCallback((exits: { name: string; exitNumber?: string; coord: [number, number] }[]) => {
     if (!shieldLayerGroupRef.current || exits.length === 0) return;
     
@@ -1064,19 +1065,27 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const { name, exitNumber, coord } = exit;
       if (!coord || !coord[0] || !coord[1]) return;
       
-      const exitLabel = exitNumber ? `EXIT ${exitNumber}` : 'EXIT';
-      const roadName = name.length > 25 ? name.substring(0, 23) + '...' : name;
+      const roadName = name.length > 30 ? name.substring(0, 28) + '...' : name;
+      const hasExitNum = !!exitNumber;
       
-      const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7))">
-        <div style="background:#006b3f;border:2px solid #fff;border-radius:4px;padding:2px 6px;min-width:60px;text-align:center">
-          <div style="font-size:8px;font-weight:900;color:#fff;letter-spacing:1px;border-bottom:1px solid rgba(255,255,255,0.3);padding-bottom:1px;margin-bottom:1px">${exitLabel}</div>
-          <div style="font-size:7px;font-weight:700;color:#fff;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis">${roadName}</div>
+      const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.8))">
+        <div style="position:relative;background:linear-gradient(180deg,#005a2d,#004020);border:2.5px solid #fff;border-radius:5px;padding:3px 8px 3px 8px;min-width:72px;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15)">
+          ${hasExitNum ? `<div style="position:absolute;top:-1px;right:-1px;background:#006b3f;border:1.5px solid #fff;border-radius:2px;padding:0px 3px">
+            <span style="font-size:6px;font-weight:900;color:#fff;letter-spacing:0.5px">EXIT</span>
+            <span style="font-size:8px;font-weight:900;color:#fff;margin-left:2px">${exitNumber}</span>
+          </div>` : ''}
+          <div style="font-size:9px;font-weight:900;color:#fff;letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.6);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;${hasExitNum ? 'padding-right:28px' : ''}">${roadName}</div>
+          <div style="height:1px;background:rgba(255,255,255,0.2);margin:2px -4px 1px"></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:3px">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M7 7l5-5 5 5M12 2v14M5 18h14" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span style="font-size:6px;font-weight:700;color:#4ade80;letter-spacing:1px">EXIT</span>
+          </div>
         </div>
-        <div style="width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #006b3f;margin:0 auto"></div>
+        <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #fff;margin:0 auto"></div>
       </div>`;
 
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [80, 38], iconAnchor: [40, 38] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 400, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [100, 48], iconAnchor: [50, 48] });
+      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 480, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[Signs] Placed ${exits.length} exit signs on route`);
   }, []);
@@ -1226,6 +1235,94 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 550, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
     });
     console.log(`[CMV] Placed ${warnings.length} CMV warning signs on route`);
+  }, []);
+
+  // Place truck restriction warning signs on route (low bridges, weight limits, tunnel, hazmat zones)
+  const placeTruckWarnings = useCallback((restrictions: { type: string; message: string; coords?: [number, number]; progress?: number }[]) => {
+    if (!shieldLayerGroupRef.current || restrictions.length === 0) return;
+    let placed = 0;
+    
+    restrictions.forEach((r) => {
+      if (!r.coords || !r.coords[0] || !r.coords[1]) return;
+      
+      let signSvg = '';
+      let signColor = '#FFD700';
+      let borderColor = '#111';
+      let labelText = '';
+      
+      if (r.type === 'BRIDGE') {
+        signColor = '#FFD700';
+        borderColor = '#dc2626';
+        labelText = 'LOW CLEARANCE';
+        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 18h16M4 18V14a8 8 0 0116 0v4" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M8 18v-3M12 18v-5M16 18v-3" stroke="#111" stroke-width="2" stroke-linecap="round"/>
+        </svg>`;
+      } else if (r.type === 'WEIGHT') {
+        signColor = '#FFD700';
+        borderColor = '#f59e0b';
+        labelText = 'WEIGHT LIMIT';
+        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 3L2 18h20L12 3z" stroke="#111" stroke-width="2" fill="none"/>
+          <text x="12" y="16" text-anchor="middle" fill="#111" font-size="7" font-weight="900">W</text>
+        </svg>`;
+      } else if (r.type === 'TUNNEL') {
+        signColor = '#FFD700';
+        borderColor = '#8b5cf6';
+        labelText = 'TUNNEL';
+        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 20V10a8 8 0 0116 0v10" stroke="#111" stroke-width="2.5" fill="none"/>
+          <rect x="8" y="12" width="8" height="8" rx="4" fill="#111" opacity="0.3"/>
+        </svg>`;
+      } else if (r.type === 'HAZMAT') {
+        signColor = '#FFD700';
+        borderColor = '#dc2626';
+        labelText = 'NO HAZMAT';
+        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="#dc2626" stroke-width="2.5" fill="none"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke="#dc2626" stroke-width="2.5"/>
+          <text x="12" y="14" text-anchor="middle" fill="#111" font-size="6" font-weight="900">H</text>
+        </svg>`;
+      } else if (r.type === 'TRUCK_PROHIBITED') {
+        signColor = '#fff';
+        borderColor = '#dc2626';
+        labelText = 'NO TRUCKS';
+        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="9" stroke="#dc2626" stroke-width="2.5" fill="none"/>
+          <line x1="6" y1="6" x2="18" y2="18" stroke="#dc2626" stroke-width="2.5"/>
+          <rect x="7" y="9" width="10" height="5" rx="1" fill="#111" opacity="0.6"/>
+        </svg>`;
+      } else if (r.type === 'NOTICE') {
+        signColor = '#FFD700';
+        borderColor = '#f59e0b';
+        labelText = 'NOTICE';
+        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 9v4m0 4h.01" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M4.93 19h14.14c1.34 0 2.17-1.46 1.49-2.63L13.49 4.63a1.7 1.7 0 0 0-2.98 0L3.44 16.37C2.76 17.54 3.59 19 4.93 19z" stroke="#111" stroke-width="2" fill="none"/>
+        </svg>`;
+      } else {
+        return; // Unknown type
+      }
+
+      const shortMsg = r.message.length > 35 ? r.message.substring(0, 33) + '...' : r.message;
+
+      const iconHtml = `<div class="counter-rotate" data-testid="truck-warning-marker" data-warning-type="${r.type}" style="cursor:default;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7))">
+        <div style="display:flex;flex-direction:column;align-items:center">
+          <div style="width:34px;height:34px;background:${signColor};border:3px solid ${borderColor};transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)">
+            <div style="transform:rotate(-45deg)">${signSvg}</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.9);border:1px solid ${borderColor};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:90px">
+            <div style="font-size:6px;font-weight:900;color:${borderColor};letter-spacing:0.5px;white-space:nowrap">${labelText}</div>
+            <div style="font-size:5.5px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:86px">${shortMsg}</div>
+          </div>
+        </div>
+      </div>`;
+
+      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 55], iconAnchor: [22, 27] });
+      L.marker([r.coords[0], r.coords[1]], { icon, interactive: false, zIndexOffset: 520, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      placed++;
+    });
+    if (placed > 0) console.log(`[Signs] Placed ${placed} truck warning signs on route`);
   }, []);
 
   useEffect(() => {
@@ -2140,6 +2237,58 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       let maneuverIndex = -1;
       let traveledForStep = 0;
+
+      // Speed limit & exit voice announcements during active navigation
+      if (routeSignsRef.current.speedLimitSigns.length > 0) {
+        routeSignsRef.current.speedLimitSigns.forEach((sign: any, idx: number) => {
+          if (!sign.coord) return;
+          const distToSign = calcDistMi(currentLocation[0], currentLocation[1], sign.coord[0], sign.coord[1]);
+          if (distToSign > 0 && distToSign <= 0.3) {
+            const key = `speed_${sign.speed}_${idx}`;
+            if (!spokenDistancesRef.current.has(key)) {
+              speak(`Speed limit ${sign.speed} miles per hour.`);
+              spokenDistancesRef.current.add(key);
+            }
+          }
+        });
+      }
+
+      if (routeSignsRef.current.exitSigns.length > 0) {
+        routeSignsRef.current.exitSigns.forEach((exit: any, idx: number) => {
+          if (!exit.coord) return;
+          const distToExit = calcDistMi(currentLocation[0], currentLocation[1], exit.coord[0], exit.coord[1]);
+          if (distToExit > 0 && distToExit <= 1.0) {
+            const keyFar = `exit_${idx}_1mi`;
+            const keyNear = `exit_${idx}_quarter`;
+            if (distToExit <= 1.0 && distToExit > 0.8 && !spokenDistancesRef.current.has(keyFar)) {
+              const exitLabel = exit.exitNumber ? `Exit ${exit.exitNumber}` : 'Your exit';
+              speak(`${exitLabel} toward ${exit.name} in 1 mile.`);
+              spokenDistancesRef.current.add(keyFar);
+            } else if (distToExit <= 0.3 && distToExit > 0.15 && !spokenDistancesRef.current.has(keyNear)) {
+              const exitLabel = exit.exitNumber ? `Take exit ${exit.exitNumber}` : 'Take exit';
+              speak(`${exitLabel} now.`);
+              spokenDistancesRef.current.add(keyNear);
+            }
+          }
+        });
+      }
+
+      // Truck restriction voice announcements
+      if (routeSignsRef.current.restrictions.length > 0) {
+        routeSignsRef.current.restrictions.forEach((r: any, idx: number) => {
+          if (!r.coords) return;
+          const distToWarning = calcDistMi(currentLocation[0], currentLocation[1], r.coords[0], r.coords[1]);
+          if (distToWarning > 0 && distToWarning <= 0.5) {
+            const key = `warning_${r.type}_${idx}`;
+            if (!spokenDistancesRef.current.has(key)) {
+              const typeLabel = r.type === 'BRIDGE' ? 'Low clearance ahead' : r.type === 'WEIGHT' ? 'Weight limit ahead' : r.type === 'TUNNEL' ? 'Tunnel ahead' : r.type === 'HAZMAT' ? 'Hazmat restriction ahead' : r.type === 'TRUCK_PROHIBITED' ? 'Truck restriction ahead' : 'Route notice';
+              speak(`${typeLabel}. ${r.message}.`);
+              spokenDistancesRef.current.add(key);
+            }
+          }
+        });
+      }
+
       for (let i = 0; i < routeStepsRef.current.length; i++) {
         traveledForStep += routeStepsRef.current[i].distance;
         if (traveledForStep > traveledDistance) {
@@ -3233,6 +3382,39 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 }
               }
             }
+
+            // Extract span-level notices for truck-specific warnings
+            if (span.notices && Array.isArray(span.notices)) {
+              span.notices.forEach((notice: any) => {
+                if (notice && coords[currentPointIndex]) {
+                  const msg = notice.title || notice.message || notice.code || 'Route Notice';
+                  const noticeType = (notice.code || '').toLowerCase();
+                  let type = 'NOTICE';
+                  if (noticeType.includes('violatedAvoid') || noticeType.includes('truck')) type = 'TRUCK_PROHIBITED';
+                  restrictions.push({
+                    type,
+                    message: msg,
+                    icon: AlertTriangle,
+                    color: 'text-amber-500',
+                    bg: 'bg-amber-500/20',
+                    progress: currentPointIndex / totalPoints,
+                    coords: coords[currentPointIndex]
+                  });
+                }
+              });
+            }
+            
+            // Use maxSpeed (m/s) as more accurate speed limit if available
+            if (span.maxSpeed !== undefined && span.maxSpeed > 0 && span.speedLimit === undefined) {
+              const mph = Math.round(span.maxSpeed * 2.23694);
+              if (mph !== prevSpeedLimit && (currentPointIndex - lastSpeedSignIdx) > MIN_SPEED_SIGN_GAP) {
+                if (coords[currentPointIndex]) {
+                  speedLimitSigns.push({ speed: mph, coord: coords[currentPointIndex] });
+                  lastSpeedSignIdx = currentPointIndex;
+                }
+                prevSpeedLimit = mph;
+              }
+            }
             
             currentPointIndex += (span.length || 0);
           });
@@ -3430,6 +3612,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setRestrictionAlerts(primaryRoute.restrictions.sort((a: any, b: any) => a.progress - b.progress));
       setTrafficAlerts(primaryRoute.trafficAlerts.sort((a: any, b: any) => a.progress - b.progress));
       cmvWarningsRef.current = (primaryRoute.cmvWarnings || []).sort((a: any, b: any) => a.progress - b.progress);
+      routeSignsRef.current = {
+        speedLimitSigns: primaryRoute.speedLimitSigns || [],
+        exitSigns: primaryRoute.exitSigns || [],
+        restrictions: primaryRoute.restrictions || []
+      };
       if (primaryRoute.spans) {
         routeSpansRef.current = primaryRoute.spans;
       }
@@ -3645,6 +3832,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setRestrictionAlerts([]);
     setTrafficAlerts([]);
     cmvWarningsRef.current = [];
+    routeSignsRef.current = { speedLimitSigns: [], exitSigns: [], restrictions: [] };
     
     if (isCalculating) {
       console.warn(`[handleNavigate] Already calculating, ignoring request.`);
@@ -3783,6 +3971,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Place CMV warning signs (steep grades, rollover risk, winding roads)
         if (primaryRoute.cmvWarnings && primaryRoute.cmvWarnings.length > 0) {
           placeCmvWarnings(primaryRoute.cmvWarnings);
+        }
+        
+        // Place truck restriction warning signs (low bridges, weight limits, tunnel, etc.)
+        if (primaryRoute.restrictions && primaryRoute.restrictions.length > 0) {
+          placeTruckWarnings(primaryRoute.restrictions);
         }
         
         // Fit map to route

@@ -89,5 +89,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://navigation-staging.preview.emergentagent.com. Bug fixes verified: (1) SpeedLimitMarker is now a fixed UI overlay in top-left corner (absolute top-4 left-4 z-[1500]) that only shows during active navigation with speed limit data - no longer stuck to user marker, (2) Compass mode toggle (data-testid='compass-mode-btn') and orientation toggle (data-testid='orientation-btn') both work correctly with proper visual state changes. Note: On desktop without GPS heading, heading-up mode won't visually rotate the map since there's no heading data, but the toggle saves preference to localStorage."
+  "context_for_next_testing_agent": "App at https://nav-gps-route.preview.emergentagent.com. Bug fixes verified: (1) SpeedLimitMarker is now a fixed UI overlay in top-left corner (absolute top-4 left-4 z-[1500]) that only shows during active navigation with speed limit data - no longer stuck to user marker, (2) Compass mode toggle (data-testid='compass-mode-btn') and orientation toggle (data-testid='orientation-btn') both work correctly with proper visual state changes. Note: On desktop without GPS heading, heading-up mode won't visually rotate the map since there's no heading data, but the toggle saves preference to localStorage."
 }
