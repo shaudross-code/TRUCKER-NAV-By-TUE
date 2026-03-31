@@ -1995,11 +1995,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
 
       // CMV Warning Voice Announcements
-      if (cmvWarningsRef.current.length > 0) {
+      if (cmvWarningsRef.current.length > 0 && !isNaN(remainingDist)) {
+        const cmvRemainingMiles = remainingDist / 1609.34;
         cmvWarningsRef.current.forEach((warning, idx) => {
           if (!warning.progress) return;
           const warningDistMi = initialMilesRef.current * warning.progress;
-          const distToWarning = warningDistMi - (initialMilesRef.current - remainingMiles);
+          const distToWarning = warningDistMi - (initialMilesRef.current - cmvRemainingMiles);
           
           if (distToWarning > 0 && distToWarning <= 2.0) {
             const alertKey = `cmv_${warning.type}_${idx}`;

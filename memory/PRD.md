@@ -27,13 +27,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Sharp Curve Warning Signs** — Yellow diamond signs at sharp turns
 - **Speed Limit Change Signs** — White signs at speed limit transition points
 - **Traffic Slowdown Markers** — Red/orange markers at traffic incident locations
-- **CMV Essential Warning Signs** — Steep Downgrade, Steep Hill, Rollover Risk, Winding Road (computed from 3D elevation data)
-- **CMV Voice Announcements** (2025-03-31):
-  - At 2 miles: descriptive warning with action advice (e.g., "Steep downgrade 7% ahead for 1.2 miles. Use low gear.")
-  - At 0.5 miles: urgent reminder (e.g., "Steep downgrade ahead. Reduce speed and use engine braking.")
-  - Custom voice messages per warning type: STEEP_DOWNGRADE, STEEP_HILL, ROLLOVER_RISK, WINDING_ROAD
-  - Stored in `cmvWarningsRef` with progress values, integrated with `spokenDistancesRef` dedup system
-- **Counter-Rotation for All Map Signs** — All road signs stay upright during map rotation
+- **CMV Essential Warning Signs** — Steep Downgrade, Steep Hill, Rollover Risk, Winding Road (from 3D elevation)
+- **CMV Voice Announcements** — Proximity-based TTS at 2mi and 0.5mi from each hazard zone
+- **Counter-Rotation for All Map Signs** — All signs stay upright during heading-up rotation
+- **Heading-Up Precision Fix** (2025-03-31):
+  - Removed manualRotation offset from heading-up formula (now purely -currentHeading)
+  - Reset manualRotation to 0 when entering heading-up mode
+  - Blocked two-finger touch rotation in heading-up mode
+  - Increased smoothing factor (0.45 normal, 0.6 when driving on route)
+  - Fixed `remainingMiles` scoping in CMV voice announcement block
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
@@ -49,6 +51,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - DO NOT TOUCH map container scaling/clipping logic
 - User icon: black circle with gold border + ping animation (DO NOT CHANGE)
 - Nginx proxy on port 3000 sometimes drops — recreate if needed
-- All sign markers stored in `shieldLayerGroupRef` and cleared via `clearLayers()` on route clear AND cancel
+- All sign markers stored in `shieldLayerGroupRef` and cleared on route clear AND cancel
 - CMV warnings computed from 3D polyline elevation data (HERE `return=elevation`)
-- Voice announcements use `speak()` from speechService.ts (Gemini TTS with native fallback)
+- Heading-up rotation: `totalRotation = -currentHeading` (NO manualRotation)
+- Touch rotation blocked in heading-up mode (only allowed in north-up mode)
