@@ -1262,13 +1262,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
   }, [isMapReady]);
 
+  // Create user marker ONCE when map is ready and first location is available
+  // Position updates are handled by the interpolation loop (markerTargetRef)
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapReady || !userLocation) return;
-
-    // Remove old marker
-    if (userMarkerRef.current) {
-        mapInstanceRef.current.removeLayer(userMarkerRef.current);
-    }
+    // If marker already exists, don't recreate — position is managed by interpolation
+    if (userMarkerRef.current) return;
     
     const el = document.createElement('div');
     el.className = 'user-marker-wrapper';
@@ -1276,7 +1275,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       <div class="absolute w-14 h-14 bg-[#D4AF37]/10 rounded-full animate-ping"></div>
       <div class="absolute w-10 h-10 bg-[#D4AF37]/20 rounded-full animate-pulse"></div>
       <div class="w-10 h-10 bg-black rounded-full shadow-[0_0_25px_rgba(212,175,55,0.8)] flex items-center justify-center border-[2.5px] border-[#D4AF37] z-10 overflow-visible">
-        <div class="relative w-full h-full flex items-center justify-center vehicle-pointer" style="transform: rotate(var(--vehicle-rotation, 0deg))">
+        <div class="relative w-full h-full flex items-center justify-center vehicle-pointer">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="#D4AF37" class="drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">
             <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
           </svg>
@@ -1285,11 +1284,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>
     </div>`;
     
-    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [60, 60], iconAnchor: [30, 30] }) }).addTo(mapInstanceRef.current);
-    userMarkerElRef.current = el.querySelector('.vehicle-pointer') as HTMLElement;
+    // Restore current heading immediately so the arrow doesn't flash at 0°
+    const pointerEl = el.querySelector('.vehicle-pointer') as HTMLElement;
+    if (pointerEl && smoothedHeadingRef.current) {
+      pointerEl.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
+    }
 
-    // POI fetch logic
-    if (isFetchingPoisRef.current) return;
+    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [60, 60], iconAnchor: [30, 30] }) }).addTo(mapInstanceRef.current);
+    userMarkerElRef.current = pointerEl;
+  }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+
+  // POI fetch on location change (separate from marker creation)
+  useEffect(() => {
+    if (!isMapReady || !userLocation || isFetchingPoisRef.current) return;
 
     const [lat, lon] = userLocation;
     

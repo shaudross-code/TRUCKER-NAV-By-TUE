@@ -38,7 +38,7 @@
 
 .vehicle-pointer {
   transform: rotate(var(--vehicle-rotation, 0deg));
-  transition: transform 0.3s ease-out;
+  transition: none;
 }
 
 .counter-rotate {
