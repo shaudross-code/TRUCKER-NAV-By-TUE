@@ -760,6 +760,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [weatherAlerts, setWeatherAlerts] = useState<any[]>([]);
   const [restrictionAlerts, setRestrictionAlerts] = useState<RestrictionAlert[]>([]);
   const [trafficAlerts, setTrafficAlerts] = useState<any[]>([]);
+  const cmvWarningsRef = useRef<{ type: string; severity: string; message: string; grade?: number; coord: [number, number]; progress: number }[]>([]);
   const restrictionAlertMarkersRef = useRef<L.Marker[]>([]);
   const trafficAlertMarkersRef = useRef<L.Marker[]>([]);
   const weatherAlertMarkersRef = useRef<L.Marker[]>([]);
@@ -1990,6 +1991,49 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         });
       }
 
+      // CMV Warning Voice Announcements
+      if (cmvWarningsRef.current.length > 0) {
+        cmvWarningsRef.current.forEach((warning, idx) => {
+          if (!warning.progress) return;
+          const warningDistMi = initialMilesRef.current * warning.progress;
+          const distToWarning = warningDistMi - (initialMilesRef.current - remainingMiles);
+          
+          if (distToWarning > 0 && distToWarning <= 2.0) {
+            const alertKey = `cmv_${warning.type}_${idx}`;
+            
+            // Voice message templates per warning type
+            const voiceMessages: Record<string, { far: string; near: string }> = {
+              STEEP_DOWNGRADE: {
+                far: `Attention: ${warning.message}. Use low gear.`,
+                near: `Steep downgrade ahead. Reduce speed and use engine braking.`
+              },
+              STEEP_HILL: {
+                far: `Attention: ${warning.message}. Prepare for climb.`,
+                near: `Steep hill ahead. Maintain momentum.`
+              },
+              ROLLOVER_RISK: {
+                far: `Warning: ${warning.message}. Reduce speed significantly.`,
+                near: `Rollover risk zone. Slow down immediately.`
+              },
+              WINDING_ROAD: {
+                far: `Caution: Winding road ahead in 1 mile. Reduce speed.`,
+                near: `Winding road. Use caution.`
+              }
+            };
+            
+            const msgs = voiceMessages[warning.type] || { far: `Warning: ${warning.message}`, near: `Caution ahead.` };
+            
+            if (distToWarning <= 2.0 && distToWarning > 1.9 && !spokenDistancesRef.current.has(`${alertKey}_2`)) {
+              speak(msgs.far);
+              spokenDistancesRef.current.add(`${alertKey}_2`);
+            } else if (distToWarning <= 0.5 && distToWarning > 0.4 && !spokenDistancesRef.current.has(`${alertKey}_0.5`)) {
+              speak(msgs.near);
+              spokenDistancesRef.current.add(`${alertKey}_0.5`);
+            }
+          }
+        });
+      }
+
       let maneuverIndex = -1;
       let traveledForStep = 0;
       for (let i = 0; i < routeStepsRef.current.length; i++) {
@@ -3034,7 +3078,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         ? `Steep Downgrade ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`
                         : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
                       grade: gradeRunMaxGrade,
-                      coord: coords[gradeRunStart]
+                      coord: coords[gradeRunStart],
+                      progress: gradeRunStart / rawPoints.length
                     });
                     lastCmvIdx = gradeRunStart;
                   }
@@ -3059,7 +3104,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       ? `Steep Downgrade ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`
                       : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
                     grade: gradeRunMaxGrade,
-                    coord: coords[gradeRunStart]
+                    coord: coords[gradeRunStart],
+                    progress: gradeRunStart / rawPoints.length
                   });
                   lastCmvIdx = gradeRunStart;
                 }
@@ -3083,7 +3129,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   ? `Steep Downgrade ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`
                   : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
                 grade: gradeRunMaxGrade,
-                coord: coords[gradeRunStart]
+                coord: coords[gradeRunStart],
+                progress: gradeRunStart / rawPoints.length
               });
             }
           }
@@ -3111,7 +3158,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 type: 'WINDING_ROAD',
                 severity: bearingChanges >= 8 ? 'high' : 'medium',
                 message: 'Winding Road Ahead',
-                coord: coords[i]
+                coord: coords[i],
+                progress: i / rawPoints.length
               });
               lastWindIdx = i;
             }
@@ -3139,7 +3187,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   severity: localGrade > 6 ? 'critical' : 'high',
                   message: `Rollover Risk — ${curve.direction} curve on ${localGrade.toFixed(0)}% grade`,
                   grade: localGrade,
-                  coord: curve.coord
+                  coord: curve.coord,
+                  progress: nearestIdx / rawPoints.length
                 });
               }
             }
@@ -3156,6 +3205,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setWeatherAlerts(primaryRoute.alerts.sort((a: any, b: any) => a.progress - b.progress));
       setRestrictionAlerts(primaryRoute.restrictions.sort((a: any, b: any) => a.progress - b.progress));
       setTrafficAlerts(primaryRoute.trafficAlerts.sort((a: any, b: any) => a.progress - b.progress));
+      cmvWarningsRef.current = (primaryRoute.cmvWarnings || []).sort((a: any, b: any) => a.progress - b.progress);
       if (primaryRoute.spans) {
         routeSpansRef.current = primaryRoute.spans;
       }
@@ -3370,6 +3420,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setWeatherAlerts([]);
     setRestrictionAlerts([]);
     setTrafficAlerts([]);
+    cmvWarningsRef.current = [];
     
     if (isCalculating) {
       console.warn(`[handleNavigate] Already calculating, ignoring request.`);

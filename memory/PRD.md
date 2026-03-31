@@ -6,7 +6,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Architecture
 - **Stack**: React (Vite) + Express.js backend (single-process on port 8001)
 - **Mapping**: Leaflet (2D heading-up) + Mapbox GL JS (3D satellite), Mapbox satellite-streets-v12 tiles
-- **APIs**: HERE Maps (Routing w/ elevation, Discover, Road Shields), Google Maps (Places), Mapbox (tiles), Gemini (AI), Firebase (Auth/Firestore)
+- **APIs**: HERE Maps (Routing w/ elevation, Discover, Road Shields), Google Maps (Places), Mapbox (tiles), Gemini (AI + TTS), Firebase (Auth/Firestore)
 - **Key Pattern**: 150% oversized map container with CSS `rotate:` for heading-up mode without blank tiles
 - **Counter-Rotate**: All map markers use `.counter-rotate` CSS class to stay upright during heading-up rotation
 - **Preview URL**: https://nav-emblem-display.preview.emergentagent.com
@@ -27,13 +27,13 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Sharp Curve Warning Signs** — Yellow diamond signs at sharp turns
 - **Speed Limit Change Signs** — White signs at speed limit transition points
 - **Traffic Slowdown Markers** — Red/orange markers at traffic incident locations
-- **CMV Essential Warning Signs** (2025-03-31):
-  - **Steep Downgrade** — Detects sustained negative grade > 5% from 3D elevation data (400m sliding window)
-  - **Steep Hill** — Detects sustained positive grade > 6% for climbing sections
-  - **Rollover Risk** — Detects sharp curves coinciding with > 3% grade
-  - **Winding Road** — Detects frequent bearing changes (> 30° per ~200m) in route segments
-  - All signs use yellow diamond format with truck SVG icons, severity-based borders
-- **Counter-Rotation for All Map Signs** — All road signs, shields, traffic/restriction/weather markers stay upright during map rotation
+- **CMV Essential Warning Signs** — Steep Downgrade, Steep Hill, Rollover Risk, Winding Road (computed from 3D elevation data)
+- **CMV Voice Announcements** (2025-03-31):
+  - At 2 miles: descriptive warning with action advice (e.g., "Steep downgrade 7% ahead for 1.2 miles. Use low gear.")
+  - At 0.5 miles: urgent reminder (e.g., "Steep downgrade ahead. Reduce speed and use engine braking.")
+  - Custom voice messages per warning type: STEEP_DOWNGRADE, STEEP_HILL, ROLLOVER_RISK, WINDING_ROAD
+  - Stored in `cmvWarningsRef` with progress values, integrated with `spokenDistancesRef` dedup system
+- **Counter-Rotation for All Map Signs** — All road signs stay upright during map rotation
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
@@ -43,7 +43,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Fuel cost calculator (live diesel prices)
 - Driver fatigue alert (DOT Hours of Service)
 - iOS/Android Store Submission (requires user signing certs via /app/SIGNING_GUIDE.md)
-- **Refactoring**: Break down NavigationView.tsx (~5500 lines) into hooks and sub-components
+- **Refactoring**: Break down NavigationView.tsx (~5600 lines) into hooks and sub-components
 
 ## Key Technical Notes
 - DO NOT TOUCH map container scaling/clipping logic
@@ -51,3 +51,4 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Nginx proxy on port 3000 sometimes drops — recreate if needed
 - All sign markers stored in `shieldLayerGroupRef` and cleared via `clearLayers()` on route clear AND cancel
 - CMV warnings computed from 3D polyline elevation data (HERE `return=elevation`)
+- Voice announcements use `speak()` from speechService.ts (Gemini TTS with native fallback)
