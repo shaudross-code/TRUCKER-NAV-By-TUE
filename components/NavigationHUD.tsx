@@ -1,18 +1,24 @@
-import React, { useContext } from 'react';
-import { ArrowUp } from 'lucide-react';
+import React, { useContext, useMemo } from 'react';
+import { ArrowUp, ChevronUp } from 'lucide-react';
 import { HighwayShield } from './MapUI';
 import { AppContext } from '../types';
 
+interface LaneData {
+  direction: string;
+  matches: string[];
+}
+
 interface NavigationHUDProps {
-  nextInstruction: { icon: any; distance: string; text: string; lanes?: string[] };
-  parseLane: (lane: string) => { rotation: number; active: boolean };
+  nextInstruction: { icon: any; distance: string; text: string; lanes?: LaneData[]; maneuver?: any; followingStep?: { text: string; icon: any } | null };
+  parseLane: (lane: LaneData) => { rotation: number; active: boolean; isStraight: boolean };
 }
 
 export const NavigationHUD: React.FC<NavigationHUDProps> = ({ nextInstruction, parseLane }) => {
   const context = useContext(AppContext);
   const isMetric = context?.unitSystem === 'metric';
+  const distVal = parseFloat(nextInstruction.distance);
+  const showLanes = nextInstruction.lanes && nextInstruction.lanes.length > 0 && distVal <= 2.0;
 
-  // Convert distance string (assumed miles) to km if metric
   const formatDistance = (distStr: string) => {
     const val = parseFloat(distStr);
     if (isNaN(val)) return distStr;
@@ -23,30 +29,30 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({ nextInstruction, p
     return distStr;
   };
 
-  const distUnit = isMetric ? (parseFloat(nextInstruction.distance) * 1.60934 < 1 ? 'm' : 'km') : 'mi';
+  const distUnit = isMetric ? (distVal * 1.60934 < 1 ? 'm' : 'km') : 'mi';
 
-  // Parse lane data for professional display
-  const activeLanes: number[] = [];
-  const totalLanes = nextInstruction.lanes?.length || 0;
-  nextInstruction.lanes?.forEach((lane, idx) => {
-    const { active } = parseLane(lane);
-    if (active) activeLanes.push(idx + 1);
-  });
-
-  const laneRangeLabel = activeLanes.length > 0
-    ? activeLanes.length === 1
-      ? `LANE ${activeLanes[0]}`
-      : activeLanes[activeLanes.length - 1] - activeLanes[0] === activeLanes.length - 1
-        ? `LANES ${activeLanes[0]}-${activeLanes[activeLanes.length - 1]}`
-        : `LANES ${activeLanes.join(', ')}`
-    : '';
+  const { activeLanes, totalLanes, laneRangeLabel } = useMemo(() => {
+    const active: number[] = [];
+    const total = nextInstruction.lanes?.length || 0;
+    nextInstruction.lanes?.forEach((lane, idx) => {
+      const { active: isActive } = parseLane(lane);
+      if (isActive) active.push(idx + 1);
+    });
+    let label = '';
+    if (active.length > 0 && active.length < total) {
+      if (active.length === 1) label = `LANE ${active[0]}`;
+      else if (active[active.length - 1] - active[0] === active.length - 1) label = `LANES ${active[0]}–${active[active.length - 1]}`;
+      else label = `LANES ${active.join(', ')}`;
+    }
+    return { activeLanes: active, totalLanes: total, laneRangeLabel: label };
+  }, [nextInstruction.lanes, parseLane]);
 
   return (
     <div className="absolute top-0 left-0 right-0 z-[2100] transition-all duration-700 ease-in-out translate-y-0 opacity-100">
       <div className="bg-gradient-to-b from-black/95 to-black/60 backdrop-blur-3xl border-b border-[#D4AF37]/20 p-2 md:p-6 landscape:p-2 landscape:md:p-4 pt-[calc(0.5rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] landscape:pt-[calc(0.25rem+env(safe-area-inset-top))] shadow-2xl">
-        <div className="flex flex-col md:flex-row landscape:flex-row items-start md:items-center landscape:items-center justify-between gap-2 md:gap-4 landscape:gap-2">
-          {/* Left: Maneuver icon + distance + instruction text */}
-          <div className="flex items-center gap-2 md:gap-10 landscape:gap-4 w-full md:w-auto landscape:w-auto">
+        <div className="flex flex-col gap-0">
+          {/* Main instruction row */}
+          <div className="flex items-center gap-2 md:gap-10 landscape:gap-4 w-full">
             <div className="bg-[#D4AF37] p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-2xl landscape:rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.4)] shrink-0">
               <nextInstruction.icon className="w-8 h-8 md:w-20 md:h-20 landscape:w-10 landscape:h-10 text-black" strokeWidth={4} />
             </div>
@@ -78,52 +84,54 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({ nextInstruction, p
             </div>
           </div>
 
-          {/* Right: Professional Lane Guidance Panel */}
-          {nextInstruction.lanes && nextInstruction.lanes.length > 0 && (
-            <div data-testid="lane-guidance-panel" className="flex flex-col items-center gap-1.5 md:gap-2 shrink-0">
-              {/* Lane header label */}
-              {activeLanes.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <div className="h-px w-4 bg-[#D4AF37]/40" />
-                  <span data-testid="lane-guidance-label" className="text-[10px] md:text-xs font-black text-[#D4AF37] uppercase tracking-[0.25em]">
-                    Use {laneRangeLabel}
-                  </span>
-                  <div className="h-px w-4 bg-[#D4AF37]/40" />
-                </div>
-              )}
-              {/* Lane arrows with numbers */}
-              <div className="flex gap-1.5 md:gap-2 overflow-x-auto no-scrollbar">
-                {nextInstruction.lanes.map((lane, idx) => {
-                  const { rotation, active } = parseLane(lane);
+          {/* Lane Guidance Panel — shown when within 2 miles of maneuver */}
+          {showLanes && (
+            <div data-testid="lane-guidance-panel" className="mt-2 pt-2 border-t border-white/10 animate-in slide-in-from-top-2 fade-in duration-500">
+              <div className="flex items-center justify-between">
+                {/* Lane label */}
+                {laneRangeLabel && (
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="h-px w-3 bg-[#4285F4]/60" />
+                    <span data-testid="lane-guidance-label" className="text-[9px] md:text-xs font-black text-[#4285F4] uppercase tracking-[0.2em]">
+                      Use {laneRangeLabel}
+                    </span>
+                    <div className="h-px w-3 bg-[#4285F4]/60" />
+                  </div>
+                )}
+                <span className="text-[8px] md:text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
+                  {totalLanes} lane{totalLanes !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {/* Lane arrows — road-style visualization */}
+              <div className="flex justify-center gap-0">
+                {nextInstruction.lanes!.map((lane, idx) => {
+                  const { rotation, active, isStraight } = parseLane(lane);
+                  const isFirst = idx === 0;
+                  const isLast = idx === (nextInstruction.lanes!.length - 1);
                   return (
-                    <div key={idx} className="flex flex-col items-center gap-0.5">
-                      <div className={`relative p-1.5 md:p-3 rounded-lg md:rounded-xl border-2 transition-all duration-500 shrink-0 flex items-center justify-center ${
-                        active 
-                          ? 'bg-[#D4AF37]/20 border-[#D4AF37] text-white shadow-[0_0_20px_rgba(212,175,55,0.4)]' 
-                          : 'bg-white/5 border-white/10 text-white/20'
-                      }`}>
-                        <ArrowUp 
-                          className="w-5 h-5 md:w-10 md:h-10" 
-                          strokeWidth={active ? 5 : 3} 
-                          style={{ transform: `rotate(${rotation}deg)` }} 
-                        />
-                        {active && (
-                          <div className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-3.5 md:h-3.5 bg-[#D4AF37] rounded-full border border-black" />
-                        )}
-                      </div>
-                      <span className={`text-[8px] md:text-[10px] font-black tracking-wider ${
-                        active ? 'text-[#D4AF37]' : 'text-zinc-600'
-                      }`}>
-                        {idx + 1}
-                      </span>
+                    <div key={idx} className={`relative flex flex-col items-center py-2 md:py-3 flex-1 max-w-[64px] md:max-w-[80px] transition-all duration-300 ${
+                      active 
+                        ? 'bg-[#4285F4]/20 z-10' 
+                        : 'bg-white/[0.03]'
+                    } ${isFirst ? 'rounded-l-xl' : ''} ${isLast ? 'rounded-r-xl' : ''}`}
+                    style={{ borderLeft: idx > 0 ? '1px dashed rgba(255,255,255,0.1)' : 'none' }}
+                    >
+                      {/* Active indicator bar */}
+                      {active && (
+                        <div className="absolute top-0 left-1 right-1 h-[3px] bg-[#4285F4] rounded-full shadow-[0_0_8px_rgba(66,133,244,0.6)]" />
+                      )}
+                      <ArrowUp 
+                        className={`w-5 h-5 md:w-8 md:h-8 transition-colors ${active ? 'text-white' : 'text-white/15'}`}
+                        strokeWidth={active ? 4 : 2} 
+                        style={{ transform: `rotate(${rotation}deg)` }} 
+                      />
+                      {active && (
+                        <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 md:w-2 md:h-2 bg-[#4285F4] rounded-full" />
+                      )}
                     </div>
                   );
                 })}
               </div>
-              {/* Total lanes indicator */}
-              <span className="text-[8px] md:text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
-                {totalLanes} lane{totalLanes !== 1 ? 's' : ''}
-              </span>
             </div>
           )}
         </div>

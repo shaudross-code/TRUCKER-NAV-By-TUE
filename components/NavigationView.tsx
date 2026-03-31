@@ -1284,15 +1284,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const el = document.createElement('div');
     el.className = 'user-marker-wrapper';
     el.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
-      <div class="absolute w-14 h-14 bg-[#D4AF37]/10 rounded-full animate-ping"></div>
-      <div class="absolute w-10 h-10 bg-[#D4AF37]/20 rounded-full animate-pulse"></div>
-      <div class="w-10 h-10 bg-black rounded-full shadow-[0_0_25px_rgba(212,175,55,0.8)] flex items-center justify-center border-[2.5px] border-[#D4AF37] z-10 overflow-visible">
-        <div class="relative w-full h-full flex items-center justify-center vehicle-pointer">
-          <svg viewBox="0 0 24 24" width="24" height="24" fill="#D4AF37" class="drop-shadow-[0_0_5px_rgba(212,175,55,0.5)]">
-            <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z" />
-          </svg>
-          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-[#D4AF37]/30 blur-md rounded-full"></div>
-        </div>
+      <div class="absolute w-16 h-16 bg-[#1A73E8]/8 rounded-full animate-ping"></div>
+      <div class="absolute w-12 h-12 bg-[#1A73E8]/15 rounded-full animate-pulse"></div>
+      <div class="relative vehicle-pointer" style="filter: drop-shadow(0 2px 8px rgba(26,115,232,0.6))">
+        <svg viewBox="0 0 48 48" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="nav-chevron-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#4285F4"/>
+              <stop offset="100%" stop-color="#1A73E8"/>
+            </linearGradient>
+            <filter id="nav-glow">
+              <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#1A73E8" flood-opacity="0.5"/>
+            </filter>
+          </defs>
+          <polygon points="24,4 38,36 24,28 10,36" fill="url(#nav-chevron-fill)" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" filter="url(#nav-glow)"/>
+          <polygon points="24,10 34,32 24,26 14,32" fill="#1A73E8" opacity="0.4"/>
+          <circle cx="24" cy="24" r="4" fill="white" opacity="0.9"/>
+        </svg>
       </div>
     </div>`;
     
@@ -4162,18 +4170,68 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, []);
 
   // Update target position (NOT marker directly) on GPS changes
+  // When driving with an active route, SNAP the marker to the nearest route point
   useEffect(() => {
     if (isValidLatLng(userLocation)) {
-      markerTargetRef.current = [userLocation[0], userLocation[1]];
-      // Initialize current position on first GPS fix
+      let targetPos: [number, number] = [userLocation[0], userLocation[1]];
+      
+      // Route-snap: project user GPS onto the route polyline for visual sync
+      if (isDriving && routePoints.length > 2) {
+        const searchStart = Math.max(0, lastSimIdxRef.current - 5);
+        const searchEnd = Math.min(routePoints.length, lastSimIdxRef.current + 200);
+        let minDist = Infinity;
+        let bestIdx = lastSimIdxRef.current >= 0 ? lastSimIdxRef.current : 0;
+        
+        for (let i = searchStart; i < searchEnd; i++) {
+          const dx = routePoints[i][0] - userLocation[0];
+          const dy = routePoints[i][1] - userLocation[1];
+          const d = dx * dx + dy * dy;
+          if (d < minDist) { minDist = d; bestIdx = i; }
+        }
+
+        // Also check sub-segment projection between bestIdx and bestIdx+1
+        // for smoother placement between route vertices
+        if (bestIdx < routePoints.length - 1) {
+          const A = routePoints[bestIdx];
+          const B = routePoints[bestIdx + 1];
+          const abLat = B[0] - A[0], abLon = B[1] - A[1];
+          const apLat = userLocation[0] - A[0], apLon = userLocation[1] - A[1];
+          const ab2 = abLat * abLat + abLon * abLon;
+          if (ab2 > 0) {
+            const t = Math.max(0, Math.min(1, (apLat * abLat + apLon * abLon) / ab2));
+            const projLat = A[0] + t * abLat;
+            const projLon = A[1] + t * abLon;
+            const projDist = Math.pow(projLat - userLocation[0], 2) + Math.pow(projLon - userLocation[1], 2);
+            if (projDist < minDist) {
+              targetPos = [projLat, projLon];
+              minDist = projDist;
+            } else {
+              targetPos = routePoints[bestIdx];
+            }
+          } else {
+            targetPos = routePoints[bestIdx];
+          }
+        } else {
+          targetPos = routePoints[bestIdx];
+        }
+
+        // Only snap if within ~100m of route (approx 0.001 deg ≈ 110m)
+        const snapThreshold = 0.001 * 0.001; // ~100m
+        if (minDist > snapThreshold) {
+          // Too far from route — show raw GPS (might be off-route/rerouting)
+          targetPos = [userLocation[0], userLocation[1]];
+        }
+      }
+      
+      markerTargetRef.current = targetPos;
       if (!markerCurrentRef.current) {
-        markerCurrentRef.current = [userLocation[0], userLocation[1]];
+        markerCurrentRef.current = [targetPos[0], targetPos[1]];
       }
     }
     if (isDriving && userLocation) {
       updateNavigationState(userLocation).catch(err => console.error("Navigation update failed:", err));
     }
-  }, [isDriving, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, updateNavigationState]);
+  }, [isDriving, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, updateNavigationState, routePoints]);
 
   // Fetch traffic infrastructure (signs, lights, signage) when location changes
   // Fetch traffic infrastructure ONLY when actively navigating and user moves significantly
