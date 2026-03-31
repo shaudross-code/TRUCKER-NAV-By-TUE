@@ -44,6 +44,8 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Lane Guidance Overlay** (2026-03-31): Rewrote NavigationHUD with proper LaneData type (direction+matches object). Lane guidance panel appears within 2 miles of maneuver with road-style visualization — active lanes highlighted in blue (#4285F4), dashed lane separators, top indicator bars, lane numbering.
 - **HERE-Style Navigation Chevron** (2026-03-31): Replaced gold circle+arrow user icon with professional blue gradient chevron (SVG with linearGradient #4285F4→#1A73E8, white stroke, glow filter). Matches HERE/Google Maps navigation aesthetic.
 - **Route Snapping** (2026-03-31): User marker position is projected onto the nearest route polyline segment during active navigation. Uses orthogonal sub-segment interpolation for smooth placement between vertices. Snap threshold ~100m — falls back to raw GPS when off-route.
+- **Auto-Zoom for Maneuvers** (2026-03-31): Zooms in +2 levels when within 0.3mi of a turn (0.4mi for complex maneuvers: exits, forks, roundabouts, merges). Smoothly zooms back to user's preferred level when past 0.6mi. Uses flyTo with easing. Resets on route clear/cancel.
+- **Zoom Level Indicator** (2026-03-31): Shows current zoom level number between + and - buttons in MapControls. Updates reactively via Leaflet zoomend event. User's preferred zoom is tracked separately from auto-zoom changes.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
