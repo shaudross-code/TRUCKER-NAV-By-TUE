@@ -249,6 +249,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   
   const isDriving = context?.isDriving || false;
   const setIsDriving = context?.setIsDriving || (() => {});
+  const dataSaver = context?.dataSaver || false;
   const setUserLocation = locationContext?.setUserLocation || noop;
   const hosContext = useContext(HOSContext);
   const eldStatus = hosContext?.eldStatus;
@@ -966,18 +967,25 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           <span style="color:black;font-size:${label.length > 2 ? '10' : '13'}px;font-weight:900">${label}</span></div>`;
       }
 
-      const iconHtml = `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
-        ${dirBadge}
-        <img src="${shieldUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
-        <div style="display:none;align-items:center;justify-content:center">${fallbackHtml}</div>
-        ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
-      </div>`;
+      // In data saver mode, skip HERE API image and use only SVG fallback
+      const iconHtml = dataSaver 
+        ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
+            ${dirBadge}
+            <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
+            ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+          </div>`
+        : `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
+            ${dirBadge}
+            <img src="${shieldUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
+            <div style="display:none;align-items:center;justify-content:center">${fallbackHtml}</div>
+            ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+          </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
       L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 500 }).addTo(shieldLayerGroupRef.current!);
     });
-    console.log(`[Shields] Placed ${shields.length} highway shield markers on route`);
-  }, [currentRegion.state]);
+    console.log(`[Shields] Placed ${shields.length} highway shield markers on route${dataSaver ? ' (data saver)' : ''}`);
+  }, [currentRegion.state, dataSaver]);
 
   // Place exit signs along the route
   const placeExitSigns = useCallback((exits: { name: string; exitNumber?: string; coord: [number, number] }[]) => {
@@ -1350,7 +1358,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
 
     // Use Mapbox raster tiles for the 2D view (satellite-streets-v12 style)
-    if (MAPBOX_TOKEN) {
+    // In Data Saver mode, use lighter OSM tiles instead of satellite imagery
+    if (dataSaver) {
+      console.log("NavigationView: Data Saver ON — using lightweight OSM tiles");
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19,
+        crossOrigin: true
+      }).addTo(map);
+    } else if (MAPBOX_TOKEN) {
       console.log("NavigationView: Using Mapbox satellite-streets-v12 raster tiles");
       L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
         attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -1381,7 +1397,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }).addTo(map);
     }
     map.invalidateSize();
-  }, [isMapReady, showTruckRestrictions]);
+  }, [isMapReady, showTruckRestrictions, dataSaver]);
 
   useEffect(() => {
     if (!mapRef.current || !mapInstanceRef.current) return;

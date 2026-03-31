@@ -77,14 +77,14 @@ const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           {/* Nav Items */}
-          <nav className="flex-1 mt-2 px-3 space-y-1 overflow-hidden">
+          <nav className="flex-1 mt-1 px-3 space-y-0.5 overflow-y-auto">
             {menuItems.map((item) => {
               const isActive = activeView === item.id;
               return (
                 <button
                   key={item.id}
                   onClick={() => onViewChange(item.id)}
-                  className={`w-full flex items-center gap-4 px-5 py-3.5 rounded-xl transition-all duration-200 group relative ${
+                  className={`w-full flex items-center gap-4 px-5 py-2.5 rounded-xl transition-all duration-200 group relative ${
                     isActive 
                       ? 'bg-[#D4AF37]/10 text-white border border-[#D4AF37]/20' 
                       : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900/40'
@@ -107,36 +107,36 @@ const Sidebar: React.FC<SidebarProps> = ({
           </nav>
 
           {/* Voice Command Button */}
-          <div className={`p-6 space-y-3 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          <div className={`px-3 py-2 space-y-2 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
             <button 
               onClick={() => speak("Voice guidance is active.")}
-              className={`w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-4 rounded-2xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
+              className={`w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-3 rounded-xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
             >
               <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-[#D4AF37]/10 shrink-0">
                 <Volume2 className="w-4 h-4 text-zinc-400 group-hover:text-[#D4AF37]" />
               </div>
-              {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Test Voice</span>}
+              {!isCollapsed && <span className="text-[12px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Test Voice</span>}
             </button>
 
             <button 
               onClick={onVoiceToggle}
-              className={`w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-4 rounded-2xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
+              className={`w-full bg-black border border-zinc-900 hover:border-[#D4AF37]/30 p-3 rounded-xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
             >
               <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-[#D4AF37]/10 shrink-0">
                 <Mic className="w-4 h-4 text-zinc-400 group-hover:text-[#D4AF37]" />
               </div>
-              {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Voice Command</span>}
+              {!isCollapsed && <span className="text-[12px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Voice Command</span>}
             </button>
 
             {onSignOut && (
               <button 
                 onClick={onSignOut}
-                className={`w-full bg-black border border-zinc-900 hover:border-rose-500/30 p-4 rounded-2xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
+                className={`w-full bg-black border border-zinc-900 hover:border-rose-500/30 p-3 rounded-xl flex items-center gap-3 transition-all group ${isCollapsed ? 'justify-center' : ''}`}
               >
                 <div className="bg-zinc-900 p-1.5 rounded-lg group-hover:bg-rose-500/10 shrink-0">
                   <LogOut className="w-4 h-4 text-zinc-400 group-hover:text-rose-500" />
                 </div>
-                {!isCollapsed && <span className="text-[13px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Sign Out</span>}
+                {!isCollapsed && <span className="text-[12px] font-semibold text-zinc-500 group-hover:text-zinc-200 animate-in fade-in duration-300">Sign Out</span>}
               </button>
             )}
           </div>

@@ -149,6 +149,8 @@ export interface AppContextType {
   setTakeHomePercentage: React.Dispatch<React.SetStateAction<number>>;
   unitSystem: 'imperial' | 'metric';
   setUnitSystem: React.Dispatch<React.SetStateAction<'imperial' | 'metric'>>;
+  dataSaver: boolean;
+  setDataSaver: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
 export interface HOSContextType {

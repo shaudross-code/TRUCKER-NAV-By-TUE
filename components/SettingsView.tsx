@@ -151,7 +151,7 @@ const SettingsView: React.FC = () => {
 
   if (!context) return null;
 
-  const { truckProfile, setTruckProfile, unitSystem, setUnitSystem } = context;
+  const { truckProfile, setTruckProfile, unitSystem, setUnitSystem, dataSaver, setDataSaver } = context;
 
   const handleEdit = (field: keyof typeof truckProfile) => {
     const current = truckProfile[field];
@@ -426,7 +426,7 @@ const SettingsView: React.FC = () => {
             <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">System & Data</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Toggle label="Data Saver" description="Reduce map detail" />
+            <Toggle label="Data Saver" description="Reduce map detail &amp; POI fetching" initialValue={dataSaver} onChange={(val) => setDataSaver(val)} />
             <div className="bg-[#0a0a0a] border border-zinc-900 p-5 rounded-2xl flex items-center justify-between group transition-all hover:border-[#D4AF37]/30">
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-zinc-900 rounded-xl flex items-center justify-center border border-zinc-800/50 group-hover:bg-[#D4AF37]/10 transition-all">

@@ -270,6 +270,13 @@ const AppContent: React.FC = React.memo(() => {
     try { localStorage.setItem('trucker_unitSystem', unitSystem); } catch {}
   }, [unitSystem]);
 
+  const [dataSaver, setDataSaver] = useState<boolean>(() => {
+    try { return localStorage.getItem('trucker_dataSaver') === 'true'; } catch { return false; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('trucker_dataSaver', String(dataSaver)); } catch {}
+  }, [dataSaver]);
+
   // Dashboard financial metrics - use localStorage as primary store with Firestore sync
   const loadLocal = (key: string, fallback: number) => {
     try {
@@ -459,7 +466,9 @@ const AppContent: React.FC = React.memo(() => {
       takeHomePercentage,
       setTakeHomePercentage,
       unitSystem,
-      setUnitSystem
+      setUnitSystem,
+      dataSaver,
+      setDataSaver
     }), [
       activeView, 
       navTarget, 
@@ -472,7 +481,8 @@ const AppContent: React.FC = React.memo(() => {
       truckCost,
       weekDeductions,
       takeHomePercentage,
-      unitSystem
+      unitSystem,
+      dataSaver
     ]);
 
   const mountTimeRef = useRef(Date.now());
