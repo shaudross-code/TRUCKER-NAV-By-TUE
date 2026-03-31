@@ -57,6 +57,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Fuel Cost Calculator** (2026-03-31): New `FuelCostCalculator` component with adjustable diesel price ($2-$6/gal slider) and truck MPG (3-10 slider). Shows total cost, gallons needed, cost per mile. Defaults to national average $3.52/gal and 6.5 MPG. Collapsible panel on right side during navigation.
 - **Driver Fatigue Alert (FMCSA HOS)** (2026-03-31): New `DriverFatigueAlert` component tracking all standard FMCSA Hours of Service rules: 11-hour driving limit, 14-hour on-duty window, 30-minute break after 8 hours, 70-hour/8-day cycle. Color-coded progress bars (green→amber→red), voice alerts for violations, Start Break / 10hr Off-Duty / Reset Cycle actions. State persisted to localStorage.
 - **Dynamic Lane Count Visualization** (2026-03-31): New `useLaneVisualization` hook draws white dashed lane divider lines on highway segments. Lane count inferred from HERE API `functionalClass` spans (FC1→4 lanes, FC2→3, FC3-4→2, FC5→1). Lane count indicators ("4L", "3L") shown at segment midpoints. Only rendered on FC1/FC2 highways to avoid clutter.
+- **Bug Fix: Pay Summary Inputs** (2026-03-31): Replaced direct-bind controlled inputs with `EditableNumberInput` component using local-state + blur-save pattern. Fixes "snap back to 0" issue when clearing fields.
+- **Bug Fix: Dashboard Card Inputs Not Saving for Guests** (2026-03-31): Anonymous users now skip Firestore writes entirely (saves locally via localStorage). Eliminates REQUEST_FAILED console errors.
+- **Bug Fix: NaN Guards** (2026-03-31): All financial setters in App.tsx reject NaN values to prevent data corruption.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
