@@ -956,10 +956,41 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   };
 
   // Place highway shield markers along the route using HERE Map Image API
+  // Frontend shield image blob URL cache — prevents duplicate HTTP requests for same shield type
+  const shieldBlobCacheRef = useRef<Map<string, string>>(new Map());
+  
+  const getShieldBlobUrl = useCallback(async (shieldUrl: string): Promise<string> => {
+    if (shieldBlobCacheRef.current.has(shieldUrl)) return shieldBlobCacheRef.current.get(shieldUrl)!;
+    try {
+      const resp = await fetch(shieldUrl);
+      if (!resp.ok || resp.status === 204) return '';
+      const blob = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      shieldBlobCacheRef.current.set(shieldUrl, blobUrl);
+      return blobUrl;
+    } catch { return ''; }
+  }, []);
+
   const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[]) => {
     if (!shieldLayerGroupRef.current || shields.length === 0) return;
     
+    // Pre-fetch unique shield images in parallel, then place all markers at once
+    const uniqueUrls = new Map<string, string>();
     shields.forEach((shield) => {
+      const stateCode = currentRegion.state || '';
+      const params = new URLSearchParams({ label: shield.label, countryCode: 'USA', routeLevel: String(shield.routeLevel), width: '64' });
+      if (stateCode && stateCode.length === 2) params.append('stateCode', stateCode.toUpperCase());
+      uniqueUrls.set(`${shield.label}-${shield.routeLevel}-${stateCode}`, `/api/road-shield?${params.toString()}`);
+    });
+
+    // Batch prefetch all unique shield images
+    const fetchPromises = Array.from(uniqueUrls.values()).map(url => 
+      dataSaver ? Promise.resolve('') : getShieldBlobUrl(url)
+    );
+
+    Promise.all(fetchPromises).then(() => {
+      // Now place all markers with cached blob URLs
+      shields.forEach((shield) => {
       const { label, routeLevel, type, coord, direction } = shield;
       if (!coord || !coord[0] || !coord[1]) return;
       
@@ -994,6 +1025,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           <span style="color:black;font-size:${label.length > 2 ? '10' : '13'}px;font-weight:900">${label}</span></div>`;
       }
 
+      // Use cached blob URL for the shield image to prevent duplicate HTTP requests
+      const cachedBlobUrl = shieldBlobCacheRef.current.get(shieldUrl) || '';
+      
       // In data saver mode, skip HERE API image and use only SVG fallback
       const iconHtml = dataSaver 
         ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
@@ -1001,18 +1035,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
             ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
           </div>`
-        : `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
-            ${dirBadge}
-            <img src="${shieldUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
-            <div style="display:none;align-items:center;justify-content:center">${fallbackHtml}</div>
-            ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
-          </div>`;
+        : cachedBlobUrl
+          ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
+              ${dirBadge}
+              <img src="${cachedBlobUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
+              ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+            </div>`
+          : `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
+              ${dirBadge}
+              <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
+              ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+            </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
       L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 500, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      });
+      console.log(`[Shields] Placed ${shields.length} highway shield markers on route${dataSaver ? ' (data saver)' : ''}`);
+    }).catch(err => {
+      console.error('[Shields] Failed to prefetch shield images:', err);
     });
-    console.log(`[Shields] Placed ${shields.length} highway shield markers on route${dataSaver ? ' (data saver)' : ''}`);
-  }, [currentRegion.state, dataSaver]);
+  }, [currentRegion.state, dataSaver, getShieldBlobUrl]);
 
   // Place exit signs along the route
   const placeExitSigns = useCallback((exits: { name: string; exitNumber?: string; coord: [number, number] }[]) => {
@@ -2999,7 +3041,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           // Track highway shields for route overlay
           let lastShieldName = '';
           let lastShieldPointIndex = -99999;
-          const MIN_SHIELD_GAP = Math.max(30, Math.floor(totalPoints * 0.03)); // Min ~3% of route between shields
+          const routeDistMi = summary.length / 1609.34;
+          // Same-road shields: space every ~40-60 miles (higher for longer routes)
+          const SAME_ROAD_GAP = Math.max(200, Math.floor(totalPoints * (routeDistMi > 200 ? 0.08 : 0.06)));
+          // Different-road shields: place immediately but with small minimum gap to avoid overlap
+          const DIFF_ROAD_GAP = Math.max(15, Math.floor(totalPoints * 0.005));
           
           // Track speed limit changes
           let prevSpeedLimit = -1;
@@ -3136,8 +3182,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   
                   if (shieldLabel) {
                     const effectiveIdx = span.offset ?? currentPointIndex;
-                    // Only add if road changed or sufficient distance since last shield of same type
-                    if (routeValue !== lastShieldName || (effectiveIdx - lastShieldPointIndex) > MIN_SHIELD_GAP) {
+                    const isSameRoad = routeValue === lastShieldName;
+                    const gap = isSameRoad ? SAME_ROAD_GAP : DIFF_ROAD_GAP;
+                    
+                    if (!isSameRoad || (effectiveIdx - lastShieldPointIndex) > gap) {
                       highwayShields.push({
                         label: shieldLabel,
                         routeLevel,

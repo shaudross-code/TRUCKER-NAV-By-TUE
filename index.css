@@ -50,6 +50,20 @@
   background: transparent !important;
   border: none !important;
   pointer-events: none !important;
+  will-change: transform;
+  contain: layout style;
+}
+
+/* GPU compositing for map markers */
+.user-marker-container,
+.leaflet-marker-pane {
+  will-change: transform;
+}
+
+/* Reduce paint complexity for counter-rotated elements */
+.counter-rotate {
+  will-change: transform;
+  contain: layout;
 }
 
 .map-interaction-disabled {
