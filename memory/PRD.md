@@ -22,20 +22,20 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Fuel Network tab (voice alerts for distance to selected POIs)
 - Loading screen masking component render gaps
 - Satellite tiles for 2D view (Mapbox satellite-streets-v12)
-- **Highway Road Shield Emblems** — HERE Map Image API v3 for official shield PNGs with N/S/E/W direction badges
-- **Highway Exit Signs** — Green exit signs at highway exits with exit number and destination
-- **Sharp Curve Warning Signs** — Yellow diamond signs at sharp turns
-- **Speed Limit Change Signs** — White signs at speed limit transition points
-- **Traffic Slowdown Markers** — Red/orange markers at traffic incident locations
-- **CMV Essential Warning Signs** — Steep Downgrade, Steep Hill, Rollover Risk, Winding Road (from 3D elevation)
-- **CMV Voice Announcements** — Proximity-based TTS at 2mi and 0.5mi from each hazard zone
-- **Counter-Rotation for All Map Signs** — All signs stay upright during heading-up rotation
-- **Heading-Up Precision Fix** (2025-03-31):
-  - Removed manualRotation offset from heading-up formula (now purely -currentHeading)
-  - Reset manualRotation to 0 when entering heading-up mode
-  - Blocked two-finger touch rotation in heading-up mode
-  - Increased smoothing factor (0.45 normal, 0.6 when driving on route)
-  - Fixed `remainingMiles` scoping in CMV voice announcement block
+- Highway Road Shield Emblems — HERE Map Image API v3 with N/S/E/W direction badges
+- Highway Exit Signs — Green exit signs at highway exits
+- Sharp Curve Warning Signs — Yellow diamond signs at sharp turns
+- Speed Limit Change Signs — White signs at transition points
+- Traffic Slowdown Markers — Red/orange markers at incident locations
+- CMV Essential Warning Signs — Steep Downgrade, Steep Hill, Rollover Risk, Winding Road
+- CMV Voice Announcements — Proximity-based TTS at 2mi and 0.5mi from hazard zones
+- Counter-Rotation for All Map Signs — All signs stay upright during heading-up rotation
+- Heading-Up Precision Fix — Removed manualRotation offset, blocked touch rotation in heading-up
+- **Sidebar Overflow Fix** (2025-03-31): All 9 nav items visible (reduced padding, compact bottom actions)
+- **Data Saver Toggle** (2025-03-31): Functional toggle in Settings → SYSTEM & DATA section
+  - Persisted in localStorage (trucker_dataSaver)
+  - ON: OSM tiles replace Mapbox satellite, SVG fallback shields (no API calls)
+  - OFF: Full Mapbox satellite tiles, HERE API shield PNGs
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
@@ -45,7 +45,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Fuel cost calculator (live diesel prices)
 - Driver fatigue alert (DOT Hours of Service)
 - iOS/Android Store Submission (requires user signing certs via /app/SIGNING_GUIDE.md)
-- **Refactoring**: Break down NavigationView.tsx (~5600 lines) into hooks and sub-components
+- Refactoring: Break down NavigationView.tsx (~5600 lines) into hooks and sub-components
 
 ## Key Technical Notes
 - DO NOT TOUCH map container scaling/clipping logic
