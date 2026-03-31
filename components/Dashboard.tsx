@@ -480,16 +480,16 @@ const Dashboard: React.FC = React.memo(() => {
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Weekly Earnings</span>
-                <button onClick={() => setIsEarningsInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+                <button data-testid="earnings-input-close" onClick={() => setIsEarningsInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
-                  <input autoFocus type="number" step="0.01" value={newEntryValue} onChange={(e) => setNewEntryValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdjustEarnings('add')} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
+                  <input data-testid="earnings-input" autoFocus type="number" step="0.01" value={newEntryValue} onChange={(e) => setNewEntryValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAdjustEarnings('add')} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
                 <div className="flex gap-1.5">
-                  <button onClick={() => handleAdjustEarnings('subtract')} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
-                  <button onClick={() => handleAdjustEarnings('add')} className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+                  <button data-testid="earnings-subtract-btn" onClick={() => handleAdjustEarnings('subtract')} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button data-testid="earnings-add-btn" onClick={() => handleAdjustEarnings('add')} className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
                 </div>
               </div>
             </div>

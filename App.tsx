@@ -330,6 +330,7 @@ const AppContent: React.FC = React.memo(() => {
   const setWeeklyEarnings = useCallback((val: any) => {
     setWeeklyEarningsState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
       saveLocal('weeklyEarnings', newVal);
       updateProfile({ weeklyEarnings: newVal }).catch(() => {});
       return newVal;
@@ -339,6 +340,7 @@ const AppContent: React.FC = React.memo(() => {
   const setMilesThisWeek = useCallback((val: any) => {
     setMilesThisWeekState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
       saveLocal('milesThisWeek', newVal);
       updateProfile({ milesThisWeek: newVal }).catch(() => {});
       return newVal;
@@ -348,6 +350,7 @@ const AppContent: React.FC = React.memo(() => {
   const setFuelCost = useCallback((val: any) => {
     setFuelCostState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
       saveLocal('fuelCost', newVal);
       updateProfile({ fuelCost: newVal }).catch(() => {});
       return newVal;
@@ -357,6 +360,7 @@ const AppContent: React.FC = React.memo(() => {
   const setTruckCost = useCallback((val: any) => {
     setTruckCostState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
       saveLocal('truckCost', newVal);
       updateProfile({ truckCost: newVal }).catch(() => {});
       return newVal;
@@ -366,6 +370,7 @@ const AppContent: React.FC = React.memo(() => {
   const setWeekDeductions = useCallback((val: any) => {
     setWeekDeductionsState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
       saveLocal('weekDeductions', newVal);
       updateProfile({ weekDeductions: newVal }).catch(() => {});
       return newVal;
@@ -375,6 +380,7 @@ const AppContent: React.FC = React.memo(() => {
   const setTakeHomePercentage = useCallback((val: any) => {
     setTakeHomePercentageState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
       saveLocal('takeHomePercentage', newVal);
       updateProfile({ takeHomePercentage: newVal }).catch(() => {});
       return newVal;

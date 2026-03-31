@@ -222,6 +222,11 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
     if (!user) return;
+    // Skip Firestore writes for anonymous users — data is saved locally via localStorage
+    if (user.isAnonymous) {
+      setProfile(prev => prev ? { ...prev, ...data } : null);
+      return;
+    }
     try {
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, data);
