@@ -52,19 +52,20 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 - **P0 Backend Fix: HERE API 400 Error** (2026-03-31): Removed invalid `notices` from HERE API `return` parameter in server.ts line 263. `notices` is only valid for `spans`, not `return`. Route calculation restored — 3 alternatives, full span data (speedLimit, truckAttributes, notices).
 - **Nginx Proxy Setup** (2026-03-31): Configured nginx on port 3000 to reverse-proxy to port 8001 (Express+Vite). Previous sessions had this drop occasionally.
+- **Route Comparison Panel** (2026-03-31): Replaced inline route preview with dedicated `RouteComparisonPanel` component. Shows toll costs, fuel estimates (gallons + cost), duration, distance, and restriction count for each route alternative. Professional card-based layout with color-coded route indicators.
+- **Toll Data Integration** (2026-03-31): Added `tolls` to HERE API `return` parameter in server.ts. Toll costs extracted from route sections and displayed in route comparison. NYC congestion pricing verified.
+- **Fuel Cost Calculator** (2026-03-31): New `FuelCostCalculator` component with adjustable diesel price ($2-$6/gal slider) and truck MPG (3-10 slider). Shows total cost, gallons needed, cost per mile. Defaults to national average $3.52/gal and 6.5 MPG. Collapsible panel on right side during navigation.
+- **Driver Fatigue Alert (FMCSA HOS)** (2026-03-31): New `DriverFatigueAlert` component tracking all standard FMCSA Hours of Service rules: 11-hour driving limit, 14-hour on-duty window, 30-minute break after 8 hours, 70-hour/8-day cycle. Color-coded progress bars (green→amber→red), voice alerts for violations, Start Break / 10hr Off-Duty / Reset Cycle actions. State persisted to localStorage.
+- **Dynamic Lane Count Visualization** (2026-03-31): New `useLaneVisualization` hook draws white dashed lane divider lines on highway segments. Lane count inferred from HERE API `functionalClass` spans (FC1→4 lanes, FC2→3, FC3-4→2, FC5→1). Lane count indicators ("4L", "3L") shown at segment midpoints. Only rendered on FC1/FC2 highways to avoid clutter.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
 
 ## Future/Backlog (P2)
-- Dynamic lane count visualization on route polyline
 - Speed limit warning system (flash red + audio alert when exceeding posted speed)
 - Viewport-based sign culling (performance optimization — only render visible signs)
-- Route comparison view (alternate routes with toll costs/fuel estimates)
-- Fuel cost calculator (live diesel prices)
-- Driver fatigue alert (DOT Hours of Service)
 - iOS/Android Store Submission (requires user signing certs via /app/SIGNING_GUIDE.md)
-- Refactoring: Break down NavigationView.tsx (~6100 lines) into hooks and sub-components
+- Refactoring: Break down NavigationView.tsx (~6200 lines) into hooks and sub-components
 
 ## Key Technical Notes
 - DO NOT TOUCH map container scaling/clipping logic
@@ -75,5 +76,8 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Heading-up rotation: `totalRotation = -currentHeading` (NO manualRotation)
 - Touch rotation blocked in heading-up mode (only allowed in north-up mode)
 - The "backend" supervisor process must be stopped to avoid port conflict with trucker-nav
-- HERE API `return` valid types: summary, actions, instructions, incidents, polyline, turnByTurnActions, elevation (NOT notices)
-- HERE API `spans` valid types include: notices, truckAttributes, speedLimit, maxSpeed, etc.
+- HERE API `return` valid types: summary, actions, instructions, incidents, polyline, turnByTurnActions, elevation, tolls (NOT notices)
+- HERE API `spans` valid types include: notices, truckAttributes, speedLimit, maxSpeed, functionalClass, etc.
+- Lane visualization uses `functionalClass` from spans: FC1=4 lanes, FC2=3, FC3-4=2, FC5=1
+- Fuel cost default: $3.52/gal national average, 6.5 MPG
+- FMCSA HOS rules: 11hr drive, 14hr on-duty, 30min break after 8hr, 70hr/8day cycle
