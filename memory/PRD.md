@@ -50,22 +50,30 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Shield Image Blob Cache** (2026-03-31): Pre-fetches unique shield images in parallel via Promise.all, stores as blob:// URLs. Eliminates duplicate HTTP requests for same shield type. Falls back to SVG in data saver mode.
 - **CSS Performance Optimizations** (2026-03-31): Added will-change: transform and contain: layout/style on highway-shield-icon, user-marker-container, leaflet-marker-pane, counter-rotate elements for GPU compositing.
 
+- **P0 Backend Fix: HERE API 400 Error** (2026-03-31): Removed invalid `notices` from HERE API `return` parameter in server.ts line 263. `notices` is only valid for `spans`, not `return`. Route calculation restored — 3 alternatives, full span data (speedLimit, truckAttributes, notices).
+- **Nginx Proxy Setup** (2026-03-31): Configured nginx on port 3000 to reverse-proxy to port 8001 (Express+Vite). Previous sessions had this drop occasionally.
+
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
 
 ## Future/Backlog (P2)
+- Dynamic lane count visualization on route polyline
+- Speed limit warning system (flash red + audio alert when exceeding posted speed)
+- Viewport-based sign culling (performance optimization — only render visible signs)
 - Route comparison view (alternate routes with toll costs/fuel estimates)
 - Fuel cost calculator (live diesel prices)
 - Driver fatigue alert (DOT Hours of Service)
 - iOS/Android Store Submission (requires user signing certs via /app/SIGNING_GUIDE.md)
-- Refactoring: Break down NavigationView.tsx (~5600 lines) into hooks and sub-components
+- Refactoring: Break down NavigationView.tsx (~6100 lines) into hooks and sub-components
 
 ## Key Technical Notes
 - DO NOT TOUCH map container scaling/clipping logic
-- User icon: black circle with gold border + ping animation (DO NOT CHANGE)
-- Nginx proxy on port 3000 sometimes drops — recreate if needed
+- User icon: HERE-style blue navigation chevron (SVG with gradient #4285F4→#1A73E8)
+- Nginx proxy on port 3000 → port 8001 (must recreate if dropped: /etc/nginx/conf.d/app-proxy.conf)
 - All sign markers stored in `shieldLayerGroupRef` and cleared on route clear AND cancel
 - CMV warnings computed from 3D polyline elevation data (HERE `return=elevation`)
 - Heading-up rotation: `totalRotation = -currentHeading` (NO manualRotation)
 - Touch rotation blocked in heading-up mode (only allowed in north-up mode)
 - The "backend" supervisor process must be stopped to avoid port conflict with trucker-nav
+- HERE API `return` valid types: summary, actions, instructions, incidents, polyline, turnByTurnActions, elevation (NOT notices)
+- HERE API `spans` valid types include: notices, truckAttributes, speedLimit, maxSpeed, etc.
