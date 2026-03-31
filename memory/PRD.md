@@ -46,6 +46,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Route Snapping** (2026-03-31): User marker position is projected onto the nearest route polyline segment during active navigation. Uses orthogonal sub-segment interpolation for smooth placement between vertices. Snap threshold ~100m — falls back to raw GPS when off-route.
 - **Auto-Zoom for Maneuvers** (2026-03-31): Zooms in +2 levels when within 0.3mi of a turn (0.4mi for complex maneuvers: exits, forks, roundabouts, merges). Smoothly zooms back to user's preferred level when past 0.6mi. Uses flyTo with easing. Resets on route clear/cancel.
 - **Zoom Level Indicator** (2026-03-31): Shows current zoom level number between + and - buttons in MapControls. Updates reactively via Leaflet zoomend event. User's preferred zoom is tracked separately from auto-zoom changes.
+- **Highway Shield Clustering Fix** (2026-03-31): Fixed over-clustering by using different spacing gaps: SAME_ROAD_GAP (~8% of route, ~40-60mi apart) for same road repeats, DIFF_ROAD_GAP (~0.5%) for route number changes. Shield count reduced from 27 to 14 for 545mi route.
+- **Shield Image Blob Cache** (2026-03-31): Pre-fetches unique shield images in parallel via Promise.all, stores as blob:// URLs. Eliminates duplicate HTTP requests for same shield type. Falls back to SVG in data saver mode.
+- **CSS Performance Optimizations** (2026-03-31): Added will-change: transform and contain: layout/style on highway-shield-icon, user-marker-container, leaflet-marker-pane, counter-rotate elements for GPU compositing.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
