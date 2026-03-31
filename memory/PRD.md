@@ -36,6 +36,11 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Truck Profile Edit Modal** (2026-03-31): Replaced `window.prompt()` with React modal for editing truck fields (height, weight, length, width, axle count, axle weight, trailer count, tunnel category, hazmat classes). Number input for numeric fields, dropdown select for tunnel category.
 - **Waypoint Arrived/Skip Panel** (2026-03-31): Added interactive popup above bottom HUD during active navigation. Shows next waypoint with Arrived (removes + reroutes) and Skip (removes + reroutes) buttons. Voice announcement on action. Shows remaining stop count.
 - **User Icon Spin/Direction Fix** (2026-03-31): Fixed marker being recreated on every GPS update (caused spinning). Added guard clause to create marker only once. Removed CSS transition desync between vehicle-pointer and map-container. Pre-applies smoothed heading on creation to prevent 0° flash.
+- **Route Overlay Z-Ordering** (2026-03-31): Created custom Leaflet panes — routePane (z-index 420) for polylines, signPane (z-index 630) for all sign markers. All 6 sign types (highway shields, exits, curves, speed limits, traffic, CMV warnings) render ON TOP of the highlighted route.
+- **Multi-Section Route Merging** (2026-03-31): Waypoint routes with multiple sections now merge polylines and offset action/span indices correctly for proper exit placement across all legs.
+- **Route Fetch Retry** (2026-03-31): Added exponential backoff retry (2 retries, 1s/2s delay) for route API calls. Handles network flakes gracefully.
+- **Network & GPS Monitoring** (2026-03-31): Added offline banner ("No Network — Using Cached Data") and weak GPS signal indicator for professional reliability. Added isOnline and gpsAccuracy to AppContext.
+- **Centralized Sign Clearing** (2026-03-31): Moved sign clearing to a single point before all sign placement, preventing stale sign accumulation.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
