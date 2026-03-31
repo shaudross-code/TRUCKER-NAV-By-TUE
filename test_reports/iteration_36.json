@@ -1,0 +1,114 @@
+{
+  "summary": "Tested heading-up rotation precision fix. All key changes verified: 1) Heading-up formula is purely -currentHeading (no manualRotation offset), 2) manualRotation resets to 0 when entering heading-up mode, 3) Touch rotation blocked in heading-up mode, 4) Smoothing factor increased to 0.45/0.6. Route to Vail works with all sign types.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Navigation update",
+        "issue": "ReferenceError: remainingMiles is not defined - occurs during navigation state updates",
+        "affected_selectors": [],
+        "priority": "MEDIUM"
+      }
+    ],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/test_reports/pytest/road_shield_cmv_results.xml"
+  ],
+
+  "action_items": [
+    "Fix ReferenceError: remainingMiles is not defined in NavigationView.tsx (appears in console during navigation)"
+  ],
+
+  "critical_code_review_comments": [
+    "VERIFIED: Line 4199-4202 - Heading-up mode rotation is purely -currentHeading (no manualRotation offset)",
+    "VERIFIED: Line 313-316 - handleToggleNorthUp resets manualRotation to 0 when entering heading-up mode",
+    "VERIFIED: Line 360-376 - Touch rotation handlers only active when isNorthUp is true (blocked in heading-up)",
+    "VERIFIED: Line 4186 - Smoothing factor increased to 0.6 for route navigation, 0.45 otherwise",
+    "VERIFIED: index.css line 29 - map rotation CSS var (--map-rotation) used by container",
+    "BUG FOUND: Console error 'ReferenceError: remainingMiles is not defined' during navigation updates"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "100%",
+    "frontend": "95% (minor console error)"
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+
+  "context_for_next_testing_agent": "Heading-up rotation fix verified. Key test results: 1) Initial heading-up state: nav_north_up=false, rotation=-54.19deg, 2) After North-up toggle: nav_north_up=true, rotation=0deg, 3) After Heading-up toggle: nav_north_up=false, rotation=-90.33deg. Route to Vail produces 27 shields, 3 exits, 5 speed limits, 10 CMV warnings. Minor bug: 'remainingMiles is not defined' error in console during navigation.",
+
+  "features_tested": {
+    "heading_up_rotation_formula": {
+      "status": "PASS",
+      "details": "Line 4201: totalRotation = -currentHeading (no manualRotation offset). Verified rotation values: -54.19deg, -90.33deg"
+    },
+    "manual_rotation_reset_on_heading_up_entry": {
+      "status": "PASS",
+      "details": "Line 315-316: setManualRotation(0) and manualRotationRef.current = 0 when entering heading-up mode"
+    },
+    "touch_rotation_blocked_in_heading_up": {
+      "status": "PASS",
+      "details": "Line 361, 371: Touch handlers check 'isNorthUp' before allowing rotation - blocked when isNorthUp=false (heading-up)"
+    },
+    "north_up_mode_allows_manual_rotation": {
+      "status": "PASS",
+      "details": "Line 4203-4206: North-up mode applies manualRotationRef.current to rotation"
+    },
+    "smoothing_factor_increased": {
+      "status": "PASS",
+      "details": "Line 4186: factor = 0.6 when driving with route, 0.45 otherwise (increased from 0.35)"
+    },
+    "route_calculation_works": {
+      "status": "PASS",
+      "details": "Route from Council Bluffs to Vail: 638.4 mi, 9h 9m"
+    },
+    "highway_shield_markers": {
+      "status": "PASS",
+      "details": "27 highway shield markers placed on route"
+    },
+    "exit_sign_markers": {
+      "status": "PASS",
+      "details": "3 exit sign markers placed on route"
+    },
+    "speed_limit_sign_markers": {
+      "status": "PASS",
+      "details": "5 speed limit sign markers placed on route"
+    },
+    "cmv_warning_markers": {
+      "status": "PASS",
+      "details": "10 CMV warning markers placed on route"
+    },
+    "orientation_toggle_button": {
+      "status": "PASS",
+      "details": "data-testid='orientation-btn' toggles between heading-up and north-up modes correctly"
+    },
+    "vehicle_marker_rotation": {
+      "status": "PASS",
+      "details": "Vehicle marker uses --vehicle-rotation CSS var set to currentHeading"
+    }
+  },
+
+  "console_error_found": {
+    "error": "ReferenceError: remainingMiles is not defined",
+    "location": "NavigationView.tsx during navigation state updates",
+    "impact": "Non-blocking - navigation continues to work",
+    "suggested_fix": "Ensure remainingMiles is defined before being used in forEach loops for restriction/traffic/CMV alerts"
+  }
+}

@@ -311,7 +311,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         el.style.setProperty('--map-rotation', '0deg');
       }
     } else {
-      // Switching TO Heading Up — apply current heading immediately
+      // Switching TO Heading Up — reset manual rotation and apply current heading
+      setManualRotation(0);
+      manualRotationRef.current = 0;
       // Use best available heading: GPS → route-based → position-based → smoothed
       let heading = telemetryContext?.headingRef?.current || 0;
       // Route-based heading: use current segment or first segment
@@ -334,7 +336,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (heading > 0) {
         smoothedHeadingRef.current = heading;
       }
-      const totalRotation = -heading + manualRotationRef.current;
+      const totalRotation = -heading;
       if (el) {
         el.style.setProperty('--map-rotation', `${totalRotation}deg`);
       }
@@ -356,7 +358,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
 
     const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2 && isNorthUp) {
+        // Only allow manual rotation in north-up mode
         e.preventDefault();
         isRotatingRef.current = true;
         initialAngleRef.current = getAngle(e.touches);
@@ -365,7 +368,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (isRotatingRef.current && e.touches.length === 2) {
+      if (isRotatingRef.current && e.touches.length === 2 && isNorthUp) {
         e.preventDefault();
         const currentAngle = getAngle(e.touches);
         const deltaAngle = currentAngle - initialAngleRef.current;
@@ -386,7 +389,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       mapEl.removeEventListener('touchmove', handleTouchMove);
       mapEl.removeEventListener('touchend', handleTouchEnd);
     };
-  }, []);
+  }, [isNorthUp]);
 
   // Device compass mode — uses DeviceOrientationEvent for physical compass heading
   useEffect(() => {
@@ -4173,13 +4176,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         }
       }
 
-      // Smooth the heading — speed is in mph (already converted in App.tsx)
+      // Smooth the heading — faster convergence when driving on route for precise alignment
       if (speed > 0.3 || rawHeading !== 0) {
         const diff = rawHeading - smoothedHeadingRef.current;
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
-        // Faster convergence (0.35) so heading-up responds promptly
-        smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * 0.35 + 360) % 360;
+        // Use higher convergence when actively navigating with route heading (0.6), 
+        // normal convergence otherwise (0.45)
+        const factor = (isDriving && routeCoordsRef.current.length > 1) ? 0.6 : 0.45;
+        smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * factor + 360) % 360;
       }
 
       const currentHeading = smoothedHeadingRef.current;
@@ -4191,13 +4196,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Update map rotation based on mode — apply to container div, not mapPane
       const el = mapRef.current;
       if (el) {
-        const rotation = manualRotationRef.current;
         if (!isNorthUp) {
-          // Heading-up mode: rotate map opposite to heading
-          const totalRotation = -currentHeading + rotation;
+          // Heading-up mode: rotate map purely opposite to heading (no manual rotation offset)
+          const totalRotation = -currentHeading;
           el.style.setProperty('--map-rotation', `${totalRotation}deg`);
         } else if (!isCompassMode) {
           // North-up mode: apply only manual rotation
+          const rotation = manualRotationRef.current;
           el.style.setProperty('--map-rotation', `${rotation}deg`);
         }
       }
