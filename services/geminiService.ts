@@ -193,24 +193,21 @@ export async function fetchMajorChains(lat: number, lon: number) {
     if (!ai) throw new Error("AI not initialized");
     const response = await withRetry(() => ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Find 100 real locations of major truck stop chains within a 1500-mile radius of coordinates ${lat}, ${lon}. 
-      This is for a professional worldwide trucking application. Focus on high reliability and accurate coordinates.
-      Focus EXCLUSIVELY on these brands: 
+      contents: `Find 100 real locations of major TRUCK STOP PLAZAS and TRAVEL CENTERS within a 1500-mile radius of coordinates ${lat}, ${lon}. 
+      This is for a professional trucking application. Focus on high reliability and accurate coordinates.
+      Focus EXCLUSIVELY on these truck stop plaza brands (NOT regular gas stations or convenience stores): 
       - Love's Travel Stops
       - Pilot Travel Centers
       - Flying J Travel Centers
       - Petro Stopping Centers
       - TA (TravelCenters of America)
       - Road Ranger
-      - KwikTrip / KwikStar
       - Buc-ee's
-      - Speedway
-      - Casey's
-      - Wawa
-      - Sheetz
-      - QuikTrip
-      - RaceTrac
-      - Conoco
+      - Sapp Bros Travel Centers
+      - Ambest
+      
+      DO NOT include regular gas stations like Shell, BP, Exxon, Speedway, Casey's, Wawa, Sheetz, QuikTrip, RaceTrac, Circle K, 7-Eleven, Conoco, Marathon, or Chevron.
+      Only include locations that are actual truck stop plazas with diesel islands, truck parking, and trucker amenities.
       
       Return a JSON array of objects with: name, type, lat, lon, and amenities.`,
       config: {
@@ -260,14 +257,14 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
   try {
     // Fetch multiple types of truck-related POIs in parallel using HERE APIs
     const [generalPOIs, truckStopPOIs, ...brandResults] = await Promise.all([
-      // General fueling stations, rest areas, weigh stations via Browse
+      // Weigh stations and rest areas via Browse (NO general fueling — removes random gas stations)
       fetch('/api/browse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
           lat, 
           lon, 
-          categories: '700-7600-0116,700-7600-0117,700-7600-0322'
+          categories: '700-7600-0117,700-7600-0322'
         })
       }).then(r => r.ok ? r.json() : { items: [] }),
       
@@ -275,11 +272,11 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       fetch('/api/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: safeStringify({ q: 'truck stop', lat, lon, radius: 80000 })
+        body: safeStringify({ q: 'truck stop travel plaza', lat, lon, radius: 80000 })
       }).then(r => r.ok ? r.json() : { items: [] }),
       
-      // Major brands via individual Discover calls (HERE doesn't support OR queries)
-      ...["Love's Travel Stop", "Pilot Flying J", "Petro Stopping Centers", "TA TravelCenters", "Cat Scale", "Blue Beacon Truck Wash"].map(brand =>
+      // Major truck stop plaza brands + DOT weigh stations + certified scales
+      ...["Love's Travel Stop", "Pilot Flying J", "Petro Stopping Centers", "TA TravelCenters", "Cat Scale certified truck scale", "Blue Beacon Truck Wash", "DOT weigh station", "Sapp Bros Travel Center"].map(brand =>
         fetch('/api/discover', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -345,30 +342,45 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
       
       const isWalmart = itemName.includes('walmart') || itemName.includes('wal-mart');
       const isRetail = itemName.includes("lowe's") || itemName.includes('lowes') || itemName.includes('home depot');
-      const isFuelBrand = itemName.includes('exxon') || itemName.includes('shell') ||
-                          itemName.includes('marathon') || itemName.includes('circle k') ||
-                          itemName.includes('7-eleven') || itemName.includes('seven eleven') ||
-                          itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp' ||
-                          itemName.includes('chevron') || itemName.includes('sinclair') ||
-                          itemName.includes('conoco') || itemName.includes('phillips 66') ||
-                          itemName.includes('casey') || itemName.includes('kwik') ||
-                          itemName.includes('quiktrip') || itemName.includes('wawa') ||
-                          itemName.includes('sheetz') || itemName.includes('racetrac') ||
-                          itemName.includes('speedway');
       const isLowClearance = itemName.includes('low clearance') || itemName.includes('low bridge');
+      // DOT weigh station detection
+      const isDOTWeighStation = itemName.includes('weigh station') || itemName.includes('inspection station') ||
+                                itemName.includes('port of entry') || itemName.includes('dot station');
 
       // EV charging / Tesla — not trucking-relevant, skip entirely
       const isEVCharging = itemName.includes('tesla') || itemName.includes('supercharger') ||
                            itemName.includes('ev charging') || itemName.includes('chargepoint') ||
                            itemName.includes('electrify america') || itemName.includes('ev station') ||
                            itemName.includes('electric vehicle') || itemName.includes('blink charging') ||
+                           itemName.includes('evgo') || itemName.includes('flo charging') ||
                            catIds.some((id: string) => id === '700-7600-0325' || id === '700-7600-0330');
       
+      // Regular gas stations / convenience stores — NOT truck stop plazas, skip
+      const isRegularGasStation = (
+        itemName.includes('exxon') || itemName.includes('shell') ||
+        itemName.includes('marathon') || itemName.includes('circle k') ||
+        itemName.includes('7-eleven') || itemName.includes('seven eleven') ||
+        itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp' ||
+        itemName.includes('chevron') || itemName.includes('sinclair') ||
+        itemName.includes('conoco') || itemName.includes('phillips 66') ||
+        itemName.includes('casey') || itemName.includes('kwik') ||
+        itemName.includes('quiktrip') || itemName.includes('wawa') ||
+        itemName.includes('sheetz') || itemName.includes('racetrac') ||
+        itemName.includes('speedway') || itemName.includes('sunoco') ||
+        itemName.includes('valero') || itemName.includes('citgo') ||
+        itemName.includes('mobil') || itemName.includes('texaco') ||
+        itemName.includes('arco') || itemName.includes('amoco') ||
+        itemName.includes('murphy usa') || itemName.includes('thorntons')
+      ) && !isTruckStop; // Only exclude if not also a truck stop
+      
       // CAT Scales are separate from weigh stations
-      const isCatScale = itemName.includes('cat scale') || itemName.includes('catscale');
+      const isCatScale = itemName.includes('cat scale') || itemName.includes('catscale') ||
+                         itemName.includes('certified scale') || itemName.includes('truck scale');
       
       if (isEVCharging) {
         return null; // Remove non-trucking EV POIs entirely
+      } else if (isRegularGasStation) {
+        return null; // Remove regular gas stations — only truck stop plazas allowed
       } else if (isTruckStop) {
         type = "major_chains"; // Full-service truck stops
       } else if (isCatScale) {
@@ -379,16 +391,16 @@ export async function fetchTruckPOIs(lat: number, lon: number) {
         type = "distribution"; // Retail/Distribution
       } else if (isLowClearance) {
         type = "low_clearance"; // Warning/Hazard
+      } else if (isDOTWeighStation || catIds.includes('700-7600-0322')) {
+        type = "weigh_station";
       } else if (catIds.includes('700-7900-0132')) {
-        type = "service"; // HERE truck-related services (Cat Scale, etc.)
+        type = "service"; // HERE truck-related services
       } else if (catIds.includes('700-7600-0117') || catNames.some((n: string) => n.includes('rest area'))) {
         type = "rest_area";
-      } else if (catIds.includes('700-7600-0322')) {
-        type = "weigh_station";
       } else if (catIds.some((id: string) => id?.startsWith('600-6'))) {
         type = "service";
-      } else if (isFuelBrand || catIds.includes('700-7600-0116')) {
-        type = "fuel";
+      } else if (catIds.includes('700-7600-0116')) {
+        type = "fuel"; // Only generic fuel if no brand matched — rare after filtering
       }
       
       // Extract amenities from categories and name
@@ -536,21 +548,28 @@ export async function fetchCorridorPOIs(
     const batch = dedupedSamples.slice(i, i + 3);
     
     const batchPromises = batch.flatMap(([lat, lng]) => [
-      // Discover: truck stops
+      // Discover: truck stop plazas (NOT regular gas stations)
       fetch('/api/discover', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: safeStringify({ q: 'truck stop', lat, lon: lng, radius: corridorRadius })
+        body: safeStringify({ q: 'truck stop travel plaza', lat, lon: lng, radius: corridorRadius })
       }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] })),
       
-      // Browse: fuel + rest areas + weigh stations within corridor
+      // Browse: rest areas + weigh stations within corridor (NO general fueling 700-7600-0116)
       fetch('/api/browse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: safeStringify({ 
           lat, lon: lng, 
-          categories: '700-7600-0116,700-7600-0117,700-7600-0322'
+          categories: '700-7600-0117,700-7600-0322'
         })
+      }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] })),
+
+      // Discover: DOT weigh stations and certified scales
+      fetch('/api/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: safeStringify({ q: 'DOT weigh station certified scale', lat, lon: lng, radius: corridorRadius })
       }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }))
     ]);
 
@@ -592,22 +611,44 @@ export async function fetchCorridorPOIs(
                         itemName.includes('truck stop') || itemName.includes("love's") ||
                         itemName.includes('pilot') || itemName.includes('flying j') ||
                         itemName.includes('petro stopping') || itemName.includes('sapp bros') ||
-                        itemName.includes('buc-ee');
+                        itemName.includes('buc-ee') || itemName.includes('travel plaza') ||
+                        itemName.includes('ambest') || itemName.includes('road ranger');
     const isTruckService = itemName.includes('speedco') ||
                            itemName.includes('blue beacon') || itemName.includes('rush truck');
-    const isCatScale = itemName.includes('cat scale') || itemName.includes('catscale');
+    const isCatScale = itemName.includes('cat scale') || itemName.includes('catscale') ||
+                       itemName.includes('certified scale') || itemName.includes('truck scale');
     const isEVCharging = itemName.includes('tesla') || itemName.includes('supercharger') ||
                          itemName.includes('ev charging') || itemName.includes('chargepoint') ||
                          itemName.includes('electrify america') || itemName.includes('ev station') ||
                          itemName.includes('electric vehicle') || itemName.includes('blink charging') ||
+                         itemName.includes('evgo') || itemName.includes('flo charging') ||
                          catIds.some((id: string) => id === '700-7600-0325' || id === '700-7600-0330');
+    const isDOTWeighStation = itemName.includes('weigh station') || itemName.includes('inspection station') ||
+                              itemName.includes('port of entry') || itemName.includes('dot station');
+    // Regular gas stations — NOT truck stop plazas
+    const isRegularGasStation = (
+      itemName.includes('exxon') || itemName.includes('shell') ||
+      itemName.includes('marathon') || itemName.includes('circle k') ||
+      itemName.includes('7-eleven') || itemName.includes('seven eleven') ||
+      itemName.includes(' bp ') || itemName.startsWith('bp ') || itemName === 'bp' ||
+      itemName.includes('chevron') || itemName.includes('sinclair') ||
+      itemName.includes('conoco') || itemName.includes('phillips 66') ||
+      itemName.includes('casey') || itemName.includes('kwik') ||
+      itemName.includes('quiktrip') || itemName.includes('wawa') ||
+      itemName.includes('sheetz') || itemName.includes('racetrac') ||
+      itemName.includes('speedway') || itemName.includes('sunoco') ||
+      itemName.includes('valero') || itemName.includes('citgo') ||
+      itemName.includes('mobil') || itemName.includes('texaco') ||
+      itemName.includes('murphy usa')
+    ) && !isTruckStop;
 
-    if (isEVCharging) return null; // Remove non-trucking EV POIs
+    if (isEVCharging) return null; // Remove EV POIs
+    if (isRegularGasStation) return null; // Remove regular gas stations
     if (isTruckStop) type = "major_chains";
     else if (isCatScale) type = "cat_scale";
+    else if (isDOTWeighStation || catIds.includes('700-7600-0322')) type = "weigh_station";
     else if (isTruckService || catIds.includes('700-7900-0132')) type = "service";
     else if (catIds.includes('700-7600-0117')) type = "rest_area";
-    else if (catIds.includes('700-7600-0322')) type = "weigh_station";
 
     const amenities: string[] = [];
     if (isTruckStop) amenities.push("Diesel", "DEF", "Truck Parking", "Food");

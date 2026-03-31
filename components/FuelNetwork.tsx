@@ -10,35 +10,22 @@ interface FuelNetworkItem {
 }
 
 const FUEL_NETWORK_OPTIONS: FuelNetworkItem[] = [
-  // Major Chains
+  // Truck Stop Plazas
   { id: 'loves', label: "Love's Travel Stops", group: 'chains' },
   { id: 'pilot', label: 'Pilot Travel Centers', group: 'chains' },
   { id: 'flying_j', label: 'Flying J', group: 'chains' },
   { id: 'petro', label: 'Petro Stopping Centers', group: 'chains' },
   { id: 'ta', label: 'TravelCenters of America', group: 'chains' },
   { id: 'road_ranger', label: 'Road Ranger', group: 'chains' },
-  { id: 'kwik_trip', label: 'Kwik Trip / Kwik Star', group: 'chains' },
   { id: 'bucees', label: "Buc-ee's", group: 'chains' },
-  { id: 'speedway', label: 'Speedway', group: 'chains' },
-  { id: 'caseys', label: "Casey's General Stores", group: 'chains' },
-  { id: 'wawa', label: 'Wawa', group: 'chains' },
-  { id: 'sheetz', label: 'Sheetz', group: 'chains' },
-  { id: 'quiktrip', label: 'QuikTrip (QT)', group: 'chains' },
-  { id: 'racetrac', label: 'RaceTrac', group: 'chains' },
-  { id: 'circle_k', label: 'Circle K', group: 'chains' },
-  { id: 'seven_eleven', label: '7-Eleven', group: 'chains' },
-  { id: 'conoco', label: 'Conoco', group: 'chains' },
-  { id: 'exxon', label: 'Exxon / Esso', group: 'chains' },
-  { id: 'shell', label: 'Shell', group: 'chains' },
-  { id: 'bp', label: 'BP', group: 'chains' },
-  { id: 'marathon', label: 'Marathon', group: 'chains' },
+  { id: 'sapp_bros', label: 'Sapp Bros', group: 'chains' },
+  { id: 'ambest', label: 'Ambest', group: 'chains' },
   // Services
-  { id: 'cat_scale', label: 'CAT Scales', group: 'services' },
-  { id: 'weigh_station', label: 'Weigh Stations', group: 'services' },
+  { id: 'cat_scale', label: 'Certified Scales', group: 'services' },
+  { id: 'weigh_station', label: 'DOT Weigh Stations', group: 'services' },
   { id: 'truck_wash', label: 'Truck Wash', group: 'services' },
   { id: 'rest_area', label: 'Rest Areas', group: 'services' },
   // Amenities
-  { id: 'fuel', label: 'Generic Fuel Stations', group: 'amenities' },
   { id: 'parking', label: 'Truck Parking', group: 'amenities' },
   { id: 'food', label: 'Food / Restaurants', group: 'amenities' },
 ];

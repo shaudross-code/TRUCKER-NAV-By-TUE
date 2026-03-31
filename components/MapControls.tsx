@@ -66,10 +66,10 @@ export const MapControls: React.FC<any> = React.memo(({
                 <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
-                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
+                      const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'truck_wash'];
                       const allIds = [
-                        ...brandIds, 'fuel', 'parking', 'rest_area', 
-                        'weigh_station', 'cat_scale', 'food', 'service', 'distribution', 'low_clearance', 'other'
+                        ...brandIds, 'parking', 'rest_area', 
+                        'weigh_station', 'cat_scale', 'food', 'service', 'low_clearance', 'other'
                       ];
                       setPoiFilters(new Set(allIds));
                     }}
@@ -92,21 +92,9 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'petro',         label: 'Petro' },
                     { id: 'ta',            label: 'TA' },
                     { id: 'road_ranger',   label: 'Road Ranger' },
-                    { id: 'kwik_trip',     label: 'Kwik Trip' },
                     { id: 'bucees',        label: "Buc-ee's" },
-                    { id: 'speedway',      label: 'Speedway' },
-                    { id: 'caseys',        label: "Casey's" },
-                    { id: 'wawa',          label: 'Wawa' },
-                    { id: 'sheetz',        label: 'Sheetz' },
-                    { id: 'quiktrip',      label: 'QuikTrip' },
-                    { id: 'racetrac',      label: 'RaceTrac' },
-                    { id: 'conoco',        label: 'Conoco' },
-                    { id: 'exxon',         label: 'Exxon' },
-                    { id: 'shell',         label: 'Shell' },
-                    { id: 'bp',            label: 'BP' },
-                    { id: 'marathon',      label: 'Marathon' },
-                    { id: 'circle_k',      label: 'Circle K' },
-                    { id: 'seven_eleven',  label: '7-Eleven' },
+                    { id: 'sapp_bros',     label: 'Sapp Bros' },
+                    { id: 'ambest',        label: 'Ambest' },
                     { id: 'speedco',       label: 'Speedco',       divider: true },
                     { id: 'southern_tire', label: 'Southern Tire' },
                     { id: 'rush',          label: 'Rush Truck Centers' },
@@ -117,18 +105,13 @@ export const MapControls: React.FC<any> = React.memo(({
                     { id: 'freightliner',  label: 'Freightliner' },
                     { id: 'cummins',       label: 'Cummins' },
                     { id: 'truck_wash',    label: 'Truck Wash' },
-                    { id: 'walmart',       label: 'Walmart',       divider: true },
-                    { id: 'lowes',         label: "Lowe's" },
-                    { id: 'home_depot',    label: 'Home Depot' },
-                    { id: 'fuel',          label: 'Fuel (Other)',  divider: true },
-                    { id: 'parking',       label: 'Parking' },
+                    { id: 'parking',       label: 'Parking',       divider: true },
                     { id: 'rest_area',     label: 'Rest Areas' },
-                    { id: 'weigh_station', label: 'Weigh Stations' },
-                    { id: 'cat_scale',    label: 'CAT Scales' },
+                    { id: 'weigh_station', label: 'DOT Weigh Stations' },
+                    { id: 'cat_scale',    label: 'Certified Scales' },
                     { id: 'low_clearance', label: 'Low Clearance' },
                     { id: 'food',          label: 'Food' },
                     { id: 'service',       label: 'Service (Other)' },
-                    { id: 'distribution',  label: 'Distribution' },
                     { id: 'other',         label: 'Other' }
                   ].map(filter => (
                     <React.Fragment key={filter.id}>

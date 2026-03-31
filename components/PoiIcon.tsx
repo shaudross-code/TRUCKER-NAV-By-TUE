@@ -51,6 +51,22 @@ export const getPoiFilterIcon = (id: string) => {
           <text x="10" y="17" textAnchor="middle" fill="#fff" fontFamily="Impact,sans-serif" fontSize="5.5" fontWeight="900">RANGER</text>
         </svg>
       );
+    case 'sapp_bros':
+      return (
+        <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="shrink-0">
+          <rect x=".5" y=".5" width="19" height="19" rx="3.5" fill="#1B3A5C" stroke="#E8B84B" strokeWidth="1"/>
+          <text x="10" y="9" textAnchor="middle" fill="#E8B84B" fontFamily="Impact,sans-serif" fontSize="5" fontWeight="900">SAPP</text>
+          <text x="10" y="15" textAnchor="middle" fill="#fff" fontFamily="Impact,sans-serif" fontSize="5" fontWeight="900">BROS</text>
+        </svg>
+      );
+    case 'ambest':
+      return (
+        <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="shrink-0">
+          <rect x=".5" y=".5" width="19" height="19" rx="3.5" fill="#003366" stroke="#FFD700" strokeWidth="1"/>
+          <text x="10" y="9" textAnchor="middle" fill="#FFD700" fontFamily="Impact,sans-serif" fontSize="4.5" fontWeight="900">AM</text>
+          <text x="10" y="15" textAnchor="middle" fill="#fff" fontFamily="Impact,sans-serif" fontSize="5" fontWeight="900">BEST</text>
+        </svg>
+      );
     case 'kwik_trip':
       return (
         <svg width={S} height={S} viewBox={`0 0 ${S} ${S}`} className="shrink-0">
@@ -392,7 +408,8 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   if (lowerName.includes("petro")) return 'petro';
   if (lowerName.includes("travelcenters") || lowerName.includes(" ta ") || lowerName.startsWith("ta ") || lowerName === "ta") return 'ta';
   if (lowerName.includes("road ranger")) return 'road_ranger';
-  if (lowerName.includes("kwiktrip") || lowerName.includes("kwikstar")) return 'kwik_trip';
+  if (lowerName.includes("sapp bros")) return 'sapp_bros';
+  if (lowerName.includes("ambest")) return 'ambest';
   if (lowerName.includes("buc-ee")) return 'bucees';
   if (lowerName.includes("speedway")) return 'speedway';
   if (lowerName.includes("casey")) return 'caseys';
@@ -565,6 +582,26 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
         <path d="M5 20 L35 20" stroke="#FFC220" strokeWidth="4"/>
         <text x="20" y="16" textAnchor="middle" fill="white" fontFamily="Inter, sans-serif" fontSize="6" fontWeight="900">ROAD</text>
         <text x="20" y="32" textAnchor="middle" fill="white" fontFamily="Inter, sans-serif" fontSize="6" fontWeight="900">RANGER</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("sapp bros")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="36" rx="6" fill="#1B3A5C" stroke="#E8B84B" strokeWidth="2.5"/>
+        <text x="20" y="17" textAnchor="middle" fill="#E8B84B" fontFamily="Inter, sans-serif" fontSize="8" fontWeight="900">SAPP</text>
+        <text x="20" y="30" textAnchor="middle" fill="white" fontFamily="Inter, sans-serif" fontSize="8" fontWeight="900">BROS</text>
+      </svg>
+    );
+  }
+
+  if (lowerName.includes("ambest")) {
+    return (
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-xl">
+        <rect x="2" y="2" width="36" height="36" rx="6" fill="#003366" stroke="#FFD700" strokeWidth="2.5"/>
+        <text x="20" y="16" textAnchor="middle" fill="#FFD700" fontFamily="Inter, sans-serif" fontSize="7" fontWeight="900">AM</text>
+        <text x="20" y="30" textAnchor="middle" fill="white" fontFamily="Inter, sans-serif" fontSize="8" fontWeight="900">BEST</text>
       </svg>
     );
   }

@@ -560,12 +560,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = localStorage.getItem('poi_filters');
-    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco', 'exxon', 'shell', 'bp', 'marathon', 'circle_k', 'seven_eleven', 'walmart', 'lowes', 'home_depot', 'truck_wash'];
+    const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest', 'truck_wash'];
     try {
-      return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'distribution', 'low_clearance', 'other']);
+      return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'low_clearance', 'other']);
     } catch (e) {
       console.error("Failed to parse poi_filters from localStorage", e);
-      return new Set([...brandIds, 'fuel', 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'distribution', 'low_clearance', 'other']);
+      return new Set([...brandIds, 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'low_clearance', 'other']);
     }
   });
 
@@ -5657,7 +5657,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   let Icon = MapIcon;
                   let iconColor = "text-zinc-400";
                   
-                  const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'kwik_trip', 'bucees', 'speedway', 'caseys', 'wawa', 'sheetz', 'quiktrip', 'racetrac', 'conoco'];
+                  const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest'];
                   if (category === 'fuel' || brandIds.includes(category)) { Icon = Fuel; iconColor = "text-yellow-400"; }
                   else if (category === 'parking') { Icon = ParkingSquare; iconColor = "text-blue-400"; }
                   else if (category === 'food') { Icon = UtensilsCrossed; iconColor = "text-green-400"; }
