@@ -6494,7 +6494,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         <div data-testid="trip-info-panel" className={`absolute z-[2000] flex flex-col gap-2 transition-all duration-700 scale-90 md:scale-100 w-40 md:w-52`} style={
           hudPositions.tripPanel && (hudPositions.tripPanel.x !== DEFAULT_POSITIONS.tripPanel.x || hudPositions.tripPanel.y !== DEFAULT_POSITIONS.tripPanel.y)
             ? { left: `${hudPositions.tripPanel.x}%`, top: `${hudPositions.tripPanel.y}%`, transform: 'translate(-50%, -50%)' }
-            : { [hudLayout.tripPanelPosition === 'left' ? 'left' : 'right']: '0.75rem', bottom: '180px' }
+            : { [hudLayout.tripPanelPosition === 'left' ? 'left' : 'right']: '4.5rem', bottom: '180px' }
         }>
           {hudLayout.showFuelCost && <div style={{ transform: `scale(${hudScales.fuelCost || 1})`, transformOrigin: hudLayout.tripPanelPosition === 'left' ? 'top left' : 'top right' }}><FuelCostCalculator
             routeDistanceMi={milesRemaining}
@@ -6985,7 +6985,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {hudLayout.showMapControls && <div style={{ transform: `scale(${hudScales.mapControls || 1})`, transformOrigin: 'right center' }}><MapControls
+      {hudLayout.showMapControls && <MapControls
         mapInstanceRef={mapInstanceRef}
         mapboxMapRef={mapboxMapRef}
         isFilterMenuOpen={isFilterMenuOpen}
@@ -7014,7 +7014,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         currentZoom={currentZoom}
         isDrivingMode={isDriving && milesRemaining > 0}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
-      /></div>}
+        hudScale={hudScales.mapControls || 1}
+      />}
               <RouteSettingsModal
         isOpen={isRouteSettingsOpen}
         onClose={() => setIsRouteSettingsOpen(false)}

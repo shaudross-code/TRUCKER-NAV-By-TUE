@@ -8,7 +8,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Backend**: Node.js/Express (server.ts) on port 8001
 - **Mobile**: Capacitor (iOS/Android) with EAS Build CI/CD
 - **APIs**: HERE Maps (Routing v8, Discover, Traffic), Mapbox (Tiles), Google Maps (Places), Firebase (Auth), Gemini AI
-- **Storage**: Firebase Firestore + LocalStorage (guest config)
+- **Storage**: Firebase Firestore + LocalStorage (guest config) + File-based JSON (ratings, parking)
 
 ## What's Been Implemented (Completed)
 
@@ -19,7 +19,6 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Lane guidance with dynamic lane visualization
 - Maneuver previews with upcoming turn info
 - GPS interpolation for smooth marker movement
-- Route following with automatic route-snapping
 
 ### Map Features
 - 2D satellite/street maps with Mapbox + Leaflet
@@ -30,71 +29,81 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Highway shield markers (MUTCD-compliant)
 
 ### Safety & Alerts
-- Real-time traffic incident overlays
-- Auto-reroute countdown on off-route detection
+- Real-time traffic incident overlays + auto-reroute countdown
 - Truck restriction warnings (bridges, weight, tunnel, hazmat)
 - CMV warning signs (steep grades, rollover risk)
 - Speed limit display (MUTCD-style signs on map)
 - Weather alerts and route hazard reports
 
-### Professional Lane Guidance System
-- **Visual LaneRibbon**: SVG directional arrows (8 directions) with blue highlighting for recommended lanes
-- **Synthesized lane data**: Generated from HERE API action types
-- **Voice lane guidance**: 7+ distance thresholds with professional callouts
+### Speed Limit Warning System (NEW - Apr 1, 2026)
+- **Visual Warning**: Speed display turns red with glow + pulse animation when exceeding speed limit + tolerance
+- **Audio Alert**: 880Hz square wave beeps every 3 seconds while speeding (Web Audio API)
+- **"SLOW DOWN" Banner**: Red banner above Arrival Bar showing current vs limit speed
+- **Configurable Tolerance**: +0, +3, +5 (default), +8, +10 mph tolerance in Display tab
+- **Toggle**: 21st element in Display Layout tab with siren icon
 
-### UI/HUD System
-- NavigationHUD: Top-center turn-by-turn instruction card
-- Arrival HUD: Bottom bar with road name, speed, distance, time, ETA
-- Weather panel with forecast
-- Fuel cost and HOS status panels
-- Truck restrictions and route hazards panels
-- Along-route POI list
-- Compass Rose
+### Facility Ratings & Reviews System (NEW - Apr 1, 2026)
+- **Star Rating**: 1-5 star input with hover effects in POI Detail Modal
+- **Review Tags**: 8 preset tags (Clean Restrooms, Good Food, Safe Parking, Fast Fuel, Friendly Staff, Showers, Truck Wash, WiFi)
+- **Text Reviews**: Optional 200-char review text
+- **Along Route POI Cards**: Average rating stars displayed next to fuel price
+- **Min Rating Filter**: ALL/1+/2+/3+/4+ filter in MapControls panel
+- **Backend API**: File-based JSON store (`/app/data/facility_ratings.json`)
+  - GET `/api/facility-ratings?poiId=xxx`
+  - POST `/api/facility-ratings` (submit rating)
+  - POST `/api/facility-ratings-batch` (batch fetch)
+
+### Professional Lane Guidance System
+- Visual LaneRibbon: SVG directional arrows with blue highlighting
+- Synthesized lane data from HERE API action types
+- Voice lane guidance: 7+ distance thresholds
 
 ### HUD Layout Customization (Display Tab)
-- 20 toggleable HUD elements organized in Navigation/Panels/Signs categories
-- Compass Rose toggle (show/hide compass indicator)
-- Next Stop toggle (show/hide waypoint panel above arrival bar)
-- Element resize system (XS=70%, S=85%, M=100%, L=115%, XL=130%) for 11 resizable elements
-- Scale transforms applied to ALL resizable elements (navigationHUD, speedOverlay, arrivalHUD, maneuverPreview, compassRose, nextStop, fuelCost, hosStatus, mapControls, routeComparison, weatherPanel)
+- 21 toggleable HUD elements (Navigation/Panels/Signs categories)
+- Speed Warning toggle with tolerance control
+- Compass Rose + Next Stop toggles
+- Element resize system (XS/S/M/L/XL) for 11 resizable elements
 - Drag-and-drop repositioning via @dnd-kit
-- Pixel-perfect NavPreview with Compass Rose + Next Stop mockups for live layout editing (In Route / Idle modes)
+- NavPreview with Compass Rose + Next Stop mockups
 - Persistent config via LocalStorage
-- Show All / Hide All / Reset buttons
 - Trip Panel Position toggle (LEFT/RIGHT)
 
 ### Mobile Build Pipeline
 - Capacitor integration for iOS/Android
-- GitHub Actions workflow (eas-build.yml) for remote builds
+- GitHub Actions workflow for remote builds
 - EAS Build profiles configured
 
-## Bug Fixes Applied (Latest Session - Apr 1, 2026)
-1. **NavPreview missing Compass Rose + Next Stop** - Added mockup elements with data-testids, tied idle-mode compass to showCompassRose toggle
-2. **Missing scale transforms** - Applied hudScales for maneuverPreview, fuelCost, hosStatus, routeComparison, weatherPanel in NavigationView.tsx
-3. **Display Layout changes not syncing to Navigation view** - Added useEffect that reloads hudLayout/hudPositions/hudScales from localStorage when activeView changes to NAVIGATION
-4. **All driving HUD elements missing (Arrival Bar, Route Comparison, Fuel Cost, HOS)** - Reverted RouteComparisonPanel wrapper from `<div style={scale}>` to `<>` fragment. The div created a new CSS containing block that broke the panel's absolute positioning, preventing `isDriving` from ever being set to `true`. Also added safety check: auto-start driving when `showRouteComparison` is toggled off.. Existing CustomEvent listeners retained as secondary live sync.
+## Bug Fixes Applied (Apr 1, 2026)
+1. NavPreview missing Compass Rose + Next Stop mockups
+2. Missing scale transforms for 5 elements
+3. Display Layout → Navigation view sync (activeView useEffect)
+4. Driving HUD elements missing (RouteComparisonPanel wrapper fix)
+5. MapControls off-screen (removed wrapper div, passed scale as prop)
+6. Trip panel right margin increased (4.5rem) to prevent overlap
 
 ## Known Issues
-- **Intermittent service drops**: trucker-nav and frontend supervisor processes drop ports occasionally. Restart with `sudo supervisorctl restart trucker-nav` and `sudo supervisorctl restart frontend`.
+- Intermittent service drops: trucker-nav/frontend supervisor processes
 
 ## Upcoming Tasks
-- **P1**: Map filtering for Reputation Scores (4-star+ facilities)
-- **P2**: Speed limit warning system (flash red + audio alert when exceeding posted speed)
-- **P2**: Driver reputation/review system (truckers rate facilities)
+- **P2**: Driver reputation/review aggregation and leaderboards
+- **P2**: Viewport-based sign culling (DOM performance)
 
 ## Future/Backlog
-- Viewport-based sign culling (DOM performance optimization)
-- NavigationView.tsx refactoring (~6900 lines -> smaller hooks/components)
+- NavigationView.tsx refactoring (~7000 lines → smaller hooks/components)
 - iOS/Android Store Submission
+- Offline map support
+- ELD/Telematics integration
+- Real-time parking availability predictions
 
 ## Key Files
-- `/app/components/NavigationView.tsx` - Core map UI (~6900 lines)
+- `/app/components/NavigationView.tsx` - Core map UI (~7000 lines)
 - `/app/components/NavigationHUD.tsx` - Turn-by-turn instruction card
-- `/app/components/HudLayoutView.tsx` - Display tab UI
+- `/app/components/HudLayoutView.tsx` - Display tab UI (21 elements)
 - `/app/components/NavPreview.tsx` - Live preview for layout editing
+- `/app/components/PoiDetailModal.tsx` - POI detail with ratings/reviews
+- `/app/components/MapControls.tsx` - Map controls with min rating filter
 - `/app/utils/hudLayout.ts` - HUD layout persistence
-- `/app/utils/mutcdSigns.ts` - MUTCD-compliant SVG sign generation
-- `/app/server.ts` - Express backend proxy
+- `/app/server.ts` - Express backend proxy + ratings API
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com

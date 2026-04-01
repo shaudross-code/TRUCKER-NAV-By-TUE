@@ -30,7 +30,8 @@ export const MapControls: React.FC<any> = React.memo(({
   onAddFacility,
   currentZoom,
   isDrivingMode,
-  className = ""
+  className = "",
+  hudScale = 1
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -40,7 +41,7 @@ export const MapControls: React.FC<any> = React.memo(({
   }, [isDrivingMode]);
 
   return (
-    <div id="nav-map-controls" className={`absolute right-2 md:right-4 z-[2010] flex flex-col items-end gap-1 md:gap-2 transition-all duration-700 scale-90 md:scale-100 origin-right ${className}`}>
+    <div id="nav-map-controls" className={`absolute right-2 md:right-4 z-[2010] flex flex-col items-end gap-1 md:gap-2 transition-all duration-700 origin-right ${className}`} style={{ transform: `scale(${hudScale})` }}>
         
         <div className="bg-black border border-[#D4AF37]/30 rounded-2xl md:rounded-[2.5rem] p-1.5 md:p-2 shadow-[0_40px_100px_rgba(0,0,0,0.8)] flex flex-col gap-1.5 md:gap-2 transition-all hover:scale-[1.005]">
 
