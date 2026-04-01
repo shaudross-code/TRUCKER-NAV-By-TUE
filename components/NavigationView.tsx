@@ -70,7 +70,7 @@ import {
   noTrucksSign, weightLimitSign, noHazmatSign, tunnelWarning,
   noticeWarning, exitGuideSign, directionBadge, directionLabel
 } from '../utils/mutcdSigns';
-import { loadHudLayout, loadHudPositions, DEFAULT_POSITIONS, type HudPositions } from '../utils/hudLayout';
+import { loadHudLayout, loadHudPositions, loadHudScales, DEFAULT_POSITIONS, DEFAULT_SCALES, type HudPositions, type HudScales } from '../utils/hudLayout';
 import type { HudLayoutConfig } from '../types';
 
 interface Waypoint {
@@ -344,6 +344,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // HUD Layout configuration (user-customizable visibility)
   const [hudLayout, setHudLayout] = useState<HudLayoutConfig>(loadHudLayout);
   const [hudPositions, setHudPositions] = useState<HudPositions>(loadHudPositions);
+  const [hudScales, setHudScales] = useState<HudScales>(loadHudScales);
   
   // Listen for HUD layout changes from the Display settings view
   useEffect(() => {
@@ -363,6 +364,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
     window.addEventListener('hud-positions-changed', handler);
     return () => window.removeEventListener('hud-positions-changed', handler);
+  }, []);
+
+  // Listen for HUD scale changes from the Display settings view
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const scales = (e as CustomEvent).detail as HudScales;
+      setHudScales(scales);
+    };
+    window.addEventListener('hud-scales-changed', handler);
+    return () => window.removeEventListener('hud-scales-changed', handler);
   }, []);
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
@@ -6010,10 +6021,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       />
 
       {/* Speed Limit Overlay — positioned outside z-0 map container for proper stacking */}
-      {hudLayout.showSpeedOverlay && !is3DMode && <SpeedLimitMarker currentSpeedLimit={currentSpeedLimit} speed={speed} unitSystem={context?.unitSystem} />}
+      {hudLayout.showSpeedOverlay && !is3DMode && (
+        <div style={{ transform: `scale(${hudScales.speedOverlay || 1})`, transformOrigin: 'top left' }}>
+          <SpeedLimitMarker currentSpeedLimit={currentSpeedLimit} speed={speed} unitSystem={context?.unitSystem} />
+        </div>
+      )}
 
       {/* Modern Navigation HUD */}
       {hudLayout.showNavigationHUD && !isExploreMode && milesRemaining > 0 && !is3DMode && (
+        <div style={{ transform: `scale(${hudScales.navigationHUD || 1})`, transformOrigin: 'top center', position: 'relative', zIndex: 3100 }}>
         <NavigationHUD 
           nextInstruction={nextInstruction} 
           parseLane={parseLane} 
@@ -6022,6 +6038,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           maneuverModifier={currentManeuverModifier}
           speedLimit={currentSpeedLimit ?? undefined}
         />
+        </div>
       )}
 
       {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
@@ -6649,17 +6666,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* ── Compass Rose — always visible, bottom-left of map ── */}
+      {hudLayout.showCompassRose && (
       <div
         className="absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-3 md:left-5 z-[2005] pointer-events-none"
         data-testid="compass-rose-container"
+        style={{ transform: `scale(${hudScales.compassRose || 1})`, transformOrigin: 'bottom left' }}
       >
         <CompassRose isCompassMode={isCompassMode} />
       </div>
+      )}
 
-      {isDriving && !isExploreMode && !is3DMode && waypoints.length > 0 && (
+      {hudLayout.showNextStop && isDriving && !isExploreMode && !is3DMode && waypoints.length > 0 && (
         <div
           data-testid="waypoint-action-panel"
           className="absolute bottom-[calc(8rem+env(safe-area-inset-bottom))] md:bottom-[calc(9rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2012] w-full max-w-[650px] px-3 md:px-5 pointer-events-none"
+          style={{ transform: `translateX(-50%) scale(${hudScales.nextStop || 1})`, transformOrigin: 'bottom center' }}
         >
           <div className="bg-black/95 backdrop-blur-xl border border-zinc-700/60 rounded-xl md:rounded-2xl shadow-[0_-4px_30px_rgba(0,0,0,0.7)] pointer-events-auto animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="flex items-center gap-3 p-2.5 md:p-3">
@@ -6708,11 +6729,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {hudLayout.showArrivalHUD && isDriving && !isExploreMode && !is3DMode && (
-        <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none" style={
-          hudPositions.arrivalHUD && (hudPositions.arrivalHUD.x !== DEFAULT_POSITIONS.arrivalHUD.x || hudPositions.arrivalHUD.y !== DEFAULT_POSITIONS.arrivalHUD.y)
-            ? { left: `${hudPositions.arrivalHUD.x}%`, top: `${hudPositions.arrivalHUD.y}%`, transform: 'translate(-50%, -50%)' }
-            : { bottom: 'calc(0.5rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)' }
-        }>
+        <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none" style={{
+          ...(hudPositions.arrivalHUD && (hudPositions.arrivalHUD.x !== DEFAULT_POSITIONS.arrivalHUD.x || hudPositions.arrivalHUD.y !== DEFAULT_POSITIONS.arrivalHUD.y)
+            ? { left: `${hudPositions.arrivalHUD.x}%`, top: `${hudPositions.arrivalHUD.y}%`, transform: `translate(-50%, -50%) scale(${hudScales.arrivalHUD || 1})` }
+            : { bottom: 'calc(0.5rem + env(safe-area-inset-bottom))', left: '50%', transform: `translateX(-50%) scale(${hudScales.arrivalHUD || 1})` }),
+          transformOrigin: 'bottom center',
+        }}>
           <div className="bg-black/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl md:rounded-3xl landscape:rounded-2xl shadow-[0_-8px_60px_rgba(0,0,0,0.9),0_0_40px_rgba(212,175,55,0.08)] pointer-events-auto transition-all">
             {/* Region Bar — top strip showing current state/road */}
             {(currentRegion.state || currentRoad) && (
@@ -6843,7 +6865,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {hudLayout.showMapControls && <MapControls
+      {hudLayout.showMapControls && <div style={{ transform: `scale(${hudScales.mapControls || 1})`, transformOrigin: 'right center' }}><MapControls
         mapInstanceRef={mapInstanceRef}
         mapboxMapRef={mapboxMapRef}
         isFilterMenuOpen={isFilterMenuOpen}
@@ -6870,7 +6892,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         currentZoom={currentZoom}
         isDrivingMode={isDriving && milesRemaining > 0}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
-      />}
+      /></div>}
               <RouteSettingsModal
         isOpen={isRouteSettingsOpen}
         onClose={() => setIsRouteSettingsOpen(false)}

@@ -3,7 +3,8 @@ import {
   Eye, EyeOff, RotateCcw, Navigation, Gauge, MapPin,
   Fuel, Clock, Layers, CloudSun, AlertTriangle, Shield,
   ArrowRightLeft, Milestone, Construction, Route, GitCompare,
-  Map as MapIcon, ArrowLeftRight, GripVertical
+  Map as MapIcon, ArrowLeftRight, GripVertical, Compass,
+  CircleDot, Maximize2, Minimize2
 } from 'lucide-react';
 import {
   DndContext,
@@ -28,14 +29,19 @@ import {
   DEFAULT_HUD_LAYOUT,
   DEFAULT_ORDER,
   DEFAULT_POSITIONS,
+  DEFAULT_SCALES,
+  SCALE_OPTIONS,
   loadHudLayout,
   saveHudLayout,
   loadHudOrder,
   saveHudOrder,
   loadHudPositions,
   saveHudPositions,
+  loadHudScales,
+  saveHudScales,
   type HudElementOrder,
   type HudPositions,
+  type HudScales,
 } from '../utils/hudLayout';
 
 interface HudElement {
@@ -45,18 +51,21 @@ interface HudElement {
   description: string;
   icon: React.ElementType;
   category: string;
+  scaleKey?: string; // maps to HudScales key (for resizable elements)
 }
 
 const HUD_ELEMENTS_MAP: Record<string, HudElement> = {
-  showNavigationHUD: { key: 'showNavigationHUD', label: 'Turn Instructions', shortLabel: 'Turn', description: 'Top header showing next turn direction and distance', icon: Navigation, category: 'Navigation' },
+  showNavigationHUD: { key: 'showNavigationHUD', label: 'Turn Instructions', shortLabel: 'Turn', description: 'Top header showing next turn direction and distance', icon: Navigation, category: 'Navigation', scaleKey: 'navigationHUD' },
   showLaneGuidance: { key: 'showLaneGuidance', label: 'Lane Guidance', shortLabel: 'Lanes', description: 'Lane arrows in the turn instruction header', icon: ArrowRightLeft, category: 'Navigation' },
-  showSpeedOverlay: { key: 'showSpeedOverlay', label: 'Speed Display', shortLabel: 'Speed', description: 'Current speed indicator on the map', icon: Gauge, category: 'Navigation' },
-  showArrivalHUD: { key: 'showArrivalHUD', label: 'Arrival Bar', shortLabel: 'ETA', description: 'Bottom bar with distance, time remaining, and ETA', icon: MapPin, category: 'Navigation' },
-  showManeuverPreview: { key: 'showManeuverPreview', label: 'Maneuver Preview', shortLabel: 'Preview', description: 'Mini-map preview of upcoming interchanges', icon: Route, category: 'Navigation' },
-  showFuelCost: { key: 'showFuelCost', label: 'Fuel Cost', shortLabel: 'Fuel', description: 'Estimated fuel cost panel during navigation', icon: Fuel, category: 'Panels' },
-  showHosStatus: { key: 'showHosStatus', label: 'HOS Status', shortLabel: 'HOS', description: 'Hours of Service driving time panel', icon: Clock, category: 'Panels' },
-  showMapControls: { key: 'showMapControls', label: 'Map Controls', shortLabel: 'Controls', description: 'Zoom, 2D/3D, follow, and compass buttons', icon: Layers, category: 'Panels' },
-  showRouteComparison: { key: 'showRouteComparison', label: 'Route Comparison', shortLabel: 'Routes', description: 'Alternative routes comparison panel', icon: GitCompare, category: 'Panels' },
+  showSpeedOverlay: { key: 'showSpeedOverlay', label: 'Speed Display', shortLabel: 'Speed', description: 'Current speed indicator on the map', icon: Gauge, category: 'Navigation', scaleKey: 'speedOverlay' },
+  showArrivalHUD: { key: 'showArrivalHUD', label: 'Arrival Bar', shortLabel: 'ETA', description: 'Bottom bar with distance, time remaining, and ETA', icon: MapPin, category: 'Navigation', scaleKey: 'arrivalHUD' },
+  showManeuverPreview: { key: 'showManeuverPreview', label: 'Maneuver Preview', shortLabel: 'Preview', description: 'Mini-map preview of upcoming interchanges', icon: Route, category: 'Navigation', scaleKey: 'maneuverPreview' },
+  showCompassRose: { key: 'showCompassRose', label: 'Compass Rose', shortLabel: 'Compass', description: 'Compass indicator on the map', icon: Compass, category: 'Navigation', scaleKey: 'compassRose' },
+  showNextStop: { key: 'showNextStop', label: 'Next Stop', shortLabel: 'Stop', description: 'Next waypoint/fuel stop above the arrival bar', icon: CircleDot, category: 'Navigation', scaleKey: 'nextStop' },
+  showFuelCost: { key: 'showFuelCost', label: 'Fuel Cost', shortLabel: 'Fuel', description: 'Estimated fuel cost panel during navigation', icon: Fuel, category: 'Panels', scaleKey: 'fuelCost' },
+  showHosStatus: { key: 'showHosStatus', label: 'HOS Status', shortLabel: 'HOS', description: 'Hours of Service driving time panel', icon: Clock, category: 'Panels', scaleKey: 'hosStatus' },
+  showMapControls: { key: 'showMapControls', label: 'Map Controls', shortLabel: 'Controls', description: 'Zoom, 2D/3D, follow, and compass buttons', icon: Layers, category: 'Panels', scaleKey: 'mapControls' },
+  showRouteComparison: { key: 'showRouteComparison', label: 'Route Comparison', shortLabel: 'Routes', description: 'Alternative routes comparison panel', icon: GitCompare, category: 'Panels', scaleKey: 'routeComparison' },
   showWeatherOverlay: { key: 'showWeatherOverlay', label: 'Weather Overlay', shortLabel: 'Weather', description: 'Current weather conditions on the map', icon: CloudSun, category: 'Panels' },
   showHighwayShields: { key: 'showHighwayShields', label: 'Highway Shields', shortLabel: 'Shields', description: 'Interstate, US Route, and State highway emblems', icon: Shield, category: 'Signs' },
   showSpeedLimitSigns: { key: 'showSpeedLimitSigns', label: 'Speed Limit Signs', shortLabel: 'Limits', description: 'MUTCD speed limit signs along the route', icon: Milestone, category: 'Signs' },
@@ -71,17 +80,44 @@ const HUD_ELEMENTS_MAP: Record<string, HudElement> = {
 const CATEGORIES = ['Navigation', 'Panels', 'Signs'];
 
 
+/* ─── Scale Picker ─── */
+function ScalePicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex items-center gap-0.5 bg-zinc-950 border border-zinc-800 rounded-lg p-0.5">
+      {SCALE_OPTIONS.map(opt => (
+        <button
+          key={opt.value}
+          data-testid={`scale-${opt.label}`}
+          onClick={(e) => { e.stopPropagation(); onChange(opt.value); }}
+          className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase transition-all ${
+            Math.abs(value - opt.value) < 0.01
+              ? 'bg-[#D4AF37] text-black'
+              : 'text-zinc-600 hover:text-white'
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+
 /* ─── Sortable Row ─── */
 function SortableRow({
   id,
   element,
   isVisible,
   onToggle,
+  scale,
+  onScaleChange,
 }: {
   id: string;
   element: HudElement;
   isVisible: boolean;
   onToggle: () => void;
+  scale?: number;
+  onScaleChange?: (v: number) => void;
 }) {
   const {
     attributes,
@@ -106,7 +142,7 @@ function SortableRow({
       ref={setNodeRef}
       style={style}
       data-testid={`hud-toggle-${element.key}`}
-      className={`flex items-center gap-2 px-4 py-3 transition-colors group border-b border-zinc-800/50 last:border-b-0 ${
+      className={`flex items-center gap-2 px-3 py-2.5 transition-colors group border-b border-zinc-800/50 last:border-b-0 ${
         isDragging ? 'bg-zinc-800 shadow-lg shadow-black/40 rounded-xl' : 'hover:bg-zinc-800/40'
       }`}
     >
@@ -119,22 +155,26 @@ function SortableRow({
       >
         <GripVertical className="w-4 h-4" />
       </button>
-      <button onClick={onToggle} className="flex items-center gap-3 flex-1 min-w-0">
-        <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10' : 'bg-zinc-800/50'}`}>
-          <Icon className={`w-4 h-4 transition-colors ${isVisible ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
+      <button onClick={onToggle} className="flex items-center gap-2.5 flex-1 min-w-0">
+        <div className={`p-1.5 rounded-xl transition-colors flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10' : 'bg-zinc-800/50'}`}>
+          <Icon className={`w-3.5 h-3.5 transition-colors ${isVisible ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
         </div>
         <div className="flex-1 text-left min-w-0">
-          <div className={`font-bold text-sm transition-colors ${isVisible ? 'text-white' : 'text-zinc-500'}`}>
+          <div className={`font-bold text-xs transition-colors ${isVisible ? 'text-white' : 'text-zinc-500'}`}>
             {element.label}
           </div>
-          <div className="text-zinc-600 text-xs truncate">{element.description}</div>
+          <div className="text-zinc-600 text-[10px] truncate">{element.description}</div>
         </div>
       </button>
+      {/* Scale controls — only for resizable elements */}
+      {element.scaleKey && isVisible && onScaleChange && (
+        <ScalePicker value={scale || 1} onChange={onScaleChange} />
+      )}
       <button
         onClick={onToggle}
         className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-zinc-800/50 text-zinc-600'}`}
       >
-        {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+        {isVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
       </button>
     </div>
   );
@@ -145,14 +185,18 @@ function SortableCategory({
   category,
   keys,
   config,
+  scales,
   onToggle,
   onReorder,
+  onScaleChange,
 }: {
   category: string;
   keys: string[];
   config: HudLayoutConfig;
+  scales: HudScales;
   onToggle: (key: keyof HudLayoutConfig) => void;
   onReorder: (category: string, oldIndex: number, newIndex: number) => void;
+  onScaleChange: (scaleKey: string, value: number) => void;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -174,8 +218,8 @@ function SortableCategory({
   );
 
   return (
-    <div className="mb-6" data-testid={`hud-category-${category.toLowerCase()}`}>
-      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#D4AF37] mb-3 px-1">{category}</h2>
+    <div className="mb-5" data-testid={`hud-category-${category.toLowerCase()}`}>
+      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#D4AF37] mb-2.5 px-1">{category}</h2>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={keys} strategy={verticalListSortingStrategy}>
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
@@ -190,6 +234,8 @@ function SortableCategory({
                   element={element}
                   isVisible={isVisible}
                   onToggle={() => onToggle(key as keyof HudLayoutConfig)}
+                  scale={element.scaleKey ? (scales[element.scaleKey] || 1) : undefined}
+                  onScaleChange={element.scaleKey ? (v: number) => onScaleChange(element.scaleKey!, v) : undefined}
                 />
               );
             })}
@@ -205,6 +251,7 @@ export default function HudLayoutView() {
   const [config, setConfig] = useState<HudLayoutConfig>(loadHudLayout);
   const [order, setOrder] = useState<HudElementOrder>(loadHudOrder);
   const [positions, setPositions] = useState<HudPositions>(loadHudPositions);
+  const [scales, setScales] = useState<HudScales>(loadHudScales);
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
@@ -219,14 +266,24 @@ export default function HudLayoutView() {
     window.dispatchEvent(new CustomEvent('hud-positions-changed', { detail: positions }));
   }, [positions]);
 
+  useEffect(() => {
+    saveHudScales(scales);
+    window.dispatchEvent(new CustomEvent('hud-scales-changed', { detail: scales }));
+  }, [scales]);
+
   const toggle = (key: keyof HudLayoutConfig) => {
     setConfig(prev => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const handleScaleChange = useCallback((scaleKey: string, value: number) => {
+    setScales(prev => ({ ...prev, [scaleKey]: value }));
+  }, []);
 
   const resetAll = () => {
     setConfig({ ...DEFAULT_HUD_LAYOUT });
     setOrder({ ...DEFAULT_ORDER });
     setPositions({ ...DEFAULT_POSITIONS });
+    setScales({ ...DEFAULT_SCALES });
   };
 
   const resetPositions = () => {
@@ -254,12 +311,13 @@ export default function HudLayoutView() {
 
   const visibleCount = Object.keys(HUD_ELEMENTS_MAP).filter(k => (config as any)[k]).length;
   const totalCount = Object.keys(HUD_ELEMENTS_MAP).length;
+  const customScaleCount = Object.entries(scales).filter(([, v]) => Math.abs(v - 1) > 0.01).length;
 
   return (
     <div data-testid="hud-layout-view" className="max-w-2xl mx-auto p-4 md:p-8">
-      <div className="mb-8">
+      <div className="mb-6">
         <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Display Layout</h1>
-        <p className="text-zinc-500 text-sm mt-1">Toggle visibility, drag to reorder, or reposition on the preview</p>
+        <p className="text-zinc-500 text-sm mt-1">Toggle, reorder, reposition, and resize navigation UI elements</p>
       </div>
 
       {/* Live Preview with Drag */}
@@ -273,12 +331,19 @@ export default function HudLayoutView() {
       />
 
       {/* Stats + Actions Row */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
           <div className="bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl px-3 py-1.5">
             <span className="text-[#D4AF37] font-bold text-sm">{visibleCount}/{totalCount}</span>
             <span className="text-zinc-500 text-xs ml-1">visible</span>
           </div>
+          {customScaleCount > 0 && (
+            <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl px-3 py-1.5">
+              <Maximize2 className="w-3 h-3 text-zinc-400 inline mr-1" />
+              <span className="text-zinc-400 font-bold text-sm">{customScaleCount}</span>
+              <span className="text-zinc-600 text-xs ml-1">resized</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -306,8 +371,19 @@ export default function HudLayoutView() {
         </div>
       </div>
 
+      {/* Size legend */}
+      <div className="flex items-center gap-3 mb-4 px-1">
+        <div className="flex items-center gap-1.5">
+          <Maximize2 className="w-3 h-3 text-zinc-600" />
+          <span className="text-zinc-600 text-[10px] uppercase tracking-wider font-bold">Size:</span>
+          {SCALE_OPTIONS.map(opt => (
+            <span key={opt.value} className="text-zinc-700 text-[10px]">{opt.label}={Math.round(opt.value*100)}%</span>
+          ))}
+        </div>
+      </div>
+
       {/* Trip Panel Position Toggle */}
-      <div className="mb-6 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+      <div className="mb-5 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-[#D4AF37]/10">
@@ -346,9 +422,9 @@ export default function HudLayoutView() {
       </div>
 
       {/* Drag hint */}
-      <div className="flex items-center gap-2 mb-4 px-1">
+      <div className="flex items-center gap-2 mb-3 px-1">
         <GripVertical className="w-3.5 h-3.5 text-zinc-600" />
-        <span className="text-zinc-600 text-xs">Drag the grip handle to reorder elements within each section</span>
+        <span className="text-zinc-600 text-xs">Drag to reorder. Use size buttons (XS-XL) to resize elements.</span>
       </div>
 
       {/* Sortable Categories */}
@@ -358,12 +434,14 @@ export default function HudLayoutView() {
           category={category}
           keys={order[category] || DEFAULT_ORDER[category]}
           config={config}
+          scales={scales}
           onToggle={toggle}
           onReorder={handleReorder}
+          onScaleChange={handleScaleChange}
         />
       ))}
 
-      <div className="text-center text-zinc-600 text-xs mt-8 pb-8">
+      <div className="text-center text-zinc-600 text-xs mt-6 pb-8">
         Changes apply instantly to the navigation view
       </div>
     </div>

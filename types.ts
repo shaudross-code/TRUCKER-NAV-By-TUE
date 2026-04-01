@@ -107,6 +107,8 @@ export interface HudLayoutConfig {
   showManeuverPreview: boolean;
   showRouteComparison: boolean;
   showLaneGuidance: boolean;
+  showCompassRose: boolean;
+  showNextStop: boolean;
   tripPanelPosition: 'right' | 'left';
 }
 
