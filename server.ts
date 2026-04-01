@@ -724,6 +724,61 @@ async function createServer() {
     }
   });
 
+  // GET parking predictions — time-of-day based availability forecast
+  app.get('/api/poi/parking-predict', async (req, res) => {
+    const { poiId, hour } = req.query;
+    if (!poiId) return res.status(400).json({ error: 'poiId is required' });
+    try {
+      const store = readParkingStore();
+      const entry = store[String(poiId)];
+      const currentHour = hour ? parseInt(String(hour), 10) : new Date().getHours();
+
+      // Historical patterns: truck stops fill up at predictable times
+      // Peak hours: 7-9 PM (drivers hitting HOS limits), Low: 6-10 AM (departures)
+      const baseFill: Record<string, number> = {
+        light: 0.3, medium: 0.55, heavy: 0.78, maxed: 0.95
+      };
+      const hourFactor = [
+        0.55, 0.50, 0.45, 0.42, 0.40, 0.38, // 0-5 AM: emptying
+        0.35, 0.32, 0.30, 0.33, 0.38, 0.42,  // 6-11 AM: low
+        0.48, 0.52, 0.55, 0.60, 0.68, 0.75,  // 12-5 PM: filling
+        0.82, 0.90, 0.93, 0.88, 0.78, 0.65   // 6-11 PM: peak then decline
+      ];
+      const factor = hourFactor[Math.min(23, Math.max(0, currentHour))];
+      const lastStatus = entry?.status || 'medium';
+      const basePct = baseFill[lastStatus] || 0.5;
+      // Blend historical pattern with last known status
+      const predicted = Math.round((basePct * 0.4 + factor * 0.6) * 100);
+
+      let prediction: string;
+      if (predicted < 40) prediction = 'LIKELY OPEN';
+      else if (predicted < 65) prediction = 'FILLING UP';
+      else if (predicted < 85) prediction = 'FULL SOON';
+      else prediction = 'LIKELY FULL';
+
+      // Generate next 6 hours forecast
+      const forecast = Array.from({ length: 6 }, (_, i) => {
+        const h = (currentHour + i + 1) % 24;
+        const f = hourFactor[h];
+        const p = Math.round((basePct * 0.4 + f * 0.6) * 100);
+        return { hour: h, fillPercent: p, label: p < 40 ? 'OPEN' : p < 65 ? 'FILLING' : p < 85 ? 'FULL SOON' : 'FULL' };
+      });
+
+      res.json({
+        poiId: String(poiId),
+        currentHour,
+        fillPercent: predicted,
+        prediction,
+        forecast,
+        lastKnownStatus: lastStatus,
+        updatedAt: entry?.updatedAt || null
+      });
+    } catch (error) {
+      console.error('Error computing parking prediction:', error);
+      res.status(500).json({ error: 'Failed to compute parking prediction' });
+    }
+  });
+
   app.post('/api/waypoint-sequence', async (req, res) => {
     const { start, end, destination } = req.body; // destination is an array of waypoints
     try {
