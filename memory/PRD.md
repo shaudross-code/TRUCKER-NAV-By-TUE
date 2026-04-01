@@ -37,6 +37,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Speed limit display (MUTCD-style signs on map)
 - Weather alerts and route hazard reports
 
+### Professional Lane Guidance System
+- **Visual LaneRibbon**: SVG directional arrows (8 directions: straight, left, right, slight left/right, sharp left/right, u-turn) with blue #4285F4 highlighting for recommended lanes
+- **Synthesized lane data**: Generated from HERE API action types (enterHighway→3 lanes, exit→4 lanes, keep→3 lanes, turn→2-3 lanes, fork→3 lanes, continueHighway→3 lanes)
+- **Voice lane guidance**: 7+ distance thresholds (initial, 2mi, 1.5mi for complex, 1mi, 0.75mi dedicated lane reminder, 0.5mi, 0.25mi final lane reminder, 0.2mi immediate)
+- **Professional callouts**: Lane-specific phrases with ordinal numbers (e.g., "Move to the second lane from left", "Stay in the right 2 lanes for the exit")
+
 ### UI/HUD System
 - NavigationHUD: Top-center turn-by-turn instruction card (z-3100)
 - Arrival HUD: Bottom bar with road name, speed, distance, time, ETA
