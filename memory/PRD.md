@@ -71,7 +71,8 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Bug Fixes Applied (Latest Session - Apr 1, 2026)
 1. **NavPreview missing Compass Rose + Next Stop** - Added mockup elements with data-testids, tied idle-mode compass to showCompassRose toggle
 2. **Missing scale transforms** - Applied hudScales for maneuverPreview, fuelCost, hosStatus, routeComparison, weatherPanel in NavigationView.tsx
-3. **Display Layout changes not syncing to Navigation view** - Added useEffect that reloads hudLayout/hudPositions/hudScales from localStorage when activeView changes to NAVIGATION. Existing CustomEvent listeners retained as secondary live sync.
+3. **Display Layout changes not syncing to Navigation view** - Added useEffect that reloads hudLayout/hudPositions/hudScales from localStorage when activeView changes to NAVIGATION
+4. **All driving HUD elements missing (Arrival Bar, Route Comparison, Fuel Cost, HOS)** - Reverted RouteComparisonPanel wrapper from `<div style={scale}>` to `<>` fragment. The div created a new CSS containing block that broke the panel's absolute positioning, preventing `isDriving` from ever being set to `true`. Also added safety check: auto-start driving when `showRouteComparison` is toggled off.. Existing CustomEvent listeners retained as secondary live sync.
 
 ## Known Issues
 - **Intermittent service drops**: trucker-nav and frontend supervisor processes drop ports occasionally. Restart with `sudo supervisorctl restart trucker-nav` and `sudo supervisorctl restart frontend`.
