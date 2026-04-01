@@ -6213,9 +6213,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* Fuel Cost & HOS Panel — Right side, bottom area to avoid MapControls overlap */}
+      {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}
       {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
-        <div data-testid="trip-info-panel" className="absolute right-2 md:right-4 z-[2000] flex flex-col gap-2 transition-all duration-700 bottom-[calc(7rem+env(safe-area-inset-bottom))] md:bottom-28 scale-90 md:scale-100 origin-bottom-right w-44 md:w-56">
+        <div data-testid="trip-info-panel" className="absolute right-2 md:right-4 z-[2000] flex flex-col gap-2 transition-all duration-700 bottom-[calc(10rem+env(safe-area-inset-bottom))] md:bottom-[180px] scale-90 md:scale-100 origin-bottom-right w-44 md:w-56">
           <FuelCostCalculator
             routeDistanceMi={milesRemaining}
             initialFuelPrice={fuelPricePerGallon}
@@ -6710,6 +6710,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setShowFacilities={setShowFacilities}
         onAddFacility={() => setShowAddFacility(true)}
         currentZoom={currentZoom}
+        isDrivingMode={isDriving && milesRemaining > 0}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
       />
               <RouteSettingsModal
