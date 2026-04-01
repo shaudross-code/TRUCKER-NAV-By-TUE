@@ -38,13 +38,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Weather alerts and route hazard reports
 
 ### Professional Lane Guidance System
-- **Visual LaneRibbon**: SVG directional arrows (8 directions: straight, left, right, slight left/right, sharp left/right, u-turn) with blue #4285F4 highlighting for recommended lanes
-- **Synthesized lane data**: Generated from HERE API action types (enterHighway→3 lanes, exit→4 lanes, keep→3 lanes, turn→2-3 lanes, fork→3 lanes, continueHighway→3 lanes)
-- **Voice lane guidance**: 7+ distance thresholds (initial, 2mi, 1.5mi for complex, 1mi, 0.75mi dedicated lane reminder, 0.5mi, 0.25mi final lane reminder, 0.2mi immediate)
-- **Professional callouts**: Lane-specific phrases with ordinal numbers (e.g., "Move to the second lane from left", "Stay in the right 2 lanes for the exit")
+- **Visual LaneRibbon**: SVG directional arrows (8 directions) with blue highlighting for recommended lanes
+- **Synthesized lane data**: Generated from HERE API action types
+- **Voice lane guidance**: 7+ distance thresholds with professional callouts
 
 ### UI/HUD System
-- NavigationHUD: Top-center turn-by-turn instruction card (z-3100)
+- NavigationHUD: Top-center turn-by-turn instruction card
 - Arrival HUD: Bottom bar with road name, speed, distance, time, ETA
 - Weather panel with forecast
 - Fuel cost and HOS status panels
@@ -54,13 +53,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ### HUD Layout Customization (Display Tab)
 - 20 toggleable HUD elements organized in Navigation/Panels/Signs categories
-- **NEW**: Compass Rose toggle (show/hide compass indicator)
-- **NEW**: Next Stop toggle (show/hide waypoint panel above arrival bar)
-- **NEW**: Element resize system (XS=70%, S=85%, M=100%, L=115%, XL=130%) for 11 resizable elements
+- Compass Rose toggle (show/hide compass indicator)
+- Next Stop toggle (show/hide waypoint panel above arrival bar)
+- Element resize system (XS=70%, S=85%, M=100%, L=115%, XL=130%) for 11 resizable elements
+- Scale transforms applied to ALL resizable elements (navigationHUD, speedOverlay, arrivalHUD, maneuverPreview, compassRose, nextStop, fuelCost, hosStatus, mapControls, routeComparison, weatherPanel)
 - Drag-and-drop repositioning via @dnd-kit
-- Pixel-perfect NavPreview for live layout editing (In Route / Idle modes)
-- Persistent config via LocalStorage (trucker_hud_layout, trucker_hud_positions, trucker_hud_scales, trucker_hud_order)
-- Show All / Hide All / Reset buttons (resets scales, positions, and toggles)
+- Pixel-perfect NavPreview with Compass Rose + Next Stop mockups for live layout editing (In Route / Idle modes)
+- Persistent config via LocalStorage
+- Show All / Hide All / Reset buttons
 - Trip Panel Position toggle (LEFT/RIGHT)
 
 ### Mobile Build Pipeline
@@ -68,17 +68,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - GitHub Actions workflow (eas-build.yml) for remote builds
 - EAS Build profiles configured
 
-## Bug Fixes Applied (Latest Session)
-1. **NavigationHUD missing** - Fixed z-index (2000 → 3100) and explicit CSS centering (was hidden behind WarningBanners at z-3000)
-2. **Speed limit overlapping header** - Moved SpeedLimitMarker out of z-0 map container, set z-[1999]
-3. **Route comparison / arrival HUD overlap** - Fixed isDriving state (used stale `alternativeRoutes` state instead of local `routes` variable)
-4. **Route simulation frozen** - Reset lastSimIdxRef, lastUpdateLocationRef, lastUpdateRef on new route start
-5. **Initial instruction not set** - Added setNextInstruction in handleNavigate with first step instruction
-6. **Route comparison follow mode** - Added setIsFollowMode/setIsNorthUp/setIsOverviewMode in onClose callback
-7. **Waypoint panel overlap** - Increased bottom spacing from 5.5rem to 8rem
+## Bug Fixes Applied (Latest Session - Apr 1, 2026)
+1. **NavPreview missing Compass Rose + Next Stop** - Added mockup elements with data-testids, tied idle-mode compass to showCompassRose toggle
+2. **Missing scale transforms** - Applied hudScales for maneuverPreview, fuelCost, hosStatus, routeComparison, weatherPanel in NavigationView.tsx
 
 ## Known Issues
-- **Intermittent service drops**: trucker-nav and frontend supervisor processes drop ports occasionally (502/blank screen). Restart with `sudo supervisorctl restart trucker-nav` and `sudo supervisorctl restart frontend`.
+- **Intermittent service drops**: trucker-nav and frontend supervisor processes drop ports occasionally. Restart with `sudo supervisorctl restart trucker-nav` and `sudo supervisorctl restart frontend`.
 
 ## Upcoming Tasks
 - **P1**: Map filtering for Reputation Scores (4-star+ facilities)
@@ -87,11 +82,11 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## Future/Backlog
 - Viewport-based sign culling (DOM performance optimization)
-- NavigationView.tsx refactoring (~6700 lines → smaller hooks/components)
+- NavigationView.tsx refactoring (~6900 lines -> smaller hooks/components)
 - iOS/Android Store Submission
 
 ## Key Files
-- `/app/components/NavigationView.tsx` - Core map UI (~6700 lines)
+- `/app/components/NavigationView.tsx` - Core map UI (~6900 lines)
 - `/app/components/NavigationHUD.tsx` - Turn-by-turn instruction card
 - `/app/components/HudLayoutView.tsx` - Display tab UI
 - `/app/components/NavPreview.tsx` - Live preview for layout editing
