@@ -70,7 +70,7 @@ import {
   noTrucksSign, weightLimitSign, noHazmatSign, tunnelWarning,
   noticeWarning, exitGuideSign, directionBadge, directionLabel
 } from '../utils/mutcdSigns';
-import { loadHudLayout } from '../utils/hudLayout';
+import { loadHudLayout, loadHudPositions, DEFAULT_POSITIONS, type HudPositions } from '../utils/hudLayout';
 import type { HudLayoutConfig } from '../types';
 
 interface Waypoint {
@@ -242,6 +242,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   
   // HUD Layout configuration (user-customizable visibility)
   const [hudLayout, setHudLayout] = useState<HudLayoutConfig>(loadHudLayout);
+  const [hudPositions, setHudPositions] = useState<HudPositions>(loadHudPositions);
   
   // Listen for HUD layout changes from the Display settings view
   useEffect(() => {
@@ -251,6 +252,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
     window.addEventListener('hud-layout-changed', handler);
     return () => window.removeEventListener('hud-layout-changed', handler);
+  }, []);
+
+  // Listen for HUD position changes from the Display preview
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const pos = (e as CustomEvent).detail as HudPositions;
+      setHudPositions(pos);
+    };
+    window.addEventListener('hud-positions-changed', handler);
+    return () => window.removeEventListener('hud-positions-changed', handler);
   }, []);
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
@@ -5818,7 +5829,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
       {hudLayout.showManeuverPreview && !isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
-        <div className="absolute top-36 left-4 z-[2000] w-72 pointer-events-auto">
+        <div className="absolute z-[2000] w-72 pointer-events-auto" style={
+          hudPositions.maneuverPreview && (hudPositions.maneuverPreview.x !== DEFAULT_POSITIONS.maneuverPreview.x || hudPositions.maneuverPreview.y !== DEFAULT_POSITIONS.maneuverPreview.y)
+            ? { left: `${hudPositions.maneuverPreview.x}%`, top: `${hudPositions.maneuverPreview.y}%`, transform: 'translate(-50%, -50%)' }
+            : { top: '9rem', left: '1rem' }
+        }>
           <ManeuverPreview {...maneuverPreviewData} />
         </div>
       )}
@@ -5870,7 +5885,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Weather & Restriction Overlay */}
       {!selectedPoi && !isExploreMode && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
-        <div id="nav-weather-overlay" className={`absolute left-2 md:left-4 z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 -translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'} scale-90 md:scale-100 origin-left`}>
+        <div id="nav-weather-overlay" className={`absolute z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 scale-90 md:scale-100`} style={
+          hudPositions.weatherPanel && (hudPositions.weatherPanel.x !== DEFAULT_POSITIONS.weatherPanel.x || hudPositions.weatherPanel.y !== DEFAULT_POSITIONS.weatherPanel.y)
+            ? { left: `${hudPositions.weatherPanel.x}%`, top: `${hudPositions.weatherPanel.y}%`, transform: 'translate(-50%, -50%)' }
+            : { left: '0.5rem', top: milesRemaining > 0 ? '55%' : '50%', transform: 'translateY(-50%)' }
+        }>
           {hudLayout.showTruckRestrictions && restrictionAlerts.length > 0 && (
             <div className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-orange-500/20 pb-1.5">
@@ -6149,7 +6168,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}
       {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
-        <div data-testid="trip-info-panel" className={`absolute ${hudLayout.tripPanelPosition === 'left' ? 'left-2 md:left-4 origin-bottom-left' : 'right-2 md:right-4 origin-bottom-right'} z-[2000] flex flex-col gap-2 transition-all duration-700 bottom-[calc(10rem+env(safe-area-inset-bottom))] md:bottom-[180px] scale-90 md:scale-100 w-44 md:w-56`}>
+        <div data-testid="trip-info-panel" className={`absolute z-[2000] flex flex-col gap-2 transition-all duration-700 scale-90 md:scale-100 w-44 md:w-56`} style={
+          hudPositions.tripPanel && (hudPositions.tripPanel.x !== DEFAULT_POSITIONS.tripPanel.x || hudPositions.tripPanel.y !== DEFAULT_POSITIONS.tripPanel.y)
+            ? { left: `${hudPositions.tripPanel.x}%`, top: `${hudPositions.tripPanel.y}%`, transform: 'translate(-50%, -50%)' }
+            : { [hudLayout.tripPanelPosition === 'left' ? 'left' : 'right']: '0.5rem', bottom: '180px' }
+        }>
           {hudLayout.showFuelCost && <FuelCostCalculator
             routeDistanceMi={milesRemaining}
             initialFuelPrice={fuelPricePerGallon}
@@ -6488,7 +6511,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {hudLayout.showArrivalHUD && isDriving && !isExploreMode && !is3DMode && (
-        <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-6 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none">
+        <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none" style={
+          hudPositions.arrivalHUD && (hudPositions.arrivalHUD.x !== DEFAULT_POSITIONS.arrivalHUD.x || hudPositions.arrivalHUD.y !== DEFAULT_POSITIONS.arrivalHUD.y)
+            ? { left: `${hudPositions.arrivalHUD.x}%`, top: `${hudPositions.arrivalHUD.y}%`, transform: 'translate(-50%, -50%)' }
+            : { bottom: 'calc(0.5rem + env(safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)' }
+        }>
           <div className="bg-black/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl md:rounded-3xl landscape:rounded-2xl shadow-[0_-8px_60px_rgba(0,0,0,0.9),0_0_40px_rgba(212,175,55,0.08)] pointer-events-auto transition-all">
             {/* Region Bar — top strip showing current state/road */}
             {(currentRegion.state || currentRoad) && (

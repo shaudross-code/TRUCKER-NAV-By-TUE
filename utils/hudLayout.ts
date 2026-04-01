@@ -74,3 +74,36 @@ export function saveHudOrder(order: HudElementOrder): void {
     localStorage.setItem(ORDER_KEY, JSON.stringify(order));
   } catch {}
 }
+
+/* ─── Position Storage ─── */
+const POS_KEY = 'nav_hud_positions';
+
+export interface HudPosition { x: number; y: number }
+export type HudPositions = Record<string, HudPosition>;
+
+export const DEFAULT_POSITIONS: HudPositions = {
+  navigationHUD:    { x: 50, y: 3 },
+  speedOverlay:     { x: 3, y: 72 },
+  maneuverPreview:  { x: 82, y: 3 },
+  weatherPanel:     { x: 3, y: 42 },
+  tripPanel:        { x: 82, y: 55 },
+  mapControls:      { x: 92, y: 38 },
+  routeComparison:  { x: 50, y: 14 },
+  arrivalHUD:       { x: 50, y: 90 },
+};
+
+export function loadHudPositions(): HudPositions {
+  try {
+    const stored = localStorage.getItem(POS_KEY);
+    if (stored) {
+      return { ...DEFAULT_POSITIONS, ...JSON.parse(stored) };
+    }
+  } catch {}
+  return { ...DEFAULT_POSITIONS };
+}
+
+export function saveHudPositions(positions: HudPositions): void {
+  try {
+    localStorage.setItem(POS_KEY, JSON.stringify(positions));
+  } catch {}
+}

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Eye, EyeOff, RotateCcw, Navigation, Gauge, MapPin,
   Fuel, Clock, Layers, CloudSun, AlertTriangle, Shield,
   ArrowRightLeft, Milestone, Construction, Route, GitCompare,
-  Map as MapIcon, ArrowLeftRight, GripVertical, Monitor
+  Map as MapIcon, ArrowLeftRight, GripVertical, Monitor, Move, Lock, Unlock
 } from 'lucide-react';
 import {
   DndContext,
@@ -26,11 +26,15 @@ import type { HudLayoutConfig } from '../types';
 import {
   DEFAULT_HUD_LAYOUT,
   DEFAULT_ORDER,
+  DEFAULT_POSITIONS,
   loadHudLayout,
   saveHudLayout,
   loadHudOrder,
   saveHudOrder,
+  loadHudPositions,
+  saveHudPositions,
   type HudElementOrder,
+  type HudPositions,
 } from '../utils/hudLayout';
 
 interface HudElement {
@@ -65,19 +69,130 @@ const HUD_ELEMENTS_MAP: Record<string, HudElement> = {
 
 const CATEGORIES = ['Navigation', 'Panels', 'Signs'];
 
+/* ─── Draggable Preview Element ─── */
+function DraggablePreviewItem({
+  id,
+  positions,
+  setPositions,
+  editMode,
+  children,
+  containerRef,
+  className,
+}: {
+  id: string;
+  positions: HudPositions;
+  setPositions: React.Dispatch<React.SetStateAction<HudPositions>>;
+  editMode: boolean;
+  children: React.ReactNode;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  className?: string;
+}) {
+  const pos = positions[id] || { x: 50, y: 50 };
+  const isDraggingRef = useRef(false);
+  const startRef = useRef({ mx: 0, my: 0, px: 0, py: 0 });
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (!editMode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingRef.current = true;
+    startRef.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }, [editMode, pos.x, pos.y]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDraggingRef.current || !containerRef.current) return;
+    e.preventDefault();
+    const rect = containerRef.current.getBoundingClientRect();
+    const dx = ((e.clientX - startRef.current.mx) / rect.width) * 100;
+    const dy = ((e.clientY - startRef.current.my) / rect.height) * 100;
+    const nx = Math.max(0, Math.min(100, startRef.current.px + dx));
+    const ny = Math.max(0, Math.min(100, startRef.current.py + dy));
+    setPositions(prev => ({ ...prev, [id]: { x: nx, y: ny } }));
+  }, [id, containerRef, setPositions]);
+
+  const handlePointerUp = useCallback(() => {
+    isDraggingRef.current = false;
+  }, []);
+
+  return (
+    <div
+      data-testid={`preview-drag-${id}`}
+      className={`absolute touch-none ${editMode ? 'cursor-grab active:cursor-grabbing' : 'pointer-events-none'} ${className || ''}`}
+      style={{ left: `${pos.x}%`, top: `${pos.y}%`, transform: 'translate(-50%, -50%)' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+    >
+      {editMode && (
+        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#D4AF37] rounded-full z-20 flex items-center justify-center">
+          <Move className="w-1.5 h-1.5 text-black" />
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 /* ─── Live Preview ─── */
-function NavPreview({ config }: { config: HudLayoutConfig }) {
+function NavPreview({
+  config,
+  positions,
+  setPositions,
+  editMode,
+  setEditMode,
+  onResetPositions,
+}: {
+  config: HudLayoutConfig;
+  positions: HudPositions;
+  setPositions: React.Dispatch<React.SetStateAction<HudPositions>>;
+  editMode: boolean;
+  setEditMode: (v: boolean) => void;
+  onResetPositions: () => void;
+}) {
   const c = config;
-  const panelSide = c.tripPanelPosition;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dp = { positions, setPositions, editMode, containerRef };
 
   return (
     <div data-testid="hud-preview" className="mb-6">
-      <div className="flex items-center gap-2 mb-3 px-1">
-        <Monitor className="w-3.5 h-3.5 text-[#D4AF37]" />
-        <span className="text-[#D4AF37] text-xs font-black uppercase tracking-[0.15em]">Live Preview</span>
+      <div className="flex items-center justify-between mb-3 px-1">
+        <div className="flex items-center gap-2">
+          <Monitor className="w-3.5 h-3.5 text-[#D4AF37]" />
+          <span className="text-[#D4AF37] text-xs font-black uppercase tracking-[0.15em]">Live Preview</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {editMode && (
+            <button
+              data-testid="preview-reset-positions-btn"
+              onClick={onResetPositions}
+              className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-white bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-800 rounded-lg transition-colors"
+            >
+              Reset Pos
+            </button>
+          )}
+          <button
+            data-testid="preview-edit-toggle-btn"
+            onClick={() => setEditMode(!editMode)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-colors ${
+              editMode
+                ? 'text-[#D4AF37] bg-[#D4AF37]/10 border-[#D4AF37]/30'
+                : 'text-zinc-500 hover:text-white bg-zinc-900/50 hover:bg-zinc-800 border-zinc-800'
+            }`}
+          >
+            {editMode ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+            {editMode ? 'Editing' : 'Edit Layout'}
+          </button>
+        </div>
       </div>
-      <div className="relative w-full aspect-[16/9] bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden select-none">
-        {/* Fake map background */}
+      <div
+        ref={containerRef}
+        className={`relative w-full aspect-[16/9] bg-zinc-950 border rounded-2xl overflow-hidden select-none transition-colors ${
+          editMode ? 'border-[#D4AF37]/40 shadow-[0_0_20px_rgba(212,175,55,0.1)]' : 'border-zinc-800'
+        }`}
+      >
+        {/* Grid background */}
         <div className="absolute inset-0 opacity-20">
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -92,111 +207,153 @@ function NavPreview({ config }: { config: HudLayoutConfig }) {
         <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 400 225" preserveAspectRatio="none">
           <path d="M 50 200 Q 120 120 200 130 T 350 40" fill="none" stroke="#D4AF37" strokeWidth="3" strokeLinecap="round" strokeDasharray="8 4"/>
         </svg>
+        {/* User location */}
+        <div className="absolute top-[60%] left-[28%] z-[8]">
+          <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg shadow-blue-500/50" />
+        </div>
 
-        {/* Navigation HUD - top center */}
-        {c.showNavigationHUD && (
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/80 border border-zinc-700 rounded-lg px-3 py-1.5 flex items-center gap-2 z-10">
-            <Navigation className="w-3 h-3 text-[#D4AF37]" />
-            <div>
-              <div className="text-[7px] font-black text-white uppercase">Turn Right on I-95 N</div>
-              {c.showLaneGuidance && (
-                <div className="flex gap-0.5 mt-0.5">
-                  <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
-                  <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
-                  <div className="w-2 h-3 bg-[#D4AF37] rounded-[1px]" />
-                </div>
-              )}
+        {/* Edit mode overlay hint */}
+        {editMode && (
+          <div className="absolute inset-0 z-[1] pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#D4AF37]/20 text-[10px] font-black uppercase tracking-[0.3em]">
+              Drag elements to reposition
             </div>
-            <span className="text-[8px] font-black text-[#D4AF37] ml-1">0.3 mi</span>
           </div>
         )}
 
-        {/* Speed Overlay - bottom left of map area */}
+        {/* ── Navigation HUD ── */}
+        {c.showNavigationHUD && (
+          <DraggablePreviewItem id="navigationHUD" {...dp}>
+            <div className="bg-black/80 border border-zinc-700 rounded-lg px-3 py-1.5 flex items-center gap-2 whitespace-nowrap">
+              <Navigation className="w-3 h-3 text-[#D4AF37] flex-shrink-0" />
+              <div>
+                <div className="text-[7px] font-black text-white uppercase">Turn Right on I-95 N</div>
+                {c.showLaneGuidance && (
+                  <div className="flex gap-0.5 mt-0.5">
+                    <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
+                    <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
+                    <div className="w-2 h-3 bg-[#D4AF37] rounded-[1px]" />
+                  </div>
+                )}
+              </div>
+              <span className="text-[8px] font-black text-[#D4AF37] ml-1">0.3 mi</span>
+            </div>
+          </DraggablePreviewItem>
+        )}
+
+        {/* ── Speed Overlay ── */}
         {c.showSpeedOverlay && (
-          <div className="absolute bottom-16 left-2 bg-black/80 border border-zinc-700 rounded-lg w-10 h-10 flex flex-col items-center justify-center z-10">
-            <span className="text-[10px] font-black text-white leading-none">67</span>
-            <span className="text-[5px] font-bold text-zinc-500 uppercase">mph</span>
-          </div>
+          <DraggablePreviewItem id="speedOverlay" {...dp}>
+            <div className="bg-black/80 border border-zinc-700 rounded-lg w-10 h-10 flex flex-col items-center justify-center">
+              <span className="text-[10px] font-black text-white leading-none">67</span>
+              <span className="text-[5px] font-bold text-zinc-500 uppercase">mph</span>
+            </div>
+          </DraggablePreviewItem>
         )}
 
-        {/* Maneuver Preview - top right */}
+        {/* ── Maneuver Preview ── */}
         {c.showManeuverPreview && (
-          <div className="absolute top-2 right-2 bg-black/80 border border-zinc-700 rounded-lg w-14 h-14 flex items-center justify-center z-10">
-            <div className="relative w-10 h-10">
-              <svg viewBox="0 0 40 40" className="w-full h-full">
+          <DraggablePreviewItem id="maneuverPreview" {...dp}>
+            <div className="bg-black/80 border border-zinc-700 rounded-lg w-14 h-14 flex items-center justify-center">
+              <svg viewBox="0 0 40 40" className="w-10 h-10">
                 <path d="M 20 35 L 20 15 Q 20 8 27 8 L 35 8" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round"/>
                 <circle cx="20" cy="20" r="2" fill="#4AF" />
               </svg>
             </div>
-          </div>
+          </DraggablePreviewItem>
         )}
 
-        {/* Weather + Restrictions - left middle */}
+        {/* ── Weather + Restrictions Panel ── */}
         {(c.showWeatherOverlay || c.showTruckRestrictions) && (
-          <div className={`absolute left-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-10`}>
-            {c.showTruckRestrictions && (
-              <div className="bg-black/80 border border-orange-500/40 rounded-lg px-1.5 py-1 flex items-center gap-1">
-                <AlertTriangle className="w-2.5 h-2.5 text-orange-500" />
-                <span className="text-[5px] font-black text-orange-400 uppercase">Low Bridge</span>
-              </div>
-            )}
-            {c.showWeatherOverlay && (
-              <div className="bg-black/80 border border-[#D4AF37]/30 rounded-lg px-1.5 py-1 flex items-center gap-1.5">
-                <CloudSun className="w-2.5 h-2.5 text-[#D4AF37]" />
-                <span className="text-[7px] font-bold text-white">72°</span>
-              </div>
-            )}
-          </div>
+          <DraggablePreviewItem id="weatherPanel" {...dp}>
+            <div className="flex flex-col gap-1">
+              {c.showTruckRestrictions && (
+                <div className="bg-black/80 border border-orange-500/40 rounded-lg px-1.5 py-1 flex items-center gap-1">
+                  <AlertTriangle className="w-2.5 h-2.5 text-orange-500" />
+                  <span className="text-[5px] font-black text-orange-400 uppercase">Low Bridge</span>
+                </div>
+              )}
+              {c.showWeatherOverlay && (
+                <div className="bg-black/80 border border-[#D4AF37]/30 rounded-lg px-1.5 py-1 flex items-center gap-1.5">
+                  <CloudSun className="w-2.5 h-2.5 text-[#D4AF37]" />
+                  <span className="text-[7px] font-bold text-white">72°</span>
+                </div>
+              )}
+            </div>
+          </DraggablePreviewItem>
         )}
 
-        {/* Route Comparison - top center below HUD */}
+        {/* ── Route Comparison ── */}
         {c.showRouteComparison && (
-          <div className={`absolute ${c.showNavigationHUD ? 'top-12' : 'top-2'} left-1/2 -translate-x-1/2 bg-black/80 border border-zinc-700 rounded-lg px-2 py-1 flex items-center gap-2 z-10`}>
-            <GitCompare className="w-2.5 h-2.5 text-[#D4AF37]" />
-            <div className="flex gap-1.5">
-              <span className="text-[5px] font-black text-[#D4AF37] bg-[#D4AF37]/10 px-1 rounded">2h 15m</span>
-              <span className="text-[5px] font-black text-zinc-500 bg-zinc-800 px-1 rounded">2h 40m</span>
+          <DraggablePreviewItem id="routeComparison" {...dp}>
+            <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1 flex items-center gap-2 whitespace-nowrap">
+              <GitCompare className="w-2.5 h-2.5 text-[#D4AF37]" />
+              <div className="flex gap-1.5">
+                <span className="text-[5px] font-black text-[#D4AF37] bg-[#D4AF37]/10 px-1 rounded">2h 15m</span>
+                <span className="text-[5px] font-black text-zinc-500 bg-zinc-800 px-1 rounded">2h 40m</span>
+              </div>
             </div>
-          </div>
+          </DraggablePreviewItem>
         )}
 
-        {/* Trip Panel (Fuel + HOS) */}
+        {/* ── Trip Panel (Fuel + HOS) ── */}
         {(c.showFuelCost || c.showHosStatus) && (
-          <div className={`absolute ${panelSide === 'left' ? 'left-2' : 'right-2'} bottom-14 flex flex-col gap-1 z-10`}>
-            {c.showFuelCost && (
-              <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
-                <div className="flex items-center gap-1">
-                  <Fuel className="w-2.5 h-2.5 text-[#D4AF37]" />
-                  <span className="text-[6px] font-black text-zinc-500 uppercase">Fuel</span>
+          <DraggablePreviewItem id="tripPanel" {...dp}>
+            <div className="flex flex-col gap-1">
+              {c.showFuelCost && (
+                <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <Fuel className="w-2.5 h-2.5 text-[#D4AF37]" />
+                    <span className="text-[6px] font-black text-zinc-500 uppercase">Fuel</span>
+                  </div>
+                  <span className="text-[8px] font-black text-white">$124.50</span>
                 </div>
-                <span className="text-[8px] font-black text-white">$124.50</span>
-              </div>
-            )}
-            {c.showHosStatus && (
-              <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
-                <div className="flex items-center gap-1">
-                  <Clock className="w-2.5 h-2.5 text-emerald-400" />
-                  <span className="text-[6px] font-black text-zinc-500 uppercase">HOS</span>
+              )}
+              {c.showHosStatus && (
+                <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5 text-emerald-400" />
+                    <span className="text-[6px] font-black text-zinc-500 uppercase">HOS</span>
+                  </div>
+                  <span className="text-[8px] font-black text-emerald-400">6h 22m</span>
                 </div>
-                <span className="text-[8px] font-black text-emerald-400">6h 22m</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Map Controls - right side */}
-        {c.showMapControls && (
-          <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-10 ${c.showManeuverPreview ? 'mt-4' : ''}`}>
-            <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">+</div>
-            <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">-</div>
-            <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center">
-              <Layers className="w-2.5 h-2.5 text-zinc-400" />
+              )}
             </div>
-          </div>
+          </DraggablePreviewItem>
         )}
 
-        {/* Signs on the route */}
-        <div className="absolute inset-0 z-[5]">
+        {/* ── Map Controls ── */}
+        {c.showMapControls && (
+          <DraggablePreviewItem id="mapControls" {...dp}>
+            <div className="flex flex-col gap-0.5">
+              <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">+</div>
+              <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">-</div>
+              <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center">
+                <Layers className="w-2.5 h-2.5 text-zinc-400" />
+              </div>
+            </div>
+          </DraggablePreviewItem>
+        )}
+
+        {/* ── Arrival HUD ── */}
+        {c.showArrivalHUD && (
+          <DraggablePreviewItem id="arrivalHUD" {...dp}>
+            <div className="bg-black/90 border border-zinc-700 rounded-lg px-3 py-1.5 flex items-center gap-3 whitespace-nowrap">
+              <div className="flex items-center gap-2">
+                <span className="text-[7px] font-black text-[#D4AF37] uppercase">142 mi</span>
+                <span className="text-[5px] text-zinc-600">|</span>
+                <span className="text-[7px] font-black text-white">2h 15m</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[6px] font-bold text-zinc-500 uppercase">ETA</span>
+                <span className="text-[7px] font-black text-[#D4AF37]">3:45 PM</span>
+              </div>
+            </div>
+          </DraggablePreviewItem>
+        )}
+
+        {/* ── Map Signs (static, not draggable) ── */}
+        <div className="absolute inset-0 z-[5] pointer-events-none">
           {c.showHighwayShields && (
             <div className="absolute top-[25%] left-[55%] bg-blue-700 border border-white rounded-sm px-1 py-0.5">
               <span className="text-[5px] font-black text-white">I-95</span>
@@ -244,26 +401,6 @@ function NavPreview({ config }: { config: HudLayoutConfig }) {
             </>
           )}
         </div>
-
-        {/* Arrival HUD - bottom full width */}
-        {c.showArrivalHUD && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black/90 border-t border-zinc-700 px-3 py-1.5 flex items-center justify-between z-10">
-            <div className="flex items-center gap-2">
-              <span className="text-[7px] font-black text-[#D4AF37] uppercase">142 mi</span>
-              <span className="text-[5px] text-zinc-600">|</span>
-              <span className="text-[7px] font-black text-white">2h 15m</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[6px] font-bold text-zinc-500 uppercase">ETA</span>
-              <span className="text-[7px] font-black text-[#D4AF37]">3:45 PM</span>
-            </div>
-          </div>
-        )}
-
-        {/* User location chevron */}
-        <div className="absolute top-[60%] left-[28%] z-[8]">
-          <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg shadow-blue-500/50" />
-        </div>
       </div>
     </div>
   );
@@ -308,7 +445,6 @@ function SortableRow({
         isDragging ? 'bg-zinc-800 shadow-lg shadow-black/40 rounded-xl' : 'hover:bg-zinc-800/40'
       }`}
     >
-      {/* Drag Handle */}
       <button
         {...attributes}
         {...listeners}
@@ -318,12 +454,7 @@ function SortableRow({
       >
         <GripVertical className="w-4 h-4" />
       </button>
-
-      {/* Toggle Area */}
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-3 flex-1 min-w-0"
-      >
+      <button onClick={onToggle} className="flex items-center gap-3 flex-1 min-w-0">
         <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10' : 'bg-zinc-800/50'}`}>
           <Icon className={`w-4 h-4 transition-colors ${isVisible ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
         </div>
@@ -334,8 +465,6 @@ function SortableRow({
           <div className="text-zinc-600 text-xs truncate">{element.description}</div>
         </div>
       </button>
-
-      {/* Eye Toggle */}
       <button
         onClick={onToggle}
         className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-zinc-800/50 text-zinc-600'}`}
@@ -410,15 +539,20 @@ function SortableCategory({
 export default function HudLayoutView() {
   const [config, setConfig] = useState<HudLayoutConfig>(loadHudLayout);
   const [order, setOrder] = useState<HudElementOrder>(loadHudOrder);
+  const [positions, setPositions] = useState<HudPositions>(loadHudPositions);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     saveHudLayout(config);
     window.dispatchEvent(new CustomEvent('hud-layout-changed', { detail: config }));
   }, [config]);
 
+  useEffect(() => { saveHudOrder(order); }, [order]);
+
   useEffect(() => {
-    saveHudOrder(order);
-  }, [order]);
+    saveHudPositions(positions);
+    window.dispatchEvent(new CustomEvent('hud-positions-changed', { detail: positions }));
+  }, [positions]);
 
   const toggle = (key: keyof HudLayoutConfig) => {
     setConfig(prev => ({ ...prev, [key]: !prev[key] }));
@@ -427,6 +561,11 @@ export default function HudLayoutView() {
   const resetAll = () => {
     setConfig({ ...DEFAULT_HUD_LAYOUT });
     setOrder({ ...DEFAULT_ORDER });
+    setPositions({ ...DEFAULT_POSITIONS });
+  };
+
+  const resetPositions = () => {
+    setPositions({ ...DEFAULT_POSITIONS });
   };
 
   const hideAll = () => {
@@ -453,14 +592,20 @@ export default function HudLayoutView() {
 
   return (
     <div data-testid="hud-layout-view" className="max-w-2xl mx-auto p-4 md:p-8">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Display Layout</h1>
-        <p className="text-zinc-500 text-sm mt-1">Toggle visibility or drag to reorder elements</p>
+        <p className="text-zinc-500 text-sm mt-1">Toggle visibility, drag to reorder, or reposition on the preview</p>
       </div>
 
-      {/* Live Preview */}
-      <NavPreview config={config} />
+      {/* Live Preview with Drag */}
+      <NavPreview
+        config={config}
+        positions={positions}
+        setPositions={setPositions}
+        editMode={editMode}
+        setEditMode={setEditMode}
+        onResetPositions={resetPositions}
+      />
 
       {/* Stats + Actions Row */}
       <div className="flex items-center justify-between mb-6">
@@ -553,7 +698,6 @@ export default function HudLayoutView() {
         />
       ))}
 
-      {/* Footer note */}
       <div className="text-center text-zinc-600 text-xs mt-8 pb-8">
         Changes apply instantly to the navigation view
       </div>
