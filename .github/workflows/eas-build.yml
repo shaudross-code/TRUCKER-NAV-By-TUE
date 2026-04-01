@@ -40,6 +40,15 @@ jobs:
       - name: Install dependencies
         run: yarn install
 
+      - name: Debug - List Xcode schemes
+        run: |
+          echo "=== xcodeproj schemes ==="
+          xcodebuild -project ios/App/App.xcodeproj -list 2>&1 || true
+          echo "=== xcworkspace schemes ==="
+          xcodebuild -workspace ios/App/App.xcworkspace -list 2>&1 || true
+          echo "=== Scheme files ==="
+          find ios -name "*.xcscheme" -type f 2>/dev/null || true
+
       - name: Setup EAS CLI
         uses: expo/expo-github-action@v8
         with:
