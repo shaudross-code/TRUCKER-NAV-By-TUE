@@ -53,11 +53,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Compass Rose
 
 ### HUD Layout Customization (Display Tab)
-- 18 toggleable HUD elements organized in Navigation/Panels/Signs categories
+- 20 toggleable HUD elements organized in Navigation/Panels/Signs categories
+- **NEW**: Compass Rose toggle (show/hide compass indicator)
+- **NEW**: Next Stop toggle (show/hide waypoint panel above arrival bar)
+- **NEW**: Element resize system (XS=70%, S=85%, M=100%, L=115%, XL=130%) for 11 resizable elements
 - Drag-and-drop repositioning via @dnd-kit
 - Pixel-perfect NavPreview for live layout editing (In Route / Idle modes)
-- Persistent config via LocalStorage (trucker_hud_layout, trucker_hud_positions)
-- Show All / Hide All / Reset buttons
+- Persistent config via LocalStorage (trucker_hud_layout, trucker_hud_positions, trucker_hud_scales, trucker_hud_order)
+- Show All / Hide All / Reset buttons (resets scales, positions, and toggles)
 - Trip Panel Position toggle (LEFT/RIGHT)
 
 ### Mobile Build Pipeline
