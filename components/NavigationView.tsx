@@ -346,7 +346,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [hudPositions, setHudPositions] = useState<HudPositions>(loadHudPositions);
   const [hudScales, setHudScales] = useState<HudScales>(loadHudScales);
   
-  // Listen for HUD layout changes from the Display settings view
+  // Reload HUD config from localStorage when this view becomes active
+  useEffect(() => {
+    if (activeView === ViewType.NAVIGATION) {
+      setHudLayout(loadHudLayout());
+      setHudPositions(loadHudPositions());
+      setHudScales(loadHudScales());
+    }
+  }, [activeView]);
+
+  // Listen for HUD layout changes from the Display settings view (live sync while hidden)
   useEffect(() => {
     const handler = (e: Event) => {
       const config = (e as CustomEvent).detail as HudLayoutConfig;
