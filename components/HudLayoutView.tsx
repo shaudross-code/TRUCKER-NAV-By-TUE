@@ -188,215 +188,366 @@ function NavPreview({
       </div>
       <div
         ref={containerRef}
-        className={`relative w-full aspect-[16/9] bg-zinc-950 border rounded-2xl overflow-hidden select-none transition-colors ${
+        className={`relative w-full aspect-[16/9] bg-[#0a0a0a] border rounded-2xl overflow-hidden select-none transition-colors ${
           editMode ? 'border-[#D4AF37]/40 shadow-[0_0_20px_rgba(212,175,55,0.1)]' : 'border-zinc-800'
         }`}
       >
-        {/* Grid background */}
-        <div className="absolute inset-0 opacity-20">
-          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+        {/* Map tile background */}
+        <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 40% 50%, #111 0%, #0a0a0a 60%, #050505 100%)' }}>
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" className="opacity-[0.08]">
             <defs>
-              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#333" strokeWidth="0.5"/>
+              <pattern id="mapgrid" width="32" height="32" patternUnits="userSpaceOnUse">
+                <path d="M 32 0 L 0 0 0 32" fill="none" stroke="#D4AF37" strokeWidth="0.3"/>
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
+            <rect width="100%" height="100%" fill="url(#mapgrid)" />
           </svg>
         </div>
-        {/* Fake route line */}
-        <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 400 225" preserveAspectRatio="none">
-          <path d="M 50 200 Q 120 120 200 130 T 350 40" fill="none" stroke="#D4AF37" strokeWidth="3" strokeLinecap="round" strokeDasharray="8 4"/>
+        {/* Route polyline */}
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 480 270" preserveAspectRatio="none">
+          <path d="M 40 230 C 80 180 140 160 200 155 S 320 100 420 50" fill="none" stroke="#D4AF37" strokeWidth="4" strokeLinecap="round" opacity="0.35"/>
+          <path d="M 40 230 C 80 180 140 160 200 155 S 320 100 420 50" fill="none" stroke="#D4AF37" strokeWidth="2" strokeLinecap="round" opacity="0.7" strokeDasharray="6 4"/>
         </svg>
-        {/* User location */}
-        <div className="absolute top-[60%] left-[28%] z-[8]">
-          <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg shadow-blue-500/50" />
+        {/* User location dot */}
+        <div className="absolute top-[58%] left-[25%] z-[8]">
+          <div className="w-3 h-3 rounded-full bg-[#4285F4] border-[1.5px] border-white shadow-[0_0_12px_rgba(66,133,244,0.6)]" />
+          <div className="absolute -inset-2 rounded-full bg-[#4285F4]/15 animate-ping" />
         </div>
 
-        {/* Edit mode overlay hint */}
         {editMode && (
-          <div className="absolute inset-0 z-[1] pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-[#D4AF37]/20 text-[10px] font-black uppercase tracking-[0.3em]">
-              Drag elements to reposition
-            </div>
+          <div className="absolute inset-0 z-[1] pointer-events-none flex items-center justify-center">
+            <span className="text-[#D4AF37]/15 text-[10px] font-black uppercase tracking-[0.3em]">Drag elements to reposition</span>
           </div>
         )}
 
-        {/* ── Navigation HUD ── */}
+        {/* ══════ Navigation HUD (matches NavigationHUD.tsx) ══════ */}
         {c.showNavigationHUD && (
           <DraggablePreviewItem id="navigationHUD" {...dp}>
-            <div className="bg-black/80 border border-zinc-700 rounded-lg px-3 py-1.5 flex items-center gap-2 whitespace-nowrap">
-              <Navigation className="w-3 h-3 text-[#D4AF37] flex-shrink-0" />
-              <div>
-                <div className="text-[7px] font-black text-white uppercase">Turn Right on I-95 N</div>
-                {c.showLaneGuidance && (
-                  <div className="flex gap-0.5 mt-0.5">
-                    <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
-                    <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
-                    <div className="w-2 h-3 bg-[#D4AF37] rounded-[1px]" />
+            <div className="bg-zinc-900/95 backdrop-blur-xl rounded-xl shadow-2xl border border-zinc-700/40 overflow-hidden" style={{ width: '180px' }}>
+              <div className="flex items-stretch">
+                {/* Direction icon column */}
+                <div className="flex items-center justify-center px-2.5 py-2 bg-zinc-800/50">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <ArrowRightLeft className="w-5 h-5 text-white drop-shadow-md" style={{ transform: 'rotate(-45deg)' }} />
+                    <span className="text-[7px] font-black text-white">0.3 mi</span>
                   </div>
-                )}
+                </div>
+                {/* Instruction content */}
+                <div className="flex-1 py-2 px-2.5 min-w-0">
+                  <div className="text-white font-bold text-[8px] leading-tight truncate">
+                    Turn Right on <span className="text-[#D4AF37]">I-95 N</span>
+                  </div>
+                  <div className="text-zinc-400 text-[6px] mt-0.5 truncate">toward Philadelphia</div>
+                  <div className="flex items-center gap-0.5 mt-0.5">
+                    <span className="text-[5px] text-zinc-500 font-mono">65 mph</span>
+                  </div>
+                </div>
               </div>
-              <span className="text-[8px] font-black text-[#D4AF37] ml-1">0.3 mi</span>
+              {/* Lane guidance ribbon */}
+              {c.showLaneGuidance && (
+                <div className="border-t border-zinc-700/30 px-2 py-1 bg-zinc-800/30">
+                  <div className="flex justify-center gap-0">
+                    {[false, false, true, true, false].map((active, i) => (
+                      <div key={i} className={`flex items-center justify-center py-0.5 flex-1 max-w-[14px] ${active ? 'bg-[#4285F4]/20' : 'bg-white/[0.02]'} ${i === 0 ? 'rounded-l' : ''} ${i === 4 ? 'rounded-r' : ''}`}
+                        style={{ borderLeft: i > 0 ? '1px dashed rgba(255,255,255,0.08)' : 'none' }}>
+                        {active ? (
+                          <div className="w-1.5 h-1.5 bg-[#4285F4] rounded-full shadow-[0_0_4px_rgba(66,133,244,0.5)]" />
+                        ) : (
+                          <div className="w-0.5 h-0.5 bg-white/10 rounded-full" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Speed Overlay ── */}
+        {/* ══════ Speed Limit Sign (matches SpeedLimitMarker) ══════ */}
         {c.showSpeedOverlay && (
           <DraggablePreviewItem id="speedOverlay" {...dp}>
-            <div className="bg-black/80 border border-zinc-700 rounded-lg w-10 h-10 flex flex-col items-center justify-center">
-              <span className="text-[10px] font-black text-white leading-none">67</span>
-              <span className="text-[5px] font-bold text-zinc-500 uppercase">mph</span>
+            <div className="flex flex-col items-center">
+              {/* MUTCD Speed Limit Sign */}
+              <div className="bg-white border-[2px] border-black rounded-sm p-0.5 w-10 flex flex-col items-center">
+                <span className="text-[4px] font-black text-black leading-none tracking-tight">SPEED</span>
+                <span className="text-[4px] font-black text-black leading-none tracking-tight">LIMIT</span>
+                <span className="text-[12px] font-black text-black leading-none mt-0.5">65</span>
+              </div>
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Maneuver Preview ── */}
+        {/* ══════ Maneuver Preview (matches ManeuverPreview) ══════ */}
         {c.showManeuverPreview && (
           <DraggablePreviewItem id="maneuverPreview" {...dp}>
-            <div className="bg-black/80 border border-zinc-700 rounded-lg w-14 h-14 flex items-center justify-center">
-              <svg viewBox="0 0 40 40" className="w-10 h-10">
-                <path d="M 20 35 L 20 15 Q 20 8 27 8 L 35 8" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round"/>
-                <circle cx="20" cy="20" r="2" fill="#4AF" />
-              </svg>
+            <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/40 rounded-xl shadow-2xl overflow-hidden" style={{ width: '60px', height: '60px' }}>
+              <div className="w-full h-full bg-zinc-950 relative">
+                <svg viewBox="0 0 60 60" className="w-full h-full">
+                  <path d="M 30 52 L 30 22 Q 30 12 42 12 L 55 12" fill="none" stroke="#D4AF37" strokeWidth="3" strokeLinecap="round"/>
+                  <path d="M 10 52 L 10 22 Q 10 12 20 12" fill="none" stroke="#444" strokeWidth="2" strokeLinecap="round" strokeDasharray="3 2"/>
+                  <circle cx="30" cy="35" r="3" fill="#4285F4" stroke="white" strokeWidth="1"/>
+                  <polygon points="42,8 48,12 42,16" fill="#D4AF37"/>
+                </svg>
+                <div className="absolute top-1 left-1 text-[5px] font-black text-zinc-500 uppercase">Preview</div>
+              </div>
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Weather + Restrictions Panel ── */}
+        {/* ══════ Weather + Restrictions (matches NavigationView overlay) ══════ */}
         {(c.showWeatherOverlay || c.showTruckRestrictions) && (
           <DraggablePreviewItem id="weatherPanel" {...dp}>
             <div className="flex flex-col gap-1">
               {c.showTruckRestrictions && (
-                <div className="bg-black/80 border border-orange-500/40 rounded-lg px-1.5 py-1 flex items-center gap-1">
-                  <AlertTriangle className="w-2.5 h-2.5 text-orange-500" />
-                  <span className="text-[5px] font-black text-orange-400 uppercase">Low Bridge</span>
+                <div className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <AlertTriangle className="w-2.5 h-2.5 text-orange-500" />
+                    <div>
+                      <div className="text-[5px] font-black text-orange-400 uppercase">Low Bridge</div>
+                      <div className="text-[4px] text-orange-400/60">12'6" Clearance</div>
+                    </div>
+                  </div>
                 </div>
               )}
               {c.showWeatherOverlay && (
-                <div className="bg-black/80 border border-[#D4AF37]/30 rounded-lg px-1.5 py-1 flex items-center gap-1.5">
-                  <CloudSun className="w-2.5 h-2.5 text-[#D4AF37]" />
-                  <span className="text-[7px] font-bold text-white">72°</span>
+                <div className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1.5">
+                    <CloudSun className="w-3 h-3 text-[#D4AF37]" />
+                    <div>
+                      <div className="text-[8px] font-black text-white">72°F</div>
+                      <div className="text-[5px] text-zinc-500 font-bold">Clear</div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Route Comparison ── */}
+        {/* ══════ Route Comparison (matches route comparison panel) ══════ */}
         {c.showRouteComparison && (
           <DraggablePreviewItem id="routeComparison" {...dp}>
-            <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1 flex items-center gap-2 whitespace-nowrap">
-              <GitCompare className="w-2.5 h-2.5 text-[#D4AF37]" />
-              <div className="flex gap-1.5">
-                <span className="text-[5px] font-black text-[#D4AF37] bg-[#D4AF37]/10 px-1 rounded">2h 15m</span>
-                <span className="text-[5px] font-black text-zinc-500 bg-zinc-800 px-1 rounded">2h 40m</span>
+            <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/40 rounded-xl shadow-2xl overflow-hidden" style={{ width: '140px' }}>
+              <div className="px-2 py-1.5 border-b border-zinc-800/50">
+                <div className="flex items-center gap-1">
+                  <GitCompare className="w-2.5 h-2.5 text-[#D4AF37]" />
+                  <span className="text-[6px] font-black text-zinc-500 uppercase tracking-wider">Routes</span>
+                </div>
+              </div>
+              <div className="p-1.5 flex flex-col gap-1">
+                <div className="flex items-center justify-between bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
+                    <span className="text-[6px] font-black text-white">I-95 N</span>
+                  </div>
+                  <span className="text-[7px] font-black text-[#D4AF37]">2h 15m</span>
+                </div>
+                <div className="flex items-center justify-between bg-zinc-800/50 rounded-lg px-2 py-1">
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                    <span className="text-[6px] font-black text-zinc-400">US-1 N</span>
+                  </div>
+                  <span className="text-[7px] font-black text-zinc-500">2h 40m</span>
+                </div>
               </div>
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Trip Panel (Fuel + HOS) ── */}
+        {/* ══════ Trip Panel: Fuel + HOS (matches FuelCostCalculator + DriverFatigueAlert) ══════ */}
         {(c.showFuelCost || c.showHosStatus) && (
           <DraggablePreviewItem id="tripPanel" {...dp}>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col gap-1" style={{ width: '90px' }}>
               {c.showFuelCost && (
-                <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
-                  <div className="flex items-center gap-1">
-                    <Fuel className="w-2.5 h-2.5 text-[#D4AF37]" />
-                    <span className="text-[6px] font-black text-zinc-500 uppercase">Fuel</span>
+                <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <div className="flex items-center gap-1">
+                      <Fuel className="w-3 h-3 text-[#D4AF37]" />
+                      <span className="text-[6px] font-black text-white uppercase">Fuel Est</span>
+                    </div>
                   </div>
-                  <span className="text-[8px] font-black text-white">$124.50</span>
+                  <div className="px-2 pb-1.5 flex gap-1">
+                    <div className="bg-zinc-800/60 rounded px-1 py-0.5 text-center flex-1">
+                      <div className="text-[4px] text-zinc-500 font-bold">GAL</div>
+                      <div className="text-[7px] font-black text-white">24.3</div>
+                    </div>
+                    <div className="bg-zinc-800/60 rounded px-1 py-0.5 text-center flex-1">
+                      <div className="text-[4px] text-zinc-500 font-bold">COST</div>
+                      <div className="text-[7px] font-black text-[#D4AF37]">$89</div>
+                    </div>
+                  </div>
                 </div>
               )}
               {c.showHosStatus && (
-                <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-2.5 h-2.5 text-emerald-400" />
-                    <span className="text-[6px] font-black text-zinc-500 uppercase">HOS</span>
+                <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg overflow-hidden">
+                  <div className="flex items-center justify-between px-2 py-1.5">
+                    <div className="flex items-center gap-1">
+                      <Clock className="w-3 h-3 text-emerald-400" />
+                      <span className="text-[6px] font-black text-white uppercase">HOS</span>
+                    </div>
+                    <span className="text-[5px] px-1 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">OK</span>
                   </div>
-                  <span className="text-[8px] font-black text-emerald-400">6h 22m</span>
+                  <div className="px-2 pb-1.5">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[5px] text-zinc-500 font-bold">Drive Time</span>
+                      <span className="text-[6px] font-black text-emerald-400">6h 22m</span>
+                    </div>
+                    <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-emerald-500 rounded-full" style={{ width: '58%' }} />
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Map Controls ── */}
+        {/* ══════ Map Controls (matches MapControls.tsx capsule) ══════ */}
         {c.showMapControls && (
           <DraggablePreviewItem id="mapControls" {...dp}>
-            <div className="flex flex-col gap-0.5">
-              <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">+</div>
-              <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">-</div>
-              <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center">
-                <Layers className="w-2.5 h-2.5 text-zinc-400" />
+            <div className="bg-black border border-[#D4AF37]/30 rounded-2xl p-1 shadow-[0_20px_60px_rgba(0,0,0,0.8)] flex flex-col gap-1">
+              <div className="p-1 rounded-lg bg-white/5 text-zinc-500 flex items-center justify-center">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="3" y1="12" x2="21" y2="12"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
+              </div>
+              <div className="p-1 rounded-lg bg-white/5 text-zinc-500 flex items-center justify-center">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              </div>
+              <div className="h-px bg-zinc-800 mx-0.5" />
+              <div className="p-1 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37] flex items-center justify-center">
+                <Layers className="w-2.5 h-2.5" />
+              </div>
+              <div className="p-1 rounded-lg bg-white/5 text-zinc-500 flex items-center justify-center">
+                <Navigation className="w-2.5 h-2.5" />
               </div>
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Arrival HUD ── */}
+        {/* ══════ Arrival HUD (matches NavigationView bottom bar) ══════ */}
         {c.showArrivalHUD && (
           <DraggablePreviewItem id="arrivalHUD" {...dp}>
-            <div className="bg-black/90 border border-zinc-700 rounded-lg px-3 py-1.5 flex items-center gap-3 whitespace-nowrap">
-              <div className="flex items-center gap-2">
-                <span className="text-[7px] font-black text-[#D4AF37] uppercase">142 mi</span>
-                <span className="text-[5px] text-zinc-600">|</span>
-                <span className="text-[7px] font-black text-white">2h 15m</span>
+            <div className="bg-black/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-xl shadow-[0_-8px_40px_rgba(0,0,0,0.9),0_0_20px_rgba(212,175,55,0.08)]" style={{ width: '260px' }}>
+              {/* Region bar */}
+              <div className="flex items-center justify-between px-2 py-0.5 border-b border-white/5">
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-2 h-2 text-[#D4AF37]" />
+                  <span className="text-[6px] font-black text-white uppercase tracking-wider">I-95 N</span>
+                  <div className="bg-blue-700 border border-white rounded-[1px] px-0.5">
+                    <span className="text-[4px] font-black text-white">I-95</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-[5px] font-black text-[#D4AF37]/80 uppercase tracking-wider">PA</span>
+                  <div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.6)]" />
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <span className="text-[6px] font-bold text-zinc-500 uppercase">ETA</span>
-                <span className="text-[7px] font-black text-[#D4AF37]">3:45 PM</span>
+              {/* Stats row */}
+              <div className="flex items-center p-1.5 gap-1">
+                {/* Exit + Reroute buttons */}
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <div className="p-1 rounded-lg bg-zinc-900/80 border border-zinc-800">
+                    <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#666" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </div>
+                  <div className="p-1 rounded-lg bg-zinc-900/80 border border-zinc-800">
+                    <RotateCcw className="w-[7px] h-[7px] text-zinc-500" />
+                  </div>
+                </div>
+                <div className="h-5 w-px bg-zinc-800 shrink-0" />
+                {/* Speed */}
+                <div className="flex flex-col items-center shrink-0 min-w-[28px]">
+                  <span className="text-[4px] font-bold text-zinc-600 uppercase tracking-wider">Speed</span>
+                  <span className="text-[10px] font-[900] text-white leading-none tabular-nums">67</span>
+                  <span className="text-[4px] text-zinc-600 font-bold">mph</span>
+                </div>
+                <div className="h-4 w-px bg-zinc-800/60 shrink-0" />
+                {/* Distance */}
+                <div className="flex flex-col items-center shrink-0 min-w-[28px]">
+                  <span className="text-[4px] font-bold text-zinc-600 uppercase tracking-wider">Dist</span>
+                  <span className="text-[10px] font-[900] text-[#D4AF37] leading-none tabular-nums">142</span>
+                  <span className="text-[4px] text-zinc-600 font-bold">mi</span>
+                </div>
+                <div className="h-4 w-px bg-zinc-800/60 shrink-0" />
+                {/* Time */}
+                <div className="flex flex-col items-center shrink-0 min-w-[28px]">
+                  <span className="text-[4px] font-bold text-zinc-600 uppercase tracking-wider">Time</span>
+                  <span className="text-[10px] font-[900] text-[#D4AF37] leading-none tabular-nums">2h 15m</span>
+                </div>
+                <div className="h-4 w-px bg-zinc-800/60 shrink-0" />
+                {/* ETA */}
+                <div className="flex flex-col items-center shrink-0 min-w-[30px]">
+                  <span className="text-[4px] font-bold text-zinc-600 uppercase tracking-wider">ETA</span>
+                  <div className="flex items-center gap-0.5">
+                    <div className="w-1 h-1 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_4px_#D4AF37]" />
+                    <span className="text-[10px] font-[900] text-white leading-none">3:45</span>
+                  </div>
+                  <span className="text-[4px] font-bold text-emerald-500/70 uppercase tracking-wider">LIVE</span>
+                </div>
               </div>
             </div>
           </DraggablePreviewItem>
         )}
 
-        {/* ── Map Signs (static, not draggable) ── */}
+        {/* ══════ Map Signs (static, on route — not draggable) ══════ */}
         <div className="absolute inset-0 z-[5] pointer-events-none">
           {c.showHighwayShields && (
-            <div className="absolute top-[25%] left-[55%] bg-blue-700 border border-white rounded-sm px-1 py-0.5">
-              <span className="text-[5px] font-black text-white">I-95</span>
+            <div className="absolute top-[22%] left-[52%]">
+              <div className="relative">
+                <svg width="22" height="18" viewBox="0 0 44 36">
+                  <path d="M22 0 L44 12 L38 36 L6 36 L0 12 Z" fill="#003F87" stroke="white" strokeWidth="2"/>
+                  <text x="22" y="16" textAnchor="middle" fill="white" fontSize="7" fontWeight="900">INTERSTATE</text>
+                  <text x="22" y="30" textAnchor="middle" fill="white" fontSize="14" fontWeight="900">95</text>
+                </svg>
+              </div>
             </div>
           )}
           {c.showSpeedLimitSigns && (
-            <div className="absolute top-[40%] left-[42%] bg-white border border-black rounded-sm px-0.5 py-0.5 flex flex-col items-center">
-              <span className="text-[3px] font-black text-black leading-none">SPEED</span>
-              <span className="text-[3px] font-black text-black leading-none">LIMIT</span>
-              <span className="text-[7px] font-black text-black leading-tight">65</span>
+            <div className="absolute top-[42%] left-[40%]">
+              <div className="bg-white border-2 border-black rounded-[1px] px-0.5 py-0.5 flex flex-col items-center w-[14px]">
+                <span className="text-[3px] font-black text-black leading-none">SPEED</span>
+                <span className="text-[3px] font-black text-black leading-none">LIMIT</span>
+                <span className="text-[8px] font-black text-black leading-none mt-0.5">65</span>
+              </div>
             </div>
           )}
           {c.showExitSigns && (
-            <div className="absolute top-[20%] right-[25%] bg-emerald-700 border border-white/50 rounded-sm px-1 py-0.5">
-              <span className="text-[5px] font-black text-white">EXIT 42</span>
+            <div className="absolute top-[18%] right-[22%]">
+              <div className="bg-[#006B3F] border border-white/60 rounded-[1px] px-1 py-0.5 flex items-center gap-1">
+                <div className="bg-[#006B3F] border border-white/80 rounded-[1px] px-0.5">
+                  <span className="text-[4px] font-black text-white">EXIT</span>
+                </div>
+                <span className="text-[5px] font-black text-white">42 - Market St</span>
+              </div>
             </div>
           )}
           {c.showCurveWarnings && (
-            <div className="absolute top-[55%] left-[60%]">
-              <div className="w-4 h-4 bg-yellow-400 rotate-45 flex items-center justify-center border border-black/30">
-                <span className="text-[5px] font-black text-black -rotate-45">!</span>
+            <div className="absolute top-[53%] left-[58%]">
+              <div className="w-[14px] h-[14px] bg-[#FFCC00] rotate-45 flex items-center justify-center border border-black/40">
+                <svg className="-rotate-45" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="black" strokeWidth="3"><path d="M12 4c-4 0-7 3-7 7s7 9 7 9"/></svg>
               </div>
             </div>
           )}
           {c.showCmvWarnings && (
-            <div className="absolute top-[65%] left-[35%]">
-              <div className="w-4 h-4 bg-yellow-400 rotate-45 flex items-center justify-center border-2 border-red-600/60">
-                <span className="text-[4px] font-black text-black -rotate-45">6%</span>
+            <div className="absolute top-[65%] left-[33%]">
+              <div className="w-[14px] h-[14px] bg-[#FFCC00] rotate-45 flex items-center justify-center border-2 border-red-600/70">
+                <span className="text-[5px] font-black text-black -rotate-45">6%</span>
               </div>
             </div>
           )}
           {c.showTrafficIncidents && (
-            <div className="absolute top-[35%] right-[40%] bg-red-600 rounded-full w-3.5 h-3.5 flex items-center justify-center border border-white/50 animate-pulse">
-              <AlertTriangle className="w-2 h-2 text-white" />
+            <div className="absolute top-[33%] right-[38%]">
+              <div className="bg-red-600 rounded-full w-[14px] h-[14px] flex items-center justify-center border border-white/60 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.5)]">
+                <AlertTriangle className="w-2 h-2 text-white" />
+              </div>
             </div>
           )}
           {c.showWaypointMarkers && (
             <>
-              <div className="absolute top-[75%] left-[15%] bg-[#D4AF37] rounded-full w-4 h-4 flex items-center justify-center border border-black">
-                <span className="text-[6px] font-black text-black">1</span>
+              <div className="absolute top-[72%] left-[13%] bg-[#D4AF37] rounded-full w-[16px] h-[16px] flex items-center justify-center border-2 border-black shadow-lg">
+                <span className="text-[7px] font-black text-black">1</span>
               </div>
-              <div className="absolute top-[15%] right-[12%] bg-[#D4AF37] rounded-full w-4 h-4 flex items-center justify-center border border-black">
-                <span className="text-[6px] font-black text-black">2</span>
+              <div className="absolute top-[12%] right-[10%] bg-[#D4AF37] rounded-full w-[16px] h-[16px] flex items-center justify-center border-2 border-black shadow-lg">
+                <span className="text-[7px] font-black text-black">2</span>
               </div>
             </>
           )}
