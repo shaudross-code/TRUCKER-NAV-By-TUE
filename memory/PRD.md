@@ -14,51 +14,45 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Completed Features
 - Real POI integration (HERE Discover + Google Places)
 - Turn-by-turn truck routing with HERE API
-- 2D heading-up map rotation (oversized container hack)
-- 3D satellite view with Mapbox GL JS
-- Smooth GPS marker interpolation (requestAnimationFrame lerping)
-- Speed display & instruction units (imperial conversion)
-- POI stop position insertion
-- Fuel Network tab (voice alerts for distance to selected POIs)
-- Loading screen masking component render gaps
-- Satellite tiles for 2D view (Mapbox satellite-streets-v12)
-- Highway Road Shield Emblems, Exit Signs, Curve Warning Signs, Speed Limit Change Signs
+- 2D heading-up map rotation + 3D satellite view
+- Smooth GPS marker interpolation, Speed display, POI stop insertion
+- Fuel Network tab, Loading screen, Satellite tiles
+- Highway Road Shield Emblems, Exit Signs, Curve Warning Signs, Speed Limit Signs
 - Traffic Slowdown Markers, CMV Essential Warning Signs, CMV Voice Announcements
-- Counter-Rotation for All Map Signs
-- Heading-Up Precision Fix, Sidebar Overflow Fix, Data Saver Toggle
-- Truck Profile Edit Modal, Waypoint Arrived/Skip Panel
-- Route Overlay Z-Ordering, Multi-Section Route Merging, Route Fetch Retry
-- Network & GPS Monitoring, Lane Guidance Overlay, Route Snapping, Auto-Zoom for Maneuvers
+- Counter-Rotation for All Map Signs, Heading-Up Precision Fix
+- Sidebar Overflow Fix, Data Saver Toggle, Truck Profile Edit Modal
+- Waypoint Arrived/Skip Panel, Route Overlay Z-Ordering
+- Multi-Section Route Merging, Route Fetch Retry, Network & GPS Monitoring
+- Lane Guidance Overlay, Route Snapping, Auto-Zoom for Maneuvers
 - Route Comparison Panel, Toll Data Integration
 - Fuel Cost Calculator, Driver Fatigue Alert (FMCSA HOS)
 - Dynamic Lane Count Visualization
 - POI System Overhaul: Truck Stop Plazas Only
 - Voice Guidance: Graduated Maneuver Announcements
-- Navigation Intelligence Overhaul (route visual separation, active segment highlighting, ManeuverPreview, truck intelligence)
+- Navigation Intelligence Overhaul
 
 ### New Features (2026-04-01)
-- **Decluttered User Location Icon**: Simplified navigation chevron — removed pulsing circles, smaller icon (40x40).
-- **Collapsible Map Controls**: Hamburger (☰) toggle button. Auto-collapses during driving mode. Filter, Overview, 2D/3D, Follow, Compass are collapsible. Zoom +/-, zoom level, heading-up always visible. Original button order preserved.
-- **Numbered Waypoint Markers**: Gold numbered circles (1, 2, 3...) on the map at each waypoint during active navigation.
-- **UI Overlap Fix (Fuel Cost & HOS)**: Repositioned trip-info panel to `bottom-[180px]` right side, clearing both MapControls above and arrival HUD below. Auto-collapse of MapControls during driving prevents vertical overlap.
-- **Real-time Traffic Incident Overlays**: Live incidents from HERE Traffic API v7 every 60s during navigation. Color-coded markers on route. Popup details on click.
-- **Auto-Reroute Countdown**: 10s countdown banner for critical traffic incidents with cancel option.
+- **Decluttered User Location Icon**: Simplified blue chevron, 40x40px.
+- **Collapsible Map Controls**: Hamburger (☰) toggle, auto-collapses during driving. Original button order preserved.
+- **Numbered Waypoint Markers**: Gold numbered circles (1, 2, 3...) at waypoints on map.
+- **UI Overlap Fix**: Trip-info panel at `bottom-[180px]` right side, auto-collapse MapControls during driving.
+- **Real-time Traffic Incident Overlays**: Color-coded markers from HERE Traffic API v7 on route.
+- **Auto-Reroute Countdown**: 10s countdown for critical traffic incidents.
+- **NavigationHUD Mobile Fix**: Pushed HUD down to `top-14` on mobile/tablet to prevent browser toolbar clipping. Desktop stays at `top-3` via `lg:` breakpoint.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
 
 ## Future/Backlog (P2)
-- Speed limit warning system (flash red + audio alert when exceeding posted speed)
-- Viewport-based sign culling (performance optimization — only render visible signs)
+- Speed limit warning system
+- Viewport-based sign culling
 - iOS/Android Store Submission
-- Refactoring: Break down NavigationView.tsx (~6700 lines) into hooks and sub-components
+- Refactoring NavigationView.tsx (~6700 lines)
 
 ## Key Technical Notes
-- Nginx proxy on port 3000 → port 8001 (must recreate if dropped)
-- All sign markers stored in `shieldLayerGroupRef`
-- Heading-up rotation: `totalRotation = -currentHeading` (NO manualRotation)
-- HERE API `return` valid types: summary, actions, instructions, incidents, polyline, turnByTurnActions, elevation, tolls
-- Fuel cost default: $3.52/gal, 6.5 MPG; HOS rules: 11hr drive, 14hr on-duty, 30min break after 8hr, 70hr/8day
-- MapControls auto-collapse via `isDrivingMode` prop; original button order: Filter→Zoom→Overview→2D→Follow→Heading→Compass
-- Traffic incidents fetched from `/api/traffic-incidents` (HERE Traffic API v7)
-- Waypoint markers in `waypointMarkersRef`, traffic incidents in `trafficIncidentMarkersRef`
+- Nginx proxy on port 3000 → 8001 (must recreate if dropped)
+- HERE API `return` valid: summary, actions, instructions, incidents, polyline, turnByTurnActions, elevation, tolls
+- MapControls auto-collapse via `isDrivingMode` prop
+- Traffic incidents from `/api/traffic-incidents`
+- NavigationHUD positioning: `top-14` mobile/tablet, `lg:top-3` desktop (accounts for browser toolbar)
+- The "backend" supervisor process must be stopped to avoid port conflict with trucker-nav

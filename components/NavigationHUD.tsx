@@ -83,7 +83,7 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
   return (
     <div 
       data-testid="navigation-hud" 
-      className="absolute top-3 left-3 right-3 md:left-auto md:right-auto md:left-1/2 md:-translate-x-1/2 md:w-[480px] z-[2000] pointer-events-none"
+      className="absolute top-14 left-3 right-3 lg:top-3 lg:left-auto lg:right-auto lg:left-1/2 lg:-translate-x-1/2 lg:w-[480px] z-[2000] pointer-events-none"
     >
       <div className={`bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border overflow-hidden transition-all duration-300 ${
         detailLevel === 'immediate' ? 'border-[#D4AF37]/60 ring-1 ring-[#D4AF37]/20' : 'border-zinc-700/40'

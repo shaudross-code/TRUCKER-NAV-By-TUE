@@ -5895,7 +5895,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Truck Intelligence: Steep Grade Alert */}
       {activeGradeAlert && isDriving && (
-        <div data-testid="grade-alert" className="absolute top-4 left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-3 fade-in duration-300">
+        <div data-testid="grade-alert" className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-3 fade-in duration-300">
           <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-600/95 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(217,119,6,0.5)] pointer-events-auto border border-amber-500/40">
             <div className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center flex-shrink-0">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -5915,7 +5915,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Network Offline Banner — Critical for professional truck use */}
       {context && !context.isOnline && (
-        <div data-testid="network-offline-banner" className="absolute top-2 left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-2 fade-in duration-300">
+        <div data-testid="network-offline-banner" className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-2 fade-in duration-300">
           <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/95 backdrop-blur-md rounded-lg shadow-[0_4px_20px_rgba(220,38,38,0.4)] pointer-events-auto">
             <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
             <span className="text-[10px] font-black text-white uppercase tracking-wider">No Network — Using Cached Data</span>
@@ -5925,7 +5925,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* GPS Signal Quality Indicator */}
       {isDriving && !isExploreMode && telemetryContext?.gpsAccuracyRef?.current != null && telemetryContext.gpsAccuracyRef.current > 50 && (
-        <div data-testid="gps-weak-signal" className="absolute top-2 right-2 z-[2100] animate-in fade-in duration-300">
+        <div data-testid="gps-weak-signal" className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] right-2 z-[2100] animate-in fade-in duration-300">
           <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-600/90 backdrop-blur-md rounded-lg shadow-lg">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="shrink-0">
               <path d="M12 2a7 7 0 017 7c0 5.25-7 13-7 13S5 14.25 5 9a7 7 0 017-7z" stroke="white" strokeWidth="2"/>
