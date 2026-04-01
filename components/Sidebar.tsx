@@ -15,7 +15,8 @@ import {
   History,
   DollarSign,
   LogOut,
-  Fuel
+  Fuel,
+  LayoutPanelTop
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { speak } from '../services/speechService';
@@ -46,6 +47,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ViewType.MAINTENANCE, icon: Wrench, label: 'Maintenance' },
     { id: ViewType.ROUTE_HISTORY, icon: History, label: 'History' },
     { id: ViewType.FUEL_NETWORK, icon: Fuel, label: 'Fuel Network' },
+    { id: ViewType.HUD_LAYOUT, icon: LayoutPanelTop, label: 'Display' },
     { id: ViewType.SETTINGS, icon: Settings, label: 'Settings' },
   ];
 

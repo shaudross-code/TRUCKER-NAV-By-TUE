@@ -12,6 +12,7 @@ const Maintenance = lazy(() => import('./components/Maintenance'));
 const SettingsView = lazy(() => import('./components/SettingsView'));
 const RouteHistory = lazy(() => import('./components/RouteHistory'));
 const FuelNetwork = lazy(() => import('./components/FuelNetwork'));
+const HudLayoutView = lazy(() => import('./components/HudLayoutView'));
 
 import { ViewType, AppContext, LocationContext, TelemetryContext } from './types';
 
@@ -460,6 +461,8 @@ const AppContent: React.FC = React.memo(() => {
       case ViewType.GITHUB_UPDATES:
       case ViewType.FUEL_NETWORK:
         return <Suspense fallback={<ContentLoader />}><FuelNetwork /></Suspense>;
+      case ViewType.HUD_LAYOUT:
+        return <Suspense fallback={<ContentLoader />}><HudLayoutView /></Suspense>;
       default:
         return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
     }

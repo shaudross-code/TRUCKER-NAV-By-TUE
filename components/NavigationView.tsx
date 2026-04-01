@@ -70,6 +70,8 @@ import {
   noTrucksSign, weightLimitSign, noHazmatSign, tunnelWarning,
   noticeWarning, exitGuideSign, directionBadge, directionLabel
 } from '../utils/mutcdSigns';
+import { loadHudLayout } from '../utils/hudLayout';
+import type { HudLayoutConfig } from '../types';
 
 interface Waypoint {
   id: string;
@@ -237,6 +239,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const autoRerouteTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastIncidentFetchRef = useRef<number>(0);
   const [triggerReroute, setTriggerReroute] = useState(false);
+  
+  // HUD Layout configuration (user-customizable visibility)
+  const [hudLayout, setHudLayout] = useState<HudLayoutConfig>(loadHudLayout);
+  
+  // Listen for HUD layout changes from the Display settings view
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const config = (e as CustomEvent).detail as HudLayoutConfig;
+      setHudLayout(config);
+    };
+    window.addEventListener('hud-layout-changed', handler);
+    return () => window.removeEventListener('hud-layout-changed', handler);
+  }, []);
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
     return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
@@ -1485,7 +1500,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     waypointMarkersRef.current.forEach(m => m.remove());
     waypointMarkersRef.current = [];
 
-    if (!mapInstanceRef.current || !isMapReady || waypoints.length === 0 || milesRemaining <= 0) return;
+    if (!mapInstanceRef.current || !isMapReady || waypoints.length === 0 || milesRemaining <= 0 || !hudLayout.showWaypointMarkers) return;
 
     waypoints.forEach((wp: any, idx: number) => {
       if (!wp.lat || !wp.lon) return;
@@ -1515,7 +1530,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }).addTo(mapInstanceRef.current!);
       waypointMarkersRef.current.push(marker);
     });
-  }, [isMapReady, waypoints, milesRemaining]);
+  }, [isMapReady, waypoints, milesRemaining, hudLayout.showWaypointMarkers]);
 
   // Real-time traffic incident overlays on the route
   useEffect(() => {
@@ -1645,7 +1660,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
     };
 
-    if (milesRemaining > 0 && isMapReady) {
+    if (milesRemaining > 0 && isMapReady && hudLayout.showTrafficIncidents) {
       fetchAndDisplayIncidents();
       trafficIncidentIntervalRef.current = setInterval(fetchAndDisplayIncidents, 60000); // Every 60s
     }
@@ -4373,32 +4388,32 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           shieldLayerGroupRef.current.clearLayers();
         }
         // Place highway shield markers on the route
-        if (primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
+        if (hudLayout.showHighwayShields && primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
           placeHighwayShields(primaryRoute.highwayShields);
         }
         // Place exit signs
-        if (primaryRoute.exitSigns && primaryRoute.exitSigns.length > 0) {
+        if (hudLayout.showExitSigns && primaryRoute.exitSigns && primaryRoute.exitSigns.length > 0) {
           placeExitSigns(primaryRoute.exitSigns);
         }
         // Place sharp curve warnings
-        if (primaryRoute.curveSigns && primaryRoute.curveSigns.length > 0) {
+        if (hudLayout.showCurveWarnings && primaryRoute.curveSigns && primaryRoute.curveSigns.length > 0) {
           placeCurveSigns(primaryRoute.curveSigns);
         }
         // Place speed limit change signs
-        if (primaryRoute.speedLimitSigns && primaryRoute.speedLimitSigns.length > 0) {
+        if (hudLayout.showSpeedLimitSigns && primaryRoute.speedLimitSigns && primaryRoute.speedLimitSigns.length > 0) {
           placeSpeedLimitSigns(primaryRoute.speedLimitSigns);
         }
         // Place traffic slowdown markers
-        if (primaryRoute.trafficSlowdowns && primaryRoute.trafficSlowdowns.length > 0) {
+        if (hudLayout.showTrafficIncidents && primaryRoute.trafficSlowdowns && primaryRoute.trafficSlowdowns.length > 0) {
           placeTrafficSlowdowns(primaryRoute.trafficSlowdowns);
         }
         // Place CMV warning signs (steep grades, rollover risk, winding roads)
-        if (primaryRoute.cmvWarnings && primaryRoute.cmvWarnings.length > 0) {
+        if (hudLayout.showCmvWarnings && primaryRoute.cmvWarnings && primaryRoute.cmvWarnings.length > 0) {
           placeCmvWarnings(primaryRoute.cmvWarnings);
         }
         
         // Place truck restriction warning signs (low bridges, weight limits, tunnel, etc.)
-        if (primaryRoute.restrictions && primaryRoute.restrictions.length > 0) {
+        if (hudLayout.showTruckRestrictions && primaryRoute.restrictions && primaryRoute.restrictions.length > 0) {
           placeTruckWarnings(primaryRoute.restrictions);
         }
 
@@ -5613,7 +5628,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 {/* The contents of this div are dynamically generated by Leaflet at runtime */}
               </div>
             </div>
-            <SpeedLimitMarker currentSpeedLimit={currentSpeedLimit} speed={speed} unitSystem={context?.unitSystem} />
+            {hudLayout.showSpeedOverlay && <SpeedLimitMarker currentSpeedLimit={currentSpeedLimit} speed={speed} unitSystem={context?.unitSystem} />}
           </>
         )}
       </div>
@@ -5633,7 +5648,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       {!isMapReady && !mapInitError && <div className="absolute inset-0 z-50 flex items-center justify-center bg-black text-white">Loading Map...</div>}
 
       {/* Route Comparison Overlay */}
-      {isRoutePreview && alternativeRoutes.length > 1 && (
+      {hudLayout.showRouteComparison && isRoutePreview && alternativeRoutes.length > 1 && (
         <>
           <RouteComparisonPanel
             routes={alternativeRoutes}
@@ -5790,7 +5805,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       />
 
       {/* Modern Navigation HUD */}
-      {!isExploreMode && milesRemaining > 0 && !is3DMode && (
+      {hudLayout.showNavigationHUD && !isExploreMode && milesRemaining > 0 && !is3DMode && (
         <NavigationHUD 
           nextInstruction={nextInstruction} 
           parseLane={parseLane} 
@@ -5802,7 +5817,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
-      {!isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
+      {hudLayout.showManeuverPreview && !isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
         <div className="absolute top-36 left-4 z-[2000] w-72 pointer-events-auto">
           <ManeuverPreview {...maneuverPreviewData} />
         </div>
@@ -5854,9 +5869,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Weather & Restriction Overlay */}
-      {!selectedPoi && !isExploreMode && (
+      {!selectedPoi && !isExploreMode && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
         <div id="nav-weather-overlay" className={`absolute left-2 md:left-4 z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 -translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'} scale-90 md:scale-100 origin-left`}>
-          {restrictionAlerts.length > 0 && (
+          {hudLayout.showTruckRestrictions && restrictionAlerts.length > 0 && (
             <div className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-orange-500/20 pb-1.5">
                 <div className="p-1 md:p-1.5 bg-orange-500 rounded-lg">
@@ -5970,6 +5985,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           )}
 
+          {hudLayout.showWeatherOverlay && (
           <div className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-xl md:rounded-2xl p-2 md:p-4 shadow-2xl w-36 md:w-56 transition-all">
             {weather && (
               <>
@@ -6126,19 +6142,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           )}
         </div>
+        )}
       )}
 
       {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}
       {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
-        <div data-testid="trip-info-panel" className="absolute right-2 md:right-4 z-[2000] flex flex-col gap-2 transition-all duration-700 bottom-[calc(10rem+env(safe-area-inset-bottom))] md:bottom-[180px] scale-90 md:scale-100 origin-bottom-right w-44 md:w-56">
-          <FuelCostCalculator
+        <div data-testid="trip-info-panel" className={`absolute ${hudLayout.tripPanelPosition === 'left' ? 'left-2 md:left-4 origin-bottom-left' : 'right-2 md:right-4 origin-bottom-right'} z-[2000] flex flex-col gap-2 transition-all duration-700 bottom-[calc(10rem+env(safe-area-inset-bottom))] md:bottom-[180px] scale-90 md:scale-100 w-44 md:w-56`}>
+          {hudLayout.showFuelCost && <FuelCostCalculator
             routeDistanceMi={milesRemaining}
             initialFuelPrice={fuelPricePerGallon}
             initialMpg={truckMpg}
             onFuelPriceChange={setFuelPricePerGallon}
             onMpgChange={setTruckMpg}
-          />
-          <DriverFatigueAlert isDriving={isDriving} />
+          />}
+          {hudLayout.showHosStatus && <DriverFatigueAlert isDriving={isDriving} />}
         </div>
       )}
 
@@ -6468,7 +6485,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {isDriving && !isExploreMode && !is3DMode && (
+      {hudLayout.showArrivalHUD && isDriving && !isExploreMode && !is3DMode && (
         <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute bottom-[calc(0.5rem+env(safe-area-inset-bottom))] md:bottom-6 landscape:bottom-[calc(0.25rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none">
           <div className="bg-black/95 backdrop-blur-xl border border-[#D4AF37]/20 rounded-2xl md:rounded-3xl landscape:rounded-2xl shadow-[0_-8px_60px_rgba(0,0,0,0.9),0_0_40px_rgba(212,175,55,0.08)] pointer-events-auto transition-all">
             {/* Region Bar — top strip showing current state/road */}
@@ -6600,7 +6617,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      <MapControls
+      {hudLayout.showMapControls && <MapControls
         mapInstanceRef={mapInstanceRef}
         mapboxMapRef={mapboxMapRef}
         isFilterMenuOpen={isFilterMenuOpen}
@@ -6627,7 +6644,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         currentZoom={currentZoom}
         isDrivingMode={isDriving && milesRemaining > 0}
         className={`-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
-      />
+      />}
               <RouteSettingsModal
         isOpen={isRouteSettingsOpen}
         onClose={() => setIsRouteSettingsOpen(false)}

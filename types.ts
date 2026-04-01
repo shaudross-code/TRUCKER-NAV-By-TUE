@@ -80,11 +80,34 @@ export enum ViewType {
   LOAD_BOARD = 'LOAD_BOARD',
   TRUCK_STOPS = 'TRUCK_STOPS',
   MAINTENANCE = 'MAINTENANCE',
+  HUD_LAYOUT = 'HUD_LAYOUT',
   SETTINGS = 'SETTINGS',
   ROUTE_HISTORY = 'ROUTE_HISTORY',
   PAY_SUMMARY = 'PAY_SUMMARY',
   GITHUB_UPDATES = 'GITHUB_UPDATES',
   FUEL_NETWORK = 'FUEL_NETWORK'
+}
+
+export interface HudLayoutConfig {
+  showNavigationHUD: boolean;
+  showSpeedOverlay: boolean;
+  showArrivalHUD: boolean;
+  showFuelCost: boolean;
+  showHosStatus: boolean;
+  showMapControls: boolean;
+  showWeatherOverlay: boolean;
+  showTruckRestrictions: boolean;
+  showHighwayShields: boolean;
+  showSpeedLimitSigns: boolean;
+  showExitSigns: boolean;
+  showCmvWarnings: boolean;
+  showCurveWarnings: boolean;
+  showTrafficIncidents: boolean;
+  showWaypointMarkers: boolean;
+  showManeuverPreview: boolean;
+  showRouteComparison: boolean;
+  showLaneGuidance: boolean;
+  tripPanelPosition: 'right' | 'left';
 }
 
 export interface TelemetryContextType {
