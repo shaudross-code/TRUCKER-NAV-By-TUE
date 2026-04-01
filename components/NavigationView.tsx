@@ -5986,6 +5986,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           )}
 
           {hudLayout.showWeatherOverlay && (
+          <>
           <div className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/20 rounded-xl md:rounded-2xl p-2 md:p-4 shadow-2xl w-36 md:w-56 transition-all">
             {weather && (
               <>
@@ -6141,8 +6142,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               </div>
             </div>
           )}
-        </div>
+        </>
         )}
+        </div>
       )}
 
       {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}

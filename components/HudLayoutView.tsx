@@ -1,12 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Eye, EyeOff, RotateCcw, Navigation, Gauge, MapPin,
   Fuel, Clock, Layers, CloudSun, AlertTriangle, Shield,
   ArrowRightLeft, Milestone, Construction, Route, GitCompare,
-  Map as MapIcon, ArrowLeftRight
+  Map as MapIcon, ArrowLeftRight, GripVertical
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import type { HudLayoutConfig } from '../types';
-import { DEFAULT_HUD_LAYOUT, loadHudLayout, saveHudLayout } from '../utils/hudLayout';
+import {
+  DEFAULT_HUD_LAYOUT,
+  DEFAULT_ORDER,
+  loadHudLayout,
+  saveHudLayout,
+  loadHudOrder,
+  saveHudOrder,
+  type HudElementOrder,
+} from '../utils/hudLayout';
 
 interface HudElement {
   key: keyof HudLayoutConfig;
@@ -16,41 +41,179 @@ interface HudElement {
   category: string;
 }
 
-const HUD_ELEMENTS: HudElement[] = [
-  // Navigation Core
-  { key: 'showNavigationHUD', label: 'Turn Instructions', description: 'Top header showing next turn direction and distance', icon: Navigation, category: 'Navigation' },
-  { key: 'showLaneGuidance', label: 'Lane Guidance', description: 'Lane arrows in the turn instruction header', icon: ArrowRightLeft, category: 'Navigation' },
-  { key: 'showSpeedOverlay', label: 'Speed Display', description: 'Current speed indicator on the map', icon: Gauge, category: 'Navigation' },
-  { key: 'showArrivalHUD', label: 'Arrival Bar', description: 'Bottom bar with distance, time remaining, and ETA', icon: MapPin, category: 'Navigation' },
-  { key: 'showManeuverPreview', label: 'Maneuver Preview', description: 'Mini-map preview of upcoming interchanges', icon: Route, category: 'Navigation' },
-  
-  // Panels
-  { key: 'showFuelCost', label: 'Fuel Cost', description: 'Estimated fuel cost panel during navigation', icon: Fuel, category: 'Panels' },
-  { key: 'showHosStatus', label: 'HOS Status', description: 'Hours of Service driving time panel', icon: Clock, category: 'Panels' },
-  { key: 'showMapControls', label: 'Map Controls', description: 'Zoom, 2D/3D, follow, and compass buttons', icon: Layers, category: 'Panels' },
-  { key: 'showRouteComparison', label: 'Route Comparison', description: 'Alternative routes comparison panel', icon: GitCompare, category: 'Panels' },
-  { key: 'showWeatherOverlay', label: 'Weather Overlay', description: 'Current weather conditions on the map', icon: CloudSun, category: 'Panels' },
-  
-  // Signs & Markers
-  { key: 'showHighwayShields', label: 'Highway Shields', description: 'Interstate, US Route, and State highway emblems', icon: Shield, category: 'Signs' },
-  { key: 'showSpeedLimitSigns', label: 'Speed Limit Signs', description: 'MUTCD speed limit signs along the route', icon: Milestone, category: 'Signs' },
-  { key: 'showExitSigns', label: 'Exit Signs', description: 'Green highway exit guide signs', icon: MapIcon, category: 'Signs' },
-  { key: 'showCurveWarnings', label: 'Curve Warnings', description: 'Yellow diamond curve warning signs', icon: AlertTriangle, category: 'Signs' },
-  { key: 'showCmvWarnings', label: 'CMV Warnings', description: 'Steep grade, rollover risk, winding road signs', icon: Construction, category: 'Signs' },
-  { key: 'showTruckRestrictions', label: 'Truck Restrictions', description: 'Low clearance, weight limit, no-truck alerts', icon: AlertTriangle, category: 'Signs' },
-  { key: 'showTrafficIncidents', label: 'Traffic Incidents', description: 'Real-time accident, closure, construction markers', icon: AlertTriangle, category: 'Signs' },
-  { key: 'showWaypointMarkers', label: 'Waypoint Numbers', description: 'Numbered markers (1, 2, 3) at each stop', icon: MapPin, category: 'Signs' },
-];
+const HUD_ELEMENTS_MAP: Record<string, HudElement> = {
+  showNavigationHUD: { key: 'showNavigationHUD', label: 'Turn Instructions', description: 'Top header showing next turn direction and distance', icon: Navigation, category: 'Navigation' },
+  showLaneGuidance: { key: 'showLaneGuidance', label: 'Lane Guidance', description: 'Lane arrows in the turn instruction header', icon: ArrowRightLeft, category: 'Navigation' },
+  showSpeedOverlay: { key: 'showSpeedOverlay', label: 'Speed Display', description: 'Current speed indicator on the map', icon: Gauge, category: 'Navigation' },
+  showArrivalHUD: { key: 'showArrivalHUD', label: 'Arrival Bar', description: 'Bottom bar with distance, time remaining, and ETA', icon: MapPin, category: 'Navigation' },
+  showManeuverPreview: { key: 'showManeuverPreview', label: 'Maneuver Preview', description: 'Mini-map preview of upcoming interchanges', icon: Route, category: 'Navigation' },
+  showFuelCost: { key: 'showFuelCost', label: 'Fuel Cost', description: 'Estimated fuel cost panel during navigation', icon: Fuel, category: 'Panels' },
+  showHosStatus: { key: 'showHosStatus', label: 'HOS Status', description: 'Hours of Service driving time panel', icon: Clock, category: 'Panels' },
+  showMapControls: { key: 'showMapControls', label: 'Map Controls', description: 'Zoom, 2D/3D, follow, and compass buttons', icon: Layers, category: 'Panels' },
+  showRouteComparison: { key: 'showRouteComparison', label: 'Route Comparison', description: 'Alternative routes comparison panel', icon: GitCompare, category: 'Panels' },
+  showWeatherOverlay: { key: 'showWeatherOverlay', label: 'Weather Overlay', description: 'Current weather conditions on the map', icon: CloudSun, category: 'Panels' },
+  showHighwayShields: { key: 'showHighwayShields', label: 'Highway Shields', description: 'Interstate, US Route, and State highway emblems', icon: Shield, category: 'Signs' },
+  showSpeedLimitSigns: { key: 'showSpeedLimitSigns', label: 'Speed Limit Signs', description: 'MUTCD speed limit signs along the route', icon: Milestone, category: 'Signs' },
+  showExitSigns: { key: 'showExitSigns', label: 'Exit Signs', description: 'Green highway exit guide signs', icon: MapIcon, category: 'Signs' },
+  showCurveWarnings: { key: 'showCurveWarnings', label: 'Curve Warnings', description: 'Yellow diamond curve warning signs', icon: AlertTriangle, category: 'Signs' },
+  showCmvWarnings: { key: 'showCmvWarnings', label: 'CMV Warnings', description: 'Steep grade, rollover risk, winding road signs', icon: Construction, category: 'Signs' },
+  showTruckRestrictions: { key: 'showTruckRestrictions', label: 'Truck Restrictions', description: 'Low clearance, weight limit, no-truck alerts', icon: AlertTriangle, category: 'Signs' },
+  showTrafficIncidents: { key: 'showTrafficIncidents', label: 'Traffic Incidents', description: 'Real-time accident, closure, construction markers', icon: AlertTriangle, category: 'Signs' },
+  showWaypointMarkers: { key: 'showWaypointMarkers', label: 'Waypoint Numbers', description: 'Numbered markers (1, 2, 3) at each stop', icon: MapPin, category: 'Signs' },
+};
 
 const CATEGORIES = ['Navigation', 'Panels', 'Signs'];
 
+/* ─── Sortable Row ─── */
+function SortableRow({
+  id,
+  element,
+  isVisible,
+  onToggle,
+}: {
+  id: string;
+  element: HudElement;
+  isVisible: boolean;
+  onToggle: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+    position: 'relative',
+  };
+
+  const Icon = element.icon;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      data-testid={`hud-toggle-${element.key}`}
+      className={`flex items-center gap-2 px-4 py-3 transition-colors group border-b border-zinc-800/50 last:border-b-0 ${
+        isDragging ? 'bg-zinc-800 shadow-lg shadow-black/40 rounded-xl' : 'hover:bg-zinc-800/40'
+      }`}
+    >
+      {/* Drag Handle */}
+      <button
+        {...attributes}
+        {...listeners}
+        data-testid={`hud-drag-${element.key}`}
+        className="p-1 rounded-lg text-zinc-600 hover:text-[#D4AF37] hover:bg-[#D4AF37]/10 cursor-grab active:cursor-grabbing touch-none transition-colors"
+        aria-label={`Reorder ${element.label}`}
+      >
+        <GripVertical className="w-4 h-4" />
+      </button>
+
+      {/* Toggle Area */}
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-3 flex-1 min-w-0"
+      >
+        <div className={`p-2 rounded-xl transition-colors flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10' : 'bg-zinc-800/50'}`}>
+          <Icon className={`w-4 h-4 transition-colors ${isVisible ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
+        </div>
+        <div className="flex-1 text-left min-w-0">
+          <div className={`font-bold text-sm transition-colors ${isVisible ? 'text-white' : 'text-zinc-500'}`}>
+            {element.label}
+          </div>
+          <div className="text-zinc-600 text-xs truncate">{element.description}</div>
+        </div>
+      </button>
+
+      {/* Eye Toggle */}
+      <button
+        onClick={onToggle}
+        className={`p-1.5 rounded-lg transition-all flex-shrink-0 ${isVisible ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-zinc-800/50 text-zinc-600'}`}
+      >
+        {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
+
+/* ─── Category Section ─── */
+function SortableCategory({
+  category,
+  keys,
+  config,
+  onToggle,
+  onReorder,
+}: {
+  category: string;
+  keys: string[];
+  config: HudLayoutConfig;
+  onToggle: (key: keyof HudLayoutConfig) => void;
+  onReorder: (category: string, oldIndex: number, newIndex: number) => void;
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (over && active.id !== over.id) {
+        const oldIndex = keys.indexOf(active.id as string);
+        const newIndex = keys.indexOf(over.id as string);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          onReorder(category, oldIndex, newIndex);
+        }
+      }
+    },
+    [keys, category, onReorder]
+  );
+
+  return (
+    <div className="mb-6" data-testid={`hud-category-${category.toLowerCase()}`}>
+      <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#D4AF37] mb-3 px-1">{category}</h2>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={keys} strategy={verticalListSortingStrategy}>
+          <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+            {keys.map((key) => {
+              const element = HUD_ELEMENTS_MAP[key];
+              if (!element) return null;
+              const isVisible = (config as any)[key] as boolean;
+              return (
+                <SortableRow
+                  key={key}
+                  id={key}
+                  element={element}
+                  isVisible={isVisible}
+                  onToggle={() => onToggle(key as keyof HudLayoutConfig)}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </div>
+  );
+}
+
+/* ─── Main View ─── */
 export default function HudLayoutView() {
   const [config, setConfig] = useState<HudLayoutConfig>(loadHudLayout);
+  const [order, setOrder] = useState<HudElementOrder>(loadHudOrder);
 
   useEffect(() => {
     saveHudLayout(config);
     window.dispatchEvent(new CustomEvent('hud-layout-changed', { detail: config }));
   }, [config]);
+
+  useEffect(() => {
+    saveHudOrder(order);
+  }, [order]);
 
   const toggle = (key: keyof HudLayoutConfig) => {
     setConfig(prev => ({ ...prev, [key]: !prev[key] }));
@@ -58,29 +221,37 @@ export default function HudLayoutView() {
 
   const resetAll = () => {
     setConfig({ ...DEFAULT_HUD_LAYOUT });
+    setOrder({ ...DEFAULT_ORDER });
   };
 
   const hideAll = () => {
     const newConfig = { ...config };
-    HUD_ELEMENTS.forEach(el => { (newConfig as any)[el.key] = false; });
+    Object.keys(HUD_ELEMENTS_MAP).forEach(k => { (newConfig as any)[k] = false; });
     setConfig(newConfig);
   };
 
   const showAll = () => {
     const newConfig = { ...config };
-    HUD_ELEMENTS.forEach(el => { (newConfig as any)[el.key] = true; });
+    Object.keys(HUD_ELEMENTS_MAP).forEach(k => { (newConfig as any)[k] = true; });
     setConfig(newConfig);
   };
 
-  const visibleCount = HUD_ELEMENTS.filter(el => (config as any)[el.key]).length;
-  const totalCount = HUD_ELEMENTS.length;
+  const handleReorder = useCallback((category: string, oldIndex: number, newIndex: number) => {
+    setOrder(prev => ({
+      ...prev,
+      [category]: arrayMove(prev[category], oldIndex, newIndex),
+    }));
+  }, []);
+
+  const visibleCount = Object.keys(HUD_ELEMENTS_MAP).filter(k => (config as any)[k]).length;
+  const totalCount = Object.keys(HUD_ELEMENTS_MAP).length;
 
   return (
     <div data-testid="hud-layout-view" className="max-w-2xl mx-auto p-4 md:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Display Layout</h1>
-        <p className="text-zinc-500 text-sm mt-1">Customize which elements appear on your navigation view</p>
+        <p className="text-zinc-500 text-sm mt-1">Toggle visibility or drag to reorder elements</p>
       </div>
 
       {/* Stats + Actions Row */}
@@ -156,42 +327,23 @@ export default function HudLayoutView() {
         </div>
       </div>
 
-      {/* Element Categories */}
-      {CATEGORIES.map(category => {
-        const items = HUD_ELEMENTS.filter(el => el.category === category);
-        return (
-          <div key={category} className="mb-6">
-            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[#D4AF37] mb-3 px-1">{category}</h2>
-            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden divide-y divide-zinc-800/50">
-              {items.map(element => {
-                const isVisible = (config as any)[element.key] as boolean;
-                const Icon = element.icon;
-                return (
-                  <button
-                    key={element.key}
-                    data-testid={`hud-toggle-${element.key}`}
-                    onClick={() => toggle(element.key)}
-                    className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/40 transition-colors group"
-                  >
-                    <div className={`p-2 rounded-xl transition-colors ${isVisible ? 'bg-[#D4AF37]/10' : 'bg-zinc-800/50'}`}>
-                      <Icon className={`w-4 h-4 transition-colors ${isVisible ? 'text-[#D4AF37]' : 'text-zinc-600'}`} />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <div className={`font-bold text-sm transition-colors ${isVisible ? 'text-white' : 'text-zinc-500'}`}>
-                        {element.label}
-                      </div>
-                      <div className="text-zinc-600 text-xs">{element.description}</div>
-                    </div>
-                    <div className={`p-1.5 rounded-lg transition-all ${isVisible ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-zinc-800/50 text-zinc-600'}`}>
-                      {isVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
+      {/* Drag hint */}
+      <div className="flex items-center gap-2 mb-4 px-1">
+        <GripVertical className="w-3.5 h-3.5 text-zinc-600" />
+        <span className="text-zinc-600 text-xs">Drag the grip handle to reorder elements within each section</span>
+      </div>
+
+      {/* Sortable Categories */}
+      {CATEGORIES.map(category => (
+        <SortableCategory
+          key={category}
+          category={category}
+          keys={order[category] || DEFAULT_ORDER[category]}
+          config={config}
+          onToggle={toggle}
+          onReorder={handleReorder}
+        />
+      ))}
 
       {/* Footer note */}
       <div className="text-center text-zinc-600 text-xs mt-8 pb-8">
