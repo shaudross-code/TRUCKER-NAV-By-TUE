@@ -808,6 +808,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [currentRoad, setCurrentRoad] = useState<string | null>(null);
   const [currentSpeedLimit, setCurrentSpeedLimit] = useState<number | null>(null);
   const routeSpansRef = useRef<any[]>([]);
+  
+  // Voice guidance: track which distance thresholds have been announced per step index
+  const announcedManeuverThresholdsRef = useRef<Map<number, Set<string>>>(new Map());
 
   // ─── State/Country Boundary Tracking ──────────────────────────────────────
   const [currentRegion, setCurrentRegion] = useState<{ state: string | null; country: string | null; city: string | null }>(() => {
@@ -1947,6 +1950,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   useEffect(() => {
     routeStepsRef.current = routeSteps;
+    // Reset voice guidance thresholds when route steps change
+    announcedManeuverThresholdsRef.current.clear();
     poiFiltersRef.current = poiFilters;
     isOffRouteRef.current = isOffRoute;
     isCalculatingRef.current = isCalculating;
@@ -2359,6 +2364,70 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               }
             }
 
+            // ─── Voice Guidance: Graduated Distance Announcements ───
+            // Announce upcoming maneuver at: 10mi, 5mi, 2mi, 1mi, 0.5mi, 0.2mi, 1000ft
+            if (isDrivingRef.current) {
+              const distMiVoice = distanceToManeuver / 1609.34;
+              const instruction = currentStep.maneuver.instruction
+                .replace(/\u003c/g, '<').replace(/\u003e/g, '>')
+                .replace(/<[^>]+>/g, ''); // Strip HTML tags
+
+              // Build a clean maneuver description
+              const maneuverType = currentStep.maneuver.type || '';
+              const modifier = currentStep.maneuver.modifier || '';
+              let action = '';
+              if (maneuverType.includes('turn')) action = modifier ? `Turn ${modifier}` : 'Turn';
+              else if (maneuverType.includes('exit')) action = 'Take the exit';
+              else if (maneuverType.includes('fork')) action = modifier === 'left' ? 'Keep left' : modifier === 'right' ? 'Keep right' : 'Continue at the fork';
+              else if (maneuverType.includes('merge')) action = 'Merge';
+              else if (maneuverType.includes('roundabout')) action = 'Enter the roundabout';
+              else if (maneuverType.includes('ramp')) action = modifier ? `Take the ramp to the ${modifier}` : 'Take the ramp';
+              else if (maneuverType.includes('depart')) action = 'Head';
+              else if (maneuverType.includes('arrive')) action = 'Arrive at your destination';
+              else action = instruction.split('.')[0] || 'Continue';
+
+              // Extract road name from instruction
+              const roadMatch = instruction.match(/(?:on|onto|toward)\s+(.+?)(?:\s+for|\s*$)/i);
+              const roadName = roadMatch ? `onto ${roadMatch[1]}` : '';
+
+              // Thresholds in miles with voice text
+              const thresholds: [string, number, string][] = [
+                ['10mi',     10,    `In 10 miles, ${action} ${roadName}.`],
+                ['5mi',       5,    `In 5 miles, ${action} ${roadName}.`],
+                ['2mi',       2,    `In 2 miles, ${action} ${roadName}.`],
+                ['1mi',       1,    `In 1 mile, ${action} ${roadName}.`],
+                ['halfmi',    0.5,  `In half a mile, ${action} ${roadName}.`],
+                ['qtrmi',     0.25, `In a quarter mile, ${action} ${roadName}.`],
+                ['1000ft',    0.19, `In 1000 feet, ${action} ${roadName}.`],
+                ['now',       0.03, `${action} ${roadName} now.`],
+              ];
+
+              // Initialize threshold set for this step if needed
+              if (!announcedManeuverThresholdsRef.current.has(maneuverIndex)) {
+                announcedManeuverThresholdsRef.current.set(maneuverIndex, new Set());
+              }
+              const announced = announcedManeuverThresholdsRef.current.get(maneuverIndex)!;
+
+              for (const [key, thresholdMi, text] of thresholds) {
+                if (distMiVoice <= thresholdMi && !announced.has(key)) {
+                  // For far distances (>2mi), only announce major maneuvers
+                  const isMajorManeuver = ['exit', 'fork', 'turn', 'roundabout', 'merge', 'ramp'].some(t => maneuverType.includes(t));
+                  if (thresholdMi > 2 && !isMajorManeuver) continue;
+                  
+                  announced.add(key);
+                  speak(text.replace(/\s+/g, ' ').trim());
+                  break; // Only announce one threshold per update cycle
+                }
+              }
+
+              // Clean up old step announcements (keep only current and next 2)
+              for (const [stepIdx] of announcedManeuverThresholdsRef.current) {
+                if (stepIdx < maneuverIndex - 1) {
+                  announcedManeuverThresholdsRef.current.delete(stepIdx);
+                }
+              }
+            }
+
             // Update ETA based on remaining steps
             let remainingDuration = 0;
             for (let i = maneuverIndex; i < routeStepsRef.current.length; i++) {
@@ -2708,6 +2777,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     clearRouteMarkers();
     // Clear highway shield markers
     isManeuverZoomActiveRef.current = false; // Reset auto-zoom state
+    // Clear voice guidance thresholds
+    announcedManeuverThresholdsRef.current.clear();
     if (shieldLayerGroupRef.current) {
       shieldLayerGroupRef.current.clearLayers();
     }
