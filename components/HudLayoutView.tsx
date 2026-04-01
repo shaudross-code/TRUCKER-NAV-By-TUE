@@ -3,7 +3,7 @@ import {
   Eye, EyeOff, RotateCcw, Navigation, Gauge, MapPin,
   Fuel, Clock, Layers, CloudSun, AlertTriangle, Shield,
   ArrowRightLeft, Milestone, Construction, Route, GitCompare,
-  Map as MapIcon, ArrowLeftRight, GripVertical
+  Map as MapIcon, ArrowLeftRight, GripVertical, Monitor
 } from 'lucide-react';
 import {
   DndContext,
@@ -36,33 +36,238 @@ import {
 interface HudElement {
   key: keyof HudLayoutConfig;
   label: string;
+  shortLabel: string;
   description: string;
   icon: React.ElementType;
   category: string;
 }
 
 const HUD_ELEMENTS_MAP: Record<string, HudElement> = {
-  showNavigationHUD: { key: 'showNavigationHUD', label: 'Turn Instructions', description: 'Top header showing next turn direction and distance', icon: Navigation, category: 'Navigation' },
-  showLaneGuidance: { key: 'showLaneGuidance', label: 'Lane Guidance', description: 'Lane arrows in the turn instruction header', icon: ArrowRightLeft, category: 'Navigation' },
-  showSpeedOverlay: { key: 'showSpeedOverlay', label: 'Speed Display', description: 'Current speed indicator on the map', icon: Gauge, category: 'Navigation' },
-  showArrivalHUD: { key: 'showArrivalHUD', label: 'Arrival Bar', description: 'Bottom bar with distance, time remaining, and ETA', icon: MapPin, category: 'Navigation' },
-  showManeuverPreview: { key: 'showManeuverPreview', label: 'Maneuver Preview', description: 'Mini-map preview of upcoming interchanges', icon: Route, category: 'Navigation' },
-  showFuelCost: { key: 'showFuelCost', label: 'Fuel Cost', description: 'Estimated fuel cost panel during navigation', icon: Fuel, category: 'Panels' },
-  showHosStatus: { key: 'showHosStatus', label: 'HOS Status', description: 'Hours of Service driving time panel', icon: Clock, category: 'Panels' },
-  showMapControls: { key: 'showMapControls', label: 'Map Controls', description: 'Zoom, 2D/3D, follow, and compass buttons', icon: Layers, category: 'Panels' },
-  showRouteComparison: { key: 'showRouteComparison', label: 'Route Comparison', description: 'Alternative routes comparison panel', icon: GitCompare, category: 'Panels' },
-  showWeatherOverlay: { key: 'showWeatherOverlay', label: 'Weather Overlay', description: 'Current weather conditions on the map', icon: CloudSun, category: 'Panels' },
-  showHighwayShields: { key: 'showHighwayShields', label: 'Highway Shields', description: 'Interstate, US Route, and State highway emblems', icon: Shield, category: 'Signs' },
-  showSpeedLimitSigns: { key: 'showSpeedLimitSigns', label: 'Speed Limit Signs', description: 'MUTCD speed limit signs along the route', icon: Milestone, category: 'Signs' },
-  showExitSigns: { key: 'showExitSigns', label: 'Exit Signs', description: 'Green highway exit guide signs', icon: MapIcon, category: 'Signs' },
-  showCurveWarnings: { key: 'showCurveWarnings', label: 'Curve Warnings', description: 'Yellow diamond curve warning signs', icon: AlertTriangle, category: 'Signs' },
-  showCmvWarnings: { key: 'showCmvWarnings', label: 'CMV Warnings', description: 'Steep grade, rollover risk, winding road signs', icon: Construction, category: 'Signs' },
-  showTruckRestrictions: { key: 'showTruckRestrictions', label: 'Truck Restrictions', description: 'Low clearance, weight limit, no-truck alerts', icon: AlertTriangle, category: 'Signs' },
-  showTrafficIncidents: { key: 'showTrafficIncidents', label: 'Traffic Incidents', description: 'Real-time accident, closure, construction markers', icon: AlertTriangle, category: 'Signs' },
-  showWaypointMarkers: { key: 'showWaypointMarkers', label: 'Waypoint Numbers', description: 'Numbered markers (1, 2, 3) at each stop', icon: MapPin, category: 'Signs' },
+  showNavigationHUD: { key: 'showNavigationHUD', label: 'Turn Instructions', shortLabel: 'Turn', description: 'Top header showing next turn direction and distance', icon: Navigation, category: 'Navigation' },
+  showLaneGuidance: { key: 'showLaneGuidance', label: 'Lane Guidance', shortLabel: 'Lanes', description: 'Lane arrows in the turn instruction header', icon: ArrowRightLeft, category: 'Navigation' },
+  showSpeedOverlay: { key: 'showSpeedOverlay', label: 'Speed Display', shortLabel: 'Speed', description: 'Current speed indicator on the map', icon: Gauge, category: 'Navigation' },
+  showArrivalHUD: { key: 'showArrivalHUD', label: 'Arrival Bar', shortLabel: 'ETA', description: 'Bottom bar with distance, time remaining, and ETA', icon: MapPin, category: 'Navigation' },
+  showManeuverPreview: { key: 'showManeuverPreview', label: 'Maneuver Preview', shortLabel: 'Preview', description: 'Mini-map preview of upcoming interchanges', icon: Route, category: 'Navigation' },
+  showFuelCost: { key: 'showFuelCost', label: 'Fuel Cost', shortLabel: 'Fuel', description: 'Estimated fuel cost panel during navigation', icon: Fuel, category: 'Panels' },
+  showHosStatus: { key: 'showHosStatus', label: 'HOS Status', shortLabel: 'HOS', description: 'Hours of Service driving time panel', icon: Clock, category: 'Panels' },
+  showMapControls: { key: 'showMapControls', label: 'Map Controls', shortLabel: 'Controls', description: 'Zoom, 2D/3D, follow, and compass buttons', icon: Layers, category: 'Panels' },
+  showRouteComparison: { key: 'showRouteComparison', label: 'Route Comparison', shortLabel: 'Routes', description: 'Alternative routes comparison panel', icon: GitCompare, category: 'Panels' },
+  showWeatherOverlay: { key: 'showWeatherOverlay', label: 'Weather Overlay', shortLabel: 'Weather', description: 'Current weather conditions on the map', icon: CloudSun, category: 'Panels' },
+  showHighwayShields: { key: 'showHighwayShields', label: 'Highway Shields', shortLabel: 'Shields', description: 'Interstate, US Route, and State highway emblems', icon: Shield, category: 'Signs' },
+  showSpeedLimitSigns: { key: 'showSpeedLimitSigns', label: 'Speed Limit Signs', shortLabel: 'Limits', description: 'MUTCD speed limit signs along the route', icon: Milestone, category: 'Signs' },
+  showExitSigns: { key: 'showExitSigns', label: 'Exit Signs', shortLabel: 'Exits', description: 'Green highway exit guide signs', icon: MapIcon, category: 'Signs' },
+  showCurveWarnings: { key: 'showCurveWarnings', label: 'Curve Warnings', shortLabel: 'Curves', description: 'Yellow diamond curve warning signs', icon: AlertTriangle, category: 'Signs' },
+  showCmvWarnings: { key: 'showCmvWarnings', label: 'CMV Warnings', shortLabel: 'CMV', description: 'Steep grade, rollover risk, winding road signs', icon: Construction, category: 'Signs' },
+  showTruckRestrictions: { key: 'showTruckRestrictions', label: 'Truck Restrictions', shortLabel: 'Restrict', description: 'Low clearance, weight limit, no-truck alerts', icon: AlertTriangle, category: 'Signs' },
+  showTrafficIncidents: { key: 'showTrafficIncidents', label: 'Traffic Incidents', shortLabel: 'Traffic', description: 'Real-time accident, closure, construction markers', icon: AlertTriangle, category: 'Signs' },
+  showWaypointMarkers: { key: 'showWaypointMarkers', label: 'Waypoint Numbers', shortLabel: 'Waypts', description: 'Numbered markers (1, 2, 3) at each stop', icon: MapPin, category: 'Signs' },
 };
 
 const CATEGORIES = ['Navigation', 'Panels', 'Signs'];
+
+/* ─── Live Preview ─── */
+function NavPreview({ config }: { config: HudLayoutConfig }) {
+  const c = config;
+  const panelSide = c.tripPanelPosition;
+
+  return (
+    <div data-testid="hud-preview" className="mb-6">
+      <div className="flex items-center gap-2 mb-3 px-1">
+        <Monitor className="w-3.5 h-3.5 text-[#D4AF37]" />
+        <span className="text-[#D4AF37] text-xs font-black uppercase tracking-[0.15em]">Live Preview</span>
+      </div>
+      <div className="relative w-full aspect-[16/9] bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden select-none">
+        {/* Fake map background */}
+        <div className="absolute inset-0 opacity-20">
+          <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#333" strokeWidth="0.5"/>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#grid)" />
+          </svg>
+        </div>
+        {/* Fake route line */}
+        <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 400 225" preserveAspectRatio="none">
+          <path d="M 50 200 Q 120 120 200 130 T 350 40" fill="none" stroke="#D4AF37" strokeWidth="3" strokeLinecap="round" strokeDasharray="8 4"/>
+        </svg>
+
+        {/* Navigation HUD - top center */}
+        {c.showNavigationHUD && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/80 border border-zinc-700 rounded-lg px-3 py-1.5 flex items-center gap-2 z-10">
+            <Navigation className="w-3 h-3 text-[#D4AF37]" />
+            <div>
+              <div className="text-[7px] font-black text-white uppercase">Turn Right on I-95 N</div>
+              {c.showLaneGuidance && (
+                <div className="flex gap-0.5 mt-0.5">
+                  <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
+                  <div className="w-2 h-3 bg-zinc-700 rounded-[1px]" />
+                  <div className="w-2 h-3 bg-[#D4AF37] rounded-[1px]" />
+                </div>
+              )}
+            </div>
+            <span className="text-[8px] font-black text-[#D4AF37] ml-1">0.3 mi</span>
+          </div>
+        )}
+
+        {/* Speed Overlay - bottom left of map area */}
+        {c.showSpeedOverlay && (
+          <div className="absolute bottom-16 left-2 bg-black/80 border border-zinc-700 rounded-lg w-10 h-10 flex flex-col items-center justify-center z-10">
+            <span className="text-[10px] font-black text-white leading-none">67</span>
+            <span className="text-[5px] font-bold text-zinc-500 uppercase">mph</span>
+          </div>
+        )}
+
+        {/* Maneuver Preview - top right */}
+        {c.showManeuverPreview && (
+          <div className="absolute top-2 right-2 bg-black/80 border border-zinc-700 rounded-lg w-14 h-14 flex items-center justify-center z-10">
+            <div className="relative w-10 h-10">
+              <svg viewBox="0 0 40 40" className="w-full h-full">
+                <path d="M 20 35 L 20 15 Q 20 8 27 8 L 35 8" fill="none" stroke="#D4AF37" strokeWidth="2.5" strokeLinecap="round"/>
+                <circle cx="20" cy="20" r="2" fill="#4AF" />
+              </svg>
+            </div>
+          </div>
+        )}
+
+        {/* Weather + Restrictions - left middle */}
+        {(c.showWeatherOverlay || c.showTruckRestrictions) && (
+          <div className={`absolute left-2 top-1/2 -translate-y-1/2 flex flex-col gap-1 z-10`}>
+            {c.showTruckRestrictions && (
+              <div className="bg-black/80 border border-orange-500/40 rounded-lg px-1.5 py-1 flex items-center gap-1">
+                <AlertTriangle className="w-2.5 h-2.5 text-orange-500" />
+                <span className="text-[5px] font-black text-orange-400 uppercase">Low Bridge</span>
+              </div>
+            )}
+            {c.showWeatherOverlay && (
+              <div className="bg-black/80 border border-[#D4AF37]/30 rounded-lg px-1.5 py-1 flex items-center gap-1.5">
+                <CloudSun className="w-2.5 h-2.5 text-[#D4AF37]" />
+                <span className="text-[7px] font-bold text-white">72°</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Route Comparison - top center below HUD */}
+        {c.showRouteComparison && (
+          <div className={`absolute ${c.showNavigationHUD ? 'top-12' : 'top-2'} left-1/2 -translate-x-1/2 bg-black/80 border border-zinc-700 rounded-lg px-2 py-1 flex items-center gap-2 z-10`}>
+            <GitCompare className="w-2.5 h-2.5 text-[#D4AF37]" />
+            <div className="flex gap-1.5">
+              <span className="text-[5px] font-black text-[#D4AF37] bg-[#D4AF37]/10 px-1 rounded">2h 15m</span>
+              <span className="text-[5px] font-black text-zinc-500 bg-zinc-800 px-1 rounded">2h 40m</span>
+            </div>
+          </div>
+        )}
+
+        {/* Trip Panel (Fuel + HOS) */}
+        {(c.showFuelCost || c.showHosStatus) && (
+          <div className={`absolute ${panelSide === 'left' ? 'left-2' : 'right-2'} bottom-14 flex flex-col gap-1 z-10`}>
+            {c.showFuelCost && (
+              <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
+                <div className="flex items-center gap-1">
+                  <Fuel className="w-2.5 h-2.5 text-[#D4AF37]" />
+                  <span className="text-[6px] font-black text-zinc-500 uppercase">Fuel</span>
+                </div>
+                <span className="text-[8px] font-black text-white">$124.50</span>
+              </div>
+            )}
+            {c.showHosStatus && (
+              <div className="bg-black/80 border border-zinc-700 rounded-lg px-2 py-1">
+                <div className="flex items-center gap-1">
+                  <Clock className="w-2.5 h-2.5 text-emerald-400" />
+                  <span className="text-[6px] font-black text-zinc-500 uppercase">HOS</span>
+                </div>
+                <span className="text-[8px] font-black text-emerald-400">6h 22m</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Map Controls - right side */}
+        {c.showMapControls && (
+          <div className={`absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-0.5 z-10 ${c.showManeuverPreview ? 'mt-4' : ''}`}>
+            <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">+</div>
+            <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center text-[8px] font-black text-white">-</div>
+            <div className="bg-black/80 border border-zinc-700 rounded w-5 h-5 flex items-center justify-center">
+              <Layers className="w-2.5 h-2.5 text-zinc-400" />
+            </div>
+          </div>
+        )}
+
+        {/* Signs on the route */}
+        <div className="absolute inset-0 z-[5]">
+          {c.showHighwayShields && (
+            <div className="absolute top-[25%] left-[55%] bg-blue-700 border border-white rounded-sm px-1 py-0.5">
+              <span className="text-[5px] font-black text-white">I-95</span>
+            </div>
+          )}
+          {c.showSpeedLimitSigns && (
+            <div className="absolute top-[40%] left-[42%] bg-white border border-black rounded-sm px-0.5 py-0.5 flex flex-col items-center">
+              <span className="text-[3px] font-black text-black leading-none">SPEED</span>
+              <span className="text-[3px] font-black text-black leading-none">LIMIT</span>
+              <span className="text-[7px] font-black text-black leading-tight">65</span>
+            </div>
+          )}
+          {c.showExitSigns && (
+            <div className="absolute top-[20%] right-[25%] bg-emerald-700 border border-white/50 rounded-sm px-1 py-0.5">
+              <span className="text-[5px] font-black text-white">EXIT 42</span>
+            </div>
+          )}
+          {c.showCurveWarnings && (
+            <div className="absolute top-[55%] left-[60%]">
+              <div className="w-4 h-4 bg-yellow-400 rotate-45 flex items-center justify-center border border-black/30">
+                <span className="text-[5px] font-black text-black -rotate-45">!</span>
+              </div>
+            </div>
+          )}
+          {c.showCmvWarnings && (
+            <div className="absolute top-[65%] left-[35%]">
+              <div className="w-4 h-4 bg-yellow-400 rotate-45 flex items-center justify-center border-2 border-red-600/60">
+                <span className="text-[4px] font-black text-black -rotate-45">6%</span>
+              </div>
+            </div>
+          )}
+          {c.showTrafficIncidents && (
+            <div className="absolute top-[35%] right-[40%] bg-red-600 rounded-full w-3.5 h-3.5 flex items-center justify-center border border-white/50 animate-pulse">
+              <AlertTriangle className="w-2 h-2 text-white" />
+            </div>
+          )}
+          {c.showWaypointMarkers && (
+            <>
+              <div className="absolute top-[75%] left-[15%] bg-[#D4AF37] rounded-full w-4 h-4 flex items-center justify-center border border-black">
+                <span className="text-[6px] font-black text-black">1</span>
+              </div>
+              <div className="absolute top-[15%] right-[12%] bg-[#D4AF37] rounded-full w-4 h-4 flex items-center justify-center border border-black">
+                <span className="text-[6px] font-black text-black">2</span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Arrival HUD - bottom full width */}
+        {c.showArrivalHUD && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black/90 border-t border-zinc-700 px-3 py-1.5 flex items-center justify-between z-10">
+            <div className="flex items-center gap-2">
+              <span className="text-[7px] font-black text-[#D4AF37] uppercase">142 mi</span>
+              <span className="text-[5px] text-zinc-600">|</span>
+              <span className="text-[7px] font-black text-white">2h 15m</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[6px] font-bold text-zinc-500 uppercase">ETA</span>
+              <span className="text-[7px] font-black text-[#D4AF37]">3:45 PM</span>
+            </div>
+          </div>
+        )}
+
+        {/* User location chevron */}
+        <div className="absolute top-[60%] left-[28%] z-[8]">
+          <div className="w-3 h-3 rounded-full bg-blue-500 border-2 border-white shadow-lg shadow-blue-500/50" />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ─── Sortable Row ─── */
 function SortableRow({
@@ -253,6 +458,9 @@ export default function HudLayoutView() {
         <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Display Layout</h1>
         <p className="text-zinc-500 text-sm mt-1">Toggle visibility or drag to reorder elements</p>
       </div>
+
+      {/* Live Preview */}
+      <NavPreview config={config} />
 
       {/* Stats + Actions Row */}
       <div className="flex items-center justify-between mb-6">
