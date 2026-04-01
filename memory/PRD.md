@@ -35,23 +35,20 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Speed limit display (MUTCD-style signs on map)
 - Weather alerts and route hazard reports
 
-### Speed Limit Warning System (NEW - Apr 1, 2026)
-- **Visual Warning**: Speed display turns red with glow + pulse animation when exceeding speed limit + tolerance
-- **Audio Alert**: 880Hz square wave beeps every 3 seconds while speeding (Web Audio API)
-- **"SLOW DOWN" Banner**: Red banner above Arrival Bar showing current vs limit speed
-- **Configurable Tolerance**: +0, +3, +5 (default), +8, +10 mph tolerance in Display tab
-- **Toggle**: 21st element in Display Layout tab with siren icon
+### Speed Limit Warning System
+- Visual Warning: Speed display turns red with glow + pulse animation when exceeding speed limit + tolerance
+- Audio Alert: 880Hz square wave beeps every 3 seconds while speeding (Web Audio API)
+- "SLOW DOWN" Banner: Red banner above Arrival Bar showing current vs limit speed
+- Configurable Tolerance: +0, +3, +5 (default), +8, +10 mph tolerance in Display tab
+- Toggle: 21st element in Display Layout tab with siren icon
 
-### Facility Ratings & Reviews System (NEW - Apr 1, 2026)
-- **Star Rating**: 1-5 star input with hover effects in POI Detail Modal
-- **Review Tags**: 8 preset tags (Clean Restrooms, Good Food, Safe Parking, Fast Fuel, Friendly Staff, Showers, Truck Wash, WiFi)
-- **Text Reviews**: Optional 200-char review text
-- **Along Route POI Cards**: Average rating stars displayed next to fuel price
-- **Min Rating Filter**: ALL/1+/2+/3+/4+ filter in MapControls panel
-- **Backend API**: File-based JSON store (`/app/data/facility_ratings.json`)
-  - GET `/api/facility-ratings?poiId=xxx`
-  - POST `/api/facility-ratings` (submit rating)
-  - POST `/api/facility-ratings-batch` (batch fetch)
+### Facility Ratings & Reviews System
+- Star Rating: 1-5 star input with hover effects in POI Detail Modal
+- Review Tags: 8 preset tags (Clean Restrooms, Good Food, Safe Parking, Fast Fuel, Friendly Staff, Showers, Truck Wash, WiFi)
+- Text Reviews: Optional 200-char review text
+- Along Route POI Cards: Average rating stars displayed next to fuel price
+- Min Rating Filter: ALL/1+/2+/3+/4+ filter in MapControls panel
+- Backend API: File-based JSON store (`/app/data/facility_ratings.json`)
 
 ### Professional Lane Guidance System
 - Visual LaneRibbon: SVG directional arrows with blue highlighting
@@ -68,42 +65,74 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Persistent config via LocalStorage
 - Trip Panel Position toggle (LEFT/RIGHT)
 
+### ELD Logs (NEW - Apr 1, 2026)
+- FMCSA-compliant Electronic Logging Device interface
+- Status controls: Off Duty, Sleeper Berth, On Duty, Driving
+- Daily summary cards with hours tracking and progress bars
+- Visual timeline graph (Daily Log Graph) with hour labels
+- Violation detection: 11-hour driving limit, 14-hour on-duty window, 8-hour break rule
+- Status change log table with timestamps
+- CSV export functionality
+- Date navigation (view historical logs)
+- Auto-logging from HOS context
+- Persistent storage via localStorage
+
+### Offline Maps (NEW - Apr 1, 2026)
+- Download regions: US Midwest, South, Northeast, West, Southeast
+- Cache storage summary (total cached, regions count, cached routes)
+- Download progress simulation with progress bar
+- Online/Offline status indicator
+- Service Worker registration for tile caching (sw-tiles.js)
+- Cached routes section (last 5 calculated routes auto-saved)
+- Clear all cache functionality
+- Offline mode tips section
+
+### Parking Predictions API (NEW - Apr 1, 2026)
+- Backend endpoint: GET `/api/poi/parking-predict?poiId=xxx&hour=xx`
+- Time-of-day based availability forecasting
+- Historical pattern algorithm (peak hours 7-9 PM, low 6-10 AM)
+- 6-hour forecast with fill percentage per hour
+- Status labels: LIKELY OPEN, FILLING UP, FULL SOON, LIKELY FULL
+- Blends last known status with time-of-day patterns
+
 ### Mobile Build Pipeline
 - Capacitor integration for iOS/Android
 - GitHub Actions workflow for remote builds
 - EAS Build profiles configured
 
-## Bug Fixes Applied (Apr 1, 2026)
-1. NavPreview missing Compass Rose + Next Stop mockups
-2. Missing scale transforms for 5 elements
-3. Display Layout → Navigation view sync (activeView useEffect)
-4. Driving HUD elements missing (RouteComparisonPanel wrapper fix)
-5. MapControls off-screen (removed wrapper div, passed scale as prop)
-6. Trip panel right margin increased (4.5rem) to prevent overlap
+## Key API Endpoints
+- `/api/route` - HERE Routing API v8.140.0
+- `/api/traffic-incidents` - Traffic incident data
+- `/api/poi/ratings` (POST/GET) - Facility ratings
+- `/api/poi/ratings/batch` (POST) - Batch ratings
+- `/api/poi/parking-status` (POST/GET) - Parking status updates
+- `/api/poi/parking-predict` (GET) - Parking availability predictions
+- `/api/facility-ratings` (GET/POST) - Facility ratings
+- `/api/facility-ratings-batch` (POST) - Batch facility ratings
 
 ## Known Issues
 - Intermittent service drops: trucker-nav/frontend supervisor processes
 
 ## Upcoming Tasks
-- **P2**: Driver reputation/review aggregation and leaderboards
-- **P2**: Viewport-based sign culling (DOM performance)
+- **P1**: Viewport-based sign culling (only render signs currently visible in viewport for DOM performance)
 
 ## Future/Backlog
-- NavigationView.tsx refactoring (~7000 lines → smaller hooks/components)
+- NavigationView.tsx refactoring (~7000 lines -> smaller hooks/components)
 - iOS/Android Store Submission
-- Offline map support
-- ELD/Telematics integration
-- Real-time parking availability predictions
+- Driver reputation/review aggregation and leaderboards
 
 ## Key Files
 - `/app/components/NavigationView.tsx` - Core map UI (~7000 lines)
 - `/app/components/NavigationHUD.tsx` - Turn-by-turn instruction card
 - `/app/components/HudLayoutView.tsx` - Display tab UI (21 elements)
+- `/app/components/ELDLogView.tsx` - ELD logs interface
+- `/app/components/OfflineMapsView.tsx` - Offline maps management
 - `/app/components/NavPreview.tsx` - Live preview for layout editing
 - `/app/components/PoiDetailModal.tsx` - POI detail with ratings/reviews
 - `/app/components/MapControls.tsx` - Map controls with min rating filter
 - `/app/utils/hudLayout.ts` - HUD layout persistence
-- `/app/server.ts` - Express backend proxy + ratings API
+- `/app/server.ts` - Express backend proxy + all APIs
+- `/app/public/sw-tiles.js` - Service Worker for tile caching
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
