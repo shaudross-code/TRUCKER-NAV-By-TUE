@@ -48,6 +48,16 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - NavigationHUD mobile fix (top-14 for browser toolbar clearance)
 - Real-time traffic incident overlays + auto-reroute countdown
 
+### Display Layout / HUD Customization (2026-04-01)
+- **Display tab** in sidebar between Fuel Network and Settings
+- **18 toggleable HUD elements** across 3 categories: Navigation (5), Panels (5), Signs (8)
+- **Show All / Hide All / Reset** buttons for quick configuration
+- **Trip Panel Position** toggle (LEFT/RIGHT)
+- **Drag-and-drop reordering** within each category using @dnd-kit (core v6.3.1, sortable v10.0.0)
+- **Grip handle** on each element row for intuitive drag interaction
+- **Order persistence** to localStorage under `nav_hud_layout` (visibility) and `nav_hud_order` (ordering)
+- **Reset** restores both default visibility AND default element order
+
 ### Other Features
 - POI System (truck stop plazas only), Fuel Network tab, Fuel Cost Calculator
 - Driver Fatigue Alert (FMCSA HOS), Dynamic Lane Count Visualization
@@ -58,6 +68,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## Future/Backlog (P2)
 - Speed limit warning system (flash red + audio alert)
+- Driver reputation/review system (truckers rate facilities)
 - Viewport-based sign culling (DOM performance)
 - iOS/Android Store Submission
 - Refactoring NavigationView.tsx (~6700 lines)
@@ -66,5 +77,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - MUTCD signs: `/app/utils/mutcdSigns.ts` — all sign generators with FHWA standard colors
 - HERE API: v8 (latest v8.140.0) — `return=summary,actions,instructions,incidents,polyline,turnByTurnActions,elevation,tolls`
 - MapControls auto-collapse via `isDrivingMode` prop
-- Nginx proxy port 3000→8001 (recreate if dropped)
+- Nginx proxies port 3000 → 8001 (recreate if dropped)
 - Services may drop ports intermittently — restart with `sudo supervisorctl restart trucker-nav`
+- DnD library: @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities
+- JSX fix: `{hudLayout.showWeatherOverlay && (<>...</>)}` fragment wrapper in NavigationView.tsx line ~5988
