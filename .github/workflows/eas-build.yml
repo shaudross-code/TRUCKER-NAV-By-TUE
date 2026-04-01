@@ -26,20 +26,24 @@ jobs:
   build:
     name: EAS Build (${{ github.event.inputs.platform }})
     runs-on: macos-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        run: git clone --depth 1 https://github.com/${{ github.repository }}.git .
+        shell: bash
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: 24
+      - name: Setup Node.js 24
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+          nvm install 24
+          nvm use 24
+          echo "$NVM_DIR/versions/node/$(nvm current)/bin" >> $GITHUB_PATH
+        shell: bash
 
       - name: Install dependencies
         run: yarn install
+        shell: bash
 
       - name: Debug - List Xcode schemes
         run: |
@@ -49,12 +53,14 @@ jobs:
           xcodebuild -workspace ios/App/App.xcworkspace -list 2>&1 || true
           echo "=== Scheme files ==="
           find ios -name "*.xcscheme" -type f 2>/dev/null || true
+        shell: bash
 
       - name: Setup EAS CLI
-        uses: expo/expo-github-action@main
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+        run: npm install -g eas-cli@latest
+        shell: bash
 
       - name: Build app
         run: eas build --platform ${{ github.event.inputs.platform }} --profile ${{ github.event.inputs.profile }} --non-interactive
+        shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
