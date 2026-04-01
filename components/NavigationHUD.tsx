@@ -1,140 +1,187 @@
-import React, { useContext, useMemo } from 'react';
-import { ArrowUp, ChevronUp } from 'lucide-react';
-import { HighwayShield } from './MapUI';
-import { AppContext } from '../types';
+import React, { useMemo } from 'react';
+import { Navigation, ArrowUp, ArrowRight, ArrowLeft, ArrowUpRight, ArrowUpLeft, RotateCcw, GitFork, Merge, Zap } from 'lucide-react';
 
-interface LaneData {
-  direction: string;
-  matches: string[];
+// Lane direction types from HERE API
+export interface LaneData {
+  direction?: string;
+  directions?: string[];
+  valid?: boolean;
+  active?: boolean;
 }
 
 interface NavigationHUDProps {
-  nextInstruction: { icon: any; distance: string; text: string; lanes?: LaneData[]; maneuver?: any; followingStep?: { text: string; icon: any } | null };
-  parseLane: (lane: LaneData) => { rotation: number; active: boolean; isStraight: boolean };
+  nextInstruction: any;
+  parseLane: (step: any) => LaneData[] | null;
+  distanceToManeuverMi?: number;
+  roadName?: string;
+  exitNumber?: string;
+  maneuverType?: string;
+  maneuverModifier?: string;
+  speedLimit?: number;
 }
 
-export const NavigationHUD: React.FC<NavigationHUDProps> = ({ nextInstruction, parseLane }) => {
-  const context = useContext(AppContext);
-  const isMetric = context?.unitSystem === 'metric';
-  const distVal = parseFloat(nextInstruction.distance);
-  const showLanes = nextInstruction.lanes && nextInstruction.lanes.length > 0 && distVal <= 2.0;
+const getDirectionIcon = (type: string, modifier: string, size: string = "w-10 h-10") => {
+  const cls = `${size} text-white drop-shadow-md`;
+  if (type.includes('roundabout')) return <RotateCcw className={cls} />;
+  if (type.includes('fork')) return <GitFork className={cls} style={{ transform: modifier === 'left' ? 'scaleX(-1)' : '' }} />;
+  if (type.includes('merge')) return <Merge className={cls} />;
+  
+  if (modifier === 'right' || modifier === 'sharp right') return <ArrowRight className={cls} />;
+  if (modifier === 'left' || modifier === 'sharp left') return <ArrowLeft className={cls} />;
+  if (modifier === 'slight right') return <ArrowUpRight className={cls} />;
+  if (modifier === 'slight left') return <ArrowUpLeft className={cls} />;
+  
+  return <ArrowUp className={cls} />;
+};
 
-  const formatDistance = (distStr: string) => {
-    const val = parseFloat(distStr);
-    if (isNaN(val)) return distStr;
-    if (isMetric) {
-      const km = val * 1.60934;
-      return km < 1 ? `${Math.round(km * 1000)}` : km.toFixed(1);
-    }
-    return distStr;
-  };
+const formatDistance = (mi: number) => {
+  if (mi >= 10) return `${Math.round(mi)} mi`;
+  if (mi >= 1) return `${mi.toFixed(1)} mi`;
+  if (mi >= 0.19) return `${(mi * 5280).toFixed(0)} ft`;
+  return `${Math.round(mi * 5280)} ft`;
+};
 
-  const distUnit = isMetric ? (distVal * 1.60934 < 1 ? 'm' : 'km') : 'mi';
+export const NavigationHUD: React.FC<NavigationHUDProps> = ({
+  nextInstruction,
+  parseLane,
+  distanceToManeuverMi,
+  roadName,
+  exitNumber,
+  maneuverType = '',
+  maneuverModifier = '',
+  speedLimit,
+}) => {
+  if (!nextInstruction) return null;
 
-  const { activeLanes, totalLanes, laneRangeLabel } = useMemo(() => {
-    const active: number[] = [];
-    const total = nextInstruction.lanes?.length || 0;
-    nextInstruction.lanes?.forEach((lane, idx) => {
-      const { active: isActive } = parseLane(lane);
-      if (isActive) active.push(idx + 1);
-    });
-    let label = '';
-    if (active.length > 0 && active.length < total) {
-      if (active.length === 1) label = `LANE ${active[0]}`;
-      else if (active[active.length - 1] - active[0] === active.length - 1) label = `LANES ${active[0]}–${active[active.length - 1]}`;
-      else label = `LANES ${active.join(', ')}`;
-    }
-    return { activeLanes: active, totalLanes: total, laneRangeLabel: label };
-  }, [nextInstruction.lanes, parseLane]);
+  // Handle instruction as object (from NavigationView state)
+  const instrText = typeof nextInstruction === 'string' ? nextInstruction : (nextInstruction?.text || '');
+  if (!instrText || instrText === 'Ready for Route') return null;
+
+  // Parse instruction HTML to extract clean text
+  const cleanInstruction = instrText.replace(/<[^>]+>/g, '').trim();
+  
+  // Extract road name from instruction if not provided
+  const displayRoadName = roadName || (() => {
+    const match = cleanInstruction.match(/(?:on|onto|toward)\s+(.+?)(?:\s+for|\s*$)/i);
+    return match?.[1] || '';
+  })();
+
+  // Extract exit number from instruction if not provided
+  const displayExitNum = exitNumber || (() => {
+    const match = cleanInstruction.match(/exit\s+(\d+[A-Z]?)/i);
+    return match?.[1] || '';
+  })();
+
+  // Detail level based on distance
+  const detailLevel = useMemo(() => {
+    if (!distanceToManeuverMi || distanceToManeuverMi > 5) return 'far';
+    if (distanceToManeuverMi > 2) return 'approaching';
+    if (distanceToManeuverMi > 0.5) return 'close';
+    return 'immediate';
+  }, [distanceToManeuverMi]);
 
   return (
-    <div className="absolute top-0 left-0 right-0 z-[2100] transition-all duration-700 ease-in-out translate-y-0 opacity-100">
-      <div className="bg-gradient-to-b from-black/95 to-black/60 backdrop-blur-3xl border-b border-[#D4AF37]/20 p-2 md:p-6 landscape:p-2 landscape:md:p-4 pt-[calc(0.5rem+env(safe-area-inset-top))] md:pt-[calc(1rem+env(safe-area-inset-top))] landscape:pt-[calc(0.25rem+env(safe-area-inset-top))] shadow-2xl">
-        <div className="flex flex-col gap-0">
-          {/* Main instruction row */}
-          <div className="flex items-center gap-2 md:gap-10 landscape:gap-4 w-full">
-            <div className="bg-[#D4AF37] p-2 md:p-6 landscape:p-3 rounded-xl md:rounded-2xl landscape:rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.4)] shrink-0">
-              <nextInstruction.icon className="w-8 h-8 md:w-20 md:h-20 landscape:w-10 landscape:h-10 text-black" strokeWidth={4} />
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <div className="flex items-baseline gap-2 md:gap-4 landscape:gap-2">
-                <span data-testid="nav-hud-distance" className="text-4xl md:text-8xl landscape:text-5xl font-[1000] text-white tracking-tighter leading-none drop-shadow-2xl">
-                  {formatDistance(nextInstruction.distance)}
+    <div 
+      data-testid="navigation-hud" 
+      className="absolute top-3 left-3 right-3 md:left-auto md:right-auto md:left-1/2 md:-translate-x-1/2 md:w-[480px] z-[2000] pointer-events-none"
+    >
+      <div className={`bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border overflow-hidden transition-all duration-300 ${
+        detailLevel === 'immediate' ? 'border-[#D4AF37]/60 ring-1 ring-[#D4AF37]/20' : 'border-zinc-700/40'
+      }`}>
+        <div className="flex items-stretch">
+          {/* Direction icon */}
+          <div className={`flex items-center justify-center px-4 py-3 ${
+            detailLevel === 'immediate' ? 'bg-[#D4AF37]/15' : 'bg-zinc-800/50'
+          }`}>
+            <div className="flex flex-col items-center gap-1">
+              {getDirectionIcon(maneuverType, maneuverModifier)}
+              {distanceToManeuverMi !== undefined && (
+                <span className={`text-xs font-black ${
+                  detailLevel === 'immediate' ? 'text-[#D4AF37]' : 'text-white'
+                }`}>
+                  {formatDistance(distanceToManeuverMi)}
                 </span>
-                <span data-testid="nav-hud-unit" className="text-xl md:text-4xl landscape:text-2xl font-black text-[#D4AF37] uppercase tracking-tighter">{distUnit}</span>
-              </div>
-              <div className="flex items-center gap-2 md:gap-4 landscape:gap-2 mt-1 md:mt-2 landscape:mt-1 truncate">
-                {(() => {
-                  const highwayMatch = nextInstruction.text.match(/(I-|US-|SR-|Hwy|Route|State Route)\s*(\d+[A-Z]?)/i);
-                  const exitMatch = nextInstruction.text.match(/exit\s+(\d+[A-Z]?)/i);
-                  if (highwayMatch || exitMatch) {
-                    return (
-                      <div className="flex gap-2 scale-75 md:scale-100 origin-left shrink-0">
-                        {highwayMatch && <HighwayShield roadName={highwayMatch[0]} />}
-                        {exitMatch && (
-                          <div className="bg-[#D4AF37] text-black font-black px-2 py-1 rounded-lg text-sm md:text-2xl uppercase tracking-tight shrink-0">Exit {exitMatch[1]}</div>
-                        )}
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-                <span className="text-lg md:text-4xl landscape:text-2xl font-black text-white italic uppercase tracking-tight truncate drop-shadow-lg">{nextInstruction.text}</span>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* Lane Guidance Panel — shown when within 2 miles of maneuver */}
-          {showLanes && (
-            <div data-testid="lane-guidance-panel" className="mt-2 pt-2 border-t border-white/10 animate-in slide-in-from-top-2 fade-in duration-500">
-              <div className="flex items-center justify-between">
-                {/* Lane label */}
-                {laneRangeLabel && (
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <div className="h-px w-3 bg-[#4285F4]/60" />
-                    <span data-testid="lane-guidance-label" className="text-[9px] md:text-xs font-black text-[#4285F4] uppercase tracking-[0.2em]">
-                      Use {laneRangeLabel}
-                    </span>
-                    <div className="h-px w-3 bg-[#4285F4]/60" />
-                  </div>
-                )}
-                <span className="text-[8px] md:text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5">
-                  {totalLanes} lane{totalLanes !== 1 ? 's' : ''}
-                </span>
+          {/* Instruction content */}
+          <div className="flex-1 py-3 px-4 min-w-0">
+            {/* Exit badge (close range) */}
+            {displayExitNum && (detailLevel === 'close' || detailLevel === 'immediate') && (
+              <div className="inline-flex items-center gap-1 bg-[#D4AF37] text-black text-[10px] font-black px-2 py-0.5 rounded mb-1 uppercase">
+                Exit {displayExitNum}
               </div>
-              {/* Lane arrows — road-style visualization */}
-              <div className="flex justify-center gap-0">
-                {nextInstruction.lanes!.map((lane, idx) => {
-                  const { rotation, active, isStraight } = parseLane(lane);
-                  const isFirst = idx === 0;
-                  const isLast = idx === (nextInstruction.lanes!.length - 1);
-                  return (
-                    <div key={idx} className={`relative flex flex-col items-center py-2 md:py-3 flex-1 max-w-[64px] md:max-w-[80px] transition-all duration-300 ${
-                      active 
-                        ? 'bg-[#4285F4]/20 z-10' 
-                        : 'bg-white/[0.03]'
-                    } ${isFirst ? 'rounded-l-xl' : ''} ${isLast ? 'rounded-r-xl' : ''}`}
-                    style={{ borderLeft: idx > 0 ? '1px dashed rgba(255,255,255,0.1)' : 'none' }}
-                    >
-                      {/* Active indicator bar */}
-                      {active && (
-                        <div className="absolute top-0 left-1 right-1 h-[3px] bg-[#4285F4] rounded-full shadow-[0_0_8px_rgba(66,133,244,0.6)]" />
-                      )}
-                      <ArrowUp 
-                        className={`w-5 h-5 md:w-8 md:h-8 transition-colors ${active ? 'text-white' : 'text-white/15'}`}
-                        strokeWidth={active ? 4 : 2} 
-                        style={{ transform: `rotate(${rotation}deg)` }} 
-                      />
-                      {active && (
-                        <div className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 md:w-2 md:h-2 bg-[#4285F4] rounded-full" />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+            )}
+
+            {/* Primary instruction - adapts based on distance */}
+            <div className="text-white font-bold text-sm leading-tight truncate">
+              {detailLevel === 'far' && displayRoadName ? (
+                // Far: Just show road name
+                <>Continue on <span className="text-[#D4AF37]">{displayRoadName}</span></>
+              ) : (
+                // Closer: Full instruction
+                cleanInstruction
+              )}
             </div>
-          )}
+
+            {/* Road name (when approaching) */}
+            {detailLevel === 'approaching' && displayRoadName && (
+              <div className="text-zinc-400 text-xs mt-0.5 truncate">
+                toward {displayRoadName}
+              </div>
+            )}
+
+            {/* Speed limit indicator */}
+            {speedLimit && speedLimit > 0 && (
+              <div className="flex items-center gap-1 mt-1">
+                <Zap className="w-3 h-3 text-zinc-500" />
+                <span className="text-[10px] text-zinc-500 font-mono">{speedLimit} mph</span>
+              </div>
+            )}
+          </div>
         </div>
+
+        {/* Lane guidance ribbon — visible at close range */}
+        {detailLevel !== 'far' && (
+          <LaneRibbon parseLane={parseLane} nextInstruction={nextInstruction} />
+        )}
+      </div>
+    </div>
+  );
+};
+
+const LaneRibbon: React.FC<{ parseLane: (step: any) => LaneData[] | null; nextInstruction: string }> = ({ parseLane, nextInstruction }) => {
+  // Parse lanes from instruction context
+  const mockStep = { maneuver: { instruction: nextInstruction } };
+  let lanes: LaneData[] | null = null;
+  try {
+    const result = parseLane(mockStep);
+    lanes = Array.isArray(result) ? result : null;
+  } catch {
+    lanes = null;
+  }
+  
+  if (!lanes || lanes.length === 0) return null;
+
+  return (
+    <div className="border-t border-zinc-700/30 px-4 py-2 bg-zinc-800/30">
+      <div className="flex justify-center gap-0">
+        {lanes.map((lane, idx) => {
+          const active = lane.valid || lane.active;
+          return (
+            <div key={idx} className={`flex items-center justify-center py-1.5 flex-1 max-w-[42px] transition-all ${
+              active ? 'bg-[#4285F4]/20' : 'bg-white/[0.02]'
+            } ${idx === 0 ? 'rounded-l-lg' : ''} ${idx === lanes.length - 1 ? 'rounded-r-lg' : ''}`}
+            style={{ borderLeft: idx > 0 ? '1px dashed rgba(255,255,255,0.08)' : 'none' }}>
+              {active ? (
+                <div className="w-2 h-2 bg-[#4285F4] rounded-full shadow-[0_0_6px_rgba(66,133,244,0.5)]" />
+              ) : (
+                <div className="w-1 h-1 bg-white/10 rounded-full" />
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

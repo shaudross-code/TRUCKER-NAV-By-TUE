@@ -90,6 +90,8 @@ import { RouteComparisonPanel } from './RouteComparisonPanel';
 import { FuelCostCalculator } from './FuelCostCalculator';
 import { DriverFatigueAlert } from './DriverFatigueAlert';
 import { useLaneVisualization } from '../hooks/useLaneVisualization';
+import { useTruckIntelligence } from '../hooks/useTruckIntelligence';
+import { ManeuverPreview } from './ManeuverPreview';
 
 import { ViewType } from '../types';
 
@@ -469,6 +471,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [fuelPricePerGallon, setFuelPricePerGallon] = useState(3.52);
   const [truckMpg, setTruckMpg] = useState(6.5);
   const { drawLaneVisualization, clearLanes } = useLaneVisualization();
+  const { analyzeRouteGrades, checkGradeProximity, clearGradeData } = useTruckIntelligence();
+  const gradeWarningsRef = useRef<any[]>([]);
+  const [activeGradeAlert, setActiveGradeAlert] = useState<string | null>(null);
+  const [maneuverPreviewData, setManeuverPreviewData] = useState<any>(null);
+  const [currentDistToManeuverMi, setCurrentDistToManeuverMi] = useState<number | undefined>(undefined);
+  const [currentManeuverType, setCurrentManeuverType] = useState('');
+  const [currentManeuverModifier, setCurrentManeuverModifier] = useState('');
   const [isCarPlayMode, setIsCarPlayMode] = useState(() => localStorage.getItem('nav_carplay_mode') === 'true');
   const [isRouteSettingsOpen, setIsRouteSettingsOpen] = useState(false);
   const [isRoutePreview, setIsRoutePreview] = useState(false);
@@ -931,20 +940,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Clear any existing route lines
       routeGroupRef.current.clearLayers();
       
-      // 1. Outer black border line (creates the outline effect)
+      // 1. Outer glow effect (soft shadow)
       L.polyline(coords, { 
-        color: 'black', 
-        weight: 18, 
-        opacity: 0.8, 
+        color: '#D4AF37', 
+        weight: 24, 
+        opacity: 0.15, 
+        lineCap: 'round', 
+        lineJoin: 'round',
+        pane: 'routePane'
+      }).addTo(routeGroupRef.current);
+      
+      // 2. Outer black border line (creates the outline effect)
+      L.polyline(coords, { 
+        color: '#111111', 
+        weight: 16, 
+        opacity: 0.9, 
         lineCap: 'round', 
         lineJoin: 'round',
         pane: 'routePane'
       }).addTo(routeGroupRef.current);
 
-      // 2. Inner gold route line (the main navigation path)
+      // 3. Inner route line (the main navigation path)
       L.polyline(coords, { 
         color: color, 
-        weight: 12, 
+        weight: 10, 
         opacity: 1, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -961,10 +980,78 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     const polyline = L.polyline(coords, {
       color: color,
-      weight: width
+      weight: width,
+      pane: 'routePane'
     });
     polyline.addTo(map);
     mapLayersRef.current[id] = polyline;
+  };
+
+  // Draw alternative routes with distinct colors (dimmed, dashed)
+  const altRouteLayersRef = useRef<L.LayerGroup | null>(null);
+  const ALT_ROUTE_COLORS = ['#4A9EFF', '#8B5CF6', '#FF6B4A'];
+
+  const drawAlternativeRoutes = (map: L.Map, routes: any[], selectedIdx: number) => {
+    if (!altRouteLayersRef.current) {
+      altRouteLayersRef.current = L.layerGroup().addTo(map);
+    } else {
+      altRouteLayersRef.current.clearLayers();
+    }
+
+    routes.forEach((route, idx) => {
+      if (idx === selectedIdx) return; // Skip active route (drawn separately)
+      const altColor = ALT_ROUTE_COLORS[(idx > selectedIdx ? idx - 1 : idx) % ALT_ROUTE_COLORS.length];
+      
+      // Dashed outline for alt routes
+      L.polyline(route.coords, {
+        color: altColor,
+        weight: 6,
+        opacity: 0.35,
+        dashArray: '12, 8',
+        lineCap: 'round',
+        lineJoin: 'round',
+        pane: 'routePane',
+        interactive: false,
+      }).addTo(altRouteLayersRef.current!);
+    });
+
+    // Mark diverge/converge points where routes split/rejoin
+    if (routes.length > 1 && routes[selectedIdx]) {
+      const primary = routes[selectedIdx].coords;
+      routes.forEach((route, idx) => {
+        if (idx === selectedIdx) return;
+        const alt = route.coords;
+        const altColor = ALT_ROUTE_COLORS[(idx > selectedIdx ? idx - 1 : idx) % ALT_ROUTE_COLORS.length];
+        
+        // Find first diverge point (where routes separate)
+        let divergeIdx = -1;
+        for (let i = 0; i < Math.min(primary.length, alt.length); i++) {
+          const dist = Math.abs(primary[i][0] - alt[i][0]) + Math.abs(primary[i][1] - alt[i][1]);
+          if (dist > 0.001) { // ~100m separation
+            divergeIdx = Math.max(0, i - 1);
+            break;
+          }
+        }
+
+        if (divergeIdx >= 0 && divergeIdx < primary.length) {
+          const dp = primary[divergeIdx];
+          const icon = L.divIcon({
+            className: 'diverge-marker counter-rotate',
+            html: `<div style="
+              width: 12px; height: 12px;
+              background: ${altColor};
+              border: 2px solid white;
+              border-radius: 50%;
+              box-shadow: 0 0 8px ${altColor}80;
+            "></div>`,
+            iconSize: [12, 12],
+            iconAnchor: [6, 6],
+          });
+          L.marker([dp[0], dp[1]], { icon, interactive: false, pane: 'signPane' })
+            .addTo(altRouteLayersRef.current!);
+        }
+      });
+    }
   };
 
   // Place highway shield markers along the route using HERE Map Image API
@@ -1770,7 +1857,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   };
 
   const parseLane = (lane: any) => {
-    const direction = lane.direction.toLowerCase();
+    const direction = (lane?.direction || '').toLowerCase();
     const isStraight = direction.includes('straight');
     const isLeft = direction.includes('left');
     const isRight = direction.includes('right');
@@ -1791,7 +1878,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
     return {
       rotation,
-      active: lane.matches.includes('selected'),
+      active: (lane?.matches || []).includes('selected'),
       isStraight
     };
   };
@@ -1799,7 +1886,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const getLaneGuidancePhrase = (lanes: any[]) => {
     if (!lanes || lanes.length === 0) return '';
     
-    const recommendedLanes = lanes.filter(l => l.matches.includes('selected') || l.active);
+    const recommendedLanes = lanes.filter(l => (l?.matches || []).includes('selected') || l?.active);
     if (recommendedLanes.length === 0) return '';
     if (recommendedLanes.length === lanes.length) return ''; // All lanes are fine
 
@@ -1810,7 +1897,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     let firstIdx = -1;
     let lastIdx = -1;
     for (let i = 0; i < lanes.length; i++) {
-      if (lanes[i].matches.includes('selected') || lanes[i].active) {
+      if ((lanes[i]?.matches || []).includes('selected') || lanes[i]?.active) {
         if (firstIdx === -1) firstIdx = i;
         lastIdx = i;
       }
@@ -2044,14 +2131,51 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (routeLineRef.current && routeCoordsRef.current.length > nearestIndex) {
         const remainingCoords = [currentLocation, ...routeCoordsRef.current.slice(nearestIndex + 1)];
         updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 8);
+        
+        // Draw completed (traveled) portion as dimmed gray
+        if (nearestIndex > 0) {
+          const traveledCoords = routeCoordsRef.current.slice(0, nearestIndex + 1);
+          traveledCoords.push(currentLocation);
+          if (mapLayersRef.current['traveled']) {
+            mapLayersRef.current['traveled'].setLatLngs(traveledCoords);
+          } else {
+            const traveledLine = L.polyline(traveledCoords, {
+              color: '#555555',
+              weight: 8,
+              opacity: 0.4,
+              lineCap: 'round',
+              lineJoin: 'round',
+              pane: 'routePane',
+              interactive: false,
+            });
+            traveledLine.addTo(mapInstanceRef.current!);
+            mapLayersRef.current['traveled'] = traveledLine;
+          }
+        }
       }
 
       if (routeCoordsRef.current.length > nearestIndex + 1) {
         const segmentCoords = [currentLocation, routeCoordsRef.current[nearestIndex + 1]];
+        // Active segment: bright white with glow
         if (!currentSegmentLineRef.current) {
+          // Glow layer
+          const glowLine = L.polyline(segmentCoords, {
+            color: '#ffffff',
+            weight: 18,
+            opacity: 0.2,
+            lineCap: 'round',
+            pane: 'routePane',
+            interactive: false,
+          });
+          glowLine.addTo(mapInstanceRef.current!);
+          mapLayersRef.current['segment_glow'] = glowLine;
+          
           updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
           currentSegmentLineRef.current = 'segment';
         } else {
+          if (mapLayersRef.current['segment_glow']) {
+            mapLayersRef.current['segment_glow'].setLatLngs(segmentCoords);
+          }
           updateMapLine(mapInstanceRef.current, currentSegmentLineRef.current, segmentCoords, '#ffffff', 12);
         }
       }
@@ -2336,6 +2460,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               } : null
             });
 
+            // Update distance-based detail props for enhanced HUD
+            setCurrentDistToManeuverMi(distanceToManeuver / 1609.34);
+            setCurrentManeuverType(currentStep.maneuver.type || '');
+            setCurrentManeuverModifier(currentStep.maneuver.modifier || '');
+
             // Auto-zoom for upcoming maneuvers
             // Zoom in when within 0.3 mi (~480m), zoom back when past 0.5 mi (~800m)
             if (mapInstanceRef.current && isFollowMode && !isOverviewMode) {
@@ -2425,6 +2554,42 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 if (stepIdx < maneuverIndex - 1) {
                   announcedManeuverThresholdsRef.current.delete(stepIdx);
                 }
+              }
+
+              // ─── Truck Intelligence: Check steep grade proximity ───
+              if (gradeWarningsRef.current.length > 0) {
+                const gradeAlerts = checkGradeProximity(
+                  currentLocation[0], currentLocation[1],
+                  gradeWarningsRef.current,
+                  routeCoordsRef.current
+                );
+                if (gradeAlerts.length > 0) {
+                  setActiveGradeAlert(gradeAlerts[0].message);
+                  setTimeout(() => setActiveGradeAlert(null), 15000);
+                }
+              }
+
+              // ─── Maneuver Preview: Update for complex maneuvers ───
+              const distMiPreview = distanceToManeuver / 1609.34;
+              const isComplex = ['exit', 'fork', 'roundabout', 'ramp', 'merge'].some(t => 
+                (currentStep.maneuver?.type || '').includes(t)
+              );
+              if (isComplex && distMiPreview <= 2) {
+                const instrText = currentStep.maneuver?.instruction || '';
+                const exitMatch = instrText.match(/exit\s+(\d+[A-Z]?)/i);
+                const roadMatch = instrText.replace(/<[^>]+>/g, '').match(/(?:on|onto|toward)\s+(.+?)(?:\s+for|\s*$)/i);
+                setManeuverPreviewData({
+                  instruction: instrText,
+                  maneuverType: currentStep.maneuver?.type || '',
+                  modifier: currentStep.maneuver?.modifier || '',
+                  distanceMi: distMiPreview,
+                  lanes: currentStep.laneInfo || null,
+                  roadName: roadMatch?.[1] || '',
+                  exitNumber: exitMatch?.[1] || '',
+                  isComplex: true,
+                });
+              } else if (distMiPreview > 2.5 || !isComplex) {
+                setManeuverPreviewData(null);
               }
             }
 
@@ -2785,6 +2950,24 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // Clear lane visualization
     if (mapInstanceRef.current) {
       clearLanes(mapInstanceRef.current);
+    }
+    // Clear alternative route overlays
+    if (altRouteLayersRef.current) {
+      altRouteLayersRef.current.clearLayers();
+    }
+    // Clear truck intelligence data
+    gradeWarningsRef.current = [];
+    clearGradeData();
+    setActiveGradeAlert(null);
+    setManeuverPreviewData(null);
+    // Clear traveled segment
+    if (mapLayersRef.current['traveled']) {
+      mapLayersRef.current['traveled'].remove();
+      delete mapLayersRef.current['traveled'];
+    }
+    if (mapLayersRef.current['segment_glow']) {
+      mapLayersRef.current['segment_glow'].remove();
+      delete mapLayersRef.current['segment_glow'];
     }
     currentSegmentLineRef.current = null;
     if (context) context.setNavTarget(null);
@@ -4048,6 +4231,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Draw route polyline using updateMapLine for consistency
         updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
+
+        // Draw alternative routes with distinct colors if available
+        if (routes.length > 1) {
+          drawAlternativeRoutes(mapInstanceRef.current, routes, 0);
+        }
         
         // Clear all previous route overlay signs before placing new ones
         if (shieldLayerGroupRef.current) {
@@ -4086,6 +4274,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Draw lane count visualization on highway segments
         if (primaryRoute.spans && primaryRoute.spans.length > 0) {
           drawLaneVisualization(mapInstanceRef.current, coords, primaryRoute.spans, 'routePane');
+        }
+
+        // Analyze route for steep grades (truck intelligence)
+        gradeWarningsRef.current = analyzeRouteGrades(coords as any);
+        if (gradeWarningsRef.current.length > 0) {
+          console.log(`[TruckIntel] Found ${gradeWarningsRef.current.length} steep grade segments`);
         }
         
         // Fit map to route
@@ -5321,6 +5515,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 currentSegmentLineRef.current = null;
                 updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 8);
                 routeLineRef.current = { id: 'route', color: '#D4AF37' };
+                // Redraw alt routes with new selection
+                drawAlternativeRoutes(mapInstanceRef.current, alternativeRoutes, idx);
                 // Update lane visualization for selected route
                 if (route.spans) {
                   drawLaneVisualization(mapInstanceRef.current, route.coords, route.spans, 'routePane');
@@ -5457,7 +5653,36 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Modern Navigation HUD */}
       {!isExploreMode && milesRemaining > 0 && !is3DMode && (
-        <NavigationHUD nextInstruction={nextInstruction} parseLane={parseLane} />
+        <NavigationHUD 
+          nextInstruction={nextInstruction} 
+          parseLane={parseLane} 
+          distanceToManeuverMi={currentDistToManeuverMi}
+          maneuverType={currentManeuverType}
+          maneuverModifier={currentManeuverModifier}
+          speedLimit={currentSpeedLimit ?? undefined}
+        />
+      )}
+
+      {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
+      {!isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
+        <div className="absolute top-36 left-4 z-[2000] w-72 pointer-events-auto">
+          <ManeuverPreview {...maneuverPreviewData} />
+        </div>
+      )}
+
+      {/* Truck Intelligence: Steep Grade Alert */}
+      {activeGradeAlert && isDriving && (
+        <div data-testid="grade-alert" className="absolute top-4 left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-3 fade-in duration-300">
+          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-600/95 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(217,119,6,0.5)] pointer-events-auto border border-amber-500/40">
+            <div className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center flex-shrink-0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <span className="text-sm font-bold text-white">{activeGradeAlert}</span>
+          </div>
+        </div>
       )}
 
       {/* Trip Progress HUD removed in favor of nav-arrival-hud */}
