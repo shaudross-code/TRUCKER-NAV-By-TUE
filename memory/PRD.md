@@ -18,48 +18,42 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Voice Guidance: Graduated Maneuver Announcements
 - Navigation Intelligence Overhaul (visual separation, ManeuverPreview, truck intelligence)
 
-### MUTCD Road Signs System (2026-04-01)
-- **Interstate Shields (M1-1)**: Blue shield with red "INTERSTATE" top band, white route number
-- **US Route Shields (M1-4)**: Black/white shield with proper FHWA proportions
-- **State Route Shields**: Circle style with black border
-- **Speed Limit Signs (R2-1)**: White rectangle, "SPEED LIMIT" text, proper typography
-- **Warning Diamonds (W-series)**: Yellow diamond with black border, standard symbols
-  - Curve warnings (W1-1/W1-2)
-  - Steep grade (W7-1) with truck-on-slope icon + grade percentage
-  - Winding road (W1-5)
-  - Low clearance (W12-2)
-- **CMV Warning Signs**: Rollover risk (red border), steep downgrade/hill
-- **Regulatory Signs (R-series)**: No Trucks (R5-2) with red slash, Weight Limit, No Hazmat
-- **Exit Guide Signs (E-series)**: Green MUTCD rectangular with EXIT badge
-- **Construction Warning**: Orange diamond (W20-1)
-- All signs generated via `/app/utils/mutcdSigns.ts` utility module
+### MUTCD Road Signs System
+- Interstate Shields (M1-1), US Route Shields (M1-4), State Route Shields
+- Speed Limit Signs (R2-1), Warning Diamonds (W-series), CMV Warning Signs
+- Regulatory Signs (R-series), Exit Guide Signs (E-series), Construction Warning
+- All signs generated via `/app/utils/mutcdSigns.ts`
 
-### HERE API v8.140.0 Upgrade (2026-04-01)
-- Added `vehicle[emptyWeight]` (35% of gross weight estimate)
-- Added `vehicle[currentWeight]` (same as grossWeight for loaded truck)
-- Added `vehicle[tiresCount]` (18 for 5-axle, calculated from axle count)
-- Retained all existing params: height, grossWeight, length, width, axleCount, weightPerAxle, trailerCount
+### HERE API v8.140.0 Upgrade
+- Added vehicle[emptyWeight], vehicle[currentWeight], vehicle[tiresCount]
 
-### Navigation UI (2026-04-01)
-- Collapsible Map Controls with hamburger toggle, auto-collapse during driving
-- Decluttered user location icon (clean blue chevron)
-- Numbered waypoint markers (gold circles 1, 2, 3...)
-- UI overlap fix: trip-info panel at bottom-[180px]
-- NavigationHUD mobile fix (top-14 for browser toolbar clearance)
+### Navigation UI
+- Collapsible Map Controls, Decluttered user location icon
+- Numbered waypoint markers, UI overlap fix, NavigationHUD mobile fix
 - Real-time traffic incident overlays + auto-reroute countdown
 
-### Display Layout / HUD Customization (2026-04-01)
+### Display Layout / HUD Customization
 - **Display tab** in sidebar between Fuel Network and Settings
 - **18 toggleable HUD elements** across 3 categories: Navigation (5), Panels (5), Signs (8)
 - **Show All / Hide All / Reset** buttons for quick configuration
 - **Trip Panel Position** toggle (LEFT/RIGHT)
-- **Drag-and-drop reordering** within each category using @dnd-kit (core v6.3.1, sortable v10.0.0)
-- **Grip handle** on each element row for intuitive drag interaction
-- **Order persistence** to localStorage under `nav_hud_layout` (visibility) and `nav_hud_order` (ordering)
-- **Reset** restores both default visibility AND default element order
+- **Drag-and-drop list reordering** within each category using @dnd-kit (core v6.3.1, sortable v10.0.0)
+- **Live Preview** — Miniature 16:9 navigation view showing all HUD elements in their actual positions
+- **Draggable Preview Positioning** — Edit mode with Lock/Unlock toggle, users drag HUD elements freely within the preview to reposition them on the navigation screen
+  - 8 draggable elements: navigationHUD, speedOverlay, maneuverPreview, weatherPanel, tripPanel, mapControls, routeComparison, arrivalHUD
+  - Gold move indicators on each element in edit mode
+  - "Reset Pos" button to restore default positions
+  - Positions persisted to localStorage (`nav_hud_positions`)
+  - Positions applied to actual NavigationView via `hud-positions-changed` custom event
+- **Order persistence** to localStorage (`nav_hud_order` key)
+
+### EAS Build / CI
+- EAS project linked (ID: ebee86f6-6e68-4248-9f23-0643d975ee4b)
+- GitHub Actions workflow for iOS & Android builds (`.github/workflows/eas-build.yml`)
+- macOS runner with Node 24, no Node 20 dependencies
 
 ### Other Features
-- POI System (truck stop plazas only), Fuel Network tab, Fuel Cost Calculator
+- POI System, Fuel Network tab, Fuel Cost Calculator
 - Driver Fatigue Alert (FMCSA HOS), Dynamic Lane Count Visualization
 - Data Saver Toggle, Truck Profile Edit, Waypoint Arrived/Skip
 
@@ -74,10 +68,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Refactoring NavigationView.tsx (~6700 lines)
 
 ## Key Technical Notes
-- MUTCD signs: `/app/utils/mutcdSigns.ts` — all sign generators with FHWA standard colors
-- HERE API: v8 (latest v8.140.0) — `return=summary,actions,instructions,incidents,polyline,turnByTurnActions,elevation,tolls`
-- MapControls auto-collapse via `isDrivingMode` prop
-- Nginx proxies port 3000 → 8001 (recreate if dropped)
+- MUTCD signs: `/app/utils/mutcdSigns.ts`
+- HERE API: v8 (latest v8.140.0)
+- DnD libraries: @dnd-kit/core + @dnd-kit/sortable (list reorder), native pointer events (preview drag)
+- HUD positions: stored in localStorage `nav_hud_positions`, applied via custom events
+- Nginx proxies port 3000 -> 8001 (recreate if dropped)
 - Services may drop ports intermittently — restart with `sudo supervisorctl restart trucker-nav`
-- DnD library: @dnd-kit/core + @dnd-kit/sortable + @dnd-kit/utilities
-- JSX fix: `{hudLayout.showWeatherOverlay && (<>...</>)}` fragment wrapper in NavigationView.tsx line ~5988
