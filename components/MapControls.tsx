@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2, Menu } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2, Menu, Star } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 
 export const MapControls: React.FC<any> = React.memo(({ 
@@ -9,6 +9,8 @@ export const MapControls: React.FC<any> = React.memo(({
   setIsFilterMenuOpen, 
   poiFilters, 
   setPoiFilters, 
+  minRatingFilter,
+  setMinRatingFilter,
   isOverviewMode, 
   setIsOverviewMode, 
   setIsFollowMode, 
@@ -205,6 +207,34 @@ export const MapControls: React.FC<any> = React.memo(({
                       </div>
                     )}
                   </div>
+
+                  {/* ── Min Rating Filter ── */}
+                  {setMinRatingFilter && (
+                    <div className="border-t border-[#D4AF37]/10 pt-3 mt-1">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Star className="w-3 h-3 text-[#D4AF37]" fill="currentColor" />
+                        <span className="text-[9px] md:text-[11px] font-black uppercase text-white tracking-widest">Min Rating</span>
+                      </div>
+                      <div className="flex items-center gap-1" data-testid="min-rating-filter">
+                        {[0, 1, 2, 3, 4].map(val => (
+                          <button
+                            key={val}
+                            data-testid={`min-rating-${val}`}
+                            onClick={() => setMinRatingFilter(val)}
+                            className={`flex items-center gap-0.5 px-2 py-1 rounded-lg text-[8px] font-black transition-all ${
+                              minRatingFilter === val
+                                ? 'bg-[#D4AF37] text-black'
+                                : 'bg-white/5 text-zinc-500 hover:text-white'
+                            }`}
+                          >
+                            {val === 0 ? 'ALL' : (
+                              <>{val}+ <Star className="w-2 h-2" fill="currentColor" /></>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

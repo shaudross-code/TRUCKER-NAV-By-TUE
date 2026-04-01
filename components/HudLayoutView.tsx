@@ -4,7 +4,7 @@ import {
   Fuel, Clock, Layers, CloudSun, AlertTriangle, Shield,
   ArrowRightLeft, Milestone, Construction, Route, GitCompare,
   Map as MapIcon, ArrowLeftRight, GripVertical, Compass,
-  CircleDot, Maximize2, Minimize2
+  CircleDot, Maximize2, Minimize2, Siren
 } from 'lucide-react';
 import {
   DndContext,
@@ -75,6 +75,7 @@ const HUD_ELEMENTS_MAP: Record<string, HudElement> = {
   showTruckRestrictions: { key: 'showTruckRestrictions', label: 'Truck Restrictions', shortLabel: 'Restrict', description: 'Low clearance, weight limit, no-truck alerts', icon: AlertTriangle, category: 'Signs' },
   showTrafficIncidents: { key: 'showTrafficIncidents', label: 'Traffic Incidents', shortLabel: 'Traffic', description: 'Real-time accident, closure, construction markers', icon: AlertTriangle, category: 'Signs' },
   showWaypointMarkers: { key: 'showWaypointMarkers', label: 'Waypoint Numbers', shortLabel: 'Waypts', description: 'Numbered markers (1, 2, 3) at each stop', icon: MapPin, category: 'Signs' },
+  showSpeedWarning: { key: 'showSpeedWarning', label: 'Speed Warning', shortLabel: 'Warn', description: 'Flash red + audio alert when exceeding speed limit', icon: Siren, category: 'Navigation' },
 };
 
 const CATEGORIES = ['Navigation', 'Panels', 'Signs'];
@@ -420,6 +421,39 @@ export default function HudLayoutView() {
           </div>
         </div>
       </div>
+
+      {/* Speed Warning Tolerance */}
+      {config.showSpeedWarning && (
+        <div data-testid="speed-warning-tolerance" className="mb-5 bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-red-500/10">
+                <Siren className="w-5 h-5 text-red-400" />
+              </div>
+              <div>
+                <div className="text-white font-bold text-sm">Speed Warning Tolerance</div>
+                <div className="text-zinc-500 text-xs">Alert when exceeding limit by this many mph</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1 bg-zinc-950 border border-zinc-800 rounded-xl p-1">
+              {[0, 3, 5, 8, 10].map(val => (
+                <button
+                  key={val}
+                  data-testid={`speed-tolerance-${val}`}
+                  onClick={() => setConfig(prev => ({ ...prev, speedWarningTolerance: val }))}
+                  className={`px-2 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                    config.speedWarningTolerance === val
+                      ? 'bg-red-500 text-white'
+                      : 'text-zinc-500 hover:text-white'
+                  }`}
+                >
+                  +{val}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Drag hint */}
       <div className="flex items-center gap-2 mb-3 px-1">

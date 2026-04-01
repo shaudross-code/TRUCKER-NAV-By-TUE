@@ -21,6 +21,8 @@ export const DEFAULT_HUD_LAYOUT: HudLayoutConfig = {
   showLaneGuidance: true,
   showCompassRose: true,
   showNextStop: true,
+  showSpeedWarning: true,
+  speedWarningTolerance: 5,
   tripPanelPosition: 'right',
 };
 
@@ -30,7 +32,7 @@ const ORDER_KEY = 'nav_hud_order';
 export type HudElementOrder = Record<string, string[]>;
 
 export const DEFAULT_ORDER: HudElementOrder = {
-  Navigation: ['showNavigationHUD', 'showLaneGuidance', 'showSpeedOverlay', 'showArrivalHUD', 'showManeuverPreview', 'showCompassRose', 'showNextStop'],
+  Navigation: ['showNavigationHUD', 'showLaneGuidance', 'showSpeedOverlay', 'showArrivalHUD', 'showManeuverPreview', 'showCompassRose', 'showNextStop', 'showSpeedWarning'],
   Panels: ['showFuelCost', 'showHosStatus', 'showMapControls', 'showRouteComparison', 'showWeatherOverlay'],
   Signs: ['showHighwayShields', 'showSpeedLimitSigns', 'showExitSigns', 'showCurveWarnings', 'showCmvWarnings', 'showTruckRestrictions', 'showTrafficIncidents', 'showWaypointMarkers'],
 };

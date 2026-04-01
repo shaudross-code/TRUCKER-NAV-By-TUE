@@ -705,6 +705,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [poiParkingStatus, setPoiParkingStatus] = useState<{ status: string | null; updatedAt: string | null; updateCount: number } | null>(null);
   const [isParkingLoading, setIsParkingLoading] = useState(false);
   const [parkingSubmitDone, setParkingSubmitDone] = useState<string | null>(null);
+  const [poiRatingsCache, setPoiRatingsCache] = useState<Record<string, { averageRating: number; totalReviews: number }>>({});
 
   useEffect(() => {
     // Save only real POIs fetched from APIs
@@ -744,6 +745,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (str) localStorage.setItem('poi_filters', str);
   }, [poiFilters]);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+  const [minRatingFilter, setMinRatingFilter] = useState(0); // 0 = show all
   const [error, setError] = useState<string | null>(null);
   const [mapInitError, setMapInitError] = useState<string | null>(null);
   useEffect(() => {
@@ -994,6 +996,66 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   const lastViolationRef = useRef(false);
   const playedAlertsRef = useRef<Record<string, Set<number>>>({});
+  
+  // ─── Speed Warning System ─────────────────────────────────────────────────
+  const speedWarningAudioRef = useRef<AudioContext | null>(null);
+  const speedWarningActiveRef = useRef(false);
+  const speedWarningIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isSpeedWarning, setIsSpeedWarning] = useState(false);
+  
+  useEffect(() => {
+    if (!hudLayout.showSpeedWarning || !currentSpeedLimit || !isDriving) {
+      if (speedWarningIntervalRef.current) {
+        clearInterval(speedWarningIntervalRef.current);
+        speedWarningIntervalRef.current = null;
+      }
+      speedWarningActiveRef.current = false;
+      setIsSpeedWarning(false);
+      return;
+    }
+    
+    const tolerance = hudLayout.speedWarningTolerance ?? 5;
+    const isSpeeding = speed > (currentSpeedLimit + tolerance);
+    setIsSpeedWarning(isSpeeding);
+    
+    if (isSpeeding && !speedWarningActiveRef.current) {
+      speedWarningActiveRef.current = true;
+      // Play escalating beep pattern
+      const playBeep = () => {
+        try {
+          if (!speedWarningAudioRef.current) {
+            speedWarningAudioRef.current = new AudioContext();
+          }
+          const ctx = speedWarningAudioRef.current;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.value = 880;
+          osc.type = 'square';
+          gain.gain.setValueAtTime(0.15, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.15);
+        } catch {}
+      };
+      playBeep();
+      speedWarningIntervalRef.current = setInterval(playBeep, 3000);
+    } else if (!isSpeeding && speedWarningActiveRef.current) {
+      speedWarningActiveRef.current = false;
+      if (speedWarningIntervalRef.current) {
+        clearInterval(speedWarningIntervalRef.current);
+        speedWarningIntervalRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (speedWarningIntervalRef.current) {
+        clearInterval(speedWarningIntervalRef.current);
+        speedWarningIntervalRef.current = null;
+      }
+    };
+  }, [speed, currentSpeedLimit, isDriving, hudLayout.showSpeedWarning, hudLayout.speedWarningTolerance]);
 
   useEffect(() => {
     if (selectedPoi && (selectedPoi.place_id || selectedPoi.id) && !selectedPoi.detailsFetched) {
@@ -5752,6 +5814,25 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setUpcomingPois(withPrices);
   }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(','), fuelStations.length]);;
 
+  // Batch-fetch ratings for upcoming POIs
+  useEffect(() => {
+    if (upcomingPois.length === 0) return;
+    const poiIds = upcomingPois.map(p => `${p.lat.toFixed(4)}_${p.lon.toFixed(4)}`);
+    const uncachedIds = poiIds.filter(id => !poiRatingsCache[id]);
+    if (uncachedIds.length === 0) return;
+    
+    fetch('/api/facility-ratings-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ poiIds: uncachedIds }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        setPoiRatingsCache(prev => ({ ...prev, ...data }));
+      })
+      .catch(() => {});
+  }, [upcomingPois.length]);
+
 
   const toggleDriving = () => {
     if (milesRemaining <= 0) return;
@@ -6348,7 +6429,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 );
               })()}
               <div className="flex flex-col gap-1 md:gap-1.5">
-                {upcomingPois.map((poi, idx) => {
+                {upcomingPois.filter(poi => {
+                  if (minRatingFilter <= 0) return true;
+                  const rid = `${poi.lat.toFixed(4)}_${poi.lon.toFixed(4)}`;
+                  const r = poiRatingsCache[rid];
+                  return r && r.averageRating >= minRatingFilter;
+                }).map((poi, idx) => {
                   const category = getPoiCategory(poi.type, poi.name);
                   let Icon = MapIcon;
                   let iconColor = "text-zinc-400";
@@ -6375,6 +6461,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                                 ${poi.dieselPrice.toFixed(2)}
                               </span>
                             )}
+                            {(() => {
+                              const rid = `${poi.lat.toFixed(4)}_${poi.lon.toFixed(4)}`;
+                              const r = poiRatingsCache[rid];
+                              if (!r || r.averageRating === 0) return null;
+                              return (
+                                <span className="flex items-center gap-0.5" data-testid={`poi-rating-${idx}`}>
+                                  <Star className="w-2 h-2 text-[#D4AF37]" fill="currentColor" />
+                                  <span className="text-[7px] font-black text-[#D4AF37] tabular-nums">{r.averageRating.toFixed(1)}</span>
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>
@@ -6740,6 +6837,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
+      {/* Speed Warning Banner */}
+      {isSpeedWarning && hudLayout.showSpeedWarning && isDriving && (
+        <div data-testid="speed-warning-banner" className="absolute z-[2015] left-1/2 -translate-x-1/2 animate-pulse pointer-events-none" style={{ bottom: 'calc(6.5rem + env(safe-area-inset-bottom))' }}>
+          <div className="flex items-center gap-2 px-4 py-2 bg-red-600/95 border-2 border-red-400 rounded-full shadow-[0_0_30px_rgba(239,68,68,0.5)]">
+            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            <span className="text-sm font-black text-white uppercase tracking-wider">Slow Down</span>
+            <span className="text-sm font-black text-white tabular-nums">{speed} / {currentSpeedLimit} mph</span>
+          </div>
+        </div>
+      )}
+
       {hudLayout.showArrivalHUD && isDriving && !isExploreMode && !is3DMode && (
         <div id="nav-arrival-hud" data-testid="nav-arrival-hud" className="absolute z-[2010] w-full max-w-[850px] px-2 md:px-4 pointer-events-none" style={{
           ...(hudPositions.arrivalHUD && (hudPositions.arrivalHUD.x !== DEFAULT_POSITIONS.arrivalHUD.x || hudPositions.arrivalHUD.y !== DEFAULT_POSITIONS.arrivalHUD.y)
@@ -6795,10 +6903,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               {/* Stats */}
               <div className="flex items-center gap-3 md:gap-6 landscape:gap-3 overflow-x-auto no-scrollbar flex-1 px-1">
                 {/* Speed */}
-                <div id="nav-stat-speed" data-testid="nav-stat-speed" className="flex flex-col items-center shrink-0 min-w-[52px] md:min-w-[72px]">
+                <div id="nav-stat-speed" data-testid="nav-stat-speed" className={`flex flex-col items-center shrink-0 min-w-[52px] md:min-w-[72px] ${isSpeedWarning ? 'animate-pulse' : ''}`}>
                   <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Speed</span>
                   <div className="flex items-baseline gap-0.5">
-                    <span className={`text-xl md:text-3xl landscape:text-xl font-[900] tracking-tighter leading-none tabular-nums ${currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-400' : 'text-white'}`}>
+                    <span className={`text-xl md:text-3xl landscape:text-xl font-[900] tracking-tighter leading-none tabular-nums transition-colors duration-300 ${isSpeedWarning ? 'text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]' : currentSpeedLimit && speed > currentSpeedLimit ? 'text-red-400' : 'text-white'}`}>
                       {context?.unitSystem === 'metric' ? Math.round(speed * 1.60934) : speed}
                     </span>
                     <span className="text-[7px] md:text-[9px] landscape:text-[7px] text-zinc-600 font-bold uppercase">{context?.unitSystem === 'metric' ? 'km/h' : 'mph'}</span>
@@ -6884,6 +6992,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setIsFilterMenuOpen={setIsFilterMenuOpen}
         poiFilters={poiFilters}
         setPoiFilters={setPoiFilters}
+        minRatingFilter={minRatingFilter}
+        setMinRatingFilter={setMinRatingFilter}
         isOverviewMode={isOverviewMode}
         setIsOverviewMode={setIsOverviewMode}
         setIsFollowMode={setIsFollowMode}

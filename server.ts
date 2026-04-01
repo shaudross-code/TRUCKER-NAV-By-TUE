@@ -26,6 +26,43 @@ function writeParkingStore(data: Record<string, any>) {
 }
 // ────────────────────────────────────────────────────────────────────────────
 
+// ─── File-based facility ratings store ─────────────────────────────────────
+const RATINGS_FILE = path.join(__dirname, 'data', 'facility_ratings.json');
+
+interface FacilityRating {
+  rating: number;
+  review?: string;
+  tags?: string[];
+  userName?: string;
+  createdAt: string;
+}
+
+interface FacilityEntry {
+  poiId: string;
+  name: string;
+  lat: number;
+  lon: number;
+  ratings: FacilityRating[];
+  averageRating: number;
+  totalReviews: number;
+}
+
+function readRatingsStore(): Record<string, FacilityEntry> {
+  try {
+    if (!existsSync(RATINGS_FILE)) return {};
+    return JSON.parse(readFileSync(RATINGS_FILE, 'utf8'));
+  } catch { return {}; }
+}
+
+function writeRatingsStore(data: Record<string, FacilityEntry>) {
+  try {
+    const dir = path.dirname(RATINGS_FILE);
+    if (!existsSync(dir)) { import('fs').then(fs => fs.mkdirSync(dir, { recursive: true })); }
+    writeFileSync(RATINGS_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (e) { console.error('Failed to write ratings store:', e); }
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 // Initialize Firebase Admin with service account (env var or file fallback)
 try {
   let serviceAccount;
@@ -542,6 +579,91 @@ async function createServer() {
       res.status(500).json({ error: 'Failed to fetch traffic flow' });
     }
   });
+
+  // ─── Facility Ratings API ──────────────────────────────────────────────────
+
+  // GET ratings for a specific POI
+  app.get('/api/facility-ratings', async (req, res) => {
+    const { poiId } = req.query;
+    if (!poiId) return res.status(400).json({ error: 'poiId is required' });
+    try {
+      const store = readRatingsStore();
+      const entry = store[String(poiId)];
+      if (!entry) return res.json({ averageRating: 0, totalReviews: 0, ratings: [] });
+      res.json({
+        averageRating: entry.averageRating,
+        totalReviews: entry.totalReviews,
+        ratings: entry.ratings.slice(-20).reverse(),
+      });
+    } catch (error) {
+      console.error('Error fetching ratings:', error);
+      res.status(500).json({ error: 'Failed to fetch ratings' });
+    }
+  });
+
+  // GET batch ratings for multiple POIs
+  app.post('/api/facility-ratings-batch', async (req, res) => {
+    const { poiIds } = req.body;
+    if (!poiIds || !Array.isArray(poiIds)) return res.status(400).json({ error: 'poiIds array is required' });
+    try {
+      const store = readRatingsStore();
+      const results: Record<string, { averageRating: number; totalReviews: number }> = {};
+      poiIds.forEach((id: string) => {
+        const entry = store[id];
+        results[id] = entry
+          ? { averageRating: entry.averageRating, totalReviews: entry.totalReviews }
+          : { averageRating: 0, totalReviews: 0 };
+      });
+      res.json(results);
+    } catch (error) {
+      console.error('Error fetching batch ratings:', error);
+      res.status(500).json({ error: 'Failed to fetch batch ratings' });
+    }
+  });
+
+  // POST a new rating/review for a POI
+  app.post('/api/facility-ratings', async (req, res) => {
+    const { poiId, rating, review, tags, userName, name, lat, lon } = req.body;
+    if (!poiId || !rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'poiId and rating (1-5) are required' });
+    }
+    try {
+      const store = readRatingsStore();
+      if (!store[poiId]) {
+        store[poiId] = {
+          poiId,
+          name: name || 'Unknown',
+          lat: lat || 0,
+          lon: lon || 0,
+          ratings: [],
+          averageRating: 0,
+          totalReviews: 0,
+        };
+      }
+      store[poiId].ratings.push({
+        rating: Math.round(rating),
+        review: review || undefined,
+        tags: tags || undefined,
+        userName: userName || 'Driver',
+        createdAt: new Date().toISOString(),
+      });
+      const allRatings = store[poiId].ratings;
+      store[poiId].averageRating = Math.round((allRatings.reduce((sum, r) => sum + r.rating, 0) / allRatings.length) * 10) / 10;
+      store[poiId].totalReviews = allRatings.length;
+      if (name) store[poiId].name = name;
+      
+      writeRatingsStore(store);
+      res.json({
+        success: true,
+        averageRating: store[poiId].averageRating,
+        totalReviews: store[poiId].totalReviews,
+      });
+    } catch (error) {
+      console.error('Error saving rating:', error);
+      res.status(500).json({ error: 'Failed to save rating' });
+    }
+  });
+  // ────────────────────────────────────────────────────────────────────────────
 
   app.post('/api/traffic-incidents', async (req, res) => {
     const { bbox } = req.body;

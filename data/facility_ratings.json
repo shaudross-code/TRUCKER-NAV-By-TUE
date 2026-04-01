@@ -1,0 +1,63 @@
+{
+  "41.2588_-95.9346": {
+    "poiId": "41.2588_-95.9346",
+    "name": "Pilot Travel Center",
+    "lat": 41.2588,
+    "lon": -95.9346,
+    "ratings": [
+      {
+        "rating": 5,
+        "review": "Best truck stop in Iowa!",
+        "tags": [
+          "Clean Restrooms",
+          "Safe Parking",
+          "Fast Fuel"
+        ],
+        "userName": "Driver",
+        "createdAt": "2026-04-01T22:40:54.018Z"
+      }
+    ],
+    "averageRating": 5,
+    "totalReviews": 1
+  },
+  "test_poi_123": {
+    "poiId": "test_poi_123",
+    "name": "Test Pilot Flying J",
+    "lat": 32.7767,
+    "lon": -96.797,
+    "ratings": [
+      {
+        "rating": 4,
+        "review": "Great truck stop!",
+        "tags": [
+          "Clean Restrooms",
+          "Safe Parking"
+        ],
+        "userName": "Driver",
+        "createdAt": "2026-04-01T22:49:09.520Z"
+      }
+    ],
+    "averageRating": 4,
+    "totalReviews": 1
+  },
+  "41.2356_-95.8788": {
+    "poiId": "41.2356_-95.8788",
+    "name": "Pilot Flying J",
+    "lat": 41.23561,
+    "lon": -95.87878,
+    "ratings": [
+      {
+        "rating": 4,
+        "review": "Great truck stop with clean facilities!",
+        "tags": [
+          "Clean Restrooms",
+          "Safe Parking"
+        ],
+        "userName": "Driver",
+        "createdAt": "2026-04-01T22:51:56.716Z"
+      }
+    ],
+    "averageRating": 4,
+    "totalReviews": 1
+  }
+}

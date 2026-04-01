@@ -1,6 +1,14 @@
-import React, { useState } from 'react';
-import { X, Fuel, Star, MapPin, Phone, Globe, Clock, GitMerge, CircleDollarSign, Navigation as NavIcon, ListOrdered } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { X, Fuel, Star, MapPin, Phone, Globe, Clock, GitMerge, CircleDollarSign, Navigation as NavIcon, ListOrdered, Send, Tag } from 'lucide-react';
 import { TruckStopReputation } from './ReputationScore';
+
+interface FacilityRating {
+  rating: number;
+  review?: string;
+  tags?: string[];
+  userName?: string;
+  createdAt: string;
+}
 
 interface PoiDetailModalProps {
   selectedPoi: any;
@@ -23,6 +31,55 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
   addWaypoint, handleNavigate, waypointCount = 0,
 }) => {
   const [stopPosition, setStopPosition] = useState(0);
+  const [userRating, setUserRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [reviewText, setReviewText] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [facilityRatings, setFacilityRatings] = useState<{ averageRating: number; totalReviews: number; ratings: FacilityRating[] }>({ averageRating: 0, totalReviews: 0, ratings: [] });
+  const [ratingsLoading, setRatingsLoading] = useState(false);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+
+  const REVIEW_TAGS = ['Clean Restrooms', 'Good Food', 'Safe Parking', 'Fast Fuel', 'Friendly Staff', 'Showers', 'Truck Wash', 'WiFi'];
+  
+  const poiId = selectedPoi ? `${selectedPoi.lat.toFixed(4)}_${selectedPoi.lon.toFixed(4)}` : '';
+  
+  const fetchRatings = useCallback(async () => {
+    if (!poiId) return;
+    setRatingsLoading(true);
+    try {
+      const res = await fetch(`/api/facility-ratings?poiId=${encodeURIComponent(poiId)}`);
+      const data = await res.json();
+      setFacilityRatings(data);
+    } catch { } finally { setRatingsLoading(false); }
+  }, [poiId]);
+  
+  useEffect(() => { fetchRatings(); }, [fetchRatings]);
+  
+  const submitRating = async () => {
+    if (!userRating || !selectedPoi) return;
+    try {
+      const res = await fetch('/api/facility-ratings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          poiId,
+          rating: userRating,
+          review: reviewText || undefined,
+          tags: selectedTags.length > 0 ? selectedTags : undefined,
+          name: selectedPoi.name,
+          lat: selectedPoi.lat,
+          lon: selectedPoi.lon,
+        }),
+      });
+      if (res.ok) {
+        setRatingSubmitted(true);
+        setShowReviewForm(false);
+        fetchRatings();
+      }
+    } catch { }
+  };
+  
   if (!selectedPoi) return null;
 
   return (
@@ -139,6 +196,129 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
             </div>
             <div className="px-4 py-3 landscape:py-2">
               <TruckStopReputation parkingStatus={poiParkingStatus?.status as any} updateCount={poiParkingStatus?.updateCount || 0} amenityCount={selectedPoi.amenities?.length || 0} />
+            </div>
+          </div>
+
+          {/* Driver Ratings & Reviews */}
+          <div data-testid="facility-ratings-section" className="border border-[#D4AF37]/20 rounded-2xl landscape:rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[#D4AF37]/8 border-b border-[#D4AF37]/15">
+              <div className="flex items-center gap-2">
+                <Star className="w-4 h-4 text-[#D4AF37]" fill="currentColor" />
+                <span className="text-[10px] landscape:text-[8px] font-black text-[#D4AF37] uppercase tracking-widest">Driver Reviews</span>
+              </div>
+              {facilityRatings.totalReviews > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-white font-black text-sm">{facilityRatings.averageRating.toFixed(1)}</span>
+                  <div className="flex gap-0.5">
+                    {[1,2,3,4,5].map(s => (
+                      <Star key={s} className={`w-3 h-3 ${s <= Math.round(facilityRatings.averageRating) ? 'text-[#D4AF37]' : 'text-zinc-700'}`} fill={s <= Math.round(facilityRatings.averageRating) ? 'currentColor' : 'none'} />
+                    ))}
+                  </div>
+                  <span className="text-zinc-500 text-[9px] font-bold">({facilityRatings.totalReviews})</span>
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 landscape:py-2 space-y-3">
+              {/* Existing reviews */}
+              {facilityRatings.ratings.length > 0 && (
+                <div className="space-y-2 max-h-32 overflow-y-auto custom-scrollbar">
+                  {facilityRatings.ratings.slice(0, 5).map((r, idx) => (
+                    <div key={idx} className="bg-white/5 rounded-xl p-2.5 border border-white/5">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5">
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} className={`w-2.5 h-2.5 ${s <= r.rating ? 'text-[#D4AF37]' : 'text-zinc-700'}`} fill={s <= r.rating ? 'currentColor' : 'none'} />
+                            ))}
+                          </div>
+                          <span className="text-[8px] font-bold text-zinc-400">{r.userName || 'Driver'}</span>
+                        </div>
+                        <span className="text-[7px] text-zinc-600">{new Date(r.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      {r.review && <p className="text-[9px] text-zinc-300 leading-relaxed">{r.review}</p>}
+                      {r.tags && r.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {r.tags.map((tag, ti) => (
+                            <span key={ti} className="text-[7px] font-bold text-[#D4AF37] bg-[#D4AF37]/10 px-1.5 py-0.5 rounded-full">{tag}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Rate this facility */}
+              {!ratingSubmitted ? (
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 mb-2">Rate this facility:</p>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="flex gap-1" data-testid="star-rating-input">
+                      {[1,2,3,4,5].map(s => (
+                        <button
+                          key={s}
+                          data-testid={`rate-star-${s}`}
+                          onMouseEnter={() => setHoverRating(s)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          onClick={() => { setUserRating(s); setShowReviewForm(true); }}
+                          className="p-0.5 transition-transform hover:scale-125"
+                        >
+                          <Star className={`w-5 h-5 transition-colors ${s <= (hoverRating || userRating) ? 'text-[#D4AF37]' : 'text-zinc-700'}`} fill={s <= (hoverRating || userRating) ? 'currentColor' : 'none'} />
+                        </button>
+                      ))}
+                    </div>
+                    {userRating > 0 && <span className="text-xs font-bold text-white">{userRating}/5</span>}
+                  </div>
+                  
+                  {showReviewForm && (
+                    <div className="space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* Tags */}
+                      <div className="flex flex-wrap gap-1.5">
+                        {REVIEW_TAGS.map(tag => (
+                          <button
+                            key={tag}
+                            data-testid={`review-tag-${tag.toLowerCase().replace(/\s+/g, '-')}`}
+                            onClick={() => setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+                            className={`text-[8px] font-bold px-2 py-1 rounded-full border transition-colors ${
+                              selectedTags.includes(tag) 
+                                ? 'bg-[#D4AF37]/20 border-[#D4AF37]/40 text-[#D4AF37]' 
+                                : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-white'
+                            }`}
+                          >
+                            <Tag className="w-2 h-2 inline mr-0.5" />{tag}
+                          </button>
+                        ))}
+                      </div>
+                      
+                      {/* Review text */}
+                      <div className="flex gap-2">
+                        <input
+                          data-testid="review-text-input"
+                          type="text"
+                          value={reviewText}
+                          onChange={e => setReviewText(e.target.value)}
+                          placeholder="Write a quick review (optional)"
+                          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:outline-none focus:border-[#D4AF37]/50"
+                          maxLength={200}
+                        />
+                        <button
+                          data-testid="submit-rating-btn"
+                          onClick={submitRating}
+                          disabled={!userRating}
+                          className="px-4 py-2 bg-[#D4AF37] text-black rounded-xl text-xs font-black uppercase hover:bg-[#B8860B] transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                        >
+                          <Send className="w-3 h-3" /> Rate
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-in fade-in duration-300">
+                  <Star className="w-4 h-4 text-emerald-400" fill="currentColor" />
+                  <span className="text-xs font-bold text-emerald-400">Thanks for your review!</span>
+                </div>
+              )}
             </div>
           </div>
 
