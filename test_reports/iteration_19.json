@@ -86,5 +86,5 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://cmv-routing-dev.preview.emergentagent.com. New features verified: (1) Units & Display section in Settings with MPH/KM/H toggle - changes speed and distance units across entire app, (2) Lane guidance in NavigationHUD with lane numbers and 'USE LANES' header - requires active navigation to test visually. Unit system persists in localStorage. All 13 backend API tests pass. Chart dimension warning is a known low-priority issue."
+  "context_for_next_testing_agent": "App at https://hud-customizer-5.preview.emergentagent.com. New features verified: (1) Units & Display section in Settings with MPH/KM/H toggle - changes speed and distance units across entire app, (2) Lane guidance in NavigationHUD with lane numbers and 'USE LANES' header - requires active navigation to test visually. Unit system persists in localStorage. All 13 backend API tests pass. Chart dimension warning is a known low-priority issue."
 }

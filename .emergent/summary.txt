@@ -1,0 +1,146 @@
+<analysis>**original_problem_statement**: Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using HERE Maps API, turn-by-turn navigation, real-time traffic/infrastructure alerts, 3D/2D satellite maps. PRODUCT REQUIREMENTS: High-quality professional trucking GPS interface, dynamic map switching, real-time hazard alerts (hazmat, bridges, weight), custom fuel network POI tracking, CMV warning systems, smooth GPS interpolation, MUTCD-compliant official road signs, and customizable UI/HUD layouts.
+
+**User's preferred language**: English (INSTRUCT next agent to respond in English only)
+
+**what currently exists?** 
+A full-stack Node.js/Express + React (Vite) trucking navigation application. It features core navigation, custom truck routing via HERE API (v8.140.0), MUTCD-compliant vector signs (speed limits, shields, warnings), voice announcements, lane guidance, dynamic lane visualization, maneuver previews, real-time traffic incident overlays with auto-rerouting, collapsible map controls, and a newly added Display sidebar tab allowing users to dynamically hide/show specific Navigation HUD elements.
+
+**Last working item**: 
+    - **Last item agent was working**: Implementing the user's request to Create new tab above settings tab in sidebar that allows users to rearrange navigation view UI placements or hide a specific UI. The agent built , integrated it into the Sidebar, and wired up conditional rendering in . The agent *just* dispatched the  and the session ended before reading the report.
+    - **Status**: TESTING PENDING
+    - **Agent Testing Done**: Y (Agent dispatched the testing subagent, but hasn't reviewed results)
+    - **Which testing method agent to use?**: NA (Read the existing  report to verify the latest feature).
+    - **User Testing Done**: N
+
+**All Pending/In progress Issue list**:
+  Issue 1: 🔴 P0 - Verify HUD Layout Feature Testing Report
+     - Attempted fixes: The agent finished coding the HUD layout toggle system and ran the testing agent, producing . 
+     - Next debug checklist: Read . If the testing agent found bugs, fix them. If tests passed, run the  tool and update .
+     - Why fix this issue and what will be achieved with the fix? Finalizes the user's latest request for a customizable Navigation View UI.
+     - Status: TESTING PENDING
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Frontend (if additional fixes are needed).
+     - Blocked on other issue: None
+
+  Issue 2: 🟡 P2 - Intermittent Service Drops ( and )
+     - Attempted fixes: Manual mitigation via trucker-nav: stopped
+trucker-nav: started and frontend: stopped
+frontend: started whenever  or a blank preview occurs.
+     - Next debug checklist: Keep an eye out for randomly dropped ports. The underlying Node process crashes/exits occasionally.
+     - Why fix this issue and what will be achieved with the fix? Essential for maintaining preview stability while working.
+     - Status: IN PROGRESS
+     - Is recurring issue? Y
+     - Should Test frontend/backend/both after fix? Both
+     - Blocked on other issue: None
+
+**In progress Task List**:
+  Task 1: 🔴 P0 - Finalize HUD Layout Customization
+     - Where to resume: Review .
+     - What will be achieved with this? Allows users to dynamically toggle map controls, signs, fuel costs, weather, and lane guidance visibility.
+     - Status: TESTING PENDING
+     - Should Test frontend/backend/both after fix? NA
+     - Blocked on something: Reading the test report.
+
+**Upcoming and Future Tasks**
+    Upcoming Tasks:
+    - **P1**: Add map filtering for Reputation Scores (e.g., only show 4-star+ facilities).
+    - **P2**: Speed limit warning system (flashes red + audio alert when exceeding posted speed).
+    - **P2**: Driver reputation/review system (where truckers rate facilities - *Pending user approval*).
+    
+    Future Tasks:
+    - **P2**: Viewport-based sign culling (only render signs currently visible in the viewport to improve DOM performance).
+    - **P2**: iOS and Android Store Submission Setup.
+    - **Refactoring**: Break down  (~6600+ lines) into smaller custom hooks and sub-components.
+
+**Completed work in this session**
+- Simplified User Location Icon (Removed clutter) (DONE)
+- Collapsible Map Controls (Added hamburger button to MapControls) (DONE)
+- Waypoint numbered markers on the map route (DONE)
+- Real-time Traffic Incident Overlays + Auto-Reroute Countdown (DONE)
+- Fixed UI Overlap (Restored original MapControls order and correctly positioned Fuel/HOS panels) (DONE)
+- Fixed NavigationHUD mobile/iPad cutoff (Moved  offsets to account for  and browser toolbars) (DONE)
+- Upgraded HERE Maps Routing API to v8.140.0 specs (DONE)
+- Implemented real United States official MUTCD road signs (Interstate shields, US Routes, Speed Limits, Truck Warnings) (DONE)
+- Built Display tab for customizable HUD layout () (DONE - Testing review pending)
+
+**Earlier issues found/mentioned but not fixed**
+None explicitly ignored. The intermittent dropping of  and  ports remains the only lingering annoyance.
+
+**Known issue recurrence from previous fork**
+  - Issue recurrence in previous fork:  and  dropping ports (causing 502/Black screen or connection refused).
+  - Recurrence count: 15+ (Happened multiple times in the current session)
+  - Status: IN PROGRESS (Manual mitigation required by restarting supervisor services).
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Custom Leaflet Panes**:  and  for visual stacking.
+- **MUTCD SVG Generation**: Custom utility generating strict US DOT compliant vector signs on the map.
+- **HUD Layout Persistence**: Managed via  allowing users to hide/show 18 distinct map UI elements.
+
+**key DB schema**
+- Firestore : Stores . 
+- LocalStorage: Used for guest user configuration and  config.
+
+**changes in tech stack**
+- Added  to dynamically render SVG road signs instead of relying solely on API-provided images.
+
+**All files of reference**
+- : **CRITICAL** - Read this immediately.
+- 
+- 
+- 
+- 
+- 
+
+**Areas that need refactoring**
+-  has exceeded 6,600 lines and urgently needs splitting.
+
+**key api endpoints**
+- Backend:  (Upgraded HERE Routing API v8.140.0)
+- Backend: 
+
+**Critical Info for New Agent**
+- **IMMEDIATE ACTION REQUIRED**: The previous agent initiated the  for the new Display HUD Customization feature. Read . If it passes, simply run the  tool and update the .
+- **Service Instability**:  and  supervisor services drop ports frequently causing white/black screens or connection refused. Restart them if you encounter issues.
+-  is exceptionally large. Use  cautiously or utilize  to pinpoint exactly where to make updates.
+
+**documents and test reports created in this job**
+  - 
+  - 
+  - 
+  - 
+  - 
+
+**Last 10 User Messages and any pending HUMAN messages** 
+1. Why dis Navigation view header ui change? Plus other ui still overlapping each other (Resolved)
+2. 1. Once in route header 2. b (Resolved)
+3. Resume (Resolved)
+4. In this image the lane guidance header is outside of screen view [Image attached] (Resolved)
+5. Preview not loading… also make app pull real United States official roads signs into app for use throughout map.. upgrade HERE Map API route services to most updatesd versions (Resolved)
+6. Go (Resolved)
+7. Create new tab above settings tab in sidebar that allows users to rearrange navigation view UI placements or hide a specific UI (PENDING - Implementation completed, pending testing verification)
+
+**Project Health Check:**
+- Broken: Intermittent drops on  and  processes.
+
+**3rd Party Integrations** 
+- Google Maps Platform (Places API) — requires User API Key
+- HERE Maps API (Routing v8, Discover, Traffic) — requires User API Key
+- Mapbox (Raster Tiles & GL JS) — requires User API Key
+- Google Gemini API — requires User API Key
+- Firebase (Auth, Firestore) — uses provided JSON config
+
+**Testing status**
+  - Testing agent used after significant changes: YES (Reports 49, 50, 51, 52)
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: 
+  - Known regressions: None currently.
+
+**Credentials to test flow:**
+- Guest Login is available and preferred for layout testing.
+- Email: test@trucker.com / Test123456 (Check ).
+
+**What agent forgot to execute**
+- The agent failed to read the output of the testing subagent () to verify the Display/HUD Layout feature and did not invoke the  tool to conclude the request.</analysis>

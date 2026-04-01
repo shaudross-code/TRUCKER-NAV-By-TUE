@@ -7,7 +7,7 @@ import requests
 import os
 
 # Use the preview URL for testing
-BASE_URL = "https://cmv-routing-dev.preview.emergentagent.com"
+BASE_URL = "https://hud-customizer-5.preview.emergentagent.com"
 
 
 class TestHealthEndpoint:

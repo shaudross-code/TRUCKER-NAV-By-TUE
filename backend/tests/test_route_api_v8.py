@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://cmv-routing-dev.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://hud-customizer-5.preview.emergentagent.com').rstrip('/')
 
 class TestRouteAPIv8Parameters:
     """Test HERE Maps v8.140.0 routing parameters"""

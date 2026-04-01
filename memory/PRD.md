@@ -7,7 +7,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Stack**: React (Vite) + Express.js backend (single-process on port 8001)
 - **Mapping**: Leaflet (2D heading-up) + Mapbox GL JS (3D satellite), Mapbox satellite-streets-v12 tiles
 - **APIs**: HERE Maps Routing v8 (latest v8.140.0), HERE Discover, HERE Road Shields, HERE Traffic Incidents v7, Google Maps Places, Mapbox tiles, Gemini AI+TTS, Firebase Auth/Firestore
-- **Preview URL**: https://cmv-routing-dev.preview.emergentagent.com
+- **Preview URL**: https://hud-customizer-5.preview.emergentagent.com
 
 ## Completed Features (Cumulative)
 ### Core Navigation

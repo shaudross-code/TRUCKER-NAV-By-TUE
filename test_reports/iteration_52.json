@@ -43,7 +43,7 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://cmv-routing-dev.preview.emergentagent.com. Display Layout feature verified working. Key data-testids: hud-layout-view (main container), hud-show-all-btn, hud-hide-all-btn, hud-reset-btn, trip-panel-left-btn, trip-panel-right-btn, and hud-toggle-{key} for each of 18 elements. Navigation category: showNavigationHUD, showLaneGuidance, showSpeedOverlay, showArrivalHUD, showManeuverPreview. Panels category: showFuelCost, showHosStatus, showMapControls, showRouteComparison, showWeatherOverlay. Signs category: showHighwayShields, showSpeedLimitSigns, showExitSigns, showCurveWarnings, showCmvWarnings, showTruckRestrictions, showTrafficIncidents, showWaypointMarkers. Settings persist in localStorage under 'nav_hud_layout' key.",
+  "context_for_next_testing_agent": "App at https://hud-customizer-5.preview.emergentagent.com. Display Layout feature verified working. Key data-testids: hud-layout-view (main container), hud-show-all-btn, hud-hide-all-btn, hud-reset-btn, trip-panel-left-btn, trip-panel-right-btn, and hud-toggle-{key} for each of 18 elements. Navigation category: showNavigationHUD, showLaneGuidance, showSpeedOverlay, showArrivalHUD, showManeuverPreview. Panels category: showFuelCost, showHosStatus, showMapControls, showRouteComparison, showWeatherOverlay. Signs category: showHighwayShields, showSpeedLimitSigns, showExitSigns, showCurveWarnings, showCmvWarnings, showTruckRestrictions, showTrafficIncidents, showWaypointMarkers. Settings persist in localStorage under 'nav_hud_layout' key.",
 
   "features_tested": {
     "display_tab_sidebar_position": {

@@ -48,7 +48,7 @@
   "retest_needed": false,
   "should_main_agent_self_test": false,
 
-  "context_for_next_testing_agent": "App at https://cmv-routing-dev.preview.emergentagent.com. Bug fixes verified: 1) MapControls auto-collapse during driving mode - only hamburger, zoom +/-, zoom level, and heading buttons visible when collapsed, 2) Hamburger toggle (data-testid='map-controls-toggle') expands to show filter, overview, 2D, follow, compass buttons, 3) Trip-info panel (Fuel Cost & HOS) positioned at bottom-[180px] right-4 with z-index 2000, 4) MapControls positioned with z-index 2010 (above trip-info), 5) Arrival HUD at bottom center shows speed/distance/time/ETA. Test flow: Guest login -> Navigation tab -> search 'Houston TX' -> press Enter (auto-routes). IP geolocation fallback places user in Council Bluffs, Iowa.",
+  "context_for_next_testing_agent": "App at https://hud-customizer-5.preview.emergentagent.com. Bug fixes verified: 1) MapControls auto-collapse during driving mode - only hamburger, zoom +/-, zoom level, and heading buttons visible when collapsed, 2) Hamburger toggle (data-testid='map-controls-toggle') expands to show filter, overview, 2D, follow, compass buttons, 3) Trip-info panel (Fuel Cost & HOS) positioned at bottom-[180px] right-4 with z-index 2000, 4) MapControls positioned with z-index 2010 (above trip-info), 5) Arrival HUD at bottom center shows speed/distance/time/ETA. Test flow: Guest login -> Navigation tab -> search 'Houston TX' -> press Enter (auto-routes). IP geolocation fallback places user in Council Bluffs, Iowa.",
 
   "features_tested": {
     "map_controls_auto_collapse": {
