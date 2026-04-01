@@ -1,5 +1,14 @@
 {
   "expo": {
+    "name": "TRUCKERS NAV By TUE",
+    "slug": "truckers-nav",
+    "scheme": "App",
+    "ios": {
+      "bundleIdentifier": "com.tue.truckersnav"
+    },
+    "android": {
+      "package": "com.tue.truckersnav"
+    },
     "extra": {
       "eas": {
         "projectId": "ebee86f6-6e68-4248-9f23-0643d975ee4b"
