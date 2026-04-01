@@ -1,0 +1,94 @@
+{
+  "summary": "Verified MUTCD road signs implementation and HERE Maps v8.140.0 routing parameters. All features working correctly: MUTCD-compliant speed limit signs (R2-1), Interstate shields (M1-1), US Route shields (M1-4), exit guide signs, MapControls auto-collapse during driving mode, Fuel Cost & HOS panels at bottom-right, NavigationHUD at top with turn instructions.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/backend/tests/test_route_api_v8.py",
+    "/app/test_reports/pytest/route_api_v8_results.xml"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: server.ts lines 272-279 - New v8.140.0 params: vehicle[currentWeight], vehicle[emptyWeight], vehicle[tiresCount]",
+    "VERIFIED: utils/mutcdSigns.ts - MUTCD-compliant sign generators: interstateShield, usRouteShield, stateRouteShield, speedLimitSign, curveWarning, etc.",
+    "VERIFIED: NavigationView.tsx line 1198-1214 - placeSpeedLimitSigns uses speedLimitSign() from mutcdSigns.ts",
+    "VERIFIED: NavigationView.tsx line 1087-1157 - placeHighwayShields uses interstateShield(), usRouteShield(), stateRouteShield()",
+    "VERIFIED: NavigationView.tsx line 1160-1178 - placeExitSigns uses exitGuideSign() from mutcdSigns.ts",
+    "VERIFIED: NavigationView.tsx line 1245-1287 - placeCmvWarnings uses steepGradeWarning(), rolloverWarning(), windingRoadWarning()",
+    "VERIFIED: NavigationView.tsx line 1290-1346 - placeTruckWarnings uses lowClearanceWarning(), weightLimitSign(), tunnelWarning(), noHazmatSign(), noTrucksSign()",
+    "VERIFIED: MapControls.tsx line 36-38 - Auto-collapse on isDrivingMode via useEffect",
+    "VERIFIED: NavigationHUD.tsx line 86 - top-14 mobile fix for proper positioning"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100%"
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button on login screen"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App at https://cmv-routing-dev.preview.emergentagent.com. Features verified: 1) MUTCD road signs - speed limit signs (R2-1 format with white rectangle, SPEED LIMIT text, black number), Interstate shields (M1-1 blue shield with red top band), US Route shields (M1-4), exit guide signs (green with white text). 2) HERE Maps v8.140.0 params - vehicle[emptyWeight] (35% of gross), vehicle[currentWeight], vehicle[tiresCount] (18 for 5-axle). 3) MapControls auto-collapse during driving mode - only hamburger, zoom +/-, zoom level, and heading buttons visible when collapsed. 4) Fuel Cost & HOS panels at bottom-right (y=773-847, x=1718). 5) NavigationHUD at top (y=12) shows turn instruction. Test flow: Guest login -> Navigation tab -> search 'Houston TX' -> press Enter (auto-routes). IP geolocation fallback places user in Council Bluffs, Iowa.",
+
+  "features_tested": {
+    "mutcd_speed_limit_signs": {
+      "status": "PASS",
+      "details": "5 MUTCD R2-1 speed limit signs found on route. White rectangular format with 'SPEED LIMIT' text and black number (35 mph visible)."
+    },
+    "mutcd_interstate_shields": {
+      "status": "PASS",
+      "details": "24 highway shield markers found on route. Interstate shields use M1-1 format (blue shield with red top band, 'INTERSTATE' text)."
+    },
+    "mutcd_exit_signs": {
+      "status": "PASS",
+      "details": "10 exit guide signs found on route. Green rectangular format with white text."
+    },
+    "here_v8_params": {
+      "status": "PASS",
+      "details": "Route API includes vehicle[emptyWeight] (35% of gross), vehicle[currentWeight], vehicle[tiresCount] (default 18 for 5-axle)."
+    },
+    "map_controls_auto_collapse": {
+      "status": "PASS",
+      "details": "During driving mode, collapsible controls (filter, overview, 2D, follow, compass) are hidden. Hamburger, zoom +/-, zoom level, and heading buttons remain visible."
+    },
+    "hamburger_toggle": {
+      "status": "PASS",
+      "details": "Hamburger toggle (data-testid='map-controls-toggle') expands collapsible controls when clicked."
+    },
+    "fuel_cost_panel": {
+      "status": "PASS",
+      "details": "Fuel Cost panel positioned at bottom-right (y=773, x=1719). Shows $486.90 for route."
+    },
+    "hos_status_panel": {
+      "status": "PASS",
+      "details": "HOS Status panel positioned at bottom-right (y=847, x=1718). Shows '11h 0m drive left'."
+    },
+    "navigation_hud": {
+      "status": "PASS",
+      "details": "NavigationHUD visible at top (y=12, x=16). Shows turn instruction 'W Broadway. Go for 1312 ft.'"
+    },
+    "arrival_hud": {
+      "status": "PASS",
+      "details": "Arrival HUD at bottom shows speed (0), distance (899.1 mi), duration (13h 11m), ETA (5:56 PM)."
+    }
+  }
+}

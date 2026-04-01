@@ -249,6 +249,11 @@ async function createServer() {
       const widthCm = Math.round(width * 30.48);
       const axleWeightKg = Math.round(axleWeight * 0.453592);
       
+      // Estimate empty weight as ~35% of gross weight (typical for Class 8 trucks)
+      const emptyWeightKg = Math.round(weightKg * 0.35);
+      // Standard tire count: 5-axle = 18 tires
+      const tiresCount = Number(truckProfile.tiresCount) || (axleCount === 5 ? 18 : axleCount * 4 - 2);
+      
       const hereUrl = new URL('https://router.hereapi.com/v8/routes');
       hereUrl.searchParams.append('transportMode', 'truck');
       hereUrl.searchParams.append('origin', origin);
@@ -264,11 +269,14 @@ async function createServer() {
       hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names,routeNumbers,notices,functionalClass,maxSpeed,countryCode');
       hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
       hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
+      hereUrl.searchParams.append('vehicle[currentWeight]', weightKg.toString());
+      hereUrl.searchParams.append('vehicle[emptyWeight]', emptyWeightKg.toString());
       hereUrl.searchParams.append('vehicle[length]', lengthCm.toString());
       hereUrl.searchParams.append('vehicle[width]', widthCm.toString());
       hereUrl.searchParams.append('vehicle[axleCount]', axleCount.toString());
       hereUrl.searchParams.append('vehicle[weightPerAxle]', axleWeightKg.toString());
       hereUrl.searchParams.append('vehicle[trailerCount]', trailerCount.toString());
+      hereUrl.searchParams.append('vehicle[tiresCount]', tiresCount.toString());
       
       if (truckProfile.tunnelCategory && truckProfile.tunnelCategory !== 'NONE') {
         hereUrl.searchParams.append('vehicle[tunnelCategory]', truckProfile.tunnelCategory);

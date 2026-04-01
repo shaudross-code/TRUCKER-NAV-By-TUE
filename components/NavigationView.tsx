@@ -63,6 +63,13 @@ import { PoiDetailModal } from './PoiDetailModal';
 import { RouteStepsModal } from './RouteStepsModal';
 import { NavigationHUD } from './NavigationHUD';
 import { WarningBanners } from './WarningBanners';
+import {
+  interstateShield, usRouteShield, stateRouteShield,
+  speedLimitSign, curveWarning, steepGradeWarning,
+  windingRoadWarning, rolloverWarning, lowClearanceWarning,
+  noTrucksSign, weightLimitSign, noHazmatSign, tunnelWarning,
+  noticeWarning, exitGuideSign, directionBadge, directionLabel
+} from '../utils/mutcdSigns';
 
 interface Waypoint {
   id: string;
@@ -1105,30 +1112,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (stateCode && stateCode.length === 2) params.append('stateCode', stateCode.toUpperCase());
       const shieldUrl = `/api/road-shield?${params.toString()}`;
 
-      // Direction arrow SVG
-      const dirArrows: Record<string, string> = {
-        north: 'M6 10L10 4L14 10', south: 'M6 6L10 12L14 6',
-        east: 'M6 6L12 10L6 14', west: 'M14 6L8 10L14 14'
-      };
-      const dirLabel: Record<string, string> = { north: 'N', south: 'S', east: 'E', west: 'W' };
-      const dirKey = (direction || '').toLowerCase();
-      const dirBadge = dirArrows[dirKey] ? `
-        <div style="position:absolute;top:-8px;right:-10px;width:20px;height:20px;border-radius:50%;background:#1a1a2e;border:1.5px solid #D4AF37;display:flex;align-items:center;justify-content:center;z-index:2">
-          <svg width="14" height="14" viewBox="0 0 20 16" fill="none"><path d="${dirArrows[dirKey]}" stroke="#D4AF37" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </div>` : '';
+      // Direction arrow badge
+      const dirBadge = directionBadge(direction || '');
+      const dirLabelHtml = directionLabel(direction || '');
 
       let fallbackHtml = '';
       if (type === 'interstate') {
-        fallbackHtml = `<div style="width:40px;height:40px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-          <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%"><path d="M50 5 L90 20 L90 60 C90 80 50 95 50 95 C50 95 10 80 10 60 L10 20 Z" fill="#003f87" stroke="white" stroke-width="4"/><path d="M10 20 L90 20 L50 5 Z" fill="#cf142b"/></svg>
-          <span style="position:relative;color:white;font-size:${label.length > 2 ? '12' : '16'}px;font-weight:900;margin-top:4px;text-shadow:0 1px 2px rgba(0,0,0,0.8)">${label}</span></div>`;
+        fallbackHtml = interstateShield(label, 44);
       } else if (type === 'us') {
-        fallbackHtml = `<div style="width:36px;height:36px;position:relative;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-          <svg viewBox="0 0 100 100" style="position:absolute;inset:0;width:100%;height:100%"><path d="M10 10 L90 10 L90 60 C90 85 50 95 50 95 C50 95 10 85 10 60 Z" fill="white" stroke="black" stroke-width="4"/></svg>
-          <span style="position:relative;color:black;font-size:${label.length > 2 ? '11' : '14'}px;font-weight:900;margin-top:2px">${label}</span></div>`;
+        fallbackHtml = usRouteShield(label, 40);
       } else {
-        fallbackHtml = `<div style="width:32px;height:32px;border-radius:50%;background:white;border:2px solid black;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5))">
-          <span style="color:black;font-size:${label.length > 2 ? '10' : '13'}px;font-weight:900">${label}</span></div>`;
+        fallbackHtml = stateRouteShield(label, 34);
       }
 
       // Use cached blob URL for the shield image to prevent duplicate HTTP requests
@@ -1139,18 +1133,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
             ${dirBadge}
             <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
-            ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+            ${dirLabelHtml}
           </div>`
         : cachedBlobUrl
           ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
               ${dirBadge}
               <img src="${cachedBlobUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
-              ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+              ${dirLabelHtml}
             </div>`
           : `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
               ${dirBadge}
               <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
-              ${direction ? `<div style="text-align:center;margin-top:-2px"><span style="font-size:8px;font-weight:900;color:#D4AF37;text-shadow:0 1px 2px rgba(0,0,0,0.9);letter-spacing:1px">${dirLabel[dirKey] || ''}</span></div>` : ''}
+              ${dirLabelHtml}
             </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
@@ -1173,20 +1167,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const roadName = name.length > 30 ? name.substring(0, 28) + '...' : name;
       const hasExitNum = !!exitNumber;
       
-      const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.8))">
-        <div style="position:relative;background:linear-gradient(180deg,#005a2d,#004020);border:2.5px solid #fff;border-radius:5px;padding:3px 8px 3px 8px;min-width:72px;text-align:center;box-shadow:inset 0 1px 0 rgba(255,255,255,0.15)">
-          ${hasExitNum ? `<div style="position:absolute;top:-1px;right:-1px;background:#006b3f;border:1.5px solid #fff;border-radius:2px;padding:0px 3px">
-            <span style="font-size:6px;font-weight:900;color:#fff;letter-spacing:0.5px">EXIT</span>
-            <span style="font-size:8px;font-weight:900;color:#fff;margin-left:2px">${exitNumber}</span>
-          </div>` : ''}
-          <div style="font-size:9px;font-weight:900;color:#fff;letter-spacing:0.3px;text-shadow:0 1px 2px rgba(0,0,0,0.6);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;${hasExitNum ? 'padding-right:28px' : ''}">${roadName}</div>
-          <div style="height:1px;background:rgba(255,255,255,0.2);margin:2px -4px 1px"></div>
-          <div style="display:flex;align-items:center;justify-content:center;gap:3px">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M7 7l5-5 5 5M12 2v14M5 18h14" stroke="#4ade80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span style="font-size:6px;font-weight:700;color:#4ade80;letter-spacing:1px">EXIT</span>
-          </div>
-        </div>
-        <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:6px solid #fff;margin:0 auto"></div>
+      const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default">
+        ${exitGuideSign(name, exitNumber)}
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [100, 48], iconAnchor: [50, 48] });
@@ -1202,17 +1184,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     curves.forEach((curve) => {
       const { direction, coord } = curve;
       if (!coord || !coord[0] || !coord[1]) return;
-      
-      const arrowPath = direction === 'left' 
-        ? 'M18 16L10 10L18 4 M10 10L22 10' 
-        : 'M6 4L14 10L6 16 M14 10L2 10';
 
-      const iconHtml = `<div class="counter-rotate" data-testid="curve-sign-marker" style="cursor:default;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6))">
-        <div style="width:32px;height:32px;background:#FFD700;border:2px solid #111;transform:rotate(45deg);display:flex;align-items:center;justify-content:center">
-          <div style="transform:rotate(-45deg);display:flex;align-items:center;justify-content:center">
-            <svg width="20" height="20" viewBox="0 0 24 20" fill="none"><path d="${arrowPath}" stroke="#111" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-        </div>
+      const iconHtml = `<div class="counter-rotate" data-testid="curve-sign-marker" style="cursor:default">
+        ${curveWarning(direction === 'left' ? 'left' : 'right', 36)}
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [36, 36], iconAnchor: [18, 18] });
@@ -1229,12 +1203,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const { speed, coord } = sign;
       if (!coord || !coord[0] || !coord[1]) return;
       
-      const iconHtml = `<div class="counter-rotate" data-testid="speed-limit-sign-marker" style="cursor:default;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6))">
-        <div style="width:34px;height:42px;background:#fff;border:3px solid #111;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:1px">
-          <div style="font-size:6px;font-weight:900;color:#111;letter-spacing:0.5px;line-height:1">SPEED</div>
-          <div style="font-size:5px;font-weight:900;color:#111;letter-spacing:0.5px;line-height:1">LIMIT</div>
-          <div style="font-size:16px;font-weight:900;color:#111;line-height:1;margin-top:1px">${speed}</div>
-        </div>
+      const iconHtml = `<div class="counter-rotate" data-testid="speed-limit-sign-marker" style="cursor:default">
+        ${speedLimitSign(speed, 38)}
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [38, 46], iconAnchor: [19, 23] });
@@ -1281,42 +1251,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       const sevBorder = severity === 'critical' ? '#dc2626' : severity === 'high' ? '#f59e0b' : '#eab308';
       
-      // SVG icons for each CMV warning type
-      let signSvg = '';
+      // Use MUTCD-compliant signs
+      let signHtml = '';
       if (type === 'STEEP_DOWNGRADE') {
-        // Truck on descending slope
-        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <line x1="4" y1="20" x2="20" y2="8" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
-          <rect x="12" y="6" width="8" height="5" rx="1" fill="#111"/>
-          <rect x="8" y="8" width="5" height="3" rx="0.5" fill="#111"/>
-          <circle cx="11" cy="13" r="1.5" fill="#111"/><circle cx="18" cy="13" r="1.5" fill="#111"/>
-        </svg>`;
+        signHtml = steepGradeWarning('down', w.grade, 40);
       } else if (type === 'STEEP_HILL') {
-        // Truck on ascending slope
-        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <line x1="4" y1="8" x2="20" y2="20" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
-          <rect x="4" y="6" width="8" height="5" rx="1" fill="#111"/>
-          <rect x="11" y="8" width="5" height="3" rx="0.5" fill="#111"/>
-          <circle cx="6" cy="13" r="1.5" fill="#111"/><circle cx="13" cy="13" r="1.5" fill="#111"/>
-        </svg>`;
+        signHtml = steepGradeWarning('up', w.grade, 40);
       } else if (type === 'ROLLOVER_RISK') {
-        // Tipping truck
-        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <g transform="rotate(-20 12 12)">
-            <rect x="5" y="8" width="10" height="6" rx="1" fill="#111"/>
-            <rect x="14" y="10" width="5" height="4" rx="0.5" fill="#111"/>
-            <circle cx="8" cy="16" r="1.5" fill="#111"/><circle cx="16" cy="16" r="1.5" fill="#111"/>
-          </g>
-          <path d="M20 4L22 8L18 8Z" fill="#dc2626"/>
-        </svg>`;
+        signHtml = rolloverWarning(38);
       } else if (type === 'WINDING_ROAD') {
-        // S-curve
-        signSvg = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-          <path d="M12 4 C6 4 6 10 12 12 C18 14 18 20 12 20" stroke="#111" stroke-width="3" stroke-linecap="round" fill="none"/>
-        </svg>`;
+        signHtml = windingRoadWarning(36);
       }
       
-      // Warning label
       const labelMap: Record<string, string> = {
         'STEEP_DOWNGRADE': 'STEEP GRADE',
         'STEEP_HILL': 'HILL',
@@ -1324,11 +1270,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         'WINDING_ROAD': 'WINDING'
       };
 
-      const iconHtml = `<div class="counter-rotate" data-testid="cmv-warning-marker" data-warning-type="${type}" style="cursor:default;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7))">
+      const iconHtml = `<div class="counter-rotate" data-testid="cmv-warning-marker" data-warning-type="${type}" style="cursor:default">
         <div style="display:flex;flex-direction:column;align-items:center">
-          <div style="width:38px;height:38px;background:#FFD700;border:3px solid ${sevBorder};transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px rgba(0,0,0,0.15)">
-            <div style="transform:rotate(-45deg)">${signSvg}</div>
-          </div>
+          ${signHtml}
           <div style="background:rgba(0,0,0,0.85);border:1px solid ${sevBorder};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:80px">
             <div style="font-size:6px;font-weight:900;color:${sevBorder};letter-spacing:0.5px;white-space:nowrap">${labelMap[type] || type}</div>
             <div style="font-size:5px;color:rgba(255,255,255,0.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:76px">${message}</div>
@@ -1350,74 +1294,45 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     restrictions.forEach((r) => {
       if (!r.coords || !r.coords[0] || !r.coords[1]) return;
       
-      let signSvg = '';
-      let signColor = '#FFD700';
-      let borderColor = '#111';
+      let signHtml = '';
       let labelText = '';
+      let labelColor = '#f59e0b';
       
       if (r.type === 'BRIDGE') {
-        signColor = '#FFD700';
-        borderColor = '#dc2626';
+        signHtml = lowClearanceWarning(undefined, 36);
         labelText = 'LOW CLEARANCE';
-        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M4 18h16M4 18V14a8 8 0 0116 0v4" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M8 18v-3M12 18v-5M16 18v-3" stroke="#111" stroke-width="2" stroke-linecap="round"/>
-        </svg>`;
+        labelColor = '#dc2626';
       } else if (r.type === 'WEIGHT') {
-        signColor = '#FFD700';
-        borderColor = '#f59e0b';
+        signHtml = weightLimitSign(r.message.length > 15 ? 'RESTRICTED' : r.message, 30);
         labelText = 'WEIGHT LIMIT';
-        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12 3L2 18h20L12 3z" stroke="#111" stroke-width="2" fill="none"/>
-          <text x="12" y="16" text-anchor="middle" fill="#111" font-size="7" font-weight="900">W</text>
-        </svg>`;
+        labelColor = '#f59e0b';
       } else if (r.type === 'TUNNEL') {
-        signColor = '#FFD700';
-        borderColor = '#8b5cf6';
+        signHtml = tunnelWarning(36);
         labelText = 'TUNNEL';
-        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M4 20V10a8 8 0 0116 0v10" stroke="#111" stroke-width="2.5" fill="none"/>
-          <rect x="8" y="12" width="8" height="8" rx="4" fill="#111" opacity="0.3"/>
-        </svg>`;
+        labelColor = '#8b5cf6';
       } else if (r.type === 'HAZMAT') {
-        signColor = '#FFD700';
-        borderColor = '#dc2626';
+        signHtml = noHazmatSign(36);
         labelText = 'NO HAZMAT';
-        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#dc2626" stroke-width="2.5" fill="none"/>
-          <line x1="6" y1="6" x2="18" y2="18" stroke="#dc2626" stroke-width="2.5"/>
-          <text x="12" y="14" text-anchor="middle" fill="#111" font-size="6" font-weight="900">H</text>
-        </svg>`;
+        labelColor = '#dc2626';
       } else if (r.type === 'TRUCK_PROHIBITED') {
-        signColor = '#fff';
-        borderColor = '#dc2626';
+        signHtml = noTrucksSign(36);
         labelText = 'NO TRUCKS';
-        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="9" stroke="#dc2626" stroke-width="2.5" fill="none"/>
-          <line x1="6" y1="6" x2="18" y2="18" stroke="#dc2626" stroke-width="2.5"/>
-          <rect x="7" y="9" width="10" height="5" rx="1" fill="#111" opacity="0.6"/>
-        </svg>`;
+        labelColor = '#dc2626';
       } else if (r.type === 'NOTICE') {
-        signColor = '#FFD700';
-        borderColor = '#f59e0b';
+        signHtml = noticeWarning(34);
         labelText = 'NOTICE';
-        signSvg = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M12 9v4m0 4h.01" stroke="#111" stroke-width="2.5" stroke-linecap="round"/>
-          <path d="M4.93 19h14.14c1.34 0 2.17-1.46 1.49-2.63L13.49 4.63a1.7 1.7 0 0 0-2.98 0L3.44 16.37C2.76 17.54 3.59 19 4.93 19z" stroke="#111" stroke-width="2" fill="none"/>
-        </svg>`;
+        labelColor = '#f59e0b';
       } else {
-        return; // Unknown type
+        return;
       }
 
       const shortMsg = r.message.length > 35 ? r.message.substring(0, 33) + '...' : r.message;
 
-      const iconHtml = `<div class="counter-rotate" data-testid="truck-warning-marker" data-warning-type="${r.type}" style="cursor:default;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.7))">
+      const iconHtml = `<div class="counter-rotate" data-testid="truck-warning-marker" data-warning-type="${r.type}" style="cursor:default">
         <div style="display:flex;flex-direction:column;align-items:center">
-          <div style="width:34px;height:34px;background:${signColor};border:3px solid ${borderColor};transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.1)">
-            <div style="transform:rotate(-45deg)">${signSvg}</div>
-          </div>
-          <div style="background:rgba(0,0,0,0.9);border:1px solid ${borderColor};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:90px">
-            <div style="font-size:6px;font-weight:900;color:${borderColor};letter-spacing:0.5px;white-space:nowrap">${labelText}</div>
+          ${signHtml}
+          <div style="background:rgba(0,0,0,0.9);border:1px solid ${labelColor};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:90px">
+            <div style="font-size:6px;font-weight:900;color:${labelColor};letter-spacing:0.5px;white-space:nowrap">${labelText}</div>
             <div style="font-size:5.5px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:86px">${shortMsg}</div>
           </div>
         </div>
