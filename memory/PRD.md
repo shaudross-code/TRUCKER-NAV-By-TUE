@@ -60,6 +60,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Bug Fix: Pay Summary Inputs** (2026-03-31): Replaced direct-bind controlled inputs with `EditableNumberInput` component using local-state + blur-save pattern. Fixes "snap back to 0" issue when clearing fields.
 - **Bug Fix: Dashboard Card Inputs Not Saving for Guests** (2026-03-31): Anonymous users now skip Firestore writes entirely (saves locally via localStorage). Eliminates REQUEST_FAILED console errors.
 - **Bug Fix: NaN Guards** (2026-03-31): All financial setters in App.tsx reject NaN values to prevent data corruption.
+- **POI System Overhaul: Truck Stop Plazas Only** (2026-03-31): Removed all regular gas station brands (Shell, BP, Exxon, Speedway, Casey's, Wawa, Sheetz, QuikTrip, RaceTrac, Circle K, 7-Eleven, Conoco, Marathon, etc.) from POI system. Only shows actual truck stop plazas: Love's, Pilot, Flying J, Petro, TA, Road Ranger, Buc-ee's, Sapp Bros, Ambest. EV stations completely removed. Added DOT Weigh Station and Certified Scale specific searches. Updated filter panel, Fuel Network page, and PoiIcon components.
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
