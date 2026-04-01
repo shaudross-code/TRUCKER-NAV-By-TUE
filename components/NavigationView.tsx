@@ -223,6 +223,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const markerAnimFrameRef = useRef<number>(0);
   const mapLayersRef = useRef<Record<string, L.Polyline>>({});
   const poiMarkersRef = useRef<L.Marker[]>([]);
+  const waypointMarkersRef = useRef<L.Marker[]>([]);
+  const trafficIncidentMarkersRef = useRef<L.Marker[]>([]);
+  const trafficIncidentIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [autoRerouteCountdown, setAutoRerouteCountdown] = useState<number | null>(null);
+  const autoRerouteTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastIncidentFetchRef = useRef<number>(0);
+  const [triggerReroute, setTriggerReroute] = useState(false);
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
     return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
@@ -1534,22 +1541,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const el = document.createElement('div');
     el.className = 'user-marker-wrapper';
     el.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
-      <div class="absolute w-16 h-16 bg-[#1A73E8]/8 rounded-full animate-ping"></div>
-      <div class="absolute w-12 h-12 bg-[#1A73E8]/15 rounded-full animate-pulse"></div>
-      <div class="relative vehicle-pointer" style="filter: drop-shadow(0 2px 8px rgba(26,115,232,0.6))">
-        <svg viewBox="0 0 48 48" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+      <div class="relative vehicle-pointer" style="filter: drop-shadow(0 2px 6px rgba(26,115,232,0.5))">
+        <svg viewBox="0 0 40 40" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
           <defs>
             <linearGradient id="nav-chevron-fill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="#4285F4"/>
               <stop offset="100%" stop-color="#1A73E8"/>
             </linearGradient>
-            <filter id="nav-glow">
-              <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#1A73E8" flood-opacity="0.5"/>
-            </filter>
           </defs>
-          <polygon points="24,4 38,36 24,28 10,36" fill="url(#nav-chevron-fill)" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" filter="url(#nav-glow)"/>
-          <polygon points="24,10 34,32 24,26 14,32" fill="#1A73E8" opacity="0.4"/>
-          <circle cx="24" cy="24" r="4" fill="white" opacity="0.9"/>
+          <polygon points="20,4 34,32 20,24 6,32" fill="url(#nav-chevron-fill)" stroke="#fff" stroke-width="2" stroke-linejoin="round"/>
         </svg>
       </div>
     </div>`;
@@ -1560,9 +1560,214 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       pointerEl.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
     }
 
-    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [60, 60], iconAnchor: [30, 30] }) }).addTo(mapInstanceRef.current);
+    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [40, 40], iconAnchor: [20, 20] }) }).addTo(mapInstanceRef.current);
     userMarkerElRef.current = pointerEl;
   }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
+
+  // Numbered waypoint markers on the map
+  useEffect(() => {
+    // Clear old waypoint markers
+    waypointMarkersRef.current.forEach(m => m.remove());
+    waypointMarkersRef.current = [];
+
+    if (!mapInstanceRef.current || !isMapReady || waypoints.length === 0 || milesRemaining <= 0) return;
+
+    waypoints.forEach((wp: any, idx: number) => {
+      if (!wp.lat || !wp.lon) return;
+      const num = idx + 1;
+      const el = document.createElement('div');
+      el.className = 'counter-rotate';
+      el.innerHTML = `<div style="
+        display:flex;align-items:center;justify-content:center;
+        width:28px;height:28px;
+        background:#D4AF37;
+        border:2px solid #000;
+        border-radius:50%;
+        box-shadow:0 2px 8px rgba(0,0,0,0.5);
+        font-weight:900;font-size:13px;color:#000;
+        font-family:system-ui,sans-serif;
+      ">${num}</div>`;
+      const marker = L.marker([wp.lat, wp.lon], {
+        icon: L.divIcon({
+          html: el,
+          className: 'waypoint-number-marker',
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        }),
+        interactive: false,
+        zIndexOffset: 600,
+        pane: 'signPane'
+      }).addTo(mapInstanceRef.current!);
+      waypointMarkersRef.current.push(marker);
+    });
+  }, [isMapReady, waypoints, milesRemaining]);
+
+  // Real-time traffic incident overlays on the route
+  useEffect(() => {
+    // Clear previous markers and intervals on cleanup
+    const clearIncidentMarkers = () => {
+      trafficIncidentMarkersRef.current.forEach(m => m.remove());
+      trafficIncidentMarkersRef.current = [];
+    };
+
+    const fetchAndDisplayIncidents = async () => {
+      if (!mapInstanceRef.current || !isMapReady || milesRemaining <= 0 || routeCoordsRef.current.length === 0) return;
+
+      const now = Date.now();
+      if (now - lastIncidentFetchRef.current < 45000) return; // Throttle: min 45s between fetches
+      lastIncidentFetchRef.current = now;
+
+      try {
+        const coords = routeCoordsRef.current;
+        // Calculate bounding box from route
+        let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+        for (const c of coords) {
+          if (c[0] < minLat) minLat = c[0];
+          if (c[0] > maxLat) maxLat = c[0];
+          if (c[1] < minLon) minLon = c[1];
+          if (c[1] > maxLon) maxLon = c[1];
+        }
+        // Add padding
+        const pad = 0.05;
+        const bbox = `${minLon - pad},${minLat - pad},${maxLon + pad},${maxLat + pad}`;
+
+        const response = await fetch('/api/traffic-incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bbox })
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const results = data?.results || [];
+
+        clearIncidentMarkers();
+        if (!shieldLayerGroupRef.current || !mapInstanceRef.current) return;
+
+        let hasCriticalOnRoute = false;
+
+        for (const incident of results) {
+          const loc = incident?.location?.shape;
+          if (!loc) continue;
+          const desc = incident?.incidentDetails?.description?.value || incident?.incidentDetails?.type?.value || 'Incident';
+          const incType = (incident?.incidentDetails?.type?.value || '').toLowerCase();
+          const criticality = (incident?.incidentDetails?.criticality?.value || '').toLowerCase();
+
+          // Get incident lat/lon
+          let iLat: number, iLon: number;
+          if (loc.links && loc.links.length > 0 && loc.links[0].points && loc.links[0].points.length > 0) {
+            iLat = loc.links[0].points[0].lat;
+            iLon = loc.links[0].points[0].lng;
+          } else {
+            continue;
+          }
+
+          // Check if incident is near the route (within ~1 mile)
+          let isNearRoute = false;
+          for (let i = 0; i < coords.length; i += Math.max(1, Math.floor(coords.length / 200))) {
+            const dist = Math.abs(coords[i][0] - iLat) + Math.abs(coords[i][1] - iLon);
+            if (dist < 0.02) { // ~1 mile
+              isNearRoute = true;
+              break;
+            }
+          }
+          if (!isNearRoute) continue;
+
+          // Determine icon and color based on type
+          let bgColor = '#f97316'; // orange default
+          let iconSvg = '<svg viewBox="0 0 20 20" width="14" height="14" fill="white"><path d="M10 2L2 18h16L10 2zm0 4l5 10H5l5-10z"/></svg>';
+          
+          if (incType.includes('accident') || incType.includes('crash')) {
+            bgColor = '#ef4444';
+            iconSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+          } else if (incType.includes('closure') || incType.includes('closed')) {
+            bgColor = '#dc2626';
+            iconSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>';
+          } else if (incType.includes('construction') || incType.includes('road work')) {
+            bgColor = '#eab308';
+            iconSvg = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="2.5"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg>';
+          } else if (incType.includes('congestion') || incType.includes('slow')) {
+            bgColor = '#f97316';
+          }
+
+          if (criticality === 'critical') {
+            hasCriticalOnRoute = true;
+          }
+
+          const el = document.createElement('div');
+          el.className = 'counter-rotate';
+          el.innerHTML = `<div data-testid="traffic-incident-marker" style="
+            display:flex;align-items:center;justify-content:center;
+            width:26px;height:26px;
+            background:${bgColor};
+            border:2px solid #fff;
+            border-radius:50%;
+            box-shadow:0 2px 8px rgba(0,0,0,0.5);
+            cursor:pointer;
+          " title="${desc.replace(/"/g, '&quot;')}">${iconSvg}</div>`;
+
+          const marker = L.marker([iLat, iLon], {
+            icon: L.divIcon({
+              html: el,
+              className: 'traffic-incident-icon',
+              iconSize: [26, 26],
+              iconAnchor: [13, 13],
+            }),
+            interactive: true,
+            zIndexOffset: 580,
+            pane: 'signPane'
+          }).addTo(mapInstanceRef.current!);
+
+          marker.bindPopup(`<div style="font-family:system-ui;font-size:12px;max-width:200px;"><strong style="color:${bgColor}">${incType.charAt(0).toUpperCase() + incType.slice(1)}</strong><br/>${desc}</div>`, { className: 'traffic-incident-popup' });
+          trafficIncidentMarkersRef.current.push(marker);
+        }
+
+        // Trigger auto-reroute countdown for critical incidents
+        if (hasCriticalOnRoute && autoRerouteCountdown === null && !autoRerouteTimerRef.current) {
+          setAutoRerouteCountdown(10);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch traffic incidents:', err);
+      }
+    };
+
+    if (milesRemaining > 0 && isMapReady) {
+      fetchAndDisplayIncidents();
+      trafficIncidentIntervalRef.current = setInterval(fetchAndDisplayIncidents, 60000); // Every 60s
+    }
+
+    return () => {
+      if (trafficIncidentIntervalRef.current) {
+        clearInterval(trafficIncidentIntervalRef.current);
+        trafficIncidentIntervalRef.current = null;
+      }
+      clearIncidentMarkers();
+    };
+  }, [isMapReady, milesRemaining > 0]);
+
+  // Auto-reroute countdown timer
+  useEffect(() => {
+    if (autoRerouteCountdown === null) return;
+
+    if (autoRerouteCountdown <= 0) {
+      setAutoRerouteCountdown(null);
+      if (destinationCoords && !isCalculating) {
+        speak('Rerouting due to traffic incident ahead.');
+        setTriggerReroute(true);
+      }
+      return;
+    }
+
+    autoRerouteTimerRef.current = setTimeout(() => {
+      setAutoRerouteCountdown(prev => prev !== null ? prev - 1 : null);
+    }, 1000);
+
+    return () => {
+      if (autoRerouteTimerRef.current) {
+        clearTimeout(autoRerouteTimerRef.current);
+        autoRerouteTimerRef.current = null;
+      }
+    };
+  }, [autoRerouteCountdown]);
 
   // POI fetch on location change (separate from marker creation)
   useEffect(() => {
@@ -2495,7 +2700,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
             // ─── Voice Guidance: Graduated Distance Announcements ───
             // Announce upcoming maneuver at: 10mi, 5mi, 2mi, 1mi, 0.5mi, 0.2mi, 1000ft
-            if (isDrivingRef.current) {
+            if (isDriving) {
               const distMiVoice = distanceToManeuver / 1609.34;
               const instruction = currentStep.maneuver.instruction
                 .replace(/\u003c/g, '<').replace(/\u003e/g, '>')
@@ -2940,6 +3145,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
     
     clearRouteMarkers();
+    // Clear waypoint numbered markers
+    waypointMarkersRef.current.forEach(m => m.remove());
+    waypointMarkersRef.current = [];
+    // Clear traffic incident markers
+    trafficIncidentMarkersRef.current.forEach(m => m.remove());
+    trafficIncidentMarkersRef.current = [];
+    if (trafficIncidentIntervalRef.current) {
+      clearInterval(trafficIncidentIntervalRef.current);
+      trafficIncidentIntervalRef.current = null;
+    }
+    setAutoRerouteCountdown(null);
     // Clear highway shield markers
     isManeuverZoomActiveRef.current = false; // Reset auto-zoom state
     // Clear voice guidance thresholds
@@ -4408,6 +4624,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
     }
   }, [isMapReady, initialTarget, destinationCoords]);
+
+  // Auto-reroute trigger (from traffic incident countdown)
+  useEffect(() => {
+    if (!triggerReroute) return;
+    setTriggerReroute(false);
+    handleNavigate().catch(err => console.error('Auto-reroute failed:', err));
+  }, [triggerReroute]);
 
   useEffect(() => {
     if (isMapReady && userLocation) {
@@ -5990,9 +6213,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* Fuel Cost & HOS Panel — Right side when driving */}
+      {/* Fuel Cost & HOS Panel — Right side, bottom area to avoid MapControls overlap */}
       {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
-        <div data-testid="trip-info-panel" className="absolute right-2 md:right-4 z-[2000] flex flex-col gap-2 transition-all duration-700 -translate-y-1/2 top-[55%] scale-90 md:scale-100 origin-right w-44 md:w-56">
+        <div data-testid="trip-info-panel" className="absolute right-2 md:right-4 z-[2000] flex flex-col gap-2 transition-all duration-700 bottom-[calc(7rem+env(safe-area-inset-bottom))] md:bottom-28 scale-90 md:scale-100 origin-bottom-right w-44 md:w-56">
           <FuelCostCalculator
             routeDistanceMi={milesRemaining}
             initialFuelPrice={fuelPricePerGallon}
@@ -6001,6 +6224,37 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             onMpgChange={setTruckMpg}
           />
           <DriverFatigueAlert isDriving={isDriving} />
+        </div>
+      )}
+
+      {/* Auto-Reroute Countdown Banner */}
+      {autoRerouteCountdown !== null && (
+        <div data-testid="auto-reroute-banner" className="absolute top-[calc(4rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[2020] animate-in fade-in slide-in-from-top-4 duration-300">
+          <div className="bg-red-600/95 backdrop-blur-xl border border-red-400/40 rounded-xl px-5 py-3 shadow-[0_4px_24px_rgba(220,38,38,0.5)] flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" strokeWidth="2.5" className="animate-pulse">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+              <div>
+                <div className="text-white font-black text-xs uppercase tracking-wider">Traffic Incident Ahead</div>
+                <div className="text-red-100 text-[10px]">Auto-rerouting in {autoRerouteCountdown}s</div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 ml-2">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <span className="text-white font-black text-sm tabular-nums">{autoRerouteCountdown}</span>
+              </div>
+              <button
+                data-testid="cancel-reroute-btn"
+                onClick={() => setAutoRerouteCountdown(null)}
+                className="text-[10px] font-bold text-white/80 hover:text-white uppercase tracking-wider px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
