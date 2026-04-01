@@ -85,7 +85,7 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
       data-testid="navigation-hud" 
       className="absolute z-[3100] pointer-events-none"
       style={{
-        top: '0.75rem',
+        top: 'calc(0.75rem + env(safe-area-inset-top, 0px))',
         left: '50%',
         transform: 'translateX(-50%)',
         width: 'min(480px, calc(100% - 1.5rem))',

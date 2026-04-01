@@ -6382,10 +6382,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}
       {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
-        <div data-testid="trip-info-panel" className={`absolute z-[2000] flex flex-col gap-2 transition-all duration-700 scale-90 md:scale-100 w-44 md:w-56`} style={
+        <div data-testid="trip-info-panel" className={`absolute z-[2000] flex flex-col gap-2 transition-all duration-700 scale-90 md:scale-100 w-40 md:w-52`} style={
           hudPositions.tripPanel && (hudPositions.tripPanel.x !== DEFAULT_POSITIONS.tripPanel.x || hudPositions.tripPanel.y !== DEFAULT_POSITIONS.tripPanel.y)
             ? { left: `${hudPositions.tripPanel.x}%`, top: `${hudPositions.tripPanel.y}%`, transform: 'translate(-50%, -50%)' }
-            : { [hudLayout.tripPanelPosition === 'left' ? 'left' : 'right']: '0.5rem', bottom: '180px' }
+            : { [hudLayout.tripPanelPosition === 'left' ? 'left' : 'right']: '0.75rem', bottom: '180px' }
         }>
           {hudLayout.showFuelCost && <FuelCostCalculator
             routeDistanceMi={milesRemaining}
@@ -6665,12 +6665,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* ── Compass Rose — always visible, bottom-left of map ── */}
+      {/* ── Compass Rose — bottom-right, above arrival HUD ── */}
       {hudLayout.showCompassRose && (
       <div
-        className="absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] left-3 md:left-5 z-[2005] pointer-events-none"
+        className="absolute bottom-[calc(7rem+env(safe-area-inset-bottom))] right-[4.5rem] md:right-[5rem] z-[2005] pointer-events-none"
         data-testid="compass-rose-container"
-        style={{ transform: `scale(${hudScales.compassRose || 1})`, transformOrigin: 'bottom left' }}
+        style={{ transform: `scale(${hudScales.compassRose || 1})`, transformOrigin: 'bottom right' }}
       >
         <CompassRose isCompassMode={isCompassMode} />
       </div>
