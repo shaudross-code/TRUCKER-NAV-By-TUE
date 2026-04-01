@@ -6,53 +6,65 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Architecture
 - **Stack**: React (Vite) + Express.js backend (single-process on port 8001)
 - **Mapping**: Leaflet (2D heading-up) + Mapbox GL JS (3D satellite), Mapbox satellite-streets-v12 tiles
-- **APIs**: HERE Maps (Routing w/ elevation, Discover, Road Shields, Traffic Incidents), Google Maps (Places), Mapbox (tiles), Gemini (AI + TTS), Firebase (Auth/Firestore)
-- **Key Pattern**: 150% oversized map container with CSS `rotate:` for heading-up mode without blank tiles
-- **Counter-Rotate**: All map markers use `.counter-rotate` CSS class to stay upright during heading-up rotation
+- **APIs**: HERE Maps Routing v8 (latest v8.140.0), HERE Discover, HERE Road Shields, HERE Traffic Incidents v7, Google Maps Places, Mapbox tiles, Gemini AI+TTS, Firebase Auth/Firestore
 - **Preview URL**: https://cmv-routing-dev.preview.emergentagent.com
 
-## Completed Features
-- Real POI integration (HERE Discover + Google Places)
-- Turn-by-turn truck routing with HERE API
-- 2D heading-up map rotation + 3D satellite view
-- Smooth GPS marker interpolation, Speed display, POI stop insertion
-- Fuel Network tab, Loading screen, Satellite tiles
-- Highway Road Shield Emblems, Exit Signs, Curve Warning Signs, Speed Limit Signs
-- Traffic Slowdown Markers, CMV Essential Warning Signs, CMV Voice Announcements
-- Counter-Rotation for All Map Signs, Heading-Up Precision Fix
-- Sidebar Overflow Fix, Data Saver Toggle, Truck Profile Edit Modal
-- Waypoint Arrived/Skip Panel, Route Overlay Z-Ordering
-- Multi-Section Route Merging, Route Fetch Retry, Network & GPS Monitoring
+## Completed Features (Cumulative)
+### Core Navigation
+- Turn-by-turn truck routing, 2D heading-up + 3D satellite view
+- Smooth GPS interpolation, Speed display, POI stop insertion
 - Lane Guidance Overlay, Route Snapping, Auto-Zoom for Maneuvers
 - Route Comparison Panel, Toll Data Integration
-- Fuel Cost Calculator, Driver Fatigue Alert (FMCSA HOS)
-- Dynamic Lane Count Visualization
-- POI System Overhaul: Truck Stop Plazas Only
 - Voice Guidance: Graduated Maneuver Announcements
-- Navigation Intelligence Overhaul
+- Navigation Intelligence Overhaul (visual separation, ManeuverPreview, truck intelligence)
 
-### New Features (2026-04-01)
-- **Decluttered User Location Icon**: Simplified blue chevron, 40x40px.
-- **Collapsible Map Controls**: Hamburger (☰) toggle, auto-collapses during driving. Original button order preserved.
-- **Numbered Waypoint Markers**: Gold numbered circles (1, 2, 3...) at waypoints on map.
-- **UI Overlap Fix**: Trip-info panel at `bottom-[180px]` right side, auto-collapse MapControls during driving.
-- **Real-time Traffic Incident Overlays**: Color-coded markers from HERE Traffic API v7 on route.
-- **Auto-Reroute Countdown**: 10s countdown for critical traffic incidents.
-- **NavigationHUD Mobile Fix**: Pushed HUD down to `top-14` on mobile/tablet to prevent browser toolbar clipping. Desktop stays at `top-3` via `lg:` breakpoint.
+### MUTCD Road Signs System (2026-04-01)
+- **Interstate Shields (M1-1)**: Blue shield with red "INTERSTATE" top band, white route number
+- **US Route Shields (M1-4)**: Black/white shield with proper FHWA proportions
+- **State Route Shields**: Circle style with black border
+- **Speed Limit Signs (R2-1)**: White rectangle, "SPEED LIMIT" text, proper typography
+- **Warning Diamonds (W-series)**: Yellow diamond with black border, standard symbols
+  - Curve warnings (W1-1/W1-2)
+  - Steep grade (W7-1) with truck-on-slope icon + grade percentage
+  - Winding road (W1-5)
+  - Low clearance (W12-2)
+- **CMV Warning Signs**: Rollover risk (red border), steep downgrade/hill
+- **Regulatory Signs (R-series)**: No Trucks (R5-2) with red slash, Weight Limit, No Hazmat
+- **Exit Guide Signs (E-series)**: Green MUTCD rectangular with EXIT badge
+- **Construction Warning**: Orange diamond (W20-1)
+- All signs generated via `/app/utils/mutcdSigns.ts` utility module
+
+### HERE API v8.140.0 Upgrade (2026-04-01)
+- Added `vehicle[emptyWeight]` (35% of gross weight estimate)
+- Added `vehicle[currentWeight]` (same as grossWeight for loaded truck)
+- Added `vehicle[tiresCount]` (18 for 5-axle, calculated from axle count)
+- Retained all existing params: height, grossWeight, length, width, axleCount, weightPerAxle, trailerCount
+
+### Navigation UI (2026-04-01)
+- Collapsible Map Controls with hamburger toggle, auto-collapse during driving
+- Decluttered user location icon (clean blue chevron)
+- Numbered waypoint markers (gold circles 1, 2, 3...)
+- UI overlap fix: trip-info panel at bottom-[180px]
+- NavigationHUD mobile fix (top-14 for browser toolbar clearance)
+- Real-time traffic incident overlays + auto-reroute countdown
+
+### Other Features
+- POI System (truck stop plazas only), Fuel Network tab, Fuel Cost Calculator
+- Driver Fatigue Alert (FMCSA HOS), Dynamic Lane Count Visualization
+- Data Saver Toggle, Truck Profile Edit, Waypoint Arrived/Skip
 
 ## Upcoming Tasks (P1)
-- Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
+- Map filtering for Reputation Scores (4-star+ facilities)
 
 ## Future/Backlog (P2)
-- Speed limit warning system
-- Viewport-based sign culling
+- Speed limit warning system (flash red + audio alert)
+- Viewport-based sign culling (DOM performance)
 - iOS/Android Store Submission
 - Refactoring NavigationView.tsx (~6700 lines)
 
 ## Key Technical Notes
-- Nginx proxy on port 3000 → 8001 (must recreate if dropped)
-- HERE API `return` valid: summary, actions, instructions, incidents, polyline, turnByTurnActions, elevation, tolls
+- MUTCD signs: `/app/utils/mutcdSigns.ts` — all sign generators with FHWA standard colors
+- HERE API: v8 (latest v8.140.0) — `return=summary,actions,instructions,incidents,polyline,turnByTurnActions,elevation,tolls`
 - MapControls auto-collapse via `isDrivingMode` prop
-- Traffic incidents from `/api/traffic-incidents`
-- NavigationHUD positioning: `top-14` mobile/tablet, `lg:top-3` desktop (accounts for browser toolbar)
-- The "backend" supervisor process must be stopped to avoid port conflict with trucker-nav
+- Nginx proxy port 3000→8001 (recreate if dropped)
+- Services may drop ports intermittently — restart with `sudo supervisorctl restart trucker-nav`
