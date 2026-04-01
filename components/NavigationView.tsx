@@ -4743,11 +4743,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         });
       }
 
-      if (routes && routes.length > 1) {
+      if (routes && routes.length > 1 && hudLayout.showRouteComparison) {
         setIsRoutePreview(true);
         // Don't start driving yet — user needs to pick a route
       } else {
         setIsDriving(true);
+        setIsRoutePreview(false);
         if (!isDriving) {
           // Trigger follow-mode/zoom behavior
           setIsOverviewMode(false);
@@ -5871,7 +5872,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Route Comparison Overlay */}
       {hudLayout.showRouteComparison && isRoutePreview && alternativeRoutes.length > 1 && (
-        <div style={{ transform: `scale(${hudScales.routeComparison || 1})`, transformOrigin: 'top center' }}>
+        <>
           <RouteComparisonPanel
             routes={alternativeRoutes}
             selectedIndex={selectedRouteIndex}
@@ -5909,7 +5910,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               speak("Starting navigation.");
             }}
           />
-        </div>
+        </>
       )}
 
       {/* Route Steps Modal */}
