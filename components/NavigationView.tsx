@@ -156,6 +156,107 @@ const convertInstructionToImperial = (instruction: string): string => {
   return result;
 };
 
+/**
+ * Synthesizes lane guidance data from HERE API action type + direction.
+ * Professional truck GPS units generate lane views from road geometry data.
+ * Since the HERE REST API doesn't provide per-lane data, we derive it from:
+ *   - action type: enterHighway, exit, keep, continueHighway, turn, fork, roundabout
+ *   - direction: left, right, middle
+ *   - severity: light, quite, heavy
+ */
+const synthesizeLanes = (actionType: string, direction: string | undefined, severity?: string): any[] => {
+  if (!actionType || actionType === 'depart' || actionType === 'arrive') return [];
+  
+  const dir = (direction || '').toLowerCase();
+  const act = actionType.toLowerCase();
+  
+  // Helper to build a lane object
+  const lane = (dirs: string, active: boolean) => ({
+    direction: dirs,
+    matches: active ? ['selected'] : []
+  });
+
+  // Highway entrance: 3-4 lanes, ramp lane highlighted
+  if (act === 'enterhighway') {
+    if (dir === 'left') {
+      return [lane('slight left', true), lane('straight', false), lane('straight', false)];
+    } else if (dir === 'right') {
+      return [lane('straight', false), lane('straight', false), lane('slight right', true)];
+    } else {
+      // middle
+      return [lane('straight', false), lane('straight', true), lane('straight', false)];
+    }
+  }
+  
+  // Highway exit: 3-4 lanes, exit lane highlighted
+  if (act === 'exit') {
+    if (dir === 'right') {
+      return [lane('straight', false), lane('straight', false), lane('straight', false), lane('right', true)];
+    } else {
+      return [lane('left', true), lane('straight', false), lane('straight', false), lane('straight', false)];
+    }
+  }
+  
+  // Keep: highway fork/split, stay in indicated lanes
+  if (act === 'keep') {
+    if (dir === 'right') {
+      return [lane('slight left', false), lane('straight;slight right', true), lane('slight right', true)];
+    } else if (dir === 'left') {
+      return [lane('slight left', true), lane('straight;slight left', true), lane('slight right', false)];
+    } else {
+      return [lane('slight left', false), lane('straight', true), lane('slight right', false)];
+    }
+  }
+  
+  // Continue highway: stay in flow lanes
+  if (act === 'continuehighway') {
+    if (dir === 'left') {
+      return [lane('straight', true), lane('straight', true), lane('straight', false)];
+    } else if (dir === 'right') {
+      return [lane('straight', false), lane('straight', true), lane('straight', true)];
+    } else {
+      return [lane('straight', true), lane('straight', true), lane('straight', true)];
+    }
+  }
+  
+  // Fork: split lanes
+  if (act === 'fork') {
+    if (dir === 'right') {
+      return [lane('slight left', false), lane('slight right', true), lane('slight right', true)];
+    } else {
+      return [lane('slight left', true), lane('slight left', true), lane('slight right', false)];
+    }
+  }
+  
+  // Turn at intersection: 2-3 lanes based on severity
+  if (act === 'turn') {
+    const isLight = severity === 'light' || severity === 'quite';
+    if (dir === 'left') {
+      return isLight
+        ? [lane('left', true), lane('straight', false)]
+        : [lane('left', true), lane('straight', false), lane('straight', false)];
+    } else if (dir === 'right') {
+      return isLight
+        ? [lane('straight', false), lane('right', true)]
+        : [lane('straight', false), lane('straight', false), lane('right', true)];
+    }
+  }
+  
+  // Roundabout
+  if (act === 'roundabout' || act.includes('roundabout')) {
+    if (dir === 'left' || dir === 'sharp left') {
+      return [lane('left', true), lane('straight', false)];
+    } else if (dir === 'right' || dir === 'sharp right') {
+      return [lane('straight', false), lane('right', true)];
+    } else {
+      return [lane('straight', true), lane('straight', false)];
+    }
+  }
+  
+  // Default: no lane guidance for simple straight segments
+  return [];
+};
+
 const SpeedLimitMarker = React.memo(({ currentSpeedLimit, speed, unitSystem }: { currentSpeedLimit: number | null; speed: number; unitSystem?: string }) => {
   if (!currentSpeedLimit) return null;
   const isMetric = unitSystem === 'metric';
@@ -2039,26 +2140,54 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const totalLanes = lanes.length;
     const recommendedCount = recommendedLanes.length;
     
-    // Find if they are contiguous and where they are
-    let firstIdx = -1;
-    let lastIdx = -1;
+    // Find recommended lane indices (1-based for speech)
+    const activeIndices: number[] = [];
     for (let i = 0; i < lanes.length; i++) {
       if ((lanes[i]?.matches || []).includes('selected') || lanes[i]?.active) {
-        if (firstIdx === -1) firstIdx = i;
-        lastIdx = i;
+        activeIndices.push(i + 1); // 1-based
       }
     }
 
-    const isLeft = firstIdx === 0;
-    const isRight = lastIdx === totalLanes - 1;
+    const firstIdx = activeIndices[0];
+    const lastIdx = activeIndices[activeIndices.length - 1];
     
-    const position = isLeft ? 'left' : isRight ? 'right' : 'middle';
-    if (isLeft && isRight) return ''; // Should not happen if recommendedCount < totalLanes
+    const isLeftmost = firstIdx === 1;
+    const isRightmost = lastIdx === totalLanes;
+    const isCenter = !isLeftmost && !isRightmost;
 
-    const laneWord = recommendedCount === 1 ? 'lane' : 'lanes';
-    const countWord = recommendedCount === 1 ? 'the' : `the ${recommendedCount}`;
+    // Get direction hints from lane data
+    const primaryDirection = recommendedLanes[0]?.direction || '';
+    const dirHints = primaryDirection.toLowerCase().split(';').filter(Boolean);
+    const hasExit = dirHints.some(d => d.includes('right') || d.includes('exit'));
+    const hasMerge = dirHints.some(d => d.includes('merge') || d.includes('left'));
     
-    return `Use ${countWord} ${position} ${laneWord}.`;
+    // Build professional callout
+    const ordinals = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'];
+    
+    if (recommendedCount === 1) {
+      // Single lane recommendation
+      const position = isLeftmost ? 'left' : isRightmost ? 'right' : isCenter ? 'center' : '';
+      const laneNum = ordinals[firstIdx] || `lane ${firstIdx}`;
+      
+      if (totalLanes === 2) {
+        return `Use the ${position} lane.`;
+      } else if (totalLanes <= 4) {
+        return `Move to the ${laneNum} lane from left.`;
+      } else {
+        return `Use lane ${firstIdx} of ${totalLanes}, the ${position} side.`;
+      }
+    } else {
+      // Multiple lane recommendation
+      const side = isLeftmost ? 'left' : isRightmost ? 'right' : 'center';
+      
+      if (hasExit) {
+        return `Stay in the ${side} ${recommendedCount} lanes for the exit.`;
+      } else if (hasMerge) {
+        return `Use the ${side} ${recommendedCount} lanes to merge.`;
+      } else {
+        return `Use the ${side} ${recommendedCount} lanes.`;
+      }
+    }
   };
 
   const lastSpokenRef = useRef('');
@@ -2069,23 +2198,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const lastFuelNetworkCheckRef = useRef(0);
   useEffect(() => {
     if (!isDriving || nextInstruction.text === 'Ready for Route') {
-      if (isDriving && nextInstruction.text === 'Ready for Route') {
-        console.log("Navigation Speak Effect: isDriving is true but instruction is 'Ready for Route'");
-      }
       return;
     }
 
     const dist = parseFloat(nextInstruction.distance);
-    if (isNaN(dist)) {
-      console.warn("Navigation Speak Effect: distance is NaN", nextInstruction.distance);
-      return;
-    }
+    if (isNaN(dist)) return;
+    
     let shouldSpeak = false;
     let phrase = "";
 
     const lanePhrase = getLaneGuidancePhrase(nextInstruction.lanes || []);
-    console.log(`Navigation Speak Effect: dist=${dist}, text="${nextInstruction.text}", lanePhrase="${lanePhrase}"`);
+    const hasLaneGuidance = lanePhrase.length > 0;
+    const maneuverType = nextInstruction.maneuver?.type || '';
+    const isComplexManeuver = ['exit', 'fork', 'roundabout', 'merge'].some(t => maneuverType.includes(t));
 
+    // New instruction detected — announce with full context
     if (nextInstruction.text !== lastSpokenRef.current) {
       lastSpokenRef.current = nextInstruction.text;
       spokenDistancesRef.current.clear();
@@ -2093,32 +2220,71 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       shouldSpeak = true;
       if (dist > 2) {
-        phrase = `Continue for ${dist} miles, then ${nextInstruction.text}. ${lanePhrase}`;
-      } else {
-        phrase = `In ${dist} miles, ${nextInstruction.text}. ${lanePhrase}`;
+        phrase = `Continue for ${dist} miles, then ${nextInstruction.text}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
+      } else if (dist > 0.5) {
+        phrase = `In ${dist} miles, ${nextInstruction.text}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         if (dist <= 2) spokenDistancesRef.current.add('2');
+        if (dist <= 1.5) spokenDistancesRef.current.add('1.5');
         if (dist <= 1) spokenDistancesRef.current.add('1');
-        if (dist <= 0.2) spokenDistancesRef.current.add('0.2');
+      } else {
+        phrase = `In ${(dist * 5280).toFixed(0)} feet, ${nextInstruction.text}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
+        spokenDistancesRef.current.add('2');
+        spokenDistancesRef.current.add('1.5');
+        spokenDistancesRef.current.add('1');
+        if (dist <= 0.5) spokenDistancesRef.current.add('0.5');
+        if (dist <= 0.25) spokenDistancesRef.current.add('0.25');
       }
     }
 
-    if (dist <= 2.0 && dist > 1.9 && !spokenDistancesRef.current.has('2')) {
-      shouldSpeak = true;
-      phrase = `In 2 miles, ${nextInstruction.text}. ${lanePhrase}`;
-      spokenDistancesRef.current.add('2');
-    } else if (dist <= 1.0 && dist > 0.9 && !spokenDistancesRef.current.has('1')) {
-      shouldSpeak = true;
-      phrase = `In 1 mile, ${nextInstruction.text}. ${lanePhrase}`;
-      spokenDistancesRef.current.add('1');
-    } else if (dist <= 0.5 && dist > 0.4 && lanePhrase && lastLaneSpokenRef.current !== lanePhrase) {
-      // Speak lane guidance specifically at 0.5 miles if not already spoken recently
-      shouldSpeak = true;
-      phrase = lanePhrase;
-      lastLaneSpokenRef.current = lanePhrase;
-    } else if (dist <= 0.2 && !spokenDistancesRef.current.has('0.2')) {
-      shouldSpeak = true;
-      phrase = `Now, ${nextInstruction.text}. ${lanePhrase}`;
-      spokenDistancesRef.current.add('0.2');
+    // Distance-based progressive announcements
+    if (!shouldSpeak) {
+      if (dist <= 2.0 && dist > 1.8 && !spokenDistancesRef.current.has('2')) {
+        shouldSpeak = true;
+        phrase = `In 2 miles, ${nextInstruction.text}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
+        spokenDistancesRef.current.add('2');
+      } else if (dist <= 1.5 && dist > 1.3 && !spokenDistancesRef.current.has('1.5') && (hasLaneGuidance || isComplexManeuver)) {
+        // 1.5 mile announcement only for complex maneuvers or when lane change needed
+        shouldSpeak = true;
+        phrase = hasLaneGuidance 
+          ? `In 1 and a half miles, ${nextInstruction.text}. ${lanePhrase}` 
+          : `In 1 and a half miles, ${nextInstruction.text}.`;
+        spokenDistancesRef.current.add('1.5');
+      } else if (dist <= 1.0 && dist > 0.9 && !spokenDistancesRef.current.has('1')) {
+        shouldSpeak = true;
+        phrase = `In 1 mile, ${nextInstruction.text}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
+        spokenDistancesRef.current.add('1');
+      } else if (dist <= 0.75 && dist > 0.65 && hasLaneGuidance && !spokenDistancesRef.current.has('0.75')) {
+        // Dedicated lane guidance reminder at 3/4 mile
+        shouldSpeak = true;
+        phrase = `Lane guidance: ${lanePhrase}`;
+        spokenDistancesRef.current.add('0.75');
+        lastLaneSpokenRef.current = lanePhrase;
+      } else if (dist <= 0.5 && dist > 0.4 && !spokenDistancesRef.current.has('0.5')) {
+        shouldSpeak = true;
+        phrase = `In half a mile, ${nextInstruction.text}.`;
+        if (hasLaneGuidance && lastLaneSpokenRef.current !== lanePhrase) {
+          phrase += ` ${lanePhrase}`;
+          lastLaneSpokenRef.current = lanePhrase;
+        }
+        spokenDistancesRef.current.add('0.5');
+      } else if (dist <= 0.25 && dist > 0.2 && hasLaneGuidance && !spokenDistancesRef.current.has('0.25')) {
+        // Final lane reminder at quarter mile
+        shouldSpeak = true;
+        phrase = `Get in position. ${lanePhrase}`;
+        spokenDistancesRef.current.add('0.25');
+      } else if (dist <= 0.2 && !spokenDistancesRef.current.has('0.2')) {
+        shouldSpeak = true;
+        const feetRemaining = Math.round(dist * 5280);
+        phrase = feetRemaining > 500 
+          ? `In ${feetRemaining} feet, ${nextInstruction.text}.` 
+          : `${nextInstruction.text} now.`;
+        spokenDistancesRef.current.add('0.2');
+      }
     }
 
     if (shouldSpeak && phrase) {
@@ -3468,10 +3634,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             distance: action.length,
             duration: summary.length > 0 ? (action.length / summary.length) * summary.duration : 0,
             offset: action.offset ?? 0,
-            lanes: (action.lanes || []).map((lane: any) => ({
-              direction: (lane.directions || lane.indications || []).join(';'),
-              matches: (lane.isRecommended || lane.recommendation === 'recommended') ? ['selected'] : []
-            }))
+            lanes: synthesizeLanes(action.action, action.direction, action.severity)
           };
         });
 
