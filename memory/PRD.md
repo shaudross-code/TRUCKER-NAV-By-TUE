@@ -62,6 +62,12 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Bug Fix: NaN Guards** (2026-03-31): All financial setters in App.tsx reject NaN values to prevent data corruption.
 - **POI System Overhaul: Truck Stop Plazas Only** (2026-03-31): Removed all regular gas station brands (Shell, BP, Exxon, Speedway, Casey's, Wawa, Sheetz, QuikTrip, RaceTrac, Circle K, 7-Eleven, Conoco, Marathon, etc.) from POI system. Only shows actual truck stop plazas: Love's, Pilot, Flying J, Petro, TA, Road Ranger, Buc-ee's, Sapp Bros, Ambest. EV stations completely removed. Added DOT Weigh Station and Certified Scale specific searches. Updated filter panel, Fuel Network page, and PoiIcon components.
 - **Voice Guidance: Graduated Maneuver Announcements** (2026-04-01): Added turn-by-turn voice announcements at 10mi, 5mi, 2mi, 1mi, 0.5mi, 0.25mi, 1000ft, and "now" before each maneuver. Major maneuvers announced at all distances; minor maneuvers at 2mi+. Uses threshold tracking per step to prevent repeats. Clears on route cancel and new route calculation.
+- **Navigation Intelligence Overhaul** (2026-04-01): 
+  - Route visual separation: 3-layer rendering (glow + border + inner), alt routes as dashed lines with distinct colors (#4A9EFF blue, #8B5CF6 purple, #FF6B4A orange), diverge/converge point markers
+  - Active segment highlighting: Completed segments dimmed gray, current segment white glow
+  - Enhanced NavigationHUD: Distance-based progressive detail (road name at far, exit number at close, lane guidance at immediate), direction icons, speed limit display
+  - ManeuverPreview component: Zoomed preview for complex interchanges (exits, forks, roundabouts, merges, ramps) within 2mi
+  - Truck Intelligence: Steep grade detection from elevation data with proactive voice warnings (downhill -5%+, uphill 6%+)
 
 ## Upcoming Tasks (P1)
 - Map filtering for Reputation Scores (e.g., "only show 4-star+ facilities")
