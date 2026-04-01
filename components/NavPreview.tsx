@@ -3,7 +3,8 @@ import {
   Navigation, MapPin, Fuel, Clock, Layers, CloudSun,
   AlertTriangle, ArrowRightLeft, GitCompare,
   Monitor, Move, Lock, Unlock, Search, Mic, Plus,
-  Menu, Filter, Compass, MapPinned, X, RotateCcw
+  Menu, Filter, Compass, MapPinned, X, RotateCcw,
+  Truck, CheckCircle2, SkipForward
 } from 'lucide-react';
 import type { HudLayoutConfig } from '../types';
 import type { HudPositions } from '../utils/hudLayout';
@@ -177,12 +178,14 @@ export default function NavPreview({
                 <div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
               </div>
             </div>
-            {/* Compass */}
+            {/* Compass (idle) — tied to showCompassRose toggle */}
+            {c.showCompassRose && (
             <div className="absolute bottom-[8%] left-[4%] z-[15] pointer-events-none">
               <div className="w-8 h-8 rounded-full bg-black/60 border border-zinc-700/50 flex items-center justify-center">
                 <Compass className="w-5 h-5 text-zinc-500" />
               </div>
             </div>
+            )}
           </>
         )}
 
@@ -378,6 +381,41 @@ export default function NavPreview({
                 <div className="flex flex-col items-center shrink-0"><span className="text-[4px] font-bold text-zinc-600 uppercase">Time</span><span className="text-[10px] font-[900] text-[#D4AF37] leading-none tabular-nums">2:15</span><span className="text-[4px] text-zinc-600 font-bold">hr</span></div>
                 <div className="h-4 w-px bg-zinc-800/60 shrink-0" />
                 <div className="flex flex-col items-center shrink-0"><span className="text-[4px] font-bold text-zinc-600 uppercase">ETA</span><div className="flex items-center gap-0.5"><div className="w-1 h-1 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_4px_#D4AF37]" /><span className="text-[11px] font-[900] text-white leading-none tabular-nums">3:45</span></div><span className="text-[4px] font-bold text-emerald-500/70 uppercase">LIVE</span></div>
+              </div>
+            </div>
+          </DraggableItem>
+        )}
+
+        {/* Compass Rose (in-route, draggable) */}
+        {c.showCompassRose && inRoute && (
+          <DraggableItem id="compassRose" {...dp}>
+            <div data-testid="preview-compass-rose" className="w-9 h-9 rounded-full bg-black/80 border border-zinc-700/50 flex items-center justify-center shadow-lg relative">
+              <Compass className="w-5 h-5 text-zinc-400" />
+              <span className="absolute -top-0.5 left-1/2 -translate-x-1/2 text-[4px] font-black text-red-400">N</span>
+            </div>
+          </DraggableItem>
+        )}
+
+        {/* Next Stop (in-route) */}
+        {c.showNextStop && inRoute && (
+          <DraggableItem id="nextStop" {...dp}>
+            <div data-testid="preview-next-stop" className="bg-black/95 backdrop-blur-xl border border-zinc-700/60 rounded-xl shadow-lg" style={{ width: '180px' }}>
+              <div className="flex items-center gap-1.5 p-1.5">
+                <div className="p-1 rounded-lg bg-zinc-800 text-zinc-400 border border-zinc-700 shrink-0">
+                  <Truck className="w-2.5 h-2.5" />
+                </div>
+                <div className="flex flex-col flex-1 min-w-0">
+                  <span className="text-[4px] font-black text-zinc-500 uppercase tracking-[0.15em]">Next Stop</span>
+                  <span className="text-[6px] font-bold text-white truncate">Pilot Travel Center</span>
+                </div>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/25">
+                    <CheckCircle2 className="w-2 h-2 text-emerald-400" />
+                  </div>
+                  <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700">
+                    <SkipForward className="w-2 h-2 text-zinc-400" />
+                  </div>
+                </div>
               </div>
             </div>
           </DraggableItem>

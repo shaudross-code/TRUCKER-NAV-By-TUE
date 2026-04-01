@@ -5862,7 +5862,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Route Comparison Overlay */}
       {hudLayout.showRouteComparison && isRoutePreview && alternativeRoutes.length > 1 && (
-        <>
+        <div style={{ transform: `scale(${hudScales.routeComparison || 1})`, transformOrigin: 'top center' }}>
           <RouteComparisonPanel
             routes={alternativeRoutes}
             selectedIndex={selectedRouteIndex}
@@ -5900,7 +5900,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               speak("Starting navigation.");
             }}
           />
-        </>
+        </div>
       )}
 
       {/* Route Steps Modal */}
@@ -6043,11 +6043,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
       {hudLayout.showManeuverPreview && !isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
-        <div className="absolute z-[2000] w-72 pointer-events-auto" style={
-          hudPositions.maneuverPreview && (hudPositions.maneuverPreview.x !== DEFAULT_POSITIONS.maneuverPreview.x || hudPositions.maneuverPreview.y !== DEFAULT_POSITIONS.maneuverPreview.y)
-            ? { left: `${hudPositions.maneuverPreview.x}%`, top: `${hudPositions.maneuverPreview.y}%`, transform: 'translate(-50%, -50%)' }
-            : { top: '9rem', left: '1rem' }
-        }>
+        <div className="absolute z-[2000] w-72 pointer-events-auto" style={{
+          ...(hudPositions.maneuverPreview && (hudPositions.maneuverPreview.x !== DEFAULT_POSITIONS.maneuverPreview.x || hudPositions.maneuverPreview.y !== DEFAULT_POSITIONS.maneuverPreview.y)
+            ? { left: `${hudPositions.maneuverPreview.x}%`, top: `${hudPositions.maneuverPreview.y}%`, transform: `translate(-50%, -50%) scale(${hudScales.maneuverPreview || 1})` }
+            : { top: '9rem', left: '1rem', transform: `scale(${hudScales.maneuverPreview || 1})`, transformOrigin: 'top left' }
+          ),
+        }}>
           <ManeuverPreview {...maneuverPreviewData} />
         </div>
       )}
@@ -6099,11 +6100,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       {/* Weather & Restriction Overlay */}
       {!selectedPoi && !isExploreMode && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
-        <div id="nav-weather-overlay" className={`absolute z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 scale-90 md:scale-100`} style={
-          hudPositions.weatherPanel && (hudPositions.weatherPanel.x !== DEFAULT_POSITIONS.weatherPanel.x || hudPositions.weatherPanel.y !== DEFAULT_POSITIONS.weatherPanel.y)
-            ? { left: `${hudPositions.weatherPanel.x}%`, top: `${hudPositions.weatherPanel.y}%`, transform: 'translate(-50%, -50%)' }
-            : { left: '0.5rem', top: milesRemaining > 0 ? '55%' : '50%', transform: 'translateY(-50%)' }
-        }>
+        <div id="nav-weather-overlay" className={`absolute z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 scale-90 md:scale-100`} style={{
+          ...(hudPositions.weatherPanel && (hudPositions.weatherPanel.x !== DEFAULT_POSITIONS.weatherPanel.x || hudPositions.weatherPanel.y !== DEFAULT_POSITIONS.weatherPanel.y)
+            ? { left: `${hudPositions.weatherPanel.x}%`, top: `${hudPositions.weatherPanel.y}%`, transform: `translate(-50%, -50%) scale(${hudScales.weatherPanel || 1})` }
+            : { left: '0.5rem', top: milesRemaining > 0 ? '55%' : '50%', transform: `translateY(-50%) scale(${hudScales.weatherPanel || 1})`, transformOrigin: 'left center' }
+          ),
+        }}>
           {hudLayout.showTruckRestrictions && restrictionAlerts.length > 0 && (
             <div className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-orange-500/20 pb-1.5">
@@ -6387,14 +6389,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             ? { left: `${hudPositions.tripPanel.x}%`, top: `${hudPositions.tripPanel.y}%`, transform: 'translate(-50%, -50%)' }
             : { [hudLayout.tripPanelPosition === 'left' ? 'left' : 'right']: '0.75rem', bottom: '180px' }
         }>
-          {hudLayout.showFuelCost && <FuelCostCalculator
+          {hudLayout.showFuelCost && <div style={{ transform: `scale(${hudScales.fuelCost || 1})`, transformOrigin: hudLayout.tripPanelPosition === 'left' ? 'top left' : 'top right' }}><FuelCostCalculator
             routeDistanceMi={milesRemaining}
             initialFuelPrice={fuelPricePerGallon}
             initialMpg={truckMpg}
             onFuelPriceChange={setFuelPricePerGallon}
             onMpgChange={setTruckMpg}
-          />}
-          {hudLayout.showHosStatus && <DriverFatigueAlert isDriving={isDriving} />}
+          /></div>}
+          {hudLayout.showHosStatus && <div style={{ transform: `scale(${hudScales.hosStatus || 1})`, transformOrigin: hudLayout.tripPanelPosition === 'left' ? 'top left' : 'top right' }}><DriverFatigueAlert isDriving={isDriving} /></div>}
         </div>
       )}
 
