@@ -15,6 +15,7 @@ const FuelNetwork = lazy(() => import('./components/FuelNetwork'));
 const HudLayoutView = lazy(() => import('./components/HudLayoutView'));
 const ELDLogView = lazy(() => import('./components/ELDLogView'));
 const OfflineMapsView = lazy(() => import('./components/OfflineMapsView'));
+const CommunityView = lazy(() => import('./components/CommunityView'));
 
 import { ViewType, AppContext, LocationContext, TelemetryContext } from './types';
 
@@ -469,6 +470,8 @@ const AppContent: React.FC = React.memo(() => {
         return <Suspense fallback={<ContentLoader />}><ELDLogView /></Suspense>;
       case ViewType.OFFLINE_MAPS:
         return <Suspense fallback={<ContentLoader />}><OfflineMapsView /></Suspense>;
+      case ViewType.COMMUNITY:
+        return <Suspense fallback={<ContentLoader />}><CommunityView /></Suspense>;
       default:
         return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
     }

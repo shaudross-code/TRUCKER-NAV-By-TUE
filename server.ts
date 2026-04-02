@@ -779,6 +779,186 @@ async function createServer() {
     }
   });
 
+  // ─── Community Reports ──────────────────────────────────────────────────────
+  const COMMUNITY_FILE = path.join(__dirname, 'data', 'community_reports.json');
+
+  function readCommunityStore(): any[] {
+    try {
+      if (!existsSync(COMMUNITY_FILE)) return [];
+      return JSON.parse(readFileSync(COMMUNITY_FILE, 'utf8'));
+    } catch { return []; }
+  }
+
+  function writeCommunityStore(reports: any[]) {
+    try { writeFileSync(COMMUNITY_FILE, JSON.stringify(reports, null, 2), 'utf8'); }
+    catch (e) { console.error('Failed to write community store:', e); }
+  }
+
+  app.get('/api/community/reports', (req, res) => {
+    try {
+      let reports = readCommunityStore();
+      // Remove expired hazard/weigh station reports (4 hour TTL)
+      const now = Date.now();
+      reports = reports.filter((r: any) => {
+        if (r.expiresAt && new Date(r.expiresAt).getTime() < now) return false;
+        return true;
+      });
+      writeCommunityStore(reports);
+      res.json({ reports });
+    } catch (error) {
+      console.error('Error loading community reports:', error);
+      res.status(500).json({ error: 'Failed to load reports' });
+    }
+  });
+
+  app.post('/api/community/reports', (req, res) => {
+    const { category, title, description, lat, lon, locationName, userName, meta } = req.body;
+    if (!category || !title) return res.status(400).json({ error: 'category and title are required' });
+    try {
+      const reports = readCommunityStore();
+      const ttlHours = (category === 'hazard' || category === 'weigh_station') ? 4 : 24;
+      const newReport = {
+        id: `cr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        category,
+        title,
+        description: description || '',
+        lat: lat || 0,
+        lon: lon || 0,
+        locationName: locationName || 'Unknown',
+        userName: userName || 'Anonymous Trucker',
+        upvotes: 0,
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + ttlHours * 3600000).toISOString(),
+        meta: meta || {},
+      };
+      reports.push(newReport);
+      writeCommunityStore(reports);
+      res.json(newReport);
+    } catch (error) {
+      console.error('Error saving community report:', error);
+      res.status(500).json({ error: 'Failed to save report' });
+    }
+  });
+
+  app.post('/api/community/reports/:id/upvote', (req, res) => {
+    const { id } = req.params;
+    try {
+      const reports = readCommunityStore();
+      const report = reports.find((r: any) => r.id === id);
+      if (!report) return res.status(404).json({ error: 'Report not found' });
+      report.upvotes = (report.upvotes || 0) + 1;
+      writeCommunityStore(reports);
+      res.json({ upvotes: report.upvotes });
+    } catch (error) {
+      console.error('Error upvoting:', error);
+      res.status(500).json({ error: 'Failed to upvote' });
+    }
+  });
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // ─── AI Crash / Incident Prediction ─────────────────────────────────────────
+  app.post('/api/crash-prediction', async (req, res) => {
+    const { routeCoords, bbox } = req.body;
+    if (!routeCoords && !bbox) return res.status(400).json({ error: 'routeCoords or bbox required' });
+
+    try {
+      // Step 1: Fetch real traffic incidents from HERE
+      const hereBbox = bbox || (() => {
+        const lats = routeCoords.map((c: number[]) => c[0]);
+        const lons = routeCoords.map((c: number[]) => c[1]);
+        return `${Math.min(...lons)},${Math.min(...lats)},${Math.max(...lons)},${Math.max(...lats)}`;
+      })();
+
+      const hereUrl = new URL('https://data.traffic.hereapi.com/v7/incidents');
+      hereUrl.searchParams.append('in', `bbox:${hereBbox}`);
+      hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
+
+      const hereResp = await fetch(hereUrl.toString());
+      const hereData = await hereResp.json();
+      const incidents = hereData.results || [];
+
+      // Step 2: Use Gemini to analyze and predict crash risk
+      const GEMINI_KEY = process.env.GEMINI_API_KEY;
+      let aiAnalysis = null;
+
+      if (GEMINI_KEY && incidents.length > 0) {
+        const incidentSummary = incidents.slice(0, 15).map((inc: any) => {
+          const desc = inc.incidentDetails?.description?.value || 'Unknown incident';
+          const type = inc.incidentDetails?.type || 'UNKNOWN';
+          const severity = inc.incidentDetails?.severity || 'UNKNOWN';
+          const startTime = inc.incidentDetails?.startTime || '';
+          const loc = inc.location?.description?.value || '';
+          return `- [${type}] ${desc} (Severity: ${severity}, Location: ${loc}, Started: ${startTime})`;
+        }).join('\n');
+
+        const prompt = `You are an AI crash detection system for commercial truck drivers. Analyze these real-time traffic incidents along a truck route and provide:
+1. A risk score (1-10, where 10 is extremely dangerous)
+2. Top 3 specific warnings for the truck driver (max 50 words each)
+3. A recommended action (PROCEED WITH CAUTION / CONSIDER ALTERNATE ROUTE / STOP AND WAIT)
+4. Estimated delay in minutes
+
+Current incidents on route:
+${incidentSummary}
+
+Respond in valid JSON format ONLY:
+{"riskScore": number, "warnings": ["string","string","string"], "recommendation": "string", "estimatedDelay": number, "summary": "one sentence summary"}`;
+
+        try {
+          const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`;
+          const geminiResp = await fetch(geminiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.3, maxOutputTokens: 500 },
+            }),
+          });
+          const geminiData = await geminiResp.json();
+          const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          // Extract JSON from response
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            aiAnalysis = JSON.parse(jsonMatch[0]);
+          }
+        } catch (e) {
+          console.error('Gemini analysis error:', e);
+        }
+      }
+
+      // Step 3: Build response with incidents + AI analysis
+      const response: any = {
+        incidentCount: incidents.length,
+        incidents: incidents.slice(0, 20).map((inc: any) => ({
+          id: inc.incidentDetails?.id || Math.random().toString(36),
+          type: inc.incidentDetails?.type || 'UNKNOWN',
+          description: inc.incidentDetails?.description?.value || 'Traffic incident',
+          severity: inc.incidentDetails?.severity || 'UNKNOWN',
+          startTime: inc.incidentDetails?.startTime || null,
+          endTime: inc.incidentDetails?.endTime || null,
+          location: inc.location?.description?.value || 'Along route',
+          lat: inc.location?.geolocation?.latitude || null,
+          lon: inc.location?.geolocation?.longitude || null,
+        })),
+        aiPrediction: aiAnalysis || {
+          riskScore: incidents.length === 0 ? 1 : Math.min(10, Math.ceil(incidents.length * 1.5)),
+          warnings: incidents.length === 0
+            ? ['No incidents detected on your route']
+            : [`${incidents.length} incident(s) detected along your route`, 'Monitor traffic ahead', 'Maintain safe following distance'],
+          recommendation: incidents.length === 0 ? 'PROCEED WITH CAUTION' : incidents.length > 5 ? 'CONSIDER ALTERNATE ROUTE' : 'PROCEED WITH CAUTION',
+          estimatedDelay: incidents.length * 5,
+          summary: incidents.length === 0 ? 'Route is clear — no incidents detected.' : `${incidents.length} traffic incident(s) detected along your route.`
+        },
+        analyzedAt: new Date().toISOString(),
+      };
+
+      res.json(response);
+    } catch (error) {
+      console.error('Error in crash prediction:', error);
+      res.status(500).json({ error: 'Failed to analyze route incidents' });
+    }
+  });
+  // ────────────────────────────────────────────────────────────────────────────
+
   app.post('/api/waypoint-sequence', async (req, res) => {
     const { start, end, destination } = req.body; // destination is an array of waypoints
     try {

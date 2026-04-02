@@ -18,7 +18,8 @@ import {
   Fuel,
   LayoutPanelTop,
   FileText,
-  HardDrive
+  HardDrive,
+  Users
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { speak } from '../services/speechService';
@@ -49,6 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ViewType.MAINTENANCE, icon: Wrench, label: 'Maintenance' },
     { id: ViewType.ROUTE_HISTORY, icon: History, label: 'History' },
     { id: ViewType.FUEL_NETWORK, icon: Fuel, label: 'Fuel Network' },
+    { id: ViewType.COMMUNITY, icon: Users, label: 'Community' },
     { id: ViewType.ELD_LOGS, icon: FileText, label: 'ELD Logs' },
     { id: ViewType.OFFLINE_MAPS, icon: HardDrive, label: 'Offline Maps' },
     { id: ViewType.HUD_LAYOUT, icon: LayoutPanelTop, label: 'Display' },
