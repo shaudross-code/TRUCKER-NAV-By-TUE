@@ -78,6 +78,13 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Fallback heuristic when Gemini unavailable or no incidents
 - Backend: `POST /api/crash-prediction` with bbox or routeCoords
 
+### Viewport-Based Sign Culling (Apr 2, 2026) - P1
+- Signs stored in `signDataStoreRef` array instead of immediately rendering as DOM markers
+- `syncVisibleSigns()` computes which signs are within the padded viewport (+20%) on every map `moveend`/`zoomend`
+- Efficiently adds entering signs and removes leaving signs using a `Map<id, L.Marker>` diff
+- All 7 placement functions updated: highway shields, exit signs, curve warnings, speed limits, traffic slowdowns, CMV warnings, truck restrictions
+- Result: Only ~10-30 signs rendered at a time vs hundreds for a long route = major DOM performance gain
+
 ### Parking Predictions
 - Time-of-day based availability forecasting
 - 6-hour forecast with fill percentage
@@ -103,12 +110,13 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 | PC*MILER Data | SKIPPED - Requires enterprise license |
 
 ## Upcoming Tasks
-- **P1**: Viewport-based sign culling (DOM performance)
+- None currently queued
 
 ## Future/Backlog
 - NavigationView.tsx refactoring (7000+ lines -> hooks/components)
 - iOS/Android Store Submission
 - PC*MILER integration (requires paid API key)
+- Surface AI crash prediction as a live "Route Safety Score" badge on the Navigation map
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
