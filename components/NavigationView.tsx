@@ -63,15 +63,10 @@ import { PoiDetailModal } from './PoiDetailModal';
 import { RouteStepsModal } from './RouteStepsModal';
 import { NavigationHUD } from './NavigationHUD';
 import { WarningBanners } from './WarningBanners';
-import {
-  interstateShield, usRouteShield, stateRouteShield,
-  speedLimitSign, curveWarning, steepGradeWarning,
-  windingRoadWarning, rolloverWarning, lowClearanceWarning,
-  noTrucksSign, weightLimitSign, noHazmatSign, tunnelWarning,
-  noticeWarning, exitGuideSign, directionBadge, directionLabel
-} from '../utils/mutcdSigns';
 import { loadHudLayout, loadHudPositions, loadHudScales, DEFAULT_POSITIONS, DEFAULT_SCALES, type HudPositions, type HudScales } from '../utils/hudLayout';
 import type { HudLayoutConfig } from '../types';
+import { useHudConfig } from '../hooks/useHudConfig';
+import { useSignPlacement } from '../hooks/useSignPlacement';
 
 interface Waypoint {
   id: string;
@@ -323,10 +318,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const shieldLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  // Viewport-based sign culling: store all sign definitions, only render those in view
-  const signDataStoreRef = useRef<{ id: string; lat: number; lon: number; iconHtml: string; iconSize: [number, number]; iconAnchor: [number, number]; zIndexOffset: number }[]>([]);
-  const visibleSignMarkersRef = useRef<Map<string, L.Marker>>(new Map());
-  const syncVisibleSignsRef = useRef<() => void>(() => {});
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -345,11 +336,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const lastIncidentFetchRef = useRef<number>(0);
   const [triggerReroute, setTriggerReroute] = useState(false);
   
-  // HUD Layout configuration (user-customizable visibility)
-  const [hudLayout, setHudLayout] = useState<HudLayoutConfig>(loadHudLayout);
-  const [hudPositions, setHudPositions] = useState<HudPositions>(loadHudPositions);
-  const [hudScales, setHudScales] = useState<HudScales>(loadHudScales);
-  
+  // HUD Layout configuration (extracted to hook)
+  const { hudLayout, setHudLayout, hudPositions, setHudPositions, hudScales, setHudScales } = useHudConfig();
+
+  // Sign placement system (extracted to hook)
+  const {
+    signDataStoreRef, visibleSignMarkersRef, syncVisibleSignsRef,
+    syncVisibleSigns, clearSigns, setRegionState, setDataSaver,
+    placeHighwayShields, placeExitSigns, placeCurveSigns,
+    placeSpeedLimitSigns, placeTrafficSlowdowns, placeCmvWarnings, placeTruckWarnings,
+  } = useSignPlacement(mapInstanceRef, shieldLayerGroupRef);
+
   // Reload HUD config from localStorage when this view becomes active
   useEffect(() => {
     if (activeView === ViewType.NAVIGATION) {
@@ -359,35 +356,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
   }, [activeView]);
 
-  // Listen for HUD layout changes from the Display settings view (live sync while hidden)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const config = (e as CustomEvent).detail as HudLayoutConfig;
-      setHudLayout(config);
-    };
-    window.addEventListener('hud-layout-changed', handler);
-    return () => window.removeEventListener('hud-layout-changed', handler);
-  }, []);
-
-  // Listen for HUD position changes from the Display preview
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const pos = (e as CustomEvent).detail as HudPositions;
-      setHudPositions(pos);
-    };
-    window.addEventListener('hud-positions-changed', handler);
-    return () => window.removeEventListener('hud-positions-changed', handler);
-  }, []);
-
-  // Listen for HUD scale changes from the Display settings view
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const scales = (e as CustomEvent).detail as HudScales;
-      setHudScales(scales);
-    };
-    window.addEventListener('hud-scales-changed', handler);
-    return () => window.removeEventListener('hud-scales-changed', handler);
-  }, []);
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
     return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
@@ -423,6 +391,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const isDriving = context?.isDriving || false;
   const setIsDriving = context?.setIsDriving || (() => {});
   const dataSaver = context?.dataSaver || false;
+  useEffect(() => { setDataSaver(dataSaver); }, [dataSaver, setDataSaver]);
   const setUserLocation = locationContext?.setUserLocation || noop;
   const hosContext = useContext(HOSContext);
   const eldStatus = hosContext?.eldStatus;
@@ -689,8 +658,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Reset all map-attached refs so they get recreated on the new instance
       routeGroupRef.current = null;
       shieldLayerGroupRef.current = null;
-      signDataStoreRef.current = [];
-      visibleSignMarkersRef.current.clear();
+      clearSigns();
       markerClusterGroupRef.current = null;
       userMarkerRef.current = null;
       userMarkerElRef.current = null;
@@ -1001,6 +969,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return saved ? JSON.parse(saved) : { state: null, country: null, city: null };
     } catch { return { state: null, country: null, city: null }; }
   });
+  useEffect(() => { setRegionState(currentRegion.state || ''); }, [currentRegion.state, setRegionState]);
   const lastGeocodeFetchRef = useRef<{ time: number; lat: number; lon: number } | null>(null);
   const prevRegionRef = useRef<{ state: string | null; country: string | null }>({ state: null, country: null });
 
@@ -1288,347 +1257,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   };
 
   // Place highway shield markers along the route using HERE Map Image API
-  // Frontend shield image blob URL cache — prevents duplicate HTTP requests for same shield type
-  const shieldBlobCacheRef = useRef<Map<string, string>>(new Map());
-  
-  const getShieldBlobUrl = useCallback(async (shieldUrl: string): Promise<string> => {
-    if (shieldBlobCacheRef.current.has(shieldUrl)) return shieldBlobCacheRef.current.get(shieldUrl)!;
-    try {
-      const resp = await fetch(shieldUrl);
-      if (!resp.ok || resp.status === 204) return '';
-      const blob = await resp.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      shieldBlobCacheRef.current.set(shieldUrl, blobUrl);
-      return blobUrl;
-    } catch { return ''; }
-  }, []);
-
-  // ─── Viewport-based sign culling ──────────────────────────────────────────
-  // Instead of adding all markers at once, we store sign data and only render
-  // those within the current map viewport (with padding). This dramatically
-  // reduces DOM nodes for long routes (hundreds → dozens visible at a time).
-  const syncVisibleSigns = useCallback(() => {
-    const map = mapInstanceRef.current;
-    if (!map || !shieldLayerGroupRef.current) return;
-
-    const bounds = map.getBounds();
-    // Pad the bounds by ~20% so signs don't pop in/out at edges
-    const padded = bounds.pad(0.2);
-    const store = signDataStoreRef.current;
-    const visible = visibleSignMarkersRef.current;
-    const newVisibleIds = new Set<string>();
-
-    // Determine which signs are in the padded viewport
-    for (const sign of store) {
-      if (padded.contains([sign.lat, sign.lon])) {
-        newVisibleIds.add(sign.id);
-      }
-    }
-
-    // Remove markers that left the viewport
-    for (const [id, marker] of visible) {
-      if (!newVisibleIds.has(id)) {
-        shieldLayerGroupRef.current!.removeLayer(marker);
-        visible.delete(id);
-      }
-    }
-
-    // Add markers that entered the viewport
-    for (const sign of store) {
-      if (newVisibleIds.has(sign.id) && !visible.has(sign.id)) {
-        const icon = L.divIcon({
-          html: sign.iconHtml,
-          className: 'highway-shield-icon',
-          iconSize: sign.iconSize,
-          iconAnchor: sign.iconAnchor,
-        });
-        const marker = L.marker([sign.lat, sign.lon], {
-          icon,
-          interactive: false,
-          zIndexOffset: sign.zIndexOffset,
-          pane: 'signPane',
-        }).addTo(shieldLayerGroupRef.current!);
-        visible.set(sign.id, marker);
-      }
-    }
-  }, []);
-
-  // Keep ref in sync so event handlers can call it
-  syncVisibleSignsRef.current = syncVisibleSigns;
-
-  // Helper: register a sign in the data store (called by placement functions)
-  const registerSign = useCallback((id: string, lat: number, lon: number, iconHtml: string, iconSize: [number, number], iconAnchor: [number, number], zIndexOffset: number) => {
-    signDataStoreRef.current.push({ id, lat, lon, iconHtml, iconSize, iconAnchor, zIndexOffset });
-  }, []);
-  // ────────────────────────────────────────────────────────────────────────────
-
-  const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[]) => {
-    if (!shieldLayerGroupRef.current || shields.length === 0) return;
-    
-    // Pre-fetch unique shield images in parallel, then place all markers at once
-    const uniqueUrls = new Map<string, string>();
-    shields.forEach((shield) => {
-      const stateCode = currentRegion.state || '';
-      const params = new URLSearchParams({ label: shield.label, countryCode: 'USA', routeLevel: String(shield.routeLevel), width: '64' });
-      if (stateCode && stateCode.length === 2) params.append('stateCode', stateCode.toUpperCase());
-      uniqueUrls.set(`${shield.label}-${shield.routeLevel}-${stateCode}`, `/api/road-shield?${params.toString()}`);
-    });
-
-    // Batch prefetch all unique shield images
-    const fetchPromises = Array.from(uniqueUrls.values()).map(url => 
-      dataSaver ? Promise.resolve('') : getShieldBlobUrl(url)
-    );
-
-    Promise.all(fetchPromises).then(() => {
-      // Now place all markers with cached blob URLs
-      shields.forEach((shield) => {
-      const { label, routeLevel, type, coord, direction } = shield;
-      if (!coord || !coord[0] || !coord[1]) return;
-      
-      const stateCode = currentRegion.state || '';
-      const params = new URLSearchParams({ label, countryCode: 'USA', routeLevel: String(routeLevel), width: '64' });
-      if (stateCode && stateCode.length === 2) params.append('stateCode', stateCode.toUpperCase());
-      const shieldUrl = `/api/road-shield?${params.toString()}`;
-
-      // Direction arrow badge
-      const dirBadge = directionBadge(direction || '');
-      const dirLabelHtml = directionLabel(direction || '');
-
-      let fallbackHtml = '';
-      if (type === 'interstate') {
-        fallbackHtml = interstateShield(label, 44);
-      } else if (type === 'us') {
-        fallbackHtml = usRouteShield(label, 40);
-      } else {
-        fallbackHtml = stateRouteShield(label, 34);
-      }
-
-      // Use cached blob URL for the shield image to prevent duplicate HTTP requests
-      const cachedBlobUrl = shieldBlobCacheRef.current.get(shieldUrl) || '';
-      
-      // In data saver mode, skip HERE API image and use only SVG fallback
-      const iconHtml = dataSaver 
-        ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
-            ${dirBadge}
-            <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
-            ${dirLabelHtml}
-          </div>`
-        : cachedBlobUrl
-          ? `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
-              ${dirBadge}
-              <img src="${cachedBlobUrl}" style="width:40px;height:auto;filter:drop-shadow(0 2px 6px rgba(0,0,0,0.6))" alt="${type === 'interstate' ? 'I-' : type === 'us' ? 'US-' : ''}${label}"/>
-              ${dirLabelHtml}
-            </div>`
-          : `<div class="counter-rotate" data-testid="highway-shield-marker" style="position:relative;cursor:default">
-              ${dirBadge}
-              <div style="display:flex;align-items:center;justify-content:center">${fallbackHtml}</div>
-              ${dirLabelHtml}
-            </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
-      registerSign(`shield-${label}-${routeLevel}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [48, 52], [24, 26], 500);
-      });
-      syncVisibleSigns();
-      console.log(`[Shields] Placed ${shields.length} highway shield markers on route${dataSaver ? ' (data saver)' : ''}`);
-    }).catch(err => {
-      console.error('[Shields] Failed to prefetch shield images:', err);
-    });
-  }, [currentRegion.state, dataSaver, getShieldBlobUrl, registerSign, syncVisibleSigns]);
-
-  // Place exit signs along the route (MUTCD-style static green highway exit signs)
-  const placeExitSigns = useCallback((exits: { name: string; exitNumber?: string; coord: [number, number] }[]) => {
-    if (!shieldLayerGroupRef.current || exits.length === 0) return;
-    
-    exits.forEach((exit) => {
-      const { name, exitNumber, coord } = exit;
-      if (!coord || !coord[0] || !coord[1]) return;
-      
-      const roadName = name.length > 30 ? name.substring(0, 28) + '...' : name;
-      const hasExitNum = !!exitNumber;
-      
-      const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default">
-        ${exitGuideSign(name, exitNumber)}
-      </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [100, 48], iconAnchor: [50, 48] });
-      registerSign(`exit-${exitNumber || name}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [100, 48], [50, 48], 480);
-    });
-    syncVisibleSigns();
-    console.log(`[Signs] Placed ${exits.length} exit signs on route`);
-  }, [registerSign, syncVisibleSigns]);
-
-  // Place sharp curve warning signs
-  const placeCurveSigns = useCallback((curves: { severity: string; direction: string; coord: [number, number] }[]) => {
-    if (!shieldLayerGroupRef.current || curves.length === 0) return;
-    
-    curves.forEach((curve) => {
-      const { direction, coord } = curve;
-      if (!coord || !coord[0] || !coord[1]) return;
-
-      const iconHtml = `<div class="counter-rotate" data-testid="curve-sign-marker" style="cursor:default">
-        ${curveWarning(direction === 'left' ? 'left' : 'right', 36)}
-      </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [36, 36], iconAnchor: [18, 18] });
-      registerSign(`curve-${direction}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [36, 36], [18, 18], 450);
-    });
-    syncVisibleSigns();
-    console.log(`[Signs] Placed ${curves.length} curve warning signs on route`);
-  }, [registerSign, syncVisibleSigns]);
-
-  // Place speed limit change signs
-  const placeSpeedLimitSigns = useCallback((signs: { speed: number; coord: [number, number] }[]) => {
-    if (!shieldLayerGroupRef.current || signs.length === 0) return;
-    
-    signs.forEach((sign) => {
-      const { speed, coord } = sign;
-      if (!coord || !coord[0] || !coord[1]) return;
-      
-      const iconHtml = `<div class="counter-rotate" data-testid="speed-limit-sign-marker" style="cursor:default">
-        ${speedLimitSign(speed, 38)}
-      </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [38, 46], iconAnchor: [19, 23] });
-      registerSign(`speed-${speed}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [38, 46], [19, 23], 460);
-    });
-    syncVisibleSigns();
-    console.log(`[Signs] Placed ${signs.length} speed limit signs on route`);
-  }, [registerSign, syncVisibleSigns]);
-
-  // Place traffic slowdown markers
-  const placeTrafficSlowdowns = useCallback((slowdowns: { severity: string; message: string; coord: [number, number] }[]) => {
-    if (!shieldLayerGroupRef.current || slowdowns.length === 0) return;
-    
-    slowdowns.forEach((sd) => {
-      const { severity, message, coord } = sd;
-      if (!coord || !coord[0] || !coord[1]) return;
-      
-      const sevColor = severity === 'high' || severity === 'critical' ? '#dc2626' : severity === 'medium' ? '#f59e0b' : '#ef4444';
-      const shortMsg = message.length > 30 ? message.substring(0, 28) + '...' : message;
-      
-      const iconHtml = `<div class="counter-rotate" data-testid="traffic-slowdown-marker" style="cursor:default;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.6))">
-        <div style="background:${sevColor};border:2px solid #fff;border-radius:4px;padding:2px 5px;text-align:center;max-width:90px">
-          <div style="display:flex;align-items:center;gap:2px;justify-content:center">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 9v4m0 4h.01M4.93 19h14.14c1.34 0 2.17-1.46 1.49-2.63L13.49 4.63a1.7 1.7 0 0 0-2.98 0L3.44 16.37C2.76 17.54 3.59 19 4.93 19z" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>
-            <span style="font-size:7px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:0.5px">Slowdown</span>
-          </div>
-          <div style="font-size:6px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:80px">${shortMsg}</div>
-        </div>
-        <div style="width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:4px solid ${sevColor};margin:0 auto"></div>
-      </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [94, 34], iconAnchor: [47, 34] });
-      registerSign(`slowdown-${severity}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [94, 34], [47, 34], 470);
-    });
-    syncVisibleSigns();
-    console.log(`[Signs] Placed ${slowdowns.length} traffic slowdown markers on route`);
-  }, [registerSign, syncVisibleSigns]);
-
-  // Place CMV warning signs (steep grade, rollover risk, winding road, steep hill)
-  const placeCmvWarnings = useCallback((warnings: { type: string; severity: string; message: string; grade?: number; coord: [number, number] }[]) => {
-    if (!shieldLayerGroupRef.current || warnings.length === 0) return;
-    
-    warnings.forEach((w) => {
-      const { type, severity, message, coord } = w;
-      if (!coord || !coord[0] || !coord[1]) return;
-      
-      const sevBorder = severity === 'critical' ? '#dc2626' : severity === 'high' ? '#f59e0b' : '#eab308';
-      
-      // Use MUTCD-compliant signs
-      let signHtml = '';
-      if (type === 'STEEP_DOWNGRADE') {
-        signHtml = steepGradeWarning('down', w.grade, 40);
-      } else if (type === 'STEEP_HILL') {
-        signHtml = steepGradeWarning('up', w.grade, 40);
-      } else if (type === 'ROLLOVER_RISK') {
-        signHtml = rolloverWarning(38);
-      } else if (type === 'WINDING_ROAD') {
-        signHtml = windingRoadWarning(36);
-      }
-      
-      const labelMap: Record<string, string> = {
-        'STEEP_DOWNGRADE': 'STEEP GRADE',
-        'STEEP_HILL': 'HILL',
-        'ROLLOVER_RISK': 'ROLLOVER',
-        'WINDING_ROAD': 'WINDING'
-      };
-
-      const iconHtml = `<div class="counter-rotate" data-testid="cmv-warning-marker" data-warning-type="${type}" style="cursor:default">
-        <div style="display:flex;flex-direction:column;align-items:center">
-          ${signHtml}
-          <div style="background:rgba(0,0,0,0.85);border:1px solid ${sevBorder};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:80px">
-            <div style="font-size:6px;font-weight:900;color:${sevBorder};letter-spacing:0.5px;white-space:nowrap">${labelMap[type] || type}</div>
-            <div style="font-size:5px;color:rgba(255,255,255,0.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:76px">${message}</div>
-          </div>
-        </div>
-      </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 60], iconAnchor: [22, 30] });
-      registerSign(`cmv-${type}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [44, 60], [22, 30], 550);
-    });
-    syncVisibleSigns();
-    console.log(`[CMV] Placed ${warnings.length} CMV warning signs on route`);
-  }, [registerSign, syncVisibleSigns]);
-
-  // Place truck restriction warning signs on route (low bridges, weight limits, tunnel, hazmat zones)
-  const placeTruckWarnings = useCallback((restrictions: { type: string; message: string; coords?: [number, number]; progress?: number }[]) => {
-    if (!shieldLayerGroupRef.current || restrictions.length === 0) return;
-    let placed = 0;
-    
-    restrictions.forEach((r) => {
-      if (!r.coords || !r.coords[0] || !r.coords[1]) return;
-      
-      let signHtml = '';
-      let labelText = '';
-      let labelColor = '#f59e0b';
-      
-      if (r.type === 'BRIDGE') {
-        signHtml = lowClearanceWarning(undefined, 36);
-        labelText = 'LOW CLEARANCE';
-        labelColor = '#dc2626';
-      } else if (r.type === 'WEIGHT') {
-        signHtml = weightLimitSign(r.message.length > 15 ? 'RESTRICTED' : r.message, 30);
-        labelText = 'WEIGHT LIMIT';
-        labelColor = '#f59e0b';
-      } else if (r.type === 'TUNNEL') {
-        signHtml = tunnelWarning(36);
-        labelText = 'TUNNEL';
-        labelColor = '#8b5cf6';
-      } else if (r.type === 'HAZMAT') {
-        signHtml = noHazmatSign(36);
-        labelText = 'NO HAZMAT';
-        labelColor = '#dc2626';
-      } else if (r.type === 'TRUCK_PROHIBITED') {
-        signHtml = noTrucksSign(36);
-        labelText = 'NO TRUCKS';
-        labelColor = '#dc2626';
-      } else if (r.type === 'NOTICE') {
-        signHtml = noticeWarning(34);
-        labelText = 'NOTICE';
-        labelColor = '#f59e0b';
-      } else {
-        return;
-      }
-
-      const shortMsg = r.message.length > 35 ? r.message.substring(0, 33) + '...' : r.message;
-
-      const iconHtml = `<div class="counter-rotate" data-testid="truck-warning-marker" data-warning-type="${r.type}" style="cursor:default">
-        <div style="display:flex;flex-direction:column;align-items:center">
-          ${signHtml}
-          <div style="background:rgba(0,0,0,0.9);border:1px solid ${labelColor};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:90px">
-            <div style="font-size:6px;font-weight:900;color:${labelColor};letter-spacing:0.5px;white-space:nowrap">${labelText}</div>
-            <div style="font-size:5.5px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:86px">${shortMsg}</div>
-          </div>
-        </div>
-      </div>`;
-
-      const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 55], iconAnchor: [22, 27] });
-      registerSign(`truckwarn-${r.type}-${r.coords[0].toFixed(4)}`, r.coords[0], r.coords[1], iconHtml, [44, 55], [22, 27], 520);
-      placed++;
-    });
-    if (placed > 0) { syncVisibleSigns(); console.log(`[Signs] Placed ${placed} truck warning signs on route`); }
-  }, [registerSign, syncVisibleSigns]);
-
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
@@ -3425,11 +3053,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     isManeuverZoomActiveRef.current = false; // Reset auto-zoom state
     // Clear voice guidance thresholds
     announcedManeuverThresholdsRef.current.clear();
-    if (shieldLayerGroupRef.current) {
-      shieldLayerGroupRef.current.clearLayers();
-    }
-    signDataStoreRef.current = [];
-    visibleSignMarkersRef.current.clear();
+    clearSigns();
     // Clear lane visualization
     if (mapInstanceRef.current) {
       clearLanes(mapInstanceRef.current);
@@ -4552,11 +4176,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     currentSegmentLineRef.current = null;
     
     // Clear highway shield and sign markers
-    if (shieldLayerGroupRef.current) {
-      shieldLayerGroupRef.current.clearLayers();
-    }
-    signDataStoreRef.current = [];
-    visibleSignMarkersRef.current.clear();
+    clearSigns();
     
     if (context) context.setNavTarget(null);
   }, [context]);
@@ -4730,8 +4350,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           shieldLayerGroupRef.current.clearLayers();
         }
         // Reset viewport culling stores for new route
-        signDataStoreRef.current = [];
-        visibleSignMarkersRef.current.clear();
+        clearSigns();
         // Place highway shield markers on the route
         if (hudLayout.showHighwayShields && primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
           placeHighwayShields(primaryRoute.highwayShields);

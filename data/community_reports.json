@@ -8,7 +8,7 @@
     "lon": -93.6,
     "locationName": "I-80 Exit 124, Pilot #422",
     "userName": "BigRig_Mike",
-    "upvotes": 3,
+    "upvotes": 4,
     "createdAt": "2026-04-02T00:15:34.465Z",
     "expiresAt": "2026-04-03T00:15:34.465Z",
     "meta": {}
@@ -123,6 +123,34 @@
     "upvotes": 0,
     "createdAt": "2026-04-02T01:44:27.499Z",
     "expiresAt": "2026-04-03T01:44:27.499Z",
+    "meta": {}
+  },
+  {
+    "id": "cr_1775097016913_45qq9d",
+    "category": "hazard",
+    "title": "Test Hazard Report",
+    "description": "Testing hazard report creation",
+    "lat": 41.5,
+    "lon": -93.5,
+    "locationName": "Test Location I-80",
+    "userName": "TestUser",
+    "upvotes": 0,
+    "createdAt": "2026-04-02T02:30:16.913Z",
+    "expiresAt": "2026-04-02T06:30:16.913Z",
+    "meta": {}
+  },
+  {
+    "id": "cr_1775097017017_vxe2vc",
+    "category": "parking",
+    "title": "Test Parking Report",
+    "description": "Spaces available at test location",
+    "lat": 41.6,
+    "lon": -93.6,
+    "locationName": "I-80 Exit 50",
+    "userName": "TestTrucker",
+    "upvotes": 0,
+    "createdAt": "2026-04-02T02:30:17.017Z",
+    "expiresAt": "2026-04-03T02:30:17.017Z",
     "meta": {}
   }
 ]
