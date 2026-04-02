@@ -7,26 +7,24 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - **Frontend**: React (Vite) + TypeScript + Tailwind CSS + Leaflet Maps
 - **Backend**: Node.js/Express (server.ts) on port 8001
 - **Mobile**: Capacitor (iOS/Android) with EAS Build CI/CD
-- **APIs**: HERE Maps (Routing v8, Discover, Traffic), Mapbox (Tiles), Google Maps (Places), Firebase (Auth), Gemini AI
-- **Storage**: Firebase Firestore + LocalStorage (guest config) + File-based JSON (ratings, parking)
+- **APIs**: HERE Maps (Routing v8, Discover, Traffic v7), Mapbox (Tiles), Google Maps (Places), Firebase (Auth), Gemini AI (Crash Analysis)
+- **Storage**: Firebase Firestore + LocalStorage (guest config) + File-based JSON (ratings, parking, community reports)
 
-## What's Been Implemented (Completed)
+## What's Been Implemented
 
 ### Core Navigation
 - Custom truck routing via HERE API v8.140.0
 - Turn-by-turn navigation with voice guidance
-- Route comparison (up to 3 alternatives with time/distance/fuel cost)
+- Route comparison (up to 3 alternatives)
 - Lane guidance with dynamic lane visualization
-- Maneuver previews with upcoming turn info
 - GPS interpolation for smooth marker movement
 
 ### Map Features
 - 2D satellite/street maps with Mapbox + Leaflet
 - 3D mode via MapLibre GL
 - Custom Leaflet panes (routePane, signPane)
-- Collapsible map controls (zoom, tilt, compass)
-- Numbered waypoint markers
-- Highway shield markers (MUTCD-compliant)
+- Collapsible map controls
+- Numbered waypoint markers, MUTCD highway shields
 
 ### Safety & Alerts
 - Real-time traffic incident overlays + auto-reroute countdown
@@ -36,103 +34,81 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Weather alerts and route hazard reports
 
 ### Speed Limit Warning System
-- Visual Warning: Speed display turns red with glow + pulse animation when exceeding speed limit + tolerance
-- Audio Alert: 880Hz square wave beeps every 3 seconds while speeding (Web Audio API)
-- "SLOW DOWN" Banner: Red banner above Arrival Bar showing current vs limit speed
-- Configurable Tolerance: +0, +3, +5 (default), +8, +10 mph tolerance in Display tab
-- Toggle: 21st element in Display Layout tab with siren icon
+- Visual: Speed turns red + pulse animation when exceeding limit + tolerance
+- Audio: 880Hz beeps every 3s while speeding (Web Audio API)
+- "SLOW DOWN" banner with current vs limit speed
+- Configurable tolerance: +0/+3/+5/+8/+10 mph
 
-### Facility Ratings & Reviews System
-- Star Rating: 1-5 star input with hover effects in POI Detail Modal
-- Review Tags: 8 preset tags (Clean Restrooms, Good Food, Safe Parking, Fast Fuel, Friendly Staff, Showers, Truck Wash, WiFi)
-- Text Reviews: Optional 200-char review text
-- Along Route POI Cards: Average rating stars displayed next to fuel price
-- Min Rating Filter: ALL/1+/2+/3+/4+ filter in MapControls panel
-- Backend API: File-based JSON store (`/app/data/facility_ratings.json`)
-
-### Professional Lane Guidance System
-- Visual LaneRibbon: SVG directional arrows with blue highlighting
-- Synthesized lane data from HERE API action types
-- Voice lane guidance: 7+ distance thresholds
+### Facility Ratings & Reviews
+- 1-5 star rating with 8 preset tags
+- Text reviews (200 char), along-route POI cards
+- Min rating filter in MapControls (ALL/1+/2+/3+/4+)
+- Backend: File-based JSON (`/app/data/facility_ratings.json`)
 
 ### HUD Layout Customization (Display Tab)
-- 21 toggleable HUD elements (Navigation/Panels/Signs categories)
-- Speed Warning toggle with tolerance control
-- Compass Rose + Next Stop toggles
-- Element resize system (XS/S/M/L/XL) for 11 resizable elements
-- Drag-and-drop repositioning via @dnd-kit
+- 21 toggleable HUD elements
+- Element resize (XS/S/M/L/XL) + drag-and-drop repositioning
 - NavPreview with Compass Rose + Next Stop mockups
-- Persistent config via LocalStorage
-- Trip Panel Position toggle (LEFT/RIGHT)
+- Persistent via LocalStorage
 
-### ELD Logs (NEW - Apr 1, 2026)
-- FMCSA-compliant Electronic Logging Device interface
+### ELD Logs
+- FMCSA-compliant ELD interface synced with Dashboard
 - Status controls: Off Duty, Sleeper Berth, On Duty, Driving
-- Daily summary cards with hours tracking and progress bars
-- Visual timeline graph (Daily Log Graph) with hour labels
-- Violation detection: 11-hour driving limit, 14-hour on-duty window, 8-hour break rule
-- Status change log table with timestamps
-- CSV export functionality
-- Date navigation (view historical logs)
-- Auto-logging from HOS context
-- Persistent storage via localStorage
+- Daily summary cards, visual timeline graph, violation detection
+- CSV export, date navigation, global auto-logging via HOSProvider
 
-### Offline Maps (NEW - Apr 1, 2026)
-- Download regions: US Midwest, South, Northeast, West, Southeast
-- Cache storage summary (total cached, regions count, cached routes)
-- Download progress simulation with progress bar
-- Online/Offline status indicator
-- Service Worker registration for tile caching (sw-tiles.js)
-- Cached routes section (last 5 calculated routes auto-saved)
-- Clear all cache functionality
-- Offline mode tips section
+### Offline Maps (Apr 2, 2026) 
+- Real tile pre-fetching via Service Worker (OSM tiles)
+- 5 US regions with actual tile count estimates
+- Cache storage with LIVE size reporting from SW
+- Progress reporting via postMessage during downloads
+- Automatic cache-first serving when offline
 
-### Parking Predictions API (NEW - Apr 1, 2026)
-- Backend endpoint: GET `/api/poi/parking-predict?poiId=xxx&hour=xx`
+### Community Data Layer (Apr 2, 2026) 
+- Real-time trucker reports: parking, fuel price, weigh station, road hazard, road condition
+- Quick preset reports + custom submissions
+- Upvote system for report reliability
+- Auto-expiry: hazard/weigh station (4h), others (24h)
+- Category filter stats bar, live feed sorted by recency
+- Backend: `/api/community/reports` (GET/POST), `/api/community/reports/:id/upvote` (POST)
+
+### AI Crash/Incident Detection (Apr 2, 2026)
+- Fetches real-time incidents from HERE Traffic API v7 along route corridor
+- Gemini AI analysis: risk score (1-10), 3 specific warnings, recommended action, estimated delay
+- Fallback heuristic when Gemini unavailable or no incidents
+- Backend: `POST /api/crash-prediction` with bbox or routeCoords
+
+### Parking Predictions
 - Time-of-day based availability forecasting
-- Historical pattern algorithm (peak hours 7-9 PM, low 6-10 AM)
-- 6-hour forecast with fill percentage per hour
-- Status labels: LIKELY OPEN, FILLING UP, FULL SOON, LIKELY FULL
-- Blends last known status with time-of-day patterns
-
-### Mobile Build Pipeline
-- Capacitor integration for iOS/Android
-- GitHub Actions workflow for remote builds
-- EAS Build profiles configured
+- 6-hour forecast with fill percentage
+- Backend: `GET /api/poi/parking-predict`
 
 ## Key API Endpoints
 - `/api/route` - HERE Routing API v8.140.0
-- `/api/traffic-incidents` - Traffic incident data
-- `/api/poi/ratings` (POST/GET) - Facility ratings
-- `/api/poi/ratings/batch` (POST) - Batch ratings
-- `/api/poi/parking-status` (POST/GET) - Parking status updates
-- `/api/poi/parking-predict` (GET) - Parking availability predictions
-- `/api/facility-ratings` (GET/POST) - Facility ratings
-- `/api/facility-ratings-batch` (POST) - Batch facility ratings
+- `/api/traffic-incidents` - HERE Traffic v7
+- `/api/crash-prediction` - AI incident analysis (HERE + Gemini)
+- `/api/poi/ratings` (POST/GET), `/api/poi/ratings/batch` (POST)
+- `/api/poi/parking-status` (POST/GET), `/api/poi/parking-predict` (GET)
+- `/api/community/reports` (GET/POST), `/api/community/reports/:id/upvote` (POST)
 
-## Known Issues
-- Intermittent service drops: trucker-nav/frontend supervisor processes
+## Competitive Gap Analysis (Closed)
+| Feature | Status |
+|---------|--------|
+| Offline Maps | DONE - Real SW tile caching |
+| Speed Limit Warning | DONE - Visual + Audio |
+| AI Crash Detection | DONE - HERE + Gemini |
+| Community Data | DONE - Full report system |
+| ELD Integration | DONE - FMCSA compliant |
+| Parking Predictions | DONE - Time-of-day algo |
+| PC*MILER Data | SKIPPED - Requires enterprise license |
 
 ## Upcoming Tasks
-- **P1**: Viewport-based sign culling (only render signs currently visible in viewport for DOM performance)
+- **P1**: Viewport-based sign culling (DOM performance)
 
 ## Future/Backlog
-- NavigationView.tsx refactoring (~7000 lines -> smaller hooks/components)
+- NavigationView.tsx refactoring (7000+ lines -> hooks/components)
 - iOS/Android Store Submission
-- Driver reputation/review aggregation and leaderboards
-
-## Key Files
-- `/app/components/NavigationView.tsx` - Core map UI (~7000 lines)
-- `/app/components/NavigationHUD.tsx` - Turn-by-turn instruction card
-- `/app/components/HudLayoutView.tsx` - Display tab UI (21 elements)
-- `/app/components/ELDLogView.tsx` - ELD logs interface
-- `/app/components/OfflineMapsView.tsx` - Offline maps management
-- `/app/components/NavPreview.tsx` - Live preview for layout editing
-- `/app/components/PoiDetailModal.tsx` - POI detail with ratings/reviews
-- `/app/components/MapControls.tsx` - Map controls with min rating filter
-- `/app/utils/hudLayout.ts` - HUD layout persistence
-- `/app/server.ts` - Express backend proxy + all APIs
-- `/app/public/sw-tiles.js` - Service Worker for tile caching
+- PC*MILER integration (requires paid API key)
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
