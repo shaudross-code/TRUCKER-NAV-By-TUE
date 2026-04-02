@@ -9,7 +9,7 @@ const TimerProgressBar = React.memo(({ seconds, total, color }: { seconds: numbe
   );
 });
 
-export const ELDStatusCard = React.memo(({ eldStatus, setEldStatus, formatTime }: { eldStatus: any, setEldStatus: any, formatTime: (s: number) => string }) => {
+export const ELDStatusCard = React.memo(({ eldStatus, setEldStatus, formatTime, onViewLogs }: { eldStatus: any, setEldStatus: any, formatTime: (s: number) => string, onViewLogs?: () => void }) => {
   return (
     <div className="bg-black/80 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col shadow-2xl mb-6 md:mb-8 group hover:border-[#D4AF37]/30 transition-all duration-700">
       <div className="flex justify-between items-center mb-8 md:mb-12">
@@ -65,7 +65,7 @@ export const ELDStatusCard = React.memo(({ eldStatus, setEldStatus, formatTime }
           <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#D4AF37] animate-pulse" />
           <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Cycle resets in 34h</span>
         </div>
-        <button className="px-4 md:px-6 py-1.5 md:py-2 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-full text-[8px] md:text-[10px] font-bold text-white uppercase tracking-widest transition-all">View Logs</button>
+        <button onClick={onViewLogs} className="px-4 md:px-6 py-1.5 md:py-2 bg-white/5 hover:bg-[#D4AF37] hover:text-black rounded-full text-[8px] md:text-[10px] font-bold text-white uppercase tracking-widest transition-all">View Logs</button>
       </div>
     </div>
   );

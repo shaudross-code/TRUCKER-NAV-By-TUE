@@ -4,6 +4,7 @@ import { safeStringify } from '../utils';
 import { useFirebase } from './FirebaseProvider';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase';
+import { recordStatusChange } from '../utils/eldLogger';
 
 type HOSState = {
   idleSeconds: number;
@@ -108,6 +109,11 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
+  // Record initial status on mount so the ELD log always has at least one entry for today
+  useEffect(() => {
+    recordStatusChange(state.eldStatus.status);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Load from Firestore (skip for anonymous users - no Firestore access)
   useEffect(() => {
     if (!user || user.uid.startsWith('dev-') || user.isAnonymous) return;
@@ -170,6 +176,17 @@ export const HOSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [state.eldStatus, user]);
 
   const hasViolation = state.eldStatus.timers.some(t => t.seconds <= 0) && (state.eldStatus.status === 'DRIVE' || state.eldStatus.status === 'ON');
+
+  // Global ELD logging: record every status change into localStorage logs
+  // This ensures logs are captured whether the user changes status from Dashboard, ELD Logs, or auto-drive
+  const prevStatusRef = useRef<string>(state.eldStatus.status);
+  useEffect(() => {
+    const currentStatus = state.eldStatus.status;
+    if (currentStatus !== prevStatusRef.current) {
+      prevStatusRef.current = currentStatus;
+      recordStatusChange(currentStatus);
+    }
+  }, [state.eldStatus.status]);
 
   const stateRef = useRef(state);
   useEffect(() => {

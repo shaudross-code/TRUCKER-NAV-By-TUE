@@ -1,30 +1,14 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
+import React, { useState, useEffect, useContext, useCallback, useSyncExternalStore } from 'react';
 import {
   Clock, Activity, AlertTriangle, Download, ChevronLeft, ChevronRight,
   Truck, Coffee, Moon, Briefcase, FileText, BarChart3
 } from 'lucide-react';
 import { HOSContext } from '../types';
-
-// FMCSA Status types
-type DutyStatus = 'OFF' | 'SB' | 'ON' | 'DRIVE';
-
-interface LogEntry {
-  status: DutyStatus;
-  startTime: string;
-  endTime?: string;
-  location?: string;
-  notes?: string;
-}
-
-interface DailyLog {
-  date: string;
-  entries: LogEntry[];
-  totalDrive: number;
-  totalOnDuty: number;
-  totalSleeper: number;
-  totalOff: number;
-  violations: string[];
-}
+import {
+  DutyStatus, DailyLog, LogEntry,
+  loadLogs, saveLogs, formatDate, calcTotals, detectViolations,
+  subscribeEldChanges, getEldRevision, ELD_STORAGE_KEY
+} from '../utils/eldLogger';
 
 const STATUS_CONFIG: Record<DutyStatus, { label: string; color: string; bg: string; icon: any }> = {
   OFF: { label: 'Off Duty', color: 'text-zinc-400', bg: 'bg-zinc-600', icon: Moon },
@@ -32,23 +16,6 @@ const STATUS_CONFIG: Record<DutyStatus, { label: string; color: string; bg: stri
   ON: { label: 'On Duty', color: 'text-amber-400', bg: 'bg-amber-500', icon: Briefcase },
   DRIVE: { label: 'Driving', color: 'text-emerald-400', bg: 'bg-emerald-500', icon: Truck },
 };
-
-const STORAGE_KEY = 'eld_daily_logs';
-
-function loadLogs(): DailyLog[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-  } catch { return []; }
-}
-
-function saveLogs(logs: DailyLog[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
-}
-
-function formatDate(date: Date): string {
-  return date.toISOString().split('T')[0];
-}
 
 function formatTime(isoStr: string): string {
   return new Date(isoStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -65,89 +32,13 @@ function getTimelinePercent(isoStr: string): number {
   return ((d.getHours() * 60 + d.getMinutes()) / 1440) * 100;
 }
 
-function detectViolations(entries: LogEntry[]): string[] {
-  const violations: string[] = [];
-  let totalDrive = 0;
-  let totalOnDuty = 0;
-  let driveSinceBreak = 0;
-  let lastBreak = 0;
-
-  entries.forEach(e => {
-    if (!e.endTime) return;
-    const dur = (new Date(e.endTime).getTime() - new Date(e.startTime).getTime()) / 3600000;
-    if (e.status === 'DRIVE') {
-      totalDrive += dur;
-      driveSinceBreak += dur;
-    }
-    if (e.status === 'DRIVE' || e.status === 'ON') totalOnDuty += dur;
-    if ((e.status === 'OFF' || e.status === 'SB') && dur >= 0.5) {
-      driveSinceBreak = 0;
-      lastBreak = dur;
-    }
-  });
-
-  if (totalDrive > 11) violations.push('Exceeded 11-hour driving limit');
-  if (totalOnDuty > 14) violations.push('Exceeded 14-hour on-duty window');
-  if (driveSinceBreak > 8) violations.push('Drove 8+ hours without 30-min break');
-  return violations;
-}
-
-function calcTotals(entries: LogEntry[]): { totalDrive: number; totalOnDuty: number; totalSleeper: number; totalOff: number } {
-  let totalDrive = 0, totalOnDuty = 0, totalSleeper = 0, totalOff = 0;
-  entries.forEach(e => {
-    if (!e.endTime) return;
-    const dur = (new Date(e.endTime).getTime() - new Date(e.startTime).getTime()) / 3600000;
-    if (e.status === 'DRIVE') totalDrive += dur;
-    else if (e.status === 'ON') totalOnDuty += dur;
-    else if (e.status === 'SB') totalSleeper += dur;
-    else totalOff += dur;
-  });
-  return { totalDrive, totalOnDuty, totalSleeper, totalOff };
-}
-
 export default function ELDLogView() {
   const hosContext = useContext(HOSContext);
-  const [logs, setLogs] = useState<DailyLog[]>(loadLogs);
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
-  const [manualStatus, setManualStatus] = useState<DutyStatus | null>(null);
-  const [statusNote, setStatusNote] = useState('');
 
-  // Auto-log current driving status
-  useEffect(() => {
-    if (!hosContext) return;
-    const today = formatDate(new Date());
-    const currentStatus = hosContext.eldStatus.status;
-    
-    setLogs(prev => {
-      const updated = [...prev];
-      let todayLog = updated.find(l => l.date === today);
-      if (!todayLog) {
-        todayLog = { date: today, entries: [], totalDrive: 0, totalOnDuty: 0, totalSleeper: 0, totalOff: 0, violations: [] };
-        updated.push(todayLog);
-      }
-
-      const lastEntry = todayLog.entries[todayLog.entries.length - 1];
-      const now = new Date().toISOString();
-
-      if (lastEntry && !lastEntry.endTime && lastEntry.status !== currentStatus) {
-        lastEntry.endTime = now;
-      }
-
-      if (!lastEntry || lastEntry.endTime) {
-        todayLog.entries.push({ status: currentStatus, startTime: now });
-      }
-
-      const totals = calcTotals(todayLog.entries);
-      todayLog.totalDrive = totals.totalDrive;
-      todayLog.totalOnDuty = totals.totalOnDuty;
-      todayLog.totalSleeper = totals.totalSleeper;
-      todayLog.totalOff = totals.totalOff;
-      todayLog.violations = detectViolations(todayLog.entries);
-
-      saveLogs(updated);
-      return updated;
-    });
-  }, [hosContext?.eldStatus.status]);
+  // Subscribe to shared ELD log store — re-render whenever HOSProvider records a status change
+  const eldRevision = useSyncExternalStore(subscribeEldChanges, getEldRevision);
+  const logs = loadLogs();
 
   const todayLog = logs.find(l => l.date === selectedDate) || {
     date: selectedDate, entries: [], totalDrive: 0, totalOnDuty: 0, totalSleeper: 0, totalOff: 0, violations: []
@@ -156,8 +47,6 @@ export default function ELDLogView() {
   const changeStatus = useCallback((status: DutyStatus) => {
     if (!hosContext) return;
     hosContext.setEldStatus({ status });
-    setManualStatus(null);
-    setStatusNote('');
   }, [hosContext]);
 
   const navigateDate = (dir: number) => {

@@ -634,7 +634,7 @@ const Dashboard: React.FC = React.memo(() => {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
         <div className="lg:col-span-5">
-          <ELDStatusCard eldStatus={eldStatus} setEldStatus={setEldStatus} formatTime={formatTime} />
+          <ELDStatusCard eldStatus={eldStatus} setEldStatus={setEldStatus} formatTime={formatTime} onViewLogs={() => context?.setActiveView(ViewType.ELD_LOGS)} />
           <div className="mb-6 md:mb-8">
             <WeatherAnalyticsCard />
           </div>
