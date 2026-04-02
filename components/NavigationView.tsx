@@ -343,6 +343,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const {
     signDataStoreRef, visibleSignMarkersRef, syncVisibleSignsRef,
     syncVisibleSigns, clearSigns, setRegionState, setDataSaver,
+    updateSignVisibility,
     placeHighwayShields, placeExitSigns, placeCurveSigns,
     placeSpeedLimitSigns, placeTrafficSlowdowns, placeCmvWarnings, placeTruckWarnings,
   } = useSignPlacement(mapInstanceRef, shieldLayerGroupRef);
@@ -355,6 +356,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setHudScales(loadHudScales());
     }
   }, [activeView]);
+
+  // Sync map sign visibility whenever hudLayout sign toggles change
+  useEffect(() => {
+    updateSignVisibility(hudLayout as any);
+    syncVisibleSigns();
+  }, [
+    hudLayout.showHighwayShields, hudLayout.showExitSigns, hudLayout.showCurveWarnings,
+    hudLayout.showSpeedLimitSigns, hudLayout.showTrafficIncidents, hudLayout.showCmvWarnings,
+    hudLayout.showTruckRestrictions, updateSignVisibility, syncVisibleSigns,
+  ]);
 
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });

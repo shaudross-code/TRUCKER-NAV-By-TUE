@@ -18,9 +18,25 @@ interface SignData {
   zIndexOffset: number;
 }
 
+// Map sign ID prefix → hudLayout key for visibility filtering
+const SIGN_PREFIX_TO_HUD_KEY: Record<string, string> = {
+  'shield': 'showHighwayShields',
+  'exit': 'showExitSigns',
+  'curve': 'showCurveWarnings',
+  'speed': 'showSpeedLimitSigns',
+  'slowdown': 'showTrafficIncidents',
+  'cmv': 'showCmvWarnings',
+  'truckwarn': 'showTruckRestrictions',
+};
+
+function getSignCategory(signId: string): string {
+  const dash = signId.indexOf('-');
+  return dash > 0 ? signId.substring(0, dash) : signId;
+}
+
 export function useSignPlacement(
-  mapInstanceRef: React.MutableRefObject<any>,
-  shieldLayerGroupRef: React.MutableRefObject<L.LayerGroup | null>,
+  mapInstanceRef: { current: any },
+  shieldLayerGroupRef: { current: L.LayerGroup | null },
 ) {
   const signDataStoreRef = useRef<SignData[]>([]);
   const visibleSignMarkersRef = useRef<Map<string, L.Marker>>(new Map());
@@ -28,9 +44,21 @@ export function useSignPlacement(
   const shieldBlobCacheRef = useRef<Map<string, string>>(new Map());
   const regionStateRef = useRef('');
   const dataSaverRef = useRef(false);
+  // Tracks which sign categories are visible based on hudLayout
+  const signVisibilityRef = useRef<Record<string, boolean>>({});
 
   const setRegionState = useCallback((state: string) => { regionStateRef.current = state; }, []);
   const setDataSaver = useCallback((ds: boolean) => { dataSaverRef.current = ds; }, []);
+
+  // Update sign visibility filter from hudLayout and re-sync the map
+  const updateSignVisibility = useCallback((hudLayout: Record<string, any>) => {
+    const vis: Record<string, boolean> = {};
+    for (const prefix of Object.keys(SIGN_PREFIX_TO_HUD_KEY)) {
+      const key = SIGN_PREFIX_TO_HUD_KEY[prefix];
+      vis[prefix] = hudLayout[key] !== false; // default true if undefined
+    }
+    signVisibilityRef.current = vis;
+  }, []);
 
   const getShieldBlobUrl = useCallback(async (shieldUrl: string): Promise<string> => {
     if (shieldBlobCacheRef.current.has(shieldUrl)) return shieldBlobCacheRef.current.get(shieldUrl)!;
@@ -51,14 +79,20 @@ export function useSignPlacement(
     const padded = bounds.pad(0.2);
     const store = signDataStoreRef.current;
     const visible = visibleSignMarkersRef.current;
+    const vis = signVisibilityRef.current;
     const newVisibleIds = new Set<string>();
 
     for (const sign of store) {
-      if (padded.contains([sign.lat, sign.lon])) newVisibleIds.add(sign.id);
+      // Check both viewport bounds AND hudLayout visibility
+      const category = getSignCategory(sign.id);
+      const isAllowed = vis[category] !== false; // default true
+      if (isAllowed && padded.contains([sign.lat, sign.lon])) newVisibleIds.add(sign.id);
     }
+    // Remove markers that should no longer be visible
     for (const [id, marker] of visible) {
       if (!newVisibleIds.has(id)) { shieldLayerGroupRef.current!.removeLayer(marker); visible.delete(id); }
     }
+    // Add markers that should now be visible
     for (const sign of store) {
       if (newVisibleIds.has(sign.id) && !visible.has(sign.id)) {
         const icon = L.divIcon({ html: sign.iconHtml, className: 'highway-shield-icon', iconSize: sign.iconSize, iconAnchor: sign.iconAnchor });
@@ -208,6 +242,7 @@ export function useSignPlacement(
     clearSigns,
     setRegionState,
     setDataSaver,
+    updateSignVisibility,
     placeHighwayShields,
     placeExitSigns,
     placeCurveSigns,

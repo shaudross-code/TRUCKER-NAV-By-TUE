@@ -4,6 +4,7 @@ import {
   onAuthStateChanged, 
   signInWithPopup, 
   GoogleAuthProvider, 
+  OAuthProvider,
   signOut as firebaseSignOut, 
   browserPopupRedirectResolver,
   createUserWithEmailAndPassword,
@@ -155,6 +156,28 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   };
 
+  // Apple Sign-In
+  const signInWithApple = async () => {
+    if (USE_MOCK_DATA) return;
+    try {
+      setAuthError(null);
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+    } catch (error: any) {
+      const code = error.code;
+      if (code === 'auth/popup-closed-by-user') {
+        // User closed the popup — not a real error
+        return;
+      } else if (code === 'auth/operation-not-allowed') {
+        setAuthError('Apple Sign-In is not enabled. Please enable it in Firebase Console.');
+      } else {
+        setAuthError(error.message);
+      }
+    }
+  };
+
   // Email/Password Sign-In
   const signInWithEmail = async (email: string, password: string) => {
     if (USE_MOCK_DATA) return;
@@ -243,6 +266,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     profile,
     loading,
     signIn,
+    signInWithApple,
     signInWithEmail,
     signUpWithEmail,
     signInAsGuest,

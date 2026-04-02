@@ -243,7 +243,7 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 };
 
 const AppContent: React.FC = React.memo(() => {
-  const { user, profile, loading, signIn, signInWithEmail, signUpWithEmail, signInAsGuest, signOut, updateProfile, authError } = useFirebase();
+  const { user, profile, loading, signIn, signInWithApple, signInWithEmail, signUpWithEmail, signInAsGuest, signOut, updateProfile, authError } = useFirebase();
   const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -558,7 +558,7 @@ const AppContent: React.FC = React.memo(() => {
   }
 
   if (!user) {
-    return <LoginScreen signIn={signIn} signInWithEmail={signInWithEmail} signUpWithEmail={signUpWithEmail} signInAsGuest={signInAsGuest} authError={authError} />;
+    return <LoginScreen signIn={signIn} signInWithApple={signInWithApple} signInWithEmail={signInWithEmail} signUpWithEmail={signUpWithEmail} signInAsGuest={signInAsGuest} authError={authError} />;
   }
 
   return (
