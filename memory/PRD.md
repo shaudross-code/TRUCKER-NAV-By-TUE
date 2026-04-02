@@ -1,7 +1,7 @@
 # TRUCKERS NAV By TUE - Product Requirements Document
 
 ## Original Problem Statement
-Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using HERE Maps API, turn-by-turn navigation, real-time traffic/infrastructure alerts, 3D/2D satellite maps. High-quality professional trucking GPS interface, dynamic map switching, real-time hazard alerts (hazmat, bridges, weight), custom fuel network POI tracking, CMV warning systems, smooth GPS interpolation, MUTCD-compliant official road signs, and customizable UI/HUD layouts.
+Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using HERE Maps API, turn-by-turn navigation, real-time traffic/infrastructure alerts, 3D/2D satellite maps. High-quality professional trucking GPS interface, dynamic map switching, real-time hazard alerts (hazmat, bridges, weight), custom fuel network POI tracking, CMV warning systems, smooth GPS interpolation, MUTCD-compliant official road signs, customizable UI/HUD layouts, Apple ID & Google Play Store login options.
 
 ## Architecture
 - **Frontend**: React (Vite) + TypeScript + Tailwind CSS + Leaflet Maps
@@ -50,6 +50,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Element resize (XS/S/M/L/XL) + drag-and-drop repositioning
 - NavPreview with Compass Rose + Next Stop mockups
 - Persistent via LocalStorage
+- **Live sync between Display tab and Navigation view** (Apr 2, 2026)
+- **Sign visibility filtering**: toggling off signs in Display tab instantly removes them from the map
+
+### Authentication (Apr 2, 2026)
+- Google Sign-In via Firebase GoogleAuthProvider
+- **Apple Sign-In** via Firebase OAuthProvider('apple.com')
+- Email/Password registration and login
+- Guest/Anonymous login
+- Note: Apple Sign-In requires Apple Developer account + Firebase Console setup to work
 
 ### ELD Logs
 - FMCSA-compliant ELD interface synced with Dashboard
@@ -57,14 +66,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Daily summary cards, visual timeline graph, violation detection
 - CSV export, date navigation, global auto-logging via HOSProvider
 
-### Offline Maps (Apr 2, 2026) 
+### Offline Maps
 - Real tile pre-fetching via Service Worker (OSM tiles)
 - 5 US regions with actual tile count estimates
 - Cache storage with LIVE size reporting from SW
 - Progress reporting via postMessage during downloads
 - Automatic cache-first serving when offline
 
-### Community Data Layer (Apr 2, 2026) 
+### Community Data Layer
 - Real-time trucker reports: parking, fuel price, weigh station, road hazard, road condition
 - Quick preset reports + custom submissions
 - Upvote system for report reliability
@@ -72,36 +81,28 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Category filter stats bar, live feed sorted by recency
 - Backend: `/api/community/reports` (GET/POST), `/api/community/reports/:id/upvote` (POST)
 
-### AI Crash/Incident Detection (Apr 2, 2026)
+### AI Crash/Incident Detection
 - Fetches real-time incidents from HERE Traffic API v7 along route corridor
 - Gemini AI analysis: risk score (1-10), 3 specific warnings, recommended action, estimated delay
 - Fallback heuristic when Gemini unavailable or no incidents
 - Backend: `POST /api/crash-prediction` with bbox or routeCoords
 
-### Viewport-Based Sign Culling (Apr 2, 2026) - P1
+### Viewport-Based Sign Culling
 - Signs stored in `signDataStoreRef` via extracted `useSignPlacement` hook
-- `syncVisibleSigns()` renders only signs within padded viewport (+20%)
+- `syncVisibleSigns()` renders only signs within padded viewport (+20%) AND whose category is enabled in hudLayout
 - All 7 placement functions extracted to `/app/hooks/useSignPlacement.ts`
 - HUD config extracted to `/app/hooks/useHudConfig.ts`
-- NavigationView.tsx reduced from 7150 → 6770 lines
 
-### Display Layout Position Sync Fix (Apr 2, 2026)
-- Fixed: Compass Rose, Next Stop, Speed Overlay, Navigation HUD, Map Controls, Route Comparison now all respect custom positions set via drag in Display Layout preview
+### Code Refactoring
+- Extracted sign placement system (~380 lines) into `hooks/useSignPlacement.ts`
+- Extracted HUD config management into `hooks/useHudConfig.ts`
+- Deleted dead code: `GoogleMapsNavigationView.tsx`
+- NavigationView.tsx: 7150 -> ~6770 lines
 
-### Code Refactoring (Apr 2, 2026)
-- Extracted sign placement system (~380 lines) → `hooks/useSignPlacement.ts`
-- Extracted HUD config management → `hooks/useHudConfig.ts`
-- Deleted dead code: `GoogleMapsNavigationView.tsx` (eliminated 46 TS errors)
-- NavigationView.tsx: 7150 → 6770 lines
-
-### iOS/Android Store Submission Setup (Apr 2, 2026)
+### iOS/Android Store Submission Setup
 - Production Capacitor config (webContentsDebuggingEnabled=false)
 - Full store submission guide: `STORE_SUBMISSION.md`
 - Privacy policy page: `/public/privacy.html`
-- All permissions configured (Location, Foreground Service)
-- App icons and splash screens at all required sizes
-- EAS build profiles (development, preview, production)
-- GitHub Actions CI/CD workflow for automated builds
 
 ### Parking Predictions
 - Time-of-day based availability forecasting
@@ -116,17 +117,6 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - `/api/poi/parking-status` (POST/GET), `/api/poi/parking-predict` (GET)
 - `/api/community/reports` (GET/POST), `/api/community/reports/:id/upvote` (POST)
 
-## Competitive Gap Analysis (Closed)
-| Feature | Status |
-|---------|--------|
-| Offline Maps | DONE - Real SW tile caching |
-| Speed Limit Warning | DONE - Visual + Audio |
-| AI Crash Detection | DONE - HERE + Gemini |
-| Community Data | DONE - Full report system |
-| ELD Integration | DONE - FMCSA compliant |
-| Parking Predictions | DONE - Time-of-day algo |
-| PC*MILER Data | SKIPPED - Requires enterprise license |
-
 ## Upcoming Tasks
 - None currently queued
 
@@ -137,8 +127,10 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## Key Files
 - `/app/components/NavigationView.tsx` - Core map UI (~6770 lines)
-- `/app/hooks/useSignPlacement.ts` - Extracted sign placement + viewport culling
-- `/app/hooks/useHudConfig.ts` - Extracted HUD layout/positions/scales management
+- `/app/components/LoginScreen.tsx` - Login with Google, Apple, Email, Guest
+- `/app/components/FirebaseProvider.tsx` - Firebase Auth (Google, Apple, Email, Guest)
+- `/app/hooks/useSignPlacement.ts` - Sign placement + viewport culling + visibility filter
+- `/app/hooks/useHudConfig.ts` - HUD layout/positions/scales management with event sync
 - `/app/STORE_SUBMISSION.md` - iOS/Android store submission guide
 - `/app/public/privacy.html` - Privacy policy page
 
