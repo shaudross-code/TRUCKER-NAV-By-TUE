@@ -79,11 +79,29 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Backend: `POST /api/crash-prediction` with bbox or routeCoords
 
 ### Viewport-Based Sign Culling (Apr 2, 2026) - P1
-- Signs stored in `signDataStoreRef` array instead of immediately rendering as DOM markers
-- `syncVisibleSigns()` computes which signs are within the padded viewport (+20%) on every map `moveend`/`zoomend`
-- Efficiently adds entering signs and removes leaving signs using a `Map<id, L.Marker>` diff
-- All 7 placement functions updated: highway shields, exit signs, curve warnings, speed limits, traffic slowdowns, CMV warnings, truck restrictions
-- Result: Only ~10-30 signs rendered at a time vs hundreds for a long route = major DOM performance gain
+- Signs stored in `signDataStoreRef` via extracted `useSignPlacement` hook
+- `syncVisibleSigns()` renders only signs within padded viewport (+20%)
+- All 7 placement functions extracted to `/app/hooks/useSignPlacement.ts`
+- HUD config extracted to `/app/hooks/useHudConfig.ts`
+- NavigationView.tsx reduced from 7150 → 6770 lines
+
+### Display Layout Position Sync Fix (Apr 2, 2026)
+- Fixed: Compass Rose, Next Stop, Speed Overlay, Navigation HUD, Map Controls, Route Comparison now all respect custom positions set via drag in Display Layout preview
+
+### Code Refactoring (Apr 2, 2026)
+- Extracted sign placement system (~380 lines) → `hooks/useSignPlacement.ts`
+- Extracted HUD config management → `hooks/useHudConfig.ts`
+- Deleted dead code: `GoogleMapsNavigationView.tsx` (eliminated 46 TS errors)
+- NavigationView.tsx: 7150 → 6770 lines
+
+### iOS/Android Store Submission Setup (Apr 2, 2026)
+- Production Capacitor config (webContentsDebuggingEnabled=false)
+- Full store submission guide: `STORE_SUBMISSION.md`
+- Privacy policy page: `/public/privacy.html`
+- All permissions configured (Location, Foreground Service)
+- App icons and splash screens at all required sizes
+- EAS build profiles (development, preview, production)
+- GitHub Actions CI/CD workflow for automated builds
 
 ### Parking Predictions
 - Time-of-day based availability forecasting
@@ -113,10 +131,16 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - None currently queued
 
 ## Future/Backlog
-- NavigationView.tsx refactoring (7000+ lines -> hooks/components)
-- iOS/Android Store Submission
+- Continue NavigationView.tsx refactoring (6770 lines -> target <3000)
 - PC*MILER integration (requires paid API key)
-- Surface AI crash prediction as a live "Route Safety Score" badge on the Navigation map
+- Surface AI crash prediction as live Route Safety Score badge on map
+
+## Key Files
+- `/app/components/NavigationView.tsx` - Core map UI (~6770 lines)
+- `/app/hooks/useSignPlacement.ts` - Extracted sign placement + viewport culling
+- `/app/hooks/useHudConfig.ts` - Extracted HUD layout/positions/scales management
+- `/app/STORE_SUBMISSION.md` - iOS/Android store submission guide
+- `/app/public/privacy.html` - Privacy policy page
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
