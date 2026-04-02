@@ -323,6 +323,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const shieldLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  // Viewport-based sign culling: store all sign definitions, only render those in view
+  const signDataStoreRef = useRef<{ id: string; lat: number; lon: number; iconHtml: string; iconSize: [number, number]; iconAnchor: [number, number]; zIndexOffset: number }[]>([]);
+  const visibleSignMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const syncVisibleSignsRef = useRef<() => void>(() => {});
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -685,6 +689,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Reset all map-attached refs so they get recreated on the new instance
       routeGroupRef.current = null;
       shieldLayerGroupRef.current = null;
+      signDataStoreRef.current = [];
+      visibleSignMarkersRef.current.clear();
       markerClusterGroupRef.current = null;
       userMarkerRef.current = null;
       userMarkerElRef.current = null;
@@ -862,6 +868,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           map.on('moveend', () => {
             const center = map.getCenter();
             setMapCenter([center.lat, center.lng]);
+            // Viewport-based sign culling: only render signs in current view
+            syncVisibleSignsRef.current();
           });
           map.on('zoomend', () => {
             const z = map.getZoom();
@@ -870,6 +878,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             if (!isManeuverZoomActiveRef.current) {
               userPreferredZoomRef.current = z;
             }
+            // Viewport-based sign culling: sync on zoom changes too
+            syncVisibleSignsRef.current();
           });
           // console.log("Map created successfully");
 
@@ -1293,6 +1303,65 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     } catch { return ''; }
   }, []);
 
+  // ─── Viewport-based sign culling ──────────────────────────────────────────
+  // Instead of adding all markers at once, we store sign data and only render
+  // those within the current map viewport (with padding). This dramatically
+  // reduces DOM nodes for long routes (hundreds → dozens visible at a time).
+  const syncVisibleSigns = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !shieldLayerGroupRef.current) return;
+
+    const bounds = map.getBounds();
+    // Pad the bounds by ~20% so signs don't pop in/out at edges
+    const padded = bounds.pad(0.2);
+    const store = signDataStoreRef.current;
+    const visible = visibleSignMarkersRef.current;
+    const newVisibleIds = new Set<string>();
+
+    // Determine which signs are in the padded viewport
+    for (const sign of store) {
+      if (padded.contains([sign.lat, sign.lon])) {
+        newVisibleIds.add(sign.id);
+      }
+    }
+
+    // Remove markers that left the viewport
+    for (const [id, marker] of visible) {
+      if (!newVisibleIds.has(id)) {
+        shieldLayerGroupRef.current!.removeLayer(marker);
+        visible.delete(id);
+      }
+    }
+
+    // Add markers that entered the viewport
+    for (const sign of store) {
+      if (newVisibleIds.has(sign.id) && !visible.has(sign.id)) {
+        const icon = L.divIcon({
+          html: sign.iconHtml,
+          className: 'highway-shield-icon',
+          iconSize: sign.iconSize,
+          iconAnchor: sign.iconAnchor,
+        });
+        const marker = L.marker([sign.lat, sign.lon], {
+          icon,
+          interactive: false,
+          zIndexOffset: sign.zIndexOffset,
+          pane: 'signPane',
+        }).addTo(shieldLayerGroupRef.current!);
+        visible.set(sign.id, marker);
+      }
+    }
+  }, []);
+
+  // Keep ref in sync so event handlers can call it
+  syncVisibleSignsRef.current = syncVisibleSigns;
+
+  // Helper: register a sign in the data store (called by placement functions)
+  const registerSign = useCallback((id: string, lat: number, lon: number, iconHtml: string, iconSize: [number, number], iconAnchor: [number, number], zIndexOffset: number) => {
+    signDataStoreRef.current.push({ id, lat, lon, iconHtml, iconSize, iconAnchor, zIndexOffset });
+  }, []);
+  // ────────────────────────────────────────────────────────────────────────────
+
   const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[]) => {
     if (!shieldLayerGroupRef.current || shields.length === 0) return;
     
@@ -1357,13 +1426,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [48, 52], iconAnchor: [24, 26] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 500, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`shield-${label}-${routeLevel}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [48, 52], [24, 26], 500);
       });
+      syncVisibleSigns();
       console.log(`[Shields] Placed ${shields.length} highway shield markers on route${dataSaver ? ' (data saver)' : ''}`);
     }).catch(err => {
       console.error('[Shields] Failed to prefetch shield images:', err);
     });
-  }, [currentRegion.state, dataSaver, getShieldBlobUrl]);
+  }, [currentRegion.state, dataSaver, getShieldBlobUrl, registerSign, syncVisibleSigns]);
 
   // Place exit signs along the route (MUTCD-style static green highway exit signs)
   const placeExitSigns = useCallback((exits: { name: string; exitNumber?: string; coord: [number, number] }[]) => {
@@ -1381,10 +1451,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [100, 48], iconAnchor: [50, 48] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 480, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`exit-${exitNumber || name}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [100, 48], [50, 48], 480);
     });
+    syncVisibleSigns();
     console.log(`[Signs] Placed ${exits.length} exit signs on route`);
-  }, []);
+  }, [registerSign, syncVisibleSigns]);
 
   // Place sharp curve warning signs
   const placeCurveSigns = useCallback((curves: { severity: string; direction: string; coord: [number, number] }[]) => {
@@ -1399,10 +1470,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [36, 36], iconAnchor: [18, 18] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 450, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`curve-${direction}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [36, 36], [18, 18], 450);
     });
+    syncVisibleSigns();
     console.log(`[Signs] Placed ${curves.length} curve warning signs on route`);
-  }, []);
+  }, [registerSign, syncVisibleSigns]);
 
   // Place speed limit change signs
   const placeSpeedLimitSigns = useCallback((signs: { speed: number; coord: [number, number] }[]) => {
@@ -1417,10 +1489,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [38, 46], iconAnchor: [19, 23] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 460, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`speed-${speed}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [38, 46], [19, 23], 460);
     });
+    syncVisibleSigns();
     console.log(`[Signs] Placed ${signs.length} speed limit signs on route`);
-  }, []);
+  }, [registerSign, syncVisibleSigns]);
 
   // Place traffic slowdown markers
   const placeTrafficSlowdowns = useCallback((slowdowns: { severity: string; message: string; coord: [number, number] }[]) => {
@@ -1445,10 +1518,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [94, 34], iconAnchor: [47, 34] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 470, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`slowdown-${severity}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [94, 34], [47, 34], 470);
     });
+    syncVisibleSigns();
     console.log(`[Signs] Placed ${slowdowns.length} traffic slowdown markers on route`);
-  }, []);
+  }, [registerSign, syncVisibleSigns]);
 
   // Place CMV warning signs (steep grade, rollover risk, winding road, steep hill)
   const placeCmvWarnings = useCallback((warnings: { type: string; severity: string; message: string; grade?: number; coord: [number, number] }[]) => {
@@ -1490,10 +1564,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 60], iconAnchor: [22, 30] });
-      L.marker([coord[0], coord[1]], { icon, interactive: false, zIndexOffset: 550, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`cmv-${type}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [44, 60], [22, 30], 550);
     });
+    syncVisibleSigns();
     console.log(`[CMV] Placed ${warnings.length} CMV warning signs on route`);
-  }, []);
+  }, [registerSign, syncVisibleSigns]);
 
   // Place truck restriction warning signs on route (low bridges, weight limits, tunnel, hazmat zones)
   const placeTruckWarnings = useCallback((restrictions: { type: string; message: string; coords?: [number, number]; progress?: number }[]) => {
@@ -1548,11 +1623,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>`;
 
       const icon = L.divIcon({ html: iconHtml, className: 'highway-shield-icon', iconSize: [44, 55], iconAnchor: [22, 27] });
-      L.marker([r.coords[0], r.coords[1]], { icon, interactive: false, zIndexOffset: 520, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+      registerSign(`truckwarn-${r.type}-${r.coords[0].toFixed(4)}`, r.coords[0], r.coords[1], iconHtml, [44, 55], [22, 27], 520);
       placed++;
     });
-    if (placed > 0) console.log(`[Signs] Placed ${placed} truck warning signs on route`);
-  }, []);
+    if (placed > 0) { syncVisibleSigns(); console.log(`[Signs] Placed ${placed} truck warning signs on route`); }
+  }, [registerSign, syncVisibleSigns]);
 
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
@@ -3353,6 +3428,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (shieldLayerGroupRef.current) {
       shieldLayerGroupRef.current.clearLayers();
     }
+    signDataStoreRef.current = [];
+    visibleSignMarkersRef.current.clear();
     // Clear lane visualization
     if (mapInstanceRef.current) {
       clearLanes(mapInstanceRef.current);
@@ -4478,6 +4555,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (shieldLayerGroupRef.current) {
       shieldLayerGroupRef.current.clearLayers();
     }
+    signDataStoreRef.current = [];
+    visibleSignMarkersRef.current.clear();
     
     if (context) context.setNavTarget(null);
   }, [context]);
@@ -4650,6 +4729,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         if (shieldLayerGroupRef.current) {
           shieldLayerGroupRef.current.clearLayers();
         }
+        // Reset viewport culling stores for new route
+        signDataStoreRef.current = [];
+        visibleSignMarkersRef.current.clear();
         // Place highway shield markers on the route
         if (hudLayout.showHighwayShields && primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
           placeHighwayShields(primaryRoute.highwayShields);
