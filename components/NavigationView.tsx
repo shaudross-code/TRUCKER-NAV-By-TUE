@@ -5,6 +5,9 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
 import { MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
 import { 
   Plus, 
   Search,
@@ -920,12 +923,35 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
 
           const L_any = L_obj as any;
-          // Initialize POI layer group (static, no clustering)
+          // Initialize POI layer group with marker clustering for performance
           try {
-            markerClusterGroupRef.current = L.layerGroup();
+            markerClusterGroupRef.current = (L_any as any).markerClusterGroup({
+              maxClusterRadius: 60,
+              spiderfyOnMaxZoom: true,
+              showCoverageOnHover: false,
+              zoomToBoundsOnClick: true,
+              disableClusteringAtZoom: 16,
+              chunkedLoading: true,
+              chunkInterval: 100,
+              chunkDelay: 20,
+              iconCreateFunction: (cluster: any) => {
+                const count = cluster.getChildCount();
+                let size = 'small';
+                let dim = 36;
+                if (count > 50) { size = 'large'; dim = 48; }
+                else if (count > 10) { size = 'medium'; dim = 42; }
+                return L.divIcon({
+                  html: `<div class="poi-cluster poi-cluster-${size}"><span>${count}</span></div>`,
+                  className: 'poi-cluster-icon',
+                  iconSize: L.point(dim, dim),
+                });
+              },
+            });
             map.addLayer(markerClusterGroupRef.current);
           } catch (e) {
-            console.error("NavigationView: POI layer group initialization failed", e);
+            console.error("NavigationView: MarkerClusterGroup initialization failed, falling back to LayerGroup", e);
+            markerClusterGroupRef.current = L.layerGroup();
+            map.addLayer(markerClusterGroupRef.current);
           }
 
           clearTimeout(timeoutId);
@@ -5244,7 +5270,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     poiMarkersRef.current = [];
 
     let validPoisCount = 0;
-    // Pre-filter POIs to only those within 100 miles of map center to avoid heavy iteration
+    // Pre-filter POIs to only those within 100 miles of map center, then cap at 200 nearest
     const nearbyPois = pois.filter(poi => {
       if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
       const category = getPoiCategory(poi.type, poi.name);
@@ -5252,7 +5278,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       const distance = calcDistMi(mapCenter[0], mapCenter[1], poi.lat, poi.lon);
       return distance <= 100;
-    });
+    })
+    .map(poi => ({ ...poi, _dist: calcDistMi(mapCenter[0], mapCenter[1], poi.lat, poi.lon) }))
+    .sort((a, b) => a._dist - b._dist)
+    .slice(0, 200);
 
     nearbyPois.forEach(poi => {
         try {

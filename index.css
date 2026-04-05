@@ -182,3 +182,49 @@
 .map-dark-theme {
   filter: invert(90%) hue-rotate(180deg) brightness(0.8) contrast(1.2);
 }
+
+/* POI Cluster Icons — Gold/Black theme */
+.poi-cluster-icon {
+  background: transparent !important;
+  border: none !important;
+}
+.poi-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 900;
+  color: #000;
+  border: 2px solid rgba(212, 175, 55, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 8px rgba(212, 175, 55, 0.3);
+}
+.poi-cluster span {
+  font-family: 'Impact', sans-serif;
+  letter-spacing: -0.02em;
+}
+.poi-cluster-small {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%);
+  font-size: 12px;
+}
+.poi-cluster-medium {
+  width: 42px;
+  height: 42px;
+  background: linear-gradient(135deg, #D4AF37 0%, #9A7B2C 100%);
+  font-size: 14px;
+}
+.poi-cluster-large {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #D4AF37 0%, #856D1E 100%);
+  font-size: 16px;
+  border-width: 3px;
+}
+/* Override default markercluster styles */
+.marker-cluster-small, .marker-cluster-medium, .marker-cluster-large {
+  background: transparent !important;
+}
+.marker-cluster div {
+  background: transparent !important;
+}
