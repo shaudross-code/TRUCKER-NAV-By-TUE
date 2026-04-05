@@ -16,6 +16,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## What's Been Implemented
 
+### Map & Alert Improvements (Apr 5, 2026)
+- **Thicker Traffic Flow Lines**: Road/highway overlaps now use weight 5/7/9 (up from 3/4/5) with smoothFactor 2 for smoother rendering
+- **Clickable Warning Alerts**: Truck Restrictions, Traffic Alerts, and Weather Hazards are now clickable, opening a detail modal with type, severity, location, and route progress info
+- **Collapsible Warning Alerts**: Each alert panel has an X button to collapse to a compact "+" badge with count, freeing map space
+- **Alert Detail Modal**: Gold-themed modal with dismiss button showing detailed alert information
+- **Weather Overlay Resizable**: Weather Overlay now supports XS/S/M/L/XL size controls in the Display Layout
+- **POI in Display Layout**: "Along Route" panel renamed to "POI" and added as a toggleable element in the Display Layout (Panels category)
+- **Brand Icons in POI List**: POI entries now show brand-specific SVG icons (Love's, Pilot, TA, Shell, etc.) instead of generic lucide icons
+
 ### Roads & Highways Overlay System (Apr 5, 2026)
 - **Real-Time Traffic Flow**: HERE Traffic API v7 flow data rendered as color-coded polylines (green=freeflow, gold=moderate, red=heavy) — auto-refreshes every 60s, only at zoom 10+
 - **Route Reasoning**: Visual explanation of WHY a route was chosen — toll road dashed gold lines with $ badges, truck restriction red highlights, highway preference segments
@@ -34,11 +43,14 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Speed limit sign offset at route start (LEFT of user icon)
 
 ### HUD Layout Customization (Display Tab)
-- 21 toggleable HUD elements with live sync
+- 22 toggleable HUD elements with live sync (including new POI toggle)
 - Sign visibility filtering synced with Display tab toggles
+- Drag-to-reorder, resize (XS-XL), position editing
+- Weather Overlay now resizable
 
 ### Authentication
-- Google Sign-In, Apple Sign-In, Email/Password, Guest login (Firebase Auth)
+- Google Sign-In (custom server-side OAuth flow), Email/Password, Guest login (Firebase Auth)
+- Apple Sign-In: PENDING (needs Apple Developer credentials)
 
 ### Safety, ELD, Offline, Community, AI Crash Detection
 - All previously implemented features remain functional
@@ -50,34 +62,19 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - `/api/traffic-incidents` - HERE Traffic v7
 - `/api/crash-prediction` - AI incident analysis
 - `/api/poi/ratings`, `/api/poi/parking-predict`, `/api/community/reports`
-
-## Deployment Fix (Apr 5, 2026)
-- Replaced hardcoded Firebase Project ID in `server.ts` with `process.env.FIREBASE_PROJECT_ID`
-- Moved Google OAuth credentials (CLIENT_ID, CLIENT_SECRET) from hardcoded values to `process.env`
-- Added `FIREBASE_PROJECT_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` to `.env`, `backend/.env`, and supervisor config
-- Created `/app/frontend/.env` (empty, required by deployment pipeline)
-- Deployed Firebase Hosting (`firebase deploy --only hosting`) for auth handler availability
-- Deployment agent confirms: no hardcoded secrets, all env vars properly loaded ✅
+- `/api/auth/google` & `/api/auth/google/callback` - Custom OAuth
 
 ## Firebase Auth Fix (Apr 5, 2026)
-- Fixed "authorizedDomains is not iterable" error that blocked all OAuth sign-in
-- Root cause: Firebase Identity Toolkit API (`/v1/projects`) returns response WITHOUT `authorizedDomains`, AND Firebase Hosting handler.js stuck at v3.7.5 (incompatible with SDK v12)
-- Solution: Custom server-side OAuth flow for Google Sign-In:
-  - Backend `/api/auth/google` redirects to Google OAuth with Firebase's authorized redirect URI
-  - Backend `/api/auth/google/callback` exchanges auth code for ID token
-  - Frontend polls popup URL, extracts auth code, calls backend, uses `signInWithCredential`
-  - Fetch interceptor in `firebase.ts` patches missing `authorizedDomains` in Identity Toolkit response
-- Deployed Firebase Hosting (`firebase deploy --only hosting`) for init.json availability
-- Google Sign-In: WORKING (custom OAuth flow)
-- Apple Sign-In: PENDING (needs Apple Developer credentials for server-side flow)
-- Email Sign-In: WORKING
-- Guest Login: WORKING
+- Custom server-side OAuth flow for Google Sign-In (bypasses broken Firebase handler.js v3.7.5)
+- DO NOT revert to signInWithPopup
 
 ## Future/Backlog
-- NavigationView.tsx refactoring (6800+ lines → target <3000)
+- NavigationView.tsx refactoring (6900+ lines -> target <3000)
 - PC*MILER integration (enterprise API key needed)
 - Gemini API key rotation / TTS fallback
 - Route Safety Score badge on map
+- Apple Sign-In (blocked on credentials)
+- Viewport-based sign culling
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
