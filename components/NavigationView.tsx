@@ -3619,7 +3619,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const actionCoord = coords[coordIdx] || coords[Math.floor(actionOffset * (coords.length - 1) / (summary.length || 1))];
             
             if (instruction.includes('stop sign') || action.action === 'stop') {
-              const progress = actionOffset / (summary.length || 1);
+              // Progress = polyline point index / total polyline points (NOT distance)
+              const progress = coordIdx / (coords.length - 1 || 1);
               trafficAlertsList.push({
                 type: 'STOP_SIGN',
                 message: 'Stop Sign',
