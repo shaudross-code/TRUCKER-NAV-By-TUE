@@ -46,60 +46,52 @@ export function setUserStorage(key: string, value: string, userId?: string): voi
 
 /**
  * Migrate existing non-prefixed localStorage keys to user-scoped keys.
- * Only runs once per user (tracks migration flag).
+ * Only runs once per user. Only migrates if the SAME user had pre-existing
+ * global data (checked via a fingerprint key). New users get fresh defaults.
  */
 export function migrateLocalStorageForUser(uid: string): void {
   const migrationKey = `${uid}_storage_migrated`;
   try {
     if (localStorage.getItem(migrationKey)) return; // Already migrated
-    
+
+    // Mark this user as migrated immediately to prevent re-runs
+    localStorage.setItem(migrationKey, 'true');
+
+    // Check if there's any pre-existing global data worth migrating.
+    // If none of these core keys exist globally, this is a fresh user — skip migration.
+    const coreKeys = ['trucker_weeklyEarnings', 'nav_current_destination', 'trucker_hud_layout'];
+    const hasGlobalData = coreKeys.some(k => localStorage.getItem(k) !== null);
+    if (!hasGlobalData) return; // New user — start fresh with defaults
+
+    // Check if another user already claimed this global data
+    const claimedBy = localStorage.getItem('_global_data_claimed_by');
+    if (claimedBy && claimedBy !== uid) return; // Another user owns the global data — skip
+
+    // Claim global data for this user
+    localStorage.setItem('_global_data_claimed_by', uid);
+
     const keysToMigrate = [
-      'trucker_hud_layout',
-      'trucker_hud_order',
-      'trucker_hud_positions',
-      'trucker_hud_scales',
-      'trucker_weeklyEarnings',
-      'trucker_milesThisWeek',
-      'trucker_fuelCost',
-      'trucker_truckCost',
-      'trucker_weekDeductions',
-      'trucker_takeHomePercentage',
-      'trucker_unitSystem',
-      'trucker_dataSaver',
-      'trucker_current_region',
-      'trucker_route_history',
-      'nav_current_destination',
-      'nav_destination_coords',
-      'nav_north_up',
-      'nav_avoid_tolls',
-      'nav_avoid_ferries',
-      'nav_avoid_unpaved',
-      'nav_carplay_mode',
-      'nav_show_pois',
-      'nav_show_truck_restrictions',
-      'nav_show_traffic_signs',
-      'nav_show_facilities',
-      'nav_3d_mode',
-      'nav_waypoints',
-      'poi_filters',
-      'truck_pois',
-      'truck_target_rate',
-      'truck_max_weight',
-      'offline_map_regions',
-      'offline_route_cache',
+      'trucker_hud_layout', 'trucker_hud_order', 'trucker_hud_positions', 'trucker_hud_scales',
+      'trucker_weeklyEarnings', 'trucker_milesThisWeek', 'trucker_fuelCost', 'trucker_truckCost',
+      'trucker_weekDeductions', 'trucker_takeHomePercentage', 'trucker_unitSystem', 'trucker_dataSaver',
+      'trucker_current_region', 'trucker_route_history',
+      'nav_current_destination', 'nav_destination_coords', 'nav_north_up',
+      'nav_avoid_tolls', 'nav_avoid_ferries', 'nav_avoid_unpaved', 'nav_carplay_mode',
+      'nav_show_pois', 'nav_show_truck_restrictions', 'nav_show_traffic_signs',
+      'nav_show_facilities', 'nav_3d_mode', 'nav_waypoints',
+      'poi_filters', 'truck_pois', 'truck_target_rate', 'truck_max_weight',
+      'offline_map_regions', 'offline_route_cache',
+      'nav_hud_layout', 'nav_hud_order', 'nav_hud_positions', 'nav_hud_scales',
     ];
 
     for (const key of keysToMigrate) {
       const existingValue = localStorage.getItem(key);
       if (existingValue !== null) {
         const newKey = `${uid}_${key}`;
-        // Only copy if new key doesn't already exist
         if (localStorage.getItem(newKey) === null) {
           localStorage.setItem(newKey, existingValue);
         }
       }
     }
-
-    localStorage.setItem(migrationKey, 'true');
   } catch {}
 }

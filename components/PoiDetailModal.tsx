@@ -130,13 +130,13 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
           })()}
 
           {/* Amenities */}
-          {selectedPoi.amenities && selectedPoi.amenities.length > 0 && (
+          {selectedPoi.amenities && selectedPoi.amenities.filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a)).length > 0 && (
             <div>
               <h4 className="text-[10px] landscape:text-[8px] font-bold text-zinc-500 uppercase tracking-widest mb-2 md:mb-4 landscape:mb-2 flex items-center gap-2">
                 <Star className="w-3 h-3 landscape:w-2 landscape:h-2 text-[#D4AF37]" /> Available Amenities
               </h4>
               <div className="grid grid-cols-2 gap-2 md:gap-3 landscape:gap-1.5">
-                {selectedPoi.amenities.map((amenity: string, idx: number) => (
+                {selectedPoi.amenities.filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a)).map((amenity: string, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 md:gap-3 landscape:gap-1.5 bg-white/5 p-2 md:p-3 landscape:p-1.5 rounded-xl landscape:rounded-lg border border-white/5">
                     <div className="w-1.5 h-1.5 landscape:w-1 landscape:h-1 rounded-full bg-[#D4AF37]" />
                     <span className="text-xs landscape:text-[9px] font-bold text-zinc-300">{amenity}</span>

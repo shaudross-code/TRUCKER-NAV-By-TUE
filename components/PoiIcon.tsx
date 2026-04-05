@@ -425,12 +425,12 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   if (lowerName.includes("circle k")) return 'circle_k';
   if (lowerName.includes("7-eleven") || lowerName.includes("7 eleven") || lowerName.includes("seven-eleven") || lowerName.includes("seven eleven")) return 'seven_eleven';
 
-  // EV charging — not trucking relevant, skip
+  // EV charging — not trucking relevant, exclude entirely
   if (lowerName.includes("tesla") || lowerName.includes("supercharger") || 
       lowerName.includes("chargepoint") || lowerName.includes("ev charging") ||
       lowerName.includes("electrify america") || lowerName.includes("blink charging") ||
       lowerName.includes("electric vehicle")) {
-    return 'ev_charging'; // Will be filtered out by POI display logic
+    return 'excluded';
   }
 
   // Retail with truck parking

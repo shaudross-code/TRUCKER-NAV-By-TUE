@@ -1135,7 +1135,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 openingHours: details.openingHours?.[0]?.text,
                 rating: details.rating,
                 address: details.address?.label || prev.address,
-                amenities: details.categories?.map((c: any) => c.name) || prev.amenities
+                amenities: (details.categories?.map((c: any) => c.name) || prev.amenities || [])
+                  .filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a))
               };
             });
           }
@@ -2391,27 +2392,32 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const remainingMiles = remainingDist / 1609.34;
         setMilesRemaining(remainingMiles);
         
-        // Weigh Station Alert Simulation
+        // Weigh Station Alert — based on real POI data along route
         if (initialMilesRef.current > 5 && poiFiltersRef.current.has('weigh_station')) {
-          const weighStationPoint = initialMilesRef.current * 0.5; // Halfway point
-          const distToWeighStation = remainingMiles - weighStationPoint;
+          // Find the nearest weigh station POI ahead on the route
+          const weighStationPoi = pois.find(p => {
+            const cat = getPoiCategory(p.type, p.name);
+            if (cat !== 'weigh_station') return false;
+            const poiDist = calcDistMi(userLat, userLon, p.lat, p.lon);
+            return poiDist > 0.1 && poiDist <= 3; // Within 3 miles ahead
+          });
           
-          if (distToWeighStation > 0 && distToWeighStation <= 2) {
-            if (!weighStationAlertRef.current || weighStationAlertRef.current.distance !== distToWeighStation) {
-              // Determine status randomly once when it first appears, or just set it to BYPASS/OPEN
-              const status = weighStationAlertRef.current?.status || (Math.random() > 0.3 ? 'BYPASS' : 'OPEN');
-              setWeighStationAlert({ distance: distToWeighStation, status });
+          if (weighStationPoi) {
+            const distToStation = calcDistMi(userLat, userLon, weighStationPoi.lat, weighStationPoi.lon);
+            if (!weighStationAlertRef.current || Math.abs(weighStationAlertRef.current.distance - distToStation) > 0.05) {
+              const status: 'OPEN' | 'CLOSED' | 'BYPASS' = 'OPEN';
+              setWeighStationAlert({ distance: distToStation, status });
               
-              if (distToWeighStation <= 2 && distToWeighStation > 1.9 && !spokenDistancesRef.current.has('ws_2')) {
-                speak(`Weigh station ahead in 2 miles. Status is ${status}.`);
+              if (distToStation <= 2 && distToStation > 1.9 && !spokenDistancesRef.current.has('ws_2')) {
+                speak(`Weigh station ahead in 2 miles.`);
                 spokenDistancesRef.current.add('ws_2');
-              } else if (distToWeighStation <= 0.5 && distToWeighStation > 0.4 && !spokenDistancesRef.current.has('ws_0.5')) {
-                speak(`Weigh station in half a mile. ${status === 'BYPASS' ? 'Bypass granted.' : 'Pull in.'}`);
+              } else if (distToStation <= 0.5 && distToStation > 0.4 && !spokenDistancesRef.current.has('ws_0.5')) {
+                speak(`Weigh station in half a mile. Pull in for inspection.`);
                 spokenDistancesRef.current.add('ws_0.5');
               }
             }
-          } else if (distToWeighStation <= 0 && weighStationAlertRef.current) {
-            setWeighStationAlert(null); // Clear alert after passing
+          } else if (weighStationAlertRef.current) {
+            setWeighStationAlert(null);
           }
         } else if (weighStationAlertRef.current) {
           setWeighStationAlert(null); // Clear alert if filter disabled
@@ -5280,6 +5286,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const nearbyPois = pois.filter(poi => {
       if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
       const category = getPoiCategory(poi.type, poi.name);
+      if (category === 'excluded') return false;
       if (!poiFilters.has(category)) return false;
       
       const distance = calcDistMi(mapCenter[0], mapCenter[1], poi.lat, poi.lon);
@@ -5310,9 +5317,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 <div class="font-black text-zinc-900 text-sm mb-1">${poi.name}</div>
                 <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">${poi.type}</div>
                 ${poi.address ? `<div class="text-[9px] text-zinc-600 mb-2">${poi.address}</div>` : ''}
-                ${poi.amenities && poi.amenities.length > 0 ? `
+                ${poi.amenities && poi.amenities.filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a)).length > 0 ? `
                   <div class="flex flex-wrap gap-1 mb-2">
-                    ${poi.amenities.map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-[#D4AF37]/20 text-[#9A7B2C] rounded font-bold">${a}</span>`).join('')}
+                    ${poi.amenities.filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a)).map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-[#D4AF37]/20 text-[#9A7B2C] rounded font-bold">${a}</span>`).join('')}
                   </div>
                 ` : ''}
                 ${poi.distance ? `<div class="text-[9px] text-zinc-500 mb-2">${(poi.distance / 1609.34).toFixed(1)} mi away</div>` : ''}
@@ -6324,7 +6331,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 }).map((poi, idx) => {
                   const category = getPoiCategory(poi.type, poi.name);
                   const brandIcon = getPoiFilterIcon(category);
-                  const hasBrandIcon = !['other', 'ev_charging'].includes(category);
+                  const hasBrandIcon = !['other', 'excluded'].includes(category);
                   let Icon = MapIcon;
                   let iconColor = "text-zinc-400";
                   
