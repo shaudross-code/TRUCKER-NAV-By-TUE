@@ -87,7 +87,7 @@ try {
 
 // Programmatically add authorized domains for Firebase Auth
 async function addAuthorizedDomains() {
-  const PROJECT_ID = 'project-4cbb6ad7-8e65-4988-ae7';
+  const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
   const domainsToAdd = [
     'poi-fuel-tracker.preview.emergentagent.com',
     'nav-corridor-live.preview.emergentagent.com',
@@ -166,7 +166,7 @@ async function enableAuthProviders(client: any, projectId: string) {
 }
 
 async function updateFirestoreRules() {
-  const PROJECT_ID = 'project-4cbb6ad7-8e65-4988-ae7';
+  const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
   try {
     const keyPath = path.join(__dirname, 'serviceAccountKey.json');
     const authClient = new GoogleAuth({
