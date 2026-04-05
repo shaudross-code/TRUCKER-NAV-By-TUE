@@ -13,6 +13,7 @@ Build a professional trucking GPS navigation application with:
 - Multi-user support with Google Sign-In
 - Timed guest sessions (2 hours)
 - Gold/black themed navigation interface
+- Professional highway overlays with comprehensive exit signs
 
 ## Architecture
 - **Frontend**: React + Vite + TypeScript + Leaflet
@@ -39,18 +40,20 @@ https://hud-customizer-5.preview.emergentagent.com
 - [x] Tutorial overlay for new users
 - [x] Weigh Stations / Certified Scales POIs
 - [x] 2-hour Guest Session Timer with countdown warnings
-- [x] Google Sign-In (full-page redirect + Firebase custom token) - FIXED
-- [x] Clean slate truck profile for new users - DONE
-- [x] Clean slate pay summary (no fake statements) - DONE
-- [x] Coming Soon overlay on Maintenance tab - DONE
-- [x] Coming Soon overlay on Offline Maps tab - DONE
-- [x] Announcements section in Settings (iOS/Android development notice) - DONE
+- [x] Google Sign-In (full-page redirect + Firebase custom token)
+- [x] Clean slate truck profile for new users
+- [x] Clean slate pay summary (no fake statements)
+- [x] Coming Soon overlay on Maintenance, Offline Maps tabs
+- [x] Announcements section (iOS/Android development notice)
+- [x] Professional wider route polyline (glow=34, border=24, inner=16) - Apr 2026
+- [x] Denser highway shield placement along routes - Apr 2026
+- [x] Enhanced exit sign extraction from all action types - Apr 2026
+- [x] Larger, more professional exit guide sign visuals - Apr 2026
+- [x] Wider traveled/active navigation segment styling - Apr 2026
 
 ## Google Sign-In Implementation Details
 - Uses full-page redirect flow (no popups - avoids Safari COOP issues)
-- OAuth Client ID: 290977889012-... (user's GCP project "TUE Trucking App")
 - Server exchanges Google auth code for tokens, then creates Firebase custom token via Admin SDK
-- This bypasses the Firebase project ID mismatch (OAuth client is in different GCP project than Firebase)
 - Frontend uses signInWithCustomToken to complete sign-in
 
 ## Upcoming Tasks (Priority Order)
@@ -69,13 +72,14 @@ https://hud-customizer-5.preview.emergentagent.com
 ## Key Files
 - `/app/components/NavigationView.tsx` - Core map UI (~6970 lines, needs refactoring)
 - `/app/components/FirebaseProvider.tsx` - Auth context + Google OAuth
-- `/app/components/LoginScreen.tsx` - Login UI
 - `/app/components/HudLayoutView.tsx` - HUD customization
 - `/app/components/GuestSessionTimer.tsx` - 2hr guest timer
+- `/app/hooks/useSignPlacement.ts` - Sign placement and rendering
+- `/app/utils/mutcdSigns.ts` - MUTCD road sign SVG generation
 - `/app/server.ts` - Express backend (HERE API, Google OAuth)
 - `/app/utils/userStorage.ts` - User-scoped localStorage
-- `/app/utils/mutcdSigns.ts` - MUTCD road sign SVG generation
 
 ## Known Issues
 - NavigationView.tsx is dangerously large (~6970 lines) - needs refactoring
 - Apple Sign-In disabled (requires Apple Developer credentials)
+- CORS issues with nominatim.openstreetmap.org (non-blocking, IP fallback works)
