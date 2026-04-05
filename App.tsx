@@ -20,6 +20,7 @@ const HudLayoutView = lazy(() => import('./components/HudLayoutView'));
 const ELDLogView = lazy(() => import('./components/ELDLogView'));
 const OfflineMapsView = lazy(() => import('./components/OfflineMapsView'));
 const CommunityView = lazy(() => import('./components/CommunityView'));
+const AnnouncementsView = lazy(() => import('./components/AnnouncementsView'));
 
 import { ViewType, AppContext, LocationContext, TelemetryContext } from './types';
 
@@ -490,6 +491,8 @@ const AppContent: React.FC = React.memo(() => {
         return <Suspense fallback={<ContentLoader />}><ComingSoonOverlay title="Offline Maps"><OfflineMapsView /></ComingSoonOverlay></Suspense>;
       case ViewType.COMMUNITY:
         return <Suspense fallback={<ContentLoader />}><CommunityView /></Suspense>;
+      case ViewType.ANNOUNCEMENTS:
+        return <Suspense fallback={<ContentLoader />}><AnnouncementsView /></Suspense>;
       default:
         return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
     }

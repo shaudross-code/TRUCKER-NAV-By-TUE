@@ -19,7 +19,8 @@ import {
   LayoutPanelTop,
   FileText,
   HardDrive,
-  Users
+  Users,
+  Megaphone
 } from 'lucide-react';
 import { ViewType } from '../types';
 import { speak } from '../services/speechService';
@@ -55,6 +56,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { id: ViewType.OFFLINE_MAPS, icon: HardDrive, label: 'Offline Maps' },
     { id: ViewType.HUD_LAYOUT, icon: LayoutPanelTop, label: 'Display' },
     { id: ViewType.SETTINGS, icon: Settings, label: 'Settings' },
+    { id: ViewType.ANNOUNCEMENTS, icon: Megaphone, label: 'Announcements' },
   ];
 
   return (
