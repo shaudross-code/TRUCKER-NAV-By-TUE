@@ -17,6 +17,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## What's Been Implemented
 
 ### Map & Alert Improvements (Apr 5, 2026)
+- **POI Marker Clustering**: Replaced `L.layerGroup()` with `L.markerClusterGroup()` to prevent map freezing. Gold-themed cluster badges group nearby POIs at lower zooms, expand at zoom 16+. Markers capped at 200 nearest, with chunked loading for smooth rendering.
 - **Thicker Traffic Flow Lines**: Road/highway overlaps now use weight 5/7/9 (up from 3/4/5) with smoothFactor 2 for smoother rendering
 - **Clickable Warning Alerts**: Truck Restrictions, Traffic Alerts, and Weather Hazards are now clickable, opening a detail modal with type, severity, location, and route progress info
 - **Collapsible Warning Alerts**: Each alert panel has an X button to collapse to a compact "+" badge with count, freeing map space
