@@ -177,7 +177,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             
             // Try to read the popup URL (may fail due to cross-origin)
             let popupUrl = '';
-            try { popupUrl = popup.location.href; } catch { return; }
+            try { popupUrl = popup.location.href; } catch (_e) { return; }
             
             // Check if we're back at the handler with an auth code
             if (popupUrl.includes('code=') && popupUrl.includes('__/auth/handler')) {
@@ -209,7 +209,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                 }
               }
             }
-          } catch {}
+          } catch (_e2) {}
         }, 500);
         
         // Timeout after 2 minutes

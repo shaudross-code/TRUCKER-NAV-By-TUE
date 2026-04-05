@@ -114,6 +114,7 @@ export interface HudLayoutConfig {
   showCompassRose: boolean;
   showNextStop: boolean;
   showSpeedWarning: boolean;
+  showAlongRoute: boolean;
   speedWarningTolerance: number;
   tripPanelPosition: 'right' | 'left';
 }

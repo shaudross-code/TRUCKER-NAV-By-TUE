@@ -89,7 +89,7 @@ import { FacilityPanel, AddFacilityForm } from './FacilityPanel';
 import { fetchFacilities, facilityIconSVG, Facility } from '../services/facilityService';
 import { TruckStopReputation } from './ReputationScore';
 import { RouteSettingsModal } from './RouteSettingsModal';
-import { getPoiIcon, getPoiCategory, getEntranceIcon, getExitIcon } from './PoiIcon';
+import { getPoiIcon, getPoiCategory, getPoiFilterIcon, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { getFuelNetworkSelections } from './FuelNetwork';
 import { decode } from '@here/flexpolyline';
 import { RouteComparisonPanel } from './RouteComparisonPanel';
@@ -997,6 +997,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const trafficAlertMarkersRef = useRef<L.Marker[]>([]);
   const weatherAlertMarkersRef = useRef<L.Marker[]>([]);
   const [weighStationAlert, setWeighStationAlert] = useState<{ distance: number, status: 'OPEN' | 'CLOSED' | 'BYPASS' } | null>(null);
+  
+  // Collapsible alert panels state
+  const [restrictionsCollapsed, setRestrictionsCollapsed] = useState(false);
+  const [trafficAlertsCollapsed, setTrafficAlertsCollapsed] = useState(false);
+  const [weatherAlertsCollapsed, setWeatherAlertsCollapsed] = useState(false);
+  // Alert detail modal
+  const [alertDetailModal, setAlertDetailModal] = useState<{ type: string; title: string; items: { label: string; value: string; color?: string }[] } | null>(null);
   
   const [currentRoad, setCurrentRoad] = useState<string | null>(null);
   const [currentSpeedLimit, setCurrentSpeedLimit] = useState<number | null>(null);
@@ -5970,15 +5977,28 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           ),
         }}>
           {hudLayout.showTruckRestrictions && restrictionAlerts.length > 0 && (
-            <div className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
+            restrictionsCollapsed ? (
+              <button
+                data-testid="restrictions-expand-btn"
+                onClick={() => setRestrictionsCollapsed(false)}
+                className="flex items-center gap-1.5 bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl p-2 shadow-2xl hover:bg-orange-500/10 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 text-orange-500" />
+                <span className="text-[8px] font-black text-orange-500 uppercase">{restrictionAlerts.length}</span>
+              </button>
+            ) : (
+            <div data-testid="truck-restrictions-panel" className="bg-black/90 backdrop-blur-2xl border border-orange-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-orange-500/20 pb-1.5">
                 <div className="p-1 md:p-1.5 bg-orange-500 rounded-lg">
                   <Truck className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-1">
                   <span className="text-[8px] md:text-[10px] font-black text-orange-500 uppercase tracking-wider">Truck Restrictions ({restrictionAlerts.length})</span>
                   <span className="text-[6px] md:text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Safety Critical Alerts</span>
                 </div>
+                <button data-testid="restrictions-collapse-btn" onClick={() => setRestrictionsCollapsed(true)} className="p-1 rounded-lg hover:bg-orange-500/10 text-zinc-500 hover:text-orange-500 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
               </div>
               <div className="space-y-1.5 max-h-32 md:max-h-48 overflow-y-auto custom-scrollbar pr-1">
                 {restrictionAlerts.map((alert, idx) => {
@@ -5992,7 +6012,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   };
                   const c = colorMap[alert.type] || colorMap.RESTRICTION;
                   return (
-                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${c.bg} ${c.border}`}>
+                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer hover:brightness-125 ${c.bg} ${c.border}`}
+                      onClick={() => setAlertDetailModal({
+                        type: 'restriction',
+                        title: c.label,
+                        items: [
+                          { label: 'Type', value: alert.type, color: c.text },
+                          { label: 'Details', value: alert.message },
+                          ...(alert.progress !== undefined ? [{ label: 'Route Progress', value: `${(alert.progress * 100).toFixed(0)}%` }] : []),
+                          ...(alert.coord ? [{ label: 'Location', value: `${alert.coord[0].toFixed(4)}, ${alert.coord[1].toFixed(4)}` }] : []),
+                        ]
+                      })}
+                    >
                       <div className={`p-1 rounded-md ${c.bg} ${c.text}`}>
                         <Icon className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
@@ -6007,26 +6038,50 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 })}
               </div>
             </div>
+            )
           )}
 
           {trafficAlerts.length > 0 && (
-            <div className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
+            trafficAlertsCollapsed ? (
+              <button
+                data-testid="traffic-alerts-expand-btn"
+                onClick={() => setTrafficAlertsCollapsed(false)}
+                className="flex items-center gap-1.5 bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-xl p-2 shadow-2xl hover:bg-[#D4AF37]/10 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 text-[#D4AF37]" />
+                <span className="text-[8px] font-black text-[#D4AF37] uppercase">{trafficAlerts.length}</span>
+              </button>
+            ) : (
+            <div data-testid="traffic-alerts-panel" className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-[#D4AF37]/20 pb-1.5">
                 <div className="p-1 md:p-1.5 bg-[#D4AF37] rounded-lg">
                   <TrafficCone className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-1">
                   <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">Traffic Alerts ({trafficAlerts.length})</span>
                   <span className="text-[6px] md:text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Road Features</span>
                 </div>
+                <button data-testid="traffic-alerts-collapse-btn" onClick={() => setTrafficAlertsCollapsed(true)} className="p-1 rounded-lg hover:bg-[#D4AF37]/10 text-zinc-500 hover:text-[#D4AF37] transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
               </div>
               <div className="space-y-1.5 max-h-32 md:max-h-48 overflow-y-auto custom-scrollbar pr-1">
                 {trafficAlerts.map((alert, idx) => {
                   const Icon = alert.type === 'STOP_SIGN' ? Octagon : TrafficCone;
                   return (
-                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer hover:brightness-125 ${
                       alert.type === 'STOP_SIGN' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#D4AF37]/10 border-[#D4AF37]/20'
-                    }`}>
+                    }`}
+                      onClick={() => setAlertDetailModal({
+                        type: 'traffic',
+                        title: alert.type === 'STOP_SIGN' ? 'Stop Sign' : 'Traffic Light',
+                        items: [
+                          { label: 'Type', value: alert.type === 'STOP_SIGN' ? 'Stop Sign' : 'Traffic Signal' },
+                          { label: 'Status', value: 'Upcoming on route' },
+                          ...(alert.coord ? [{ label: 'Location', value: `${alert.coord[0].toFixed(4)}, ${alert.coord[1].toFixed(4)}` }] : []),
+                        ]
+                      })}
+                    >
                       <div className={`p-1 rounded-md ${alert.type === 'STOP_SIGN' ? 'bg-red-500/20 text-red-500' : 'bg-[#D4AF37]/20 text-[#D4AF37]'}`}>
                         <Icon className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
@@ -6041,26 +6096,50 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 })}
               </div>
             </div>
+            )
           )}
 
           {weatherAlerts.length > 0 && (
-            <div className="bg-black/90 backdrop-blur-2xl border border-red-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64 animate-pulse">
+            weatherAlertsCollapsed ? (
+              <button
+                data-testid="weather-alerts-expand-btn"
+                onClick={() => setWeatherAlertsCollapsed(false)}
+                className="flex items-center gap-1.5 bg-black/90 backdrop-blur-2xl border border-red-500/30 rounded-xl p-2 shadow-2xl hover:bg-red-500/10 transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5 text-red-500" />
+                <span className="text-[8px] font-black text-red-500 uppercase">{weatherAlerts.length}</span>
+              </button>
+            ) : (
+            <div data-testid="weather-alerts-panel" className="bg-black/90 backdrop-blur-2xl border border-red-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64 animate-pulse">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-red-500/20 pb-1.5">
                 <div className="p-1 md:p-1.5 bg-red-500 rounded-lg">
                   <AlertTriangle className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-1">
                   <span className="text-[8px] md:text-[10px] font-black text-red-500 uppercase tracking-wider">Route Hazards ({weatherAlerts.length})</span>
                   <span className="text-[6px] md:text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Weather Impact Report</span>
                 </div>
+                <button data-testid="weather-alerts-collapse-btn" onClick={() => setWeatherAlertsCollapsed(true)} className="p-1 rounded-lg hover:bg-red-500/10 text-zinc-500 hover:text-red-500 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
               </div>
               <div className="space-y-1.5 max-h-32 md:max-h-48 overflow-y-auto custom-scrollbar pr-1">
                 {weatherAlerts.map((alert, idx) => {
                   const Icon = alert.icon || AlertTriangle;
                   return (
-                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                    <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer hover:brightness-125 ${
                       alert.severity === 'SEVERE' ? 'bg-red-500/10 border-red-500/20' : 'bg-amber-500/10 border-amber-500/20'
-                    }`}>
+                    }`}
+                      onClick={() => setAlertDetailModal({
+                        type: 'weather',
+                        title: alert.type || 'Weather Hazard',
+                        items: [
+                          { label: 'Severity', value: alert.severity || 'Unknown', color: alert.severity === 'SEVERE' ? 'text-red-500' : 'text-amber-500' },
+                          { label: 'Condition', value: alert.value || alert.type || 'N/A' },
+                          ...(alert.time ? [{ label: 'Timeframe', value: alert.time }] : []),
+                        ]
+                      })}
+                    >
                       <div className={`p-1 rounded-md ${alert.severity === 'SEVERE' ? 'bg-red-500/20 text-red-500' : 'bg-amber-500/20 text-amber-500'}`}>
                         <Icon className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
@@ -6081,6 +6160,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 })}
               </div>
             </div>
+            )
           )}
 
           {hudLayout.showWeatherOverlay && (
@@ -6176,13 +6256,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           )}
 
           {/* Upcoming POIs */}
-          {upcomingPois.length > 0 && (
+          {hudLayout.showAlongRoute && upcomingPois.length > 0 && (
             <div className="mt-2 bg-black/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-56 transition-all">
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2">
                 <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
                   <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
                 </div>
-                <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">Along Route</span>
+                <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI</span>
               </div>
               {/* Cheapest Fuel Banner */}
               {(() => {
@@ -6208,6 +6288,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   return r && r.averageRating >= minRatingFilter;
                 }).map((poi, idx) => {
                   const category = getPoiCategory(poi.type, poi.name);
+                  const brandIcon = getPoiFilterIcon(category);
+                  const hasBrandIcon = !['other', 'ev_charging'].includes(category);
                   let Icon = MapIcon;
                   let iconColor = "text-zinc-400";
                   
@@ -6223,7 +6305,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   return (
                     <div key={idx} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setSelectedPoi(poi)}>
                       <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden">
-                        <Icon className={`w-3 h-3 md:w-4 md:h-4 ${iconColor} shrink-0`} />
+                        {hasBrandIcon ? (
+                          <span className="shrink-0 flex items-center justify-center w-4 h-4 md:w-5 md:h-5">{brandIcon}</span>
+                        ) : (
+                          <Icon className={`w-3 h-3 md:w-4 md:h-4 ${iconColor} shrink-0`} />
+                        )}
                         <div className="flex flex-col overflow-hidden">
                           <span className="text-[8px] md:text-[10px] font-bold text-white truncate w-full">{poi.name}</span>
                           <div className="flex items-center gap-1.5">
@@ -6822,6 +6908,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setIsCarPlayMode={setIsCarPlayMode}
       />
 
+      {/* Alert Detail Modal */}
+      {alertDetailModal && (
+        <div data-testid="alert-detail-modal" className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => setAlertDetailModal(null)}>
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-5 w-80 max-w-[90vw] shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-black text-base uppercase tracking-wide">{alertDetailModal.title}</h3>
+              <button data-testid="alert-detail-close-btn" onClick={() => setAlertDetailModal(null)} className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {alertDetailModal.items.map((item, i) => (
+                <div key={i} className="flex items-center justify-between py-2 border-b border-zinc-800 last:border-b-0">
+                  <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">{item.label}</span>
+                  <span className={`text-sm font-bold ${item.color || 'text-white'}`}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+            <button onClick={() => setAlertDetailModal(null)} className="w-full mt-4 py-2.5 bg-[#D4AF37] text-black font-black text-xs uppercase tracking-widest rounded-xl hover:bg-[#c9a432] transition-colors">
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
     
     </div>
   );

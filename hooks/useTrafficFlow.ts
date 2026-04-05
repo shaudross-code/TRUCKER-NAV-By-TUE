@@ -40,9 +40,9 @@ function jamColor(jam: number): string {
 }
 
 function jamWeight(jam: number): number {
-  if (jam <= 3) return 3;
-  if (jam <= 6) return 4;
-  return 5;
+  if (jam <= 3) return 5;
+  if (jam <= 6) return 7;
+  return 9;
 }
 
 export function useTrafficFlow(
@@ -117,7 +117,7 @@ export function useTrafficFlow(
             color: jamColor(jam),
             weight: jamWeight(jam),
             opacity: 0.8,
-            smoothFactor: 1,
+            smoothFactor: 2,
             interactive: false,
           });
 
