@@ -1228,7 +1228,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // 1. Outer glow effect (soft shadow)
       L.polyline(coords, { 
         color: '#D4AF37', 
-        weight: 24, 
+        weight: 50, 
         opacity: 0.15, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -1238,7 +1238,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // 2. Outer black border line (creates the outline effect)
       L.polyline(coords, { 
         color: '#111111', 
-        weight: 16, 
+        weight: 40, 
         opacity: 0.9, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -1248,7 +1248,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // 3. Inner route line (the main navigation path)
       L.polyline(coords, { 
         color: color, 
-        weight: 10, 
+        weight: 30, 
         opacity: 1, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -1290,7 +1290,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Dashed outline for alt routes
       L.polyline(route.coords, {
         color: altColor,
-        weight: 6,
+        weight: 14,
         opacity: 0.35,
         dashArray: '12, 8',
         lineCap: 'round',
@@ -2312,7 +2312,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       if (routeLineRef.current && routeCoordsRef.current.length > nearestIndex) {
         const remainingCoords = [currentLocation, ...routeCoordsRef.current.slice(nearestIndex + 1)];
-        updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 8);
+        updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 30);
         
         // Draw completed (traveled) portion as dimmed gray
         if (nearestIndex > 0) {
@@ -2323,7 +2323,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           } else {
             const traveledLine = L.polyline(traveledCoords, {
               color: '#555555',
-              weight: 8,
+              weight: 28,
               opacity: 0.4,
               lineCap: 'round',
               lineJoin: 'round',
@@ -2343,7 +2343,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           // Glow layer
           const glowLine = L.polyline(segmentCoords, {
             color: '#ffffff',
-            weight: 18,
+            weight: 40,
             opacity: 0.2,
             lineCap: 'round',
             pane: 'routePane',
@@ -2352,7 +2352,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           glowLine.addTo(mapInstanceRef.current!);
           mapLayersRef.current['segment_glow'] = glowLine;
           
-          updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
+          updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 30);
           currentSegmentLineRef.current = 'segment';
         } else {
           if (mapLayersRef.current['segment_glow']) {
@@ -4454,7 +4454,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         currentSegmentLineRef.current = null;
         
         // Draw route polyline using updateMapLine for consistency
-        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
+        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 30);
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
 
         // Draw alternative routes with distinct colors if available
@@ -5797,7 +5797,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (mapInstanceRef.current) {
                 clearRouteMarkers();
                 currentSegmentLineRef.current = null;
-                updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 8);
+                updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 30);
                 routeLineRef.current = { id: 'route', color: '#D4AF37' };
                 // Redraw alt routes with new selection
                 drawAlternativeRoutes(mapInstanceRef.current, alternativeRoutes, idx);
