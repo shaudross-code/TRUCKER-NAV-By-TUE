@@ -264,12 +264,27 @@ async function createServer() {
   // Step 2: Google OAuth callback — exchange code for tokens, redirect to app
   app.get('/api/auth/google/callback', async (req, res) => {
     try {
-      const { code } = req.query;
+      const { code, state } = req.query;
       if (!code) return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Missing auth code. Please try again.</h2></body></html>');
       
-      const protocol = req.headers['x-forwarded-proto'] || 'https';
-      const host = req.headers.host;
-      const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+      // Read the redirect_uri from the state parameter (passed by frontend)
+      // This guarantees it matches exactly what was sent in the authorization request
+      let redirectUri = '';
+      try {
+        if (state) {
+          const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
+          redirectUri = decoded.redirect_uri || '';
+        }
+      } catch {}
+      
+      // Fallback: construct from headers if state parsing failed
+      if (!redirectUri) {
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const host = req.headers['x-forwarded-host'] || req.headers.host;
+        redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+      }
+      
+      console.log('Google OAuth callback - using redirect_uri:', redirectUri);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',

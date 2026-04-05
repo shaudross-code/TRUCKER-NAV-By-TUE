@@ -178,6 +178,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // Full-page redirect to Google — no popups, no COOP issues
     const redirectUri = `${window.location.origin}/api/auth/google/callback`;
+    const state = btoa(JSON.stringify({ redirect_uri: redirectUri }));
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,
@@ -185,6 +186,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       scope: 'openid email profile',
       prompt: 'select_account',
       access_type: 'offline',
+      state,
     });
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }, []);
