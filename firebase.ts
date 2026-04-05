@@ -4,8 +4,46 @@ import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 import { safeStringify } from './utils';
 
+// Patch: The Firebase Identity Toolkit REST API (/v1/projects) for this project
+// doesn't return `authorizedDomains`, causing "authorizedDomains is not iterable"
+// in signInWithPopup. Intercept that specific fetch call and inject the field.
+if (typeof window !== 'undefined') {
+  const _origFetch = window.fetch;
+  window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
+    const response = await _origFetch.call(this, input, init);
+    const url = typeof input === 'string' ? input : input instanceof Request ? input.url : input.toString();
+    if (url.includes('identitytoolkit.googleapis.com/v1/projects')) {
+      const clone = response.clone();
+      const body = await clone.json().catch(() => null);
+      if (body && !body.authorizedDomains) {
+        body.authorizedDomains = [
+          'localhost',
+          window.location.hostname,
+          `${firebaseConfig.projectId}.firebaseapp.com`,
+          `${firebaseConfig.projectId}.web.app`,
+        ];
+        return new Response(JSON.stringify(body), {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+        });
+      }
+    }
+    return response;
+  };
+}
+
+// Self-host Firebase Auth: use current domain as authDomain so the SDK
+// fetches /__/firebase/init.json and /__/auth/handler from our own server
+// (which proxies to the real Firebase authDomain). This fixes the popup
+// handler loading when Firebase Hosting isn't deployed.
+const config = {
+  ...firebaseConfig,
+  authDomain: typeof window !== 'undefined' ? window.location.host : firebaseConfig.authDomain,
+};
+
 // Initialize Firebase SDK
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(config);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 // Use initializeAuth with browserPopupRedirectResolver to fix cookie issues in iframes

@@ -89,6 +89,7 @@ try {
 async function addAuthorizedDomains() {
   const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
   const domainsToAdd = [
+    'hud-customizer-5.preview.emergentagent.com',
     'poi-fuel-tracker.preview.emergentagent.com',
     'nav-corridor-live.preview.emergentagent.com',
     'navigation-staging.preview.emergentagent.com',
@@ -232,6 +233,11 @@ async function createServer() {
   app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'trucker-nav' });
   });
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Note: Firebase Auth proxy handled by Vite plugin (firebaseAuthProxy).
+  // init.json served from public/__/firebase/init.json.
+  // ────────────────────────────────────────────────────────────────────────────
 
   // IP-based geolocation fallback when browser geolocation fails
   app.get('/api/ip-location', async (req, res) => {

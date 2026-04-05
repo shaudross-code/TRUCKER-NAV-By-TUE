@@ -1,0 +1,17 @@
+{
+  "apiKey": "AIzaSyCsiHqGoFnAy64I8YnNbkQhnzKOBllcgAI",
+  "authDomain": "project-4cbb6ad7-8e65-4988-ae7.firebaseapp.com",
+  "projectId": "project-4cbb6ad7-8e65-4988-ae7",
+  "storageBucket": "project-4cbb6ad7-8e65-4988-ae7.firebasestorage.app",
+  "messagingSenderId": "313371211306",
+  "appId": "1:313371211306:web:debba8415ff4f0c2517553",
+  "authorizedDomains": [
+    "localhost",
+    "hud-customizer-5.preview.emergentagent.com",
+    "project-4cbb6ad7-8e65-4988-ae7.firebaseapp.com",
+    "project-4cbb6ad7-8e65-4988-ae7.web.app",
+    "poi-fuel-tracker.preview.emergentagent.com",
+    "nav-corridor-live.preview.emergentagent.com",
+    "navigation-staging.preview.emergentagent.com"
+  ]
+}
