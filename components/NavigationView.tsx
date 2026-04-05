@@ -3558,7 +3558,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         const allIncidents = section.incidents || [];
         const alerts = allIncidents.filter((incident: any) => incident?.from?.offset != null).map((incident: any) => {
-          const progress = incident.from.offset / (summary.length || 1);
+          // incident.from.offset is a polyline point index, NOT distance in meters
+          const incidentIdx = Math.min(incident.from.offset, coords.length - 1);
+          const progress = incidentIdx / (coords.length - 1 || 1);
           let type = 'INFO';
           let message = incident.description.value;
           let icon = Zap;
@@ -3674,7 +3676,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let lastSpeedSignIdx = -99999;
 
           section.spans.forEach((span: any) => {
-            const progress = currentPointIndex / totalPoints;
+            const progress = currentPointIndex / (totalPoints - 1 || 1);
 
             if (span.streetAttributes && span.streetAttributes.includes('trafficLight')) {
               trafficAlertsList.push({
@@ -3690,7 +3692,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
             if (span.truckAttributes) {
               const attrs = span.truckAttributes;
-              const progress = currentPointIndex / totalPoints;
+              const progress = currentPointIndex / (totalPoints - 1 || 1);
               
               if (attrs.maxHeight !== undefined) {
                 const heightFt = (attrs.maxHeight / 30.48).toFixed(1);
@@ -3869,7 +3871,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     icon: AlertTriangle,
                     color: 'text-amber-500',
                     bg: 'bg-amber-500/20',
-                    progress: currentPointIndex / totalPoints,
+                    progress: currentPointIndex / (totalPoints - 1 || 1),
                     coords: coords[currentPointIndex]
                   });
                 }
@@ -3957,7 +3959,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
                       grade: gradeRunMaxGrade,
                       coord: coords[gradeRunStart],
-                      progress: gradeRunStart / rawPoints.length
+                      progress: gradeRunStart / (rawPoints.length - 1 || 1)
                     });
                     lastCmvIdx = gradeRunStart;
                   }
@@ -3983,7 +3985,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
                     grade: gradeRunMaxGrade,
                     coord: coords[gradeRunStart],
-                    progress: gradeRunStart / rawPoints.length
+                    progress: gradeRunStart / (rawPoints.length - 1 || 1)
                   });
                   lastCmvIdx = gradeRunStart;
                 }
@@ -4008,7 +4010,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   : `Steep Hill ${absGrade.toFixed(0)}% — ${(runDist / 1609.34).toFixed(1)} mi`,
                 grade: gradeRunMaxGrade,
                 coord: coords[gradeRunStart],
-                progress: gradeRunStart / rawPoints.length
+                progress: gradeRunStart / (rawPoints.length - 1 || 1)
               });
             }
           }
@@ -4037,7 +4039,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 severity: bearingChanges >= 8 ? 'high' : 'medium',
                 message: 'Winding Road Ahead',
                 coord: coords[i],
-                progress: i / rawPoints.length
+                progress: i / (rawPoints.length - 1 || 1)
               });
               lastWindIdx = i;
             }
@@ -4066,7 +4068,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   message: `Rollover Risk — ${curve.direction} curve on ${localGrade.toFixed(0)}% grade`,
                   grade: localGrade,
                   coord: curve.coord,
-                  progress: nearestIdx / rawPoints.length
+                  progress: nearestIdx / (rawPoints.length - 1 || 1)
                 });
               }
             }
