@@ -1,5 +1,6 @@
 import { getRoute } from '../src/services/hereRoutingService';
 import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
+import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import * as L from 'leaflet';
@@ -427,6 +428,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const routeDurationRef = useRef<number>(0);
   const routeSavedRef = useRef<boolean>(false);
 
+  // User-scoped localStorage helpers
+  const uKey = useCallback((key: string) => getUserStorageKey(getCurrentUserId(), key), []);
+  const uGet = useCallback((key: string) => { try { return localStorage.getItem(getUserStorageKey(getCurrentUserId(), key)); } catch { return null; } }, []);
+  const uSet = useCallback((key: string, val: string) => { try { localStorage.setItem(getUserStorageKey(getCurrentUserId(), key), val); } catch {} }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isListening, setIsListening] = useState(false);
   
@@ -444,9 +450,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const setEldStatus = hosContext?.setEldStatus;
   const hasViolation = hosContext?.hasViolation || false;
 
-  const [currentDestination, setCurrentDestination] = useState(() => localStorage.getItem('nav_current_destination') || 'Standby');
+  const [currentDestination, setCurrentDestination] = useState(() => uGet('nav_current_destination') || 'Standby');
   const [destinationCoords, setDestinationCoords] = useState<[number, number] | null>(() => {
-    const saved = localStorage.getItem('nav_destination_coords');
+    const saved = uGet('nav_destination_coords');
     try {
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
@@ -494,7 +500,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const handleToggleNorthUp = useCallback(() => {
     const newVal = !isNorthUp;
     setIsNorthUp(newVal);
-    localStorage.setItem('nav_north_up', String(newVal));
+    localStorage.setItem(uKey('nav_north_up'), String(newVal));
     
     const el = mapRef.current;
     if (newVal) {
@@ -637,13 +643,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     };
   }, [isCompassMode]);
   const [showTruckRestrictions] = useState(() => {
-    const saved = localStorage.getItem('nav_show_truck_restrictions');
+    const saved = uGet('nav_show_truck_restrictions');
     return saved === null ? true : saved === 'true';
   });
   
-  const [avoidTolls, setAvoidTolls] = useState(() => localStorage.getItem('nav_avoid_tolls') === 'true');
-  const [avoidFerries, setAvoidFerries] = useState(() => localStorage.getItem('nav_avoid_ferries') === 'true');
-  const [avoidUnpaved, setAvoidUnpaved] = useState(() => localStorage.getItem('nav_avoid_unpaved') === 'true');
+  const [avoidTolls, setAvoidTolls] = useState(() => uGet('nav_avoid_tolls') === 'true');
+  const [avoidFerries, setAvoidFerries] = useState(() => uGet('nav_avoid_ferries') === 'true');
+  const [avoidUnpaved, setAvoidUnpaved] = useState(() => uGet('nav_avoid_unpaved') === 'true');
 
   const [alternativeRoutes, setAlternativeRoutes] = useState<any[]>([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
@@ -658,7 +664,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [currentDistToManeuverMi, setCurrentDistToManeuverMi] = useState<number | undefined>(undefined);
   const [currentManeuverType, setCurrentManeuverType] = useState('');
   const [currentManeuverModifier, setCurrentManeuverModifier] = useState('');
-  const [isCarPlayMode, setIsCarPlayMode] = useState(() => localStorage.getItem('nav_carplay_mode') === 'true');
+  const [isCarPlayMode, setIsCarPlayMode] = useState(() => uGet('nav_carplay_mode') === 'true');
   const [isRouteSettingsOpen, setIsRouteSettingsOpen] = useState(false);
   const [isRoutePreview, setIsRoutePreview] = useState(false);
   const [isExploreMode, setIsExploreMode] = useState(false);
@@ -668,7 +674,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
   const [pois, setPois] = useState<any[]>(() => {
     // Clear any old fake POIs from localStorage
-    localStorage.removeItem('truck_pois');
+    uSet('truck_pois', '');
     console.log('Cleared old POI cache - will fetch fresh real data from HERE Maps');
     return [];
   });
@@ -677,12 +683,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   const [trafficInfrastructure, setTrafficInfrastructure] = useState<any[]>([]);
   const [showTrafficSigns, setShowTrafficSigns] = useState(() => 
-    localStorage.getItem('nav_show_traffic_signs') !== 'false'
+    uGet('nav_show_traffic_signs') !== 'false'
   );
   const alertedTrafficItems = useRef<Set<string>>(new Set());
   
   const [is3DMode, setIs3DMode] = useState(() => 
-    localStorage.getItem('nav_3d_mode') === 'true'
+    uGet('nav_3d_mode') === 'true'
   );
   const was3DRef = useRef(is3DMode);
 
@@ -731,7 +737,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // Save only real POIs fetched from APIs
     const str = safeStringify(pois);
     if (str && pois.length > 0) {
-      localStorage.setItem('truck_pois', str);
+      localStorage.setItem(uKey('truck_pois'), str);
     }
   }, [pois]);
   const isFetchingPoisRef = useRef(false);
@@ -739,10 +745,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const smoothedHeadingRef = useRef(0);
   const prevLocationRef = useRef<[number, number] | null>(null);
   const positionHeadingRef = useRef(0); // heading calculated from position changes
-  const [showPois] = useState(() => localStorage.getItem('nav_show_pois') !== 'false');
+  const [showPois] = useState(() => uGet('nav_show_pois') !== 'false');
 
   // ─── Facility state ──────────────────────────────────────────────────────
-  const [showFacilities, setShowFacilities] = useState(() => localStorage.getItem('nav_show_facilities') !== 'false');
+  const [showFacilities, setShowFacilities] = useState(() => uGet('nav_show_facilities') !== 'false');
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [showAddFacility, setShowAddFacility] = useState(false);
@@ -750,7 +756,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const facilityMarkersRef = useRef<Map<string, L.Marker>>(new Map());
 
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem('poi_filters');
+    const saved = uGet('poi_filters');
     const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest', 'truck_wash'];
     try {
       return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'low_clearance', 'other']);
@@ -762,7 +768,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   useEffect(() => {
     const str = safeStringify(Array.from(poiFilters));
-    if (str) localStorage.setItem('poi_filters', str);
+    if (str) uSet('poi_filters', str);
   }, [poiFilters]);
   const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
   const [minRatingFilter, setMinRatingFilter] = useState(0); // 0 = show all
@@ -775,7 +781,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [routeSteps, setRouteSteps] = useState<any[]>([]);
   const [currentManeuverIndex, setCurrentManeuverIndex] = useState(-1);
   const [waypoints, setWaypoints] = useState<Waypoint[]>(() => {
-    const saved = localStorage.getItem('nav_waypoints');
+    const saved = uGet('nav_waypoints');
     try {
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
@@ -791,16 +797,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // Persistence Effects
   useEffect(() => {
     const str = safeStringify(waypoints);
-    if (str) localStorage.setItem('nav_waypoints', str);
+    if (str) uSet('nav_waypoints', str);
   }, [waypoints]);
 
   useEffect(() => {
     const str = safeStringify(destinationCoords);
-    if (str) localStorage.setItem('nav_destination_coords', str);
+    if (str) uSet('nav_destination_coords', str);
   }, [destinationCoords]);
 
   useEffect(() => {
-    localStorage.setItem('nav_current_destination', currentDestination);
+    uSet('nav_current_destination', currentDestination);
   }, [currentDestination]);
 
   useEffect(() => {
@@ -987,13 +993,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   // Persist user preferences to localStorage
   useEffect(() => {
-    localStorage.setItem('nav_north_up', isNorthUp.toString());
-    localStorage.setItem('nav_avoid_tolls', avoidTolls.toString());
-    localStorage.setItem('nav_avoid_ferries', avoidFerries.toString());
-    localStorage.setItem('nav_avoid_unpaved', avoidUnpaved.toString());
-    localStorage.setItem('nav_carplay_mode', isCarPlayMode.toString());
-    localStorage.setItem('nav_show_pois', showPois.toString());
-    localStorage.setItem('nav_show_truck_restrictions', showTruckRestrictions.toString());
+    uSet('nav_north_up', isNorthUp.toString());
+    uSet('nav_avoid_tolls', avoidTolls.toString());
+    uSet('nav_avoid_ferries', avoidFerries.toString());
+    uSet('nav_avoid_unpaved', avoidUnpaved.toString());
+    uSet('nav_carplay_mode', isCarPlayMode.toString());
+    uSet('nav_show_pois', showPois.toString());
+    uSet('nav_show_truck_restrictions', showTruckRestrictions.toString());
   }, [isNorthUp, avoidTolls, avoidFerries, avoidUnpaved, isCarPlayMode, showPois, showTruckRestrictions]);
 
   
@@ -1041,7 +1047,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // ─── State/Country Boundary Tracking ──────────────────────────────────────
   const [currentRegion, setCurrentRegion] = useState<{ state: string | null; country: string | null; city: string | null }>(() => {
     try {
-      const saved = localStorage.getItem('trucker_current_region');
+      const saved = uGet('trucker_current_region');
       return saved ? JSON.parse(saved) : { state: null, country: null, city: null };
     } catch { return { state: null, country: null, city: null }; }
   });
@@ -2170,10 +2176,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       status
     };
 
-    const saved = localStorage.getItem('trucker_route_history');
+    const saved = uGet('trucker_route_history');
     const history = saved ? JSON.parse(saved) : [];
     const str = safeStringify([historyItem, ...history]);
-    if (str) localStorage.setItem('trucker_route_history', str);
+    if (str) uSet('trucker_route_history', str);
     routeSavedRef.current = true;
   }, [currentDestination, waypoints]);
 
@@ -2982,7 +2988,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
         setCurrentRegion(prev => {
           const updated = { state: newState, country: newCountry, city: newCity };
-          try { localStorage.setItem('trucker_current_region', JSON.stringify(updated)); } catch {}
+          try { uSet('trucker_current_region', JSON.stringify(updated)); } catch {}
           return updated;
         });
 

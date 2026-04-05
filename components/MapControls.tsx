@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2, Menu, Star, Activity, Route } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
+import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
 export const MapControls: React.FC<any> = React.memo(({ 
   mapInstanceRef, 
@@ -78,7 +79,7 @@ export const MapControls: React.FC<any> = React.memo(({
                   <button
                     onClick={() => {
                       setShowTrafficSigns(!showTrafficSigns);
-                      localStorage.setItem('nav_show_traffic_signs', String(!showTrafficSigns));
+                      localStorage.setItem(getUserStorageKey(getCurrentUserId(), 'nav_show_traffic_signs'), String(!showTrafficSigns));
                     }}
                     className="flex items-center justify-between p-1.5 md:p-2 rounded-lg bg-[#D4AF37]/5 hover:bg-[#D4AF37]/10 transition-all mb-1"
                   >
@@ -189,7 +190,7 @@ export const MapControls: React.FC<any> = React.memo(({
                           data-testid="facilities-toggle"
                           onClick={() => {
                             setShowFacilities?.(!showFacilities);
-                            localStorage.setItem('nav_show_facilities', String(!showFacilities));
+                            localStorage.setItem(getUserStorageKey(getCurrentUserId(), 'nav_show_facilities'), String(!showFacilities));
                           }}
                           className={`w-3 h-3 md:w-4 md:h-4 rounded border-2 flex items-center justify-center transition-all shrink-0 ${showFacilities ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-zinc-600'}`}
                         >
@@ -305,7 +306,7 @@ export const MapControls: React.FC<any> = React.memo(({
               onClick={() => { 
                 const newMode = !is3DMode;
                 setIs3DMode(newMode);
-                localStorage.setItem('nav_3d_mode', String(newMode));
+                localStorage.setItem(getUserStorageKey(getCurrentUserId(), 'nav_3d_mode'), String(newMode));
               }} 
               className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${is3DMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
               title={is3DMode ? '3D View Active' : 'Switch to 3D'}

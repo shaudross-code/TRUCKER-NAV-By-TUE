@@ -3,6 +3,7 @@ import {
   Download, Trash2, HardDrive, MapPin, Wifi, WifiOff,
   CheckCircle2, AlertCircle, Loader2, Map as MapIcon
 } from 'lucide-react';
+import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
 interface CachedRegion {
   id: string;
@@ -43,24 +44,24 @@ function formatBytes(bytes: number): string {
 
 function loadCachedRegions(): CachedRegion[] {
   try {
-    const stored = localStorage.getItem(CACHE_KEY);
+    const stored = localStorage.getItem(getUserStorageKey(getCurrentUserId(), CACHE_KEY));
     return stored ? JSON.parse(stored) : [];
   } catch { return []; }
 }
 
 function saveCachedRegions(regions: CachedRegion[]) {
-  localStorage.setItem(CACHE_KEY, JSON.stringify(regions));
+  localStorage.setItem(getUserStorageKey(getCurrentUserId(), CACHE_KEY), JSON.stringify(regions));
 }
 
 function loadCachedRoutes(): CachedRoute[] {
   try {
-    const stored = localStorage.getItem(ROUTE_CACHE_KEY);
+    const stored = localStorage.getItem(getUserStorageKey(getCurrentUserId(), ROUTE_CACHE_KEY));
     return stored ? JSON.parse(stored) : [];
   } catch { return []; }
 }
 
 function saveCachedRoutes(routes: CachedRoute[]) {
-  localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(routes));
+  localStorage.setItem(getUserStorageKey(getCurrentUserId(), ROUTE_CACHE_KEY), JSON.stringify(routes));
 }
 
 export default function OfflineMapsView() {

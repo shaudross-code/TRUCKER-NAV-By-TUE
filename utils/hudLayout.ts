@@ -1,4 +1,5 @@
 import type { HudLayoutConfig } from '../types';
+import { getUserStorageKey, getCurrentUserId } from './userStorage';
 
 export const DEFAULT_HUD_LAYOUT: HudLayoutConfig = {
   showNavigationHUD: true,
@@ -30,6 +31,10 @@ export const DEFAULT_HUD_LAYOUT: HudLayoutConfig = {
 const STORAGE_KEY = 'nav_hud_layout';
 const ORDER_KEY = 'nav_hud_order';
 
+function userKey(key: string): string {
+  return getUserStorageKey(getCurrentUserId(), key);
+}
+
 export type HudElementOrder = Record<string, string[]>;
 
 export const DEFAULT_ORDER: HudElementOrder = {
@@ -40,7 +45,7 @@ export const DEFAULT_ORDER: HudElementOrder = {
 
 export function loadHudLayout(): HudLayoutConfig {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(userKey(STORAGE_KEY));
     if (stored) {
       return { ...DEFAULT_HUD_LAYOUT, ...JSON.parse(stored) };
     }
@@ -50,13 +55,13 @@ export function loadHudLayout(): HudLayoutConfig {
 
 export function saveHudLayout(config: HudLayoutConfig): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    localStorage.setItem(userKey(STORAGE_KEY), JSON.stringify(config));
   } catch {}
 }
 
 export function loadHudOrder(): HudElementOrder {
   try {
-    const stored = localStorage.getItem(ORDER_KEY);
+    const stored = localStorage.getItem(userKey(ORDER_KEY));
     if (stored) {
       const parsed = JSON.parse(stored);
       const merged: HudElementOrder = {};
@@ -74,7 +79,7 @@ export function loadHudOrder(): HudElementOrder {
 
 export function saveHudOrder(order: HudElementOrder): void {
   try {
-    localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+    localStorage.setItem(userKey(ORDER_KEY), JSON.stringify(order));
   } catch {}
 }
 
@@ -99,7 +104,7 @@ export const DEFAULT_POSITIONS: HudPositions = {
 
 export function loadHudPositions(): HudPositions {
   try {
-    const stored = localStorage.getItem(POS_KEY);
+    const stored = localStorage.getItem(userKey(POS_KEY));
     if (stored) {
       return { ...DEFAULT_POSITIONS, ...JSON.parse(stored) };
     }
@@ -109,7 +114,7 @@ export function loadHudPositions(): HudPositions {
 
 export function saveHudPositions(positions: HudPositions): void {
   try {
-    localStorage.setItem(POS_KEY, JSON.stringify(positions));
+    localStorage.setItem(userKey(POS_KEY), JSON.stringify(positions));
   } catch {}
 }
 
@@ -142,7 +147,7 @@ export const SCALE_OPTIONS = [
 
 export function loadHudScales(): HudScales {
   try {
-    const stored = localStorage.getItem(SCALE_KEY);
+    const stored = localStorage.getItem(userKey(SCALE_KEY));
     if (stored) {
       return { ...DEFAULT_SCALES, ...JSON.parse(stored) };
     }
@@ -152,6 +157,6 @@ export function loadHudScales(): HudScales {
 
 export function saveHudScales(scales: HudScales): void {
   try {
-    localStorage.setItem(SCALE_KEY, JSON.stringify(scales));
+    localStorage.setItem(userKey(SCALE_KEY), JSON.stringify(scales));
   } catch {}
 }

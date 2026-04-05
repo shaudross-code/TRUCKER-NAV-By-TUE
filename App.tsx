@@ -3,6 +3,9 @@ import React, { useState, useEffect, useMemo, useCallback, useRef, Suspense, laz
 import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import { LoadingScreen } from './components/LoadingScreen';
+import ComingSoonOverlay from './components/ComingSoonOverlay';
+import TutorialOverlay from './components/TutorialOverlay';
+import { setCurrentUserId, migrateLocalStorageForUser, getUserStorageKey } from './utils/userStorage';
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const NavigationView = lazy(() => import('./components/NavigationView'));
 const PaySummary = lazy(() => import('./components/PaySummary'));
@@ -248,6 +251,18 @@ const AppContent: React.FC = React.memo(() => {
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [navTarget, setNavTarget] = useState<string | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [forceTutorial, setForceTutorial] = useState(false);
+
+  // Set the current user ID for storage scoping & migrate existing data
+  useEffect(() => {
+    if (user?.uid) {
+      setCurrentUserId(user.uid);
+      migrateLocalStorageForUser(user.uid);
+    } else {
+      setCurrentUserId(null);
+    }
+  }, [user?.uid]);
 
   // Sync profile data to local state or just use profile directly
   const truckProfile = useMemo(() => profile?.truckProfile || {
@@ -274,19 +289,20 @@ const AppContent: React.FC = React.memo(() => {
   // Unit system preference (imperial/metric) - persisted in localStorage
   const [unitSystem, setUnitSystem] = useState<'imperial' | 'metric'>(() => {
     try {
-      return (localStorage.getItem('trucker_unitSystem') as 'imperial' | 'metric') || 'imperial';
+      const key = user?.uid ? getUserStorageKey(user.uid, 'trucker_unitSystem') : 'trucker_unitSystem';
+      return (localStorage.getItem(key) as 'imperial' | 'metric') || 'imperial';
     } catch { return 'imperial'; }
   });
   useEffect(() => {
-    try { localStorage.setItem('trucker_unitSystem', unitSystem); } catch {}
-  }, [unitSystem]);
+    try { const key = user?.uid ? getUserStorageKey(user.uid, 'trucker_unitSystem') : 'trucker_unitSystem'; localStorage.setItem(key, unitSystem); } catch {}
+  }, [unitSystem, user?.uid]);
 
   const [dataSaver, setDataSaver] = useState<boolean>(() => {
-    try { return localStorage.getItem('trucker_dataSaver') === 'true'; } catch { return false; }
+    try { const key = user?.uid ? getUserStorageKey(user.uid, 'trucker_dataSaver') : 'trucker_dataSaver'; return localStorage.getItem(key) === 'true'; } catch { return false; }
   });
   useEffect(() => {
-    try { localStorage.setItem('trucker_dataSaver', String(dataSaver)); } catch {}
-  }, [dataSaver]);
+    try { const key = user?.uid ? getUserStorageKey(user.uid, 'trucker_dataSaver') : 'trucker_dataSaver'; localStorage.setItem(key, String(dataSaver)); } catch {}
+  }, [dataSaver, user?.uid]);
 
   // Network status monitoring for reliability
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
@@ -301,7 +317,8 @@ const AppContent: React.FC = React.memo(() => {
   // Dashboard financial metrics - use localStorage as primary store with Firestore sync
   const loadLocal = (key: string, fallback: number) => {
     try {
-      const v = localStorage.getItem(`trucker_${key}`);
+      const storageKey = user?.uid ? getUserStorageKey(user.uid, `trucker_${key}`) : `trucker_${key}`;
+      const v = localStorage.getItem(storageKey);
       return v !== null ? parseFloat(v) : (profile as any)?.[key] ?? fallback;
     } catch { return fallback; }
   };
@@ -328,7 +345,7 @@ const AppContent: React.FC = React.memo(() => {
   }, [profile, profileSynced]);
 
   const saveLocal = (key: string, val: number) => {
-    try { localStorage.setItem(`trucker_${key}`, String(val)); } catch {}
+    try { const storageKey = user?.uid ? getUserStorageKey(user.uid, `trucker_${key}`) : `trucker_${key}`; localStorage.setItem(storageKey, String(val)); } catch {}
   };
 
   const setWeeklyEarnings = useCallback((val: any) => {
@@ -448,15 +465,15 @@ const AppContent: React.FC = React.memo(() => {
       case ViewType.DASHBOARD:
         return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
       case ViewType.TRUCK_STOPS:
-        return <Suspense fallback={<ContentLoader />}><PredictiveParking /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><ComingSoonOverlay title="Truck Stops"><PredictiveParking /></ComingSoonOverlay></Suspense>;
       case ViewType.LOAD_BOARD:
-        return <Suspense fallback={<ContentLoader />}><LoadBoard /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><ComingSoonOverlay title="Load Board"><LoadBoard /></ComingSoonOverlay></Suspense>;
       case ViewType.MAINTENANCE:
         return <Suspense fallback={<ContentLoader />}><Maintenance /></Suspense>;
       case ViewType.NAVIGATION:
         return null; // Handled separately to keep it mounted
       case ViewType.SETTINGS:
-        return <Suspense fallback={<ContentLoader />}><SettingsView /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><SettingsView onReplayTutorial={handleReplayTutorial} /></Suspense>;
       case ViewType.ROUTE_HISTORY:
         return <Suspense fallback={<ContentLoader />}><RouteHistory /></Suspense>;
       case ViewType.PAY_SUMMARY:
@@ -561,6 +578,11 @@ const AppContent: React.FC = React.memo(() => {
     return <LoginScreen signIn={signIn} signInWithApple={signInWithApple} signInWithEmail={signInWithEmail} signUpWithEmail={signUpWithEmail} signInAsGuest={signInAsGuest} authError={authError} />;
   }
 
+  const handleReplayTutorial = () => {
+    setForceTutorial(true);
+    setShowTutorial(true);
+  };
+
   return (
     <AppContext.Provider value={contextValue}>
       <HOSProvider>
@@ -600,6 +622,13 @@ const AppContent: React.FC = React.memo(() => {
                 setNavTarget={setNavTarget}
               />
             )}
+
+            {/* Tutorial Overlay */}
+            <TutorialOverlay
+              userId={user.uid}
+              forceShow={forceTutorial}
+              onComplete={() => { setShowTutorial(false); setForceTutorial(false); }}
+            />
           </div>
         </HOSProvider>
     </AppContext.Provider>

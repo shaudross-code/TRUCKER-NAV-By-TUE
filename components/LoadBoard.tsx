@@ -2,6 +2,7 @@ import React, { useState, useEffect, useContext, useMemo, useRef, useCallback } 
 import { CheckCircle2, Loader2, Pencil, Check, X, MapPin, Weight, DollarSign, TrendingUp, RefreshCw } from 'lucide-react';
 import { AppContext, LocationContext, ViewType } from '../types';
 import { useFirebase } from './FirebaseProvider';
+import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
 // ─── US Cities database for dynamic load generation ─────────────────────────
 const US_CITIES: { name: string; coords: [number, number]; state: string }[] = [
@@ -315,22 +316,23 @@ const LoadBoard: React.FC = () => {
   const [bookingId, setBookingId] = useState<string | null>(null);
 
   // ── Persisted settings ──
+  const uKey = (k: string) => getUserStorageKey(getCurrentUserId(), k);
   const [targetRateStr, setTargetRateStr] = useState<string>(() =>
-    localStorage.getItem('truck_target_rate') || '3.00'
+    localStorage.getItem(uKey('truck_target_rate')) || '3.00'
   );
   const [maxWeightStr, setMaxWeightStr] = useState<string>(() =>
-    localStorage.getItem('truck_max_weight') || '42000'
+    localStorage.getItem(uKey('truck_max_weight')) || '42000'
   );
   const targetRate = parseFloat(targetRateStr) || 3.0;
   const maxWeight  = parseInt(maxWeightStr.replace(/[^0-9]/g, ''), 10) || 42000;
 
   const saveTargetRate = (v: string) => {
     const n = parseFloat(v.replace(/[^0-9.]/g, ''));
-    if (!isNaN(n)) { const s = n.toFixed(2); setTargetRateStr(s); localStorage.setItem('truck_target_rate', s); }
+    if (!isNaN(n)) { const s = n.toFixed(2); setTargetRateStr(s); localStorage.setItem(uKey('truck_target_rate'), s); }
   };
   const saveMaxWeight = (v: string) => {
     const n = parseInt(v.replace(/[^0-9]/g, ''), 10);
-    if (!isNaN(n)) { const s = String(n); setMaxWeightStr(s); localStorage.setItem('truck_max_weight', s); }
+    if (!isNaN(n)) { const s = String(n); setMaxWeightStr(s); localStorage.setItem(uKey('truck_max_weight'), s); }
   };
 
   // ── Dynamic load generation ──

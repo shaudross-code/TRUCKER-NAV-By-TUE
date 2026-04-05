@@ -15,7 +15,8 @@ import {
   Gauge,
   Ruler,
   X,
-  ChevronDown
+  ChevronDown,
+  GraduationCap
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
@@ -264,7 +265,7 @@ const EditModal: React.FC<{
   );
 };
 
-const SettingsView: React.FC = () => {
+const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTutorial }) => {
   const context = useContext(AppContext);
   const [downloadedMaps, setDownloadedMaps] = useState<string[]>(['California']);
   const [editField, setEditField] = useState<string | null>(null);
@@ -573,6 +574,23 @@ const SettingsView: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Tutorial Replay */}
+        {onReplayTutorial && (
+          <section className="bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-6">
+            <h2 className="text-white text-[18px] font-bold mb-4 flex items-center gap-2">
+              <GraduationCap className="w-5 h-5 text-[#D4AF37]" /> Tutorial
+            </h2>
+            <p className="text-zinc-500 text-sm mb-4">Review the app's key features with an interactive walkthrough.</p>
+            <button
+              data-testid="replay-tutorial-btn"
+              onClick={onReplayTutorial}
+              className="flex items-center gap-2 px-5 py-3 bg-[#D4AF37] text-black font-black text-xs uppercase tracking-widest rounded-xl hover:bg-[#c9a432] transition-colors shadow-[0_0_15px_rgba(212,175,55,0.2)]"
+            >
+              <GraduationCap className="w-4 h-4" /> Replay Tutorial
+            </button>
+          </section>
+        )}
       </div>
 
       {/* Truck Profile Edit Modal */}
