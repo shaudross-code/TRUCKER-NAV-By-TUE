@@ -6,9 +6,9 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Architecture
 - **Frontend**: React (Vite) + TypeScript + Tailwind CSS + Leaflet Maps
 - **Backend**: Node.js/Express (server.ts) on port 8001
-- **Mobile**: Capacitor (iOS/Android) with EAS Build CI/CD
-- **APIs**: HERE Maps (Routing v8, Discover, Traffic v7), Mapbox (Tiles), Google Maps (Places), Firebase (Auth), Gemini AI (Crash Analysis)
-- **Storage**: Firebase Firestore + LocalStorage (guest config) + File-based JSON (ratings, parking, community reports)
+- **Mobile**: Capacitor (iOS/Android)
+- **APIs**: HERE Maps (Routing v8, Discover, Traffic v7, Map Image Shield API), Mapbox (Tiles), Google Maps (Places), Firebase (Auth), Gemini AI (Crash Analysis)
+- **Storage**: Firebase Firestore + LocalStorage (guest config) + File-based JSON
 
 ## What's Been Implemented
 
@@ -19,120 +19,57 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Lane guidance with dynamic lane visualization
 - GPS interpolation for smooth marker movement
 
-### Map Features
-- 2D satellite/street maps with Mapbox + Leaflet
-- 3D mode via MapLibre GL
-- Custom Leaflet panes (routePane, signPane)
-- Collapsible map controls
-- Numbered waypoint markers, MUTCD highway shields
+### Real FHWA Standard Road Signs (Apr 5, 2026)
+- **Interstate Highway Shields (M1-1)**: Real PNG images from HERE Map Image API (`/api/road-shield`), with FHWA-spec SVG fallback (gradient blue field, red crown)
+- **US Route Shields (M1-4)**: Black shield, white interior, proper MUTCD double border
+- **State Route Shields**: Circular with proper MUTCD specifications
+- **Speed Limit Signs (R2-1)**: Regulatory white sign with double inset border, FHWA proportions (4:5 aspect), sign post element
+- **Warning Diamonds (W-series)**: Yellow/orange with double inset border per MUTCD standard
+- **Exit Guide Signs**: Green FHWA guide signs with EXIT number tabs
+- **Truck Restriction Signs**: No Trucks (R5-2), Weight Limit (R12-1), No Hazmat, Low Clearance (W12-2), Tunnel Warning
+- **CMV Warnings**: Steep Grade (W7-1), Rollover Risk (W1-8), Winding Road (W1-5)
+- **Speed Limit Sign Offset**: First sign on route offset to LEFT of user icon to prevent overlap
+
+### HUD Layout Customization (Display Tab)
+- 21 toggleable HUD elements with live sync between Display tab and Navigation view
+- Element resize (XS/S/M/L/XL) + drag-and-drop repositioning
+- Sign visibility filtering: toggling off signs in Display tab instantly removes them from the map
+- Persistent via LocalStorage
+
+### Authentication (Apr 2, 2026)
+- Google Sign-In via Firebase GoogleAuthProvider
+- **Apple Sign-In** via Firebase OAuthProvider('apple.com') — requires Apple Developer + Firebase Console setup
+- Email/Password registration and login
+- Guest/Anonymous login
 
 ### Safety & Alerts
 - Real-time traffic incident overlays + auto-reroute countdown
 - Truck restriction warnings (bridges, weight, tunnel, hazmat)
-- CMV warning signs (steep grades, rollover risk)
-- Speed limit display (MUTCD-style signs on map)
+- Speed Limit Warning System (visual + audio)
 - Weather alerts and route hazard reports
 
-### Speed Limit Warning System
-- Visual: Speed turns red + pulse animation when exceeding limit + tolerance
-- Audio: 880Hz beeps every 3s while speeding (Web Audio API)
-- "SLOW DOWN" banner with current vs limit speed
-- Configurable tolerance: +0/+3/+5/+8/+10 mph
-
-### Facility Ratings & Reviews
-- 1-5 star rating with 8 preset tags
-- Text reviews (200 char), along-route POI cards
-- Min rating filter in MapControls (ALL/1+/2+/3+/4+)
-- Backend: File-based JSON (`/app/data/facility_ratings.json`)
-
-### HUD Layout Customization (Display Tab)
-- 21 toggleable HUD elements
-- Element resize (XS/S/M/L/XL) + drag-and-drop repositioning
-- NavPreview with Compass Rose + Next Stop mockups
-- Persistent via LocalStorage
-- **Live sync between Display tab and Navigation view** (Apr 2, 2026)
-- **Sign visibility filtering**: toggling off signs in Display tab instantly removes them from the map
-
-### Authentication (Apr 2, 2026)
-- Google Sign-In via Firebase GoogleAuthProvider
-- **Apple Sign-In** via Firebase OAuthProvider('apple.com')
-- Email/Password registration and login
-- Guest/Anonymous login
-- Note: Apple Sign-In requires Apple Developer account + Firebase Console setup to work
-
-### ELD Logs
-- FMCSA-compliant ELD interface synced with Dashboard
-- Status controls: Off Duty, Sleeper Berth, On Duty, Driving
-- Daily summary cards, visual timeline graph, violation detection
-- CSV export, date navigation, global auto-logging via HOSProvider
-
-### Offline Maps
-- Real tile pre-fetching via Service Worker (OSM tiles)
-- 5 US regions with actual tile count estimates
-- Cache storage with LIVE size reporting from SW
-- Progress reporting via postMessage during downloads
-- Automatic cache-first serving when offline
-
-### Community Data Layer
-- Real-time trucker reports: parking, fuel price, weigh station, road hazard, road condition
-- Quick preset reports + custom submissions
-- Upvote system for report reliability
-- Auto-expiry: hazard/weigh station (4h), others (24h)
-- Category filter stats bar, live feed sorted by recency
-- Backend: `/api/community/reports` (GET/POST), `/api/community/reports/:id/upvote` (POST)
-
-### AI Crash/Incident Detection
-- Fetches real-time incidents from HERE Traffic API v7 along route corridor
-- Gemini AI analysis: risk score (1-10), 3 specific warnings, recommended action, estimated delay
-- Fallback heuristic when Gemini unavailable or no incidents
-- Backend: `POST /api/crash-prediction` with bbox or routeCoords
-
-### Viewport-Based Sign Culling
-- Signs stored in `signDataStoreRef` via extracted `useSignPlacement` hook
-- `syncVisibleSigns()` renders only signs within padded viewport (+20%) AND whose category is enabled in hudLayout
-- All 7 placement functions extracted to `/app/hooks/useSignPlacement.ts`
-- HUD config extracted to `/app/hooks/useHudConfig.ts`
-
-### Code Refactoring
-- Extracted sign placement system (~380 lines) into `hooks/useSignPlacement.ts`
-- Extracted HUD config management into `hooks/useHudConfig.ts`
-- Deleted dead code: `GoogleMapsNavigationView.tsx`
-- NavigationView.tsx: 7150 -> ~6770 lines
-
-### iOS/Android Store Submission Setup
-- Production Capacitor config (webContentsDebuggingEnabled=false)
-- Full store submission guide: `STORE_SUBMISSION.md`
-- Privacy policy page: `/public/privacy.html`
-
-### Parking Predictions
-- Time-of-day based availability forecasting
-- 6-hour forecast with fill percentage
-- Backend: `GET /api/poi/parking-predict`
+### Other Features
+- ELD Logs (FMCSA-compliant, synced with Dashboard)
+- Offline Maps (Service Worker tile caching)
+- Community Data Layer (trucker-reported incidents)
+- AI Crash/Incident Detection (Gemini)
+- Viewport-Based Sign Culling (performance)
+- Facility Ratings & Reviews
+- Parking Predictions
+- iOS/Android Store Submission Setup
 
 ## Key API Endpoints
 - `/api/route` - HERE Routing API v8.140.0
+- `/api/road-shield` - HERE Map Image API v3 (real shield PNGs)
 - `/api/traffic-incidents` - HERE Traffic v7
-- `/api/crash-prediction` - AI incident analysis (HERE + Gemini)
-- `/api/poi/ratings` (POST/GET), `/api/poi/ratings/batch` (POST)
-- `/api/poi/parking-status` (POST/GET), `/api/poi/parking-predict` (GET)
-- `/api/community/reports` (GET/POST), `/api/community/reports/:id/upvote` (POST)
-
-## Upcoming Tasks
-- None currently queued
+- `/api/crash-prediction` - AI incident analysis
+- `/api/poi/ratings`, `/api/poi/parking-predict`, `/api/community/reports`
 
 ## Future/Backlog
-- Continue NavigationView.tsx refactoring (6770 lines -> target <3000)
+- Continue NavigationView.tsx refactoring (6770 lines → target <3000)
 - PC*MILER integration (requires paid API key)
-- Surface AI crash prediction as live Route Safety Score badge on map
-
-## Key Files
-- `/app/components/NavigationView.tsx` - Core map UI (~6770 lines)
-- `/app/components/LoginScreen.tsx` - Login with Google, Apple, Email, Guest
-- `/app/components/FirebaseProvider.tsx` - Firebase Auth (Google, Apple, Email, Guest)
-- `/app/hooks/useSignPlacement.ts` - Sign placement + viewport culling + visibility filter
-- `/app/hooks/useHudConfig.ts` - HUD layout/positions/scales management with event sync
-- `/app/STORE_SUBMISSION.md` - iOS/Android store submission guide
-- `/app/public/privacy.html` - Privacy policy page
+- Route Safety Score badge on map
+- Gemini API key rotation (current key flagged as leaked)
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
