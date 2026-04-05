@@ -68,14 +68,14 @@ export const TruckProfileCard = React.memo(({ truckProfile, setTruckProfile }: {
           </div>
           <div className="flex justify-between items-end">
             <span className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-zinc-600">Hazmat Status</span>
-            <span className={`text-lg md:text-xl font-bold uppercase tracking-widest ${truckProfile.hazmat ? 'text-rose-500' : 'text-emerald-500'}`}>
+            <span className={`text-lg md:text-xl font-bold uppercase tracking-widest ${truckProfile.hazmat ? 'text-rose-500' : 'text-[#D4AF37]'}`}>
               {truckProfile.hazmat ? 'Restricted' : 'Cleared'}
             </span>
           </div>
         </div>
         <div className="mt-8 md:mt-12 pt-6 md:pt-8 border-t border-white/10 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-[#D4AF37] animate-pulse" />
             <span className="text-[8px] md:text-[10px] font-bold text-zinc-500 uppercase tracking-widest">System Verified</span>
           </div>
           <button 

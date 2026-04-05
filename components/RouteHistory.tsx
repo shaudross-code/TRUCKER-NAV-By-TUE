@@ -165,7 +165,7 @@ const RouteHistory: React.FC = () => {
                 <div className="flex-1 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                      item.status === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'
+                      item.status === 'COMPLETED' ? 'bg-[#D4AF37]/10 text-[#D4AF37]' : 'bg-rose-500/10 text-rose-500'
                     }`}>
                       {item.status}
                     </div>

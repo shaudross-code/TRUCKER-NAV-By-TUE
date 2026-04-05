@@ -17,8 +17,8 @@ export const QuickActions = React.memo(({ setActiveView, setNavTarget, setEldSta
     { 
       label: 'Start Break', 
       icon: Coffee, 
-      color: 'text-blue-400', 
-      bg: 'bg-blue-400/10',
+      color: 'text-[#D4AF37]', 
+      bg: 'bg-[#D4AF37]/10',
       onClick: () => {
         setEldStatus?.(prev => ({ ...prev, status: 'OFF' }));
       }
@@ -26,8 +26,8 @@ export const QuickActions = React.memo(({ setActiveView, setNavTarget, setEldSta
     { 
       label: 'Load Board', 
       icon: TrendingUp, 
-      color: 'text-emerald-400', 
-      bg: 'bg-emerald-400/10',
+      color: 'text-[#D4AF37]', 
+      bg: 'bg-[#D4AF37]/10',
       onClick: () => setActiveView?.(ViewType.LOAD_BOARD)
     },
     { 

@@ -17,7 +17,7 @@ TRUCKERS NAV is a professional-grade GPS navigation app built specifically for c
 
 FEATURES:
 - Truck-specific routing via HERE Maps API v8 — avoids low bridges, weight limits, and restricted roads
-- MUTCD-compliant road signs — real US interstate shields, speed limits, curve warnings, and truck restriction signs rendered on the map
+- MUTCD-compliant road signs — real FHWA-standard US interstate shields, speed limits, curve warnings, and truck restriction signs rendered on the map
 - Speed limit warning system — visual + audio alerts when exceeding posted speed
 - Real-time traffic incident overlays with automatic reroute suggestions
 - FMCSA-compliant ELD logging — track driving hours, violations, and export CSV
@@ -29,6 +29,7 @@ FEATURES:
 - Lane guidance with synthesized voice instructions
 - Route comparison (up to 3 alternatives with time/distance/fuel cost)
 - Facility ratings and reviews from the trucker community
+- Sign in with Apple, Google, or email — secure authentication powered by Firebase
 
 DESIGNED FOR TRUCKERS:
 - Clean, dark interface optimized for night driving
@@ -119,8 +120,12 @@ eas submit --platform android --profile production
 - [x] EAS build profiles configured (development, preview, production)
 - [x] GitHub Actions CI/CD workflow ready
 - [x] webContentsDebuggingEnabled set to false for production
-- [ ] Privacy policy hosted at a public URL
+- [x] Gold & Black signature theme applied across all views
+- [x] Apple Sign-In + Google Sign-In integrated (Firebase Auth)
+- [x] Privacy policy page at /privacy.html
+- [ ] Privacy policy hosted at a public URL (use https://truckersnav.com/privacy)
 - [ ] Support email/URL ready
 - [ ] App Store screenshots captured (6 per platform)
 - [ ] App Store description finalized
 - [ ] Apple Developer / Google Play accounts active
+- [ ] Apple Sign-In provider enabled in Firebase Console

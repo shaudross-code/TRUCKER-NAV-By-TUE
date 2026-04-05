@@ -44,8 +44,8 @@ export const MetricCard = React.memo(({ icon: Icon, label, value, trend, target,
 
     {trend && (
       <div className="mt-4 flex items-center gap-2">
-        <TrendingUp className="w-3 h-3 text-emerald-500" />
-        <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{trend}</span>
+        <TrendingUp className="w-3 h-3 text-[#D4AF37]" />
+        <span className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">{trend}</span>
       </div>
     )}
 

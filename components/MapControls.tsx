@@ -356,14 +356,14 @@ export const MapControls: React.FC<any> = React.memo(({
               data-testid="compass-mode-btn"
               className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
                 isCompassMode
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/50 shadow-[0_0_12px_rgba(59,130,246,0.4)]'
+                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
                   : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-[#D4AF37]'
               }`}
               title={isCompassMode ? 'Compass Mode Active — tap to disable' : 'Enable Device Compass Mode'}
             >
               <Compass className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${isCompassMode ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
               {isCompassMode && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-blue-400 rounded-full animate-ping" />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
               )}
             </button>
           )}

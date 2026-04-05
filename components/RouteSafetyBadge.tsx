@@ -14,7 +14,7 @@ interface CrashPrediction {
 }
 
 const RISK_COLORS: Record<string, { bg: string; border: string; text: string; glow: string }> = {
-  low:    { bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-400', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.15)]' },
+  low:    { bg: 'bg-[#D4AF37]/10', border: 'border-[#D4AF37]/30', text: 'text-[#D4AF37]', glow: 'shadow-[0_0_12px_rgba(212,175,55,0.15)]' },
   medium: { bg: 'bg-amber-500/10',   border: 'border-amber-500/30',   text: 'text-amber-400',   glow: 'shadow-[0_0_12px_rgba(245,158,11,0.15)]' },
   high:   { bg: 'bg-red-500/10',     border: 'border-red-500/30',     text: 'text-red-400',     glow: 'shadow-[0_0_12px_rgba(239,68,68,0.2)]' },
 };
@@ -142,7 +142,7 @@ export function RouteSafetyBadge({
             <div className="flex-1 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-500 ${
-                  level === 'low' ? 'bg-emerald-500' : level === 'medium' ? 'bg-amber-500' : 'bg-red-500'
+                  level === 'low' ? 'bg-[#D4AF37]' : level === 'medium' ? 'bg-amber-500' : 'bg-red-500'
                 }`}
                 style={{ width: `${score * 10}%` }}
               />

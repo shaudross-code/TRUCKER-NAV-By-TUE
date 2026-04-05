@@ -214,8 +214,8 @@ export default function OfflineMapsView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <MapIcon className="w-5 h-5 text-blue-400" />
+          <div className="p-2.5 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20">
+            <MapIcon className="w-5 h-5 text-[#D4AF37]" />
           </div>
           <div>
             <h1 className="text-lg font-black text-white uppercase tracking-wider">Offline Maps</h1>
@@ -223,7 +223,7 @@ export default function OfflineMapsView() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${isOnline ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/25' : 'bg-red-500/15 text-red-400 border border-red-500/25'}`}>
+          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold ${isOnline ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25' : 'bg-red-500/15 text-red-400 border border-red-500/25'}`}>
             {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
             {isOnline ? 'Online' : 'Offline'}
           </div>
@@ -236,7 +236,7 @@ export default function OfflineMapsView() {
           <div className="flex items-center gap-2">
             <HardDrive className="w-4 h-4 text-zinc-400" />
             <span className="text-xs font-black text-zinc-400 uppercase tracking-widest">Cache Storage</span>
-            {realCacheSize && <span className="text-[9px] text-emerald-500 font-bold">(LIVE)</span>}
+            {realCacheSize && <span className="text-[9px] text-[#D4AF37] font-bold">(LIVE)</span>}
           </div>
           <div className="flex items-center gap-2">
             {swRegistered && (
@@ -289,14 +289,14 @@ export default function OfflineMapsView() {
             return (
               <div key={region.id} data-testid={`region-${region.id}`} className="bg-zinc-900/80 border border-zinc-800 rounded-xl p-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-3 flex-1">
-                  <div className={`p-2 rounded-lg ${cached ? 'bg-emerald-500/10' : 'bg-zinc-800'}`}>
-                    <MapPin className={`w-4 h-4 ${cached ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                  <div className={`p-2 rounded-lg ${cached ? 'bg-[#D4AF37]/10' : 'bg-zinc-800'}`}>
+                    <MapPin className={`w-4 h-4 ${cached ? 'text-[#D4AF37]' : 'text-zinc-500'}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-bold text-white">{region.name}</span>
                       {cached && (
-                        <span className="flex items-center gap-0.5 text-[9px] font-bold text-emerald-400">
+                        <span className="flex items-center gap-0.5 text-[9px] font-bold text-[#D4AF37]">
                           <CheckCircle2 className="w-2.5 h-2.5" /> {cached.zoomLevels}
                         </span>
                       )}
@@ -313,9 +313,9 @@ export default function OfflineMapsView() {
                     {isDownloading && (
                       <div className="mt-1.5">
                         <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-blue-500 rounded-full transition-all duration-200" style={{ width: `${downloadProgress}%` }} />
+                          <div className="h-full bg-[#D4AF37] rounded-full transition-all duration-200" style={{ width: `${downloadProgress}%` }} />
                         </div>
-                        <span className="text-[9px] text-blue-400 font-bold">
+                        <span className="text-[9px] text-[#D4AF37] font-bold">
                           {downloadProgress}% {downloadStats ? `(${downloadStats.downloaded.toLocaleString()}/${downloadStats.total.toLocaleString()} tiles)` : 'downloading...'}
                         </span>
                       </div>
@@ -338,10 +338,10 @@ export default function OfflineMapsView() {
                     disabled={!!downloadingId || !isOnline}
                     className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
                       isDownloading
-                        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30'
                         : cached
                         ? 'bg-zinc-800 text-zinc-400 border border-zinc-700 hover:text-white hover:bg-zinc-700'
-                        : 'bg-blue-600 text-white hover:bg-blue-500'
+                        : 'bg-[#D4AF37] text-white hover:bg-[#D4AF37]'
                     } disabled:opacity-40`}
                   >
                     {isDownloading ? (
@@ -389,9 +389,9 @@ export default function OfflineMapsView() {
       <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
         <h3 className="text-xs font-black text-zinc-400 uppercase tracking-widest mb-2">Offline Mode Tips</h3>
         <ul className="space-y-1.5 text-[11px] text-zinc-500">
-          <li className="flex items-start gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" /> Tiles are real OSM map data cached via Service Worker — works fully offline</li>
-          <li className="flex items-start gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" /> Download regions before entering dead zones (rural/mountain areas)</li>
-          <li className="flex items-start gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" /> Any tiles viewed while online are automatically cached for offline use</li>
+          <li className="flex items-start gap-2"><CheckCircle2 className="w-3 h-3 text-[#D4AF37] mt-0.5 shrink-0" /> Tiles are real OSM map data cached via Service Worker — works fully offline</li>
+          <li className="flex items-start gap-2"><CheckCircle2 className="w-3 h-3 text-[#D4AF37] mt-0.5 shrink-0" /> Download regions before entering dead zones (rural/mountain areas)</li>
+          <li className="flex items-start gap-2"><CheckCircle2 className="w-3 h-3 text-[#D4AF37] mt-0.5 shrink-0" /> Any tiles viewed while online are automatically cached for offline use</li>
           <li className="flex items-start gap-2"><AlertCircle className="w-3 h-3 text-amber-500 mt-0.5 shrink-0" /> Live traffic, weather, and POI data require internet connection</li>
           <li className="flex items-start gap-2"><AlertCircle className="w-3 h-3 text-amber-500 mt-0.5 shrink-0" /> Route recalculation needs internet — cached routes follow fixed path</li>
         </ul>

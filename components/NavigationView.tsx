@@ -298,7 +298,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           </div>
 
-          <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400 text-xs text-center">
+          <div className="p-4 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl text-[#D4AF37] text-xs text-center">
             The app will rebuild automatically once the key is saved.
           </div>
         </div>
@@ -3590,8 +3590,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 type: 'TRAFFIC_LIGHT',
                 message: 'Traffic Light',
                 icon: TrafficCone,
-                color: 'text-emerald-500',
-                bg: 'bg-emerald-500/10',
+                color: 'text-[#D4AF37]',
+                bg: 'bg-[#D4AF37]/10',
                 progress,
                 coords: coords[currentPointIndex]
               });
@@ -3649,8 +3649,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     type: 'TUNNEL',
                     message: `Tunnel Cat. ${tunnelCat}${isBlocked ? ' — BLOCKED' : ''}`,
                     icon: AlertTriangle,
-                    color: isBlocked ? 'text-red-500' : 'text-purple-500',
-                    bg: isBlocked ? 'bg-red-500/20' : 'bg-purple-500/20',
+                    color: isBlocked ? 'text-red-500' : 'text-[#D4AF37]',
+                    bg: isBlocked ? 'bg-red-500/20' : 'bg-[#D4AF37]/20',
                     progress,
                     value: tunnelLevel,
                     coords: coords[currentPointIndex]
@@ -4751,7 +4751,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const iconHtml = renderToStaticMarkup(
         <div className="counter-rotate flex flex-col items-center group">
           <div className={`px-2 py-1 rounded-lg border shadow-xl mb-1 whitespace-nowrap transition-all group-hover:scale-110 ${
-            alert.type === 'STOP_SIGN' ? 'bg-red-700 border-red-500 text-white' : 'bg-emerald-600 border-emerald-400 text-white'
+            alert.type === 'STOP_SIGN' ? 'bg-red-700 border-red-500 text-white' : 'bg-[#D4AF37] border-[#D4AF37] text-white'
           }`}>
             <div className="flex items-center gap-1.5">
               {alert.type === 'STOP_SIGN' ? <Octagon className="w-3 h-3" /> : <TrafficCone className="w-3 h-3" />}
@@ -4759,7 +4759,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           </div>
           <div className={`w-6 h-6 rounded-full shadow-lg flex items-center justify-center border-2 border-black transition-all group-hover:scale-110 ${
-            alert.type === 'STOP_SIGN' ? 'bg-red-700' : 'bg-emerald-600'
+            alert.type === 'STOP_SIGN' ? 'bg-red-700' : 'bg-[#D4AF37]'
           }`}>
             {alert.type === 'STOP_SIGN' ? <Octagon className="w-3 h-3 text-white" /> : <TrafficCone className="w-3 h-3 text-white" />}
           </div>
@@ -4781,7 +4781,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const popup = L.popup({ offset: [0, -25] }).setContent(`
           <div class="p-3 min-w-[150px]">
             <div class="flex items-center gap-2 mb-2">
-              <div class="p-1.5 rounded-lg ${alert.type === 'STOP_SIGN' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}">
+              <div class="p-1.5 rounded-lg ${alert.type === 'STOP_SIGN' ? 'bg-red-100 text-red-600' : 'bg-[#D4AF37]/20 text-[#9A7B2C]'}">
                 ${alert.type === 'STOP_SIGN' ? '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><path d="M9.47 20.28l-6.75-6.75a2.5 2.5 0 0 1 0-3.54l6.75-6.75a2.5 2.5 0 0 1 3.54 0l6.75 6.75a2.5 2.5 0 0 1 0 3.54l-6.75 6.75a2.5 2.5 0 0 1-3.54 0z"></path></svg>'}
               </div>
               <div class="font-black text-zinc-900 text-sm uppercase tracking-tight">${alert.type === 'STOP_SIGN' ? 'Stop Sign' : 'Traffic Light'}</div>
@@ -5225,7 +5225,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 ${poi.address ? `<div class="text-[9px] text-zinc-600 mb-2">${poi.address}</div>` : ''}
                 ${poi.amenities && poi.amenities.length > 0 ? `
                   <div class="flex flex-wrap gap-1 mb-2">
-                    ${poi.amenities.map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded font-bold">${a}</span>`).join('')}
+                    ${poi.amenities.map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-[#D4AF37]/20 text-[#9A7B2C] rounded font-bold">${a}</span>`).join('')}
                   </div>
                 ` : ''}
                 ${poi.distance ? `<div class="text-[9px] text-zinc-500 mb-2">${(poi.distance / 1609.34).toFixed(1)} mi away</div>` : ''}
@@ -5266,7 +5266,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       + Deadhead
                     </button>
                     <button 
-                      class="add-poi-stop-btn w-1/2 py-1.5 bg-emerald-600 text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-emerald-500 transition-colors"
+                      class="add-poi-stop-btn w-1/2 py-1.5 bg-[#D4AF37] text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-[#D4AF37] transition-colors"
                       data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
                       data-type="PAID"
                     >
@@ -5733,7 +5733,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 <h3 className="text-[#D4AF37] font-bold text-xs uppercase tracking-widest">Explore Mode</h3>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <div className="w-2 h-2 bg-[#D4AF37] rounded-full animate-pulse" />
                 <span className="text-[10px] font-bold text-zinc-400 uppercase">Live Traffic</span>
                 <button 
                   onClick={() => setIsExploreMode(false)}
@@ -5941,7 +5941,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   const colorMap: Record<string, { bg: string; text: string; border: string; label: string }> = {
                     BRIDGE: { bg: 'bg-red-500/10', text: 'text-red-500', border: 'border-red-500/20', label: 'Low Bridge' },
                     WEIGHT: { bg: 'bg-orange-500/10', text: 'text-orange-500', border: 'border-orange-500/20', label: 'Weight Limit' },
-                    TUNNEL: { bg: 'bg-purple-500/10', text: 'text-purple-500', border: 'border-purple-500/20', label: 'Tunnel Restriction' },
+                    TUNNEL: { bg: 'bg-[#D4AF37]/10', text: 'text-[#D4AF37]', border: 'border-[#D4AF37]/20', label: 'Tunnel Restriction' },
                     HAZMAT: { bg: 'bg-yellow-500/10', text: 'text-yellow-500', border: 'border-yellow-500/20', label: 'Hazmat Prohibited' },
                     RESTRICTION: { bg: 'bg-orange-500/10', text: 'text-orange-500', border: 'border-orange-500/20', label: 'Restriction' },
                   };
@@ -5965,13 +5965,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           )}
 
           {trafficAlerts.length > 0 && (
-            <div className="bg-black/90 backdrop-blur-2xl border border-emerald-500/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
-              <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-emerald-500/20 pb-1.5">
-                <div className="p-1 md:p-1.5 bg-emerald-500 rounded-lg">
+            <div className="bg-black/90 backdrop-blur-2xl border border-[#D4AF37]/30 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-64">
+              <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2 border-b border-[#D4AF37]/20 pb-1.5">
+                <div className="p-1 md:p-1.5 bg-[#D4AF37] rounded-lg">
                   <TrafficCone className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[8px] md:text-[10px] font-black text-emerald-500 uppercase tracking-wider">Traffic Alerts ({trafficAlerts.length})</span>
+                  <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">Traffic Alerts ({trafficAlerts.length})</span>
                   <span className="text-[6px] md:text-[8px] font-bold text-zinc-500 uppercase tracking-widest">Road Features</span>
                 </div>
               </div>
@@ -5980,9 +5980,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   const Icon = alert.type === 'STOP_SIGN' ? Octagon : TrafficCone;
                   return (
                     <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
-                      alert.type === 'STOP_SIGN' ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20'
+                      alert.type === 'STOP_SIGN' ? 'bg-red-500/10 border-red-500/20' : 'bg-[#D4AF37]/10 border-[#D4AF37]/20'
                     }`}>
-                      <div className={`p-1 rounded-md ${alert.type === 'STOP_SIGN' ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-500'}`}>
+                      <div className={`p-1 rounded-md ${alert.type === 'STOP_SIGN' ? 'bg-red-500/20 text-red-500' : 'bg-[#D4AF37]/20 text-[#D4AF37]'}`}>
                         <Icon className="w-3 h-3 md:w-4 md:h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -6096,17 +6096,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           {weighStationAlert && (
             <div className={`mt-2 backdrop-blur-2xl border rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-56 transition-all ${
               weighStationAlert.status === 'BYPASS' 
-                ? 'bg-emerald-900/90 border-emerald-500/30' 
+                ? 'bg-[#1a1500]/90 border-[#D4AF37]/30' 
                 : 'bg-red-900/90 border-red-500/30 animate-pulse'
             }`}>
               <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2">
                 <div className={`p-1 md:p-1.5 rounded-lg ${
-                  weighStationAlert.status === 'BYPASS' ? 'bg-emerald-500' : 'bg-red-500'
+                  weighStationAlert.status === 'BYPASS' ? 'bg-[#D4AF37]' : 'bg-red-500'
                 }`}>
                   <Scale className="w-3 h-3 md:w-4 md:h-4 text-white" />
                 </div>
                 <span className={`text-[8px] md:text-[10px] font-black uppercase tracking-wider ${
-                  weighStationAlert.status === 'BYPASS' ? 'text-emerald-400' : 'text-red-400'
+                  weighStationAlert.status === 'BYPASS' ? 'text-[#D4AF37]' : 'text-red-400'
                 }`}>
                   Weigh Station
                 </span>
@@ -6116,7 +6116,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   <span className="text-[10px] md:text-xs font-bold text-white uppercase">Status</span>
                   <span className={`text-[10px] md:text-xs font-black px-1.5 py-0.5 rounded-md ${
                     weighStationAlert.status === 'BYPASS' 
-                      ? 'bg-emerald-500/20 text-emerald-400' 
+                      ? 'bg-[#D4AF37]/20 text-[#D4AF37]' 
                       : 'bg-red-500/20 text-red-400'
                   }`}>
                     {weighStationAlert.status}
@@ -6144,13 +6144,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 const cheapest = findCheapestDiesel(fuelStations);
                 if (!cheapest) return null;
                 return (
-                  <div data-testid="cheapest-fuel-banner" className="flex items-center gap-1.5 p-1.5 md:p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg mb-1.5 cursor-pointer hover:bg-emerald-500/15 transition-colors"
+                  <div data-testid="cheapest-fuel-banner" className="flex items-center gap-1.5 p-1.5 md:p-2 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-lg mb-1.5 cursor-pointer hover:bg-[#D4AF37]/15 transition-colors"
                     onClick={() => {
                       const matchedPoi = pois.find(p => matchFuelStationToPoi(cheapest, p.lat, p.lon));
                       if (matchedPoi) setSelectedPoi(matchedPoi);
                     }}>
-                    <Fuel className="w-3 h-3 text-emerald-400 shrink-0" />
-                    <span className="text-[7px] md:text-[8px] font-black text-emerald-400 truncate">Best: ${cheapest.dieselPrice?.toFixed(2)}</span>
+                    <Fuel className="w-3 h-3 text-[#D4AF37] shrink-0" />
+                    <span className="text-[7px] md:text-[8px] font-black text-[#D4AF37] truncate">Best: ${cheapest.dieselPrice?.toFixed(2)}</span>
                     <span className="text-[6px] md:text-[7px] text-zinc-500 truncate ml-auto">{cheapest.name}</span>
                   </div>
                 );
@@ -6168,12 +6168,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   
                   const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest'];
                   if (category === 'fuel' || brandIds.includes(category)) { Icon = Fuel; iconColor = "text-yellow-400"; }
-                  else if (category === 'parking') { Icon = ParkingSquare; iconColor = "text-blue-400"; }
-                  else if (category === 'food') { Icon = UtensilsCrossed; iconColor = "text-green-400"; }
+                  else if (category === 'parking') { Icon = ParkingSquare; iconColor = "text-[#D4AF37]"; }
+                  else if (category === 'food') { Icon = UtensilsCrossed; iconColor = "text-[#D4AF37]"; }
                   else if (category === 'service') { Icon = Wrench; iconColor = "text-red-400"; }
-                  else if (category === 'distribution') { Icon = Box; iconColor = "text-indigo-400"; }
-                  else if (category === 'weigh_station') { Icon = Scale; iconColor = "text-emerald-400"; }
-                  else if (category === 'cat_scale') { Icon = Scale; iconColor = "text-cyan-400"; }
+                  else if (category === 'distribution') { Icon = Box; iconColor = "text-[#D4AF37]"; }
+                  else if (category === 'weigh_station') { Icon = Scale; iconColor = "text-[#D4AF37]"; }
+                  else if (category === 'cat_scale') { Icon = Scale; iconColor = "text-[#D4AF37]"; }
 
                   return (
                     <div key={idx} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setSelectedPoi(poi)}>
@@ -6184,7 +6184,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                           <div className="flex items-center gap-1.5">
                             <span className="text-[6px] md:text-[8px] font-black text-zinc-500 uppercase truncate">{poi.type}</span>
                             {poi.dieselPrice && (
-                              <span className="text-[7px] md:text-[9px] font-black text-emerald-400 tabular-nums">
+                              <span className="text-[7px] md:text-[9px] font-black text-[#D4AF37] tabular-nums">
                                 ${poi.dieselPrice.toFixed(2)}
                               </span>
                             )}
@@ -6302,7 +6302,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         <ArrowUp className="w-3 h-3 rotate-180" />
                       </button>
                     </div>
-                    <div className={`p-2.5 md:p-3 rounded-xl ${wp.type === 'PAID' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
+                    <div className={`p-2.5 md:p-3 rounded-xl ${wp.type === 'PAID' ? 'bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
                       {wp.type === 'PAID' ? <CircleDollarSign className="w-4 h-4 md:w-5 md:h-5" /> : <Truck className="w-4 h-4 md:w-5 md:h-5" />}
                     </div>
                     <div className="flex flex-col">
@@ -6470,7 +6470,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                                 setIsFollowMode(true);
                               }
                             }}
-                            className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 hover:text-white transition-all flex items-center gap-1 md:gap-2 border border-blue-500/20"
+                            className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 hover:text-white transition-all flex items-center gap-1 md:gap-2 border border-[#D4AF37]/20"
                             title="Set as Current Location"
                           >
                             <MapPin className="w-3 h-3 md:w-3.5 md:h-3.5" />
@@ -6485,7 +6485,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                           </button>
                           <button 
                             onMouseDown={(e) => { e.stopPropagation(); addWaypoint(s, 'PAID'); }}
-                            className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 hover:text-white transition-all flex items-center gap-1 md:gap-2 border border-emerald-500/20"
+                            className="px-2 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl bg-[#D4AF37]/10 text-[#D4AF37] hover:bg-[#D4AF37]/20 hover:text-white transition-all flex items-center gap-1 md:gap-2 border border-[#D4AF37]/20"
                           >
                             <CircleDollarSign className="w-3 h-3 md:w-3.5 md:h-3.5" />
                             <span className="text-[7px] md:text-[9px] font-black uppercase tracking-widest hidden md:inline">Paid</span>
@@ -6531,7 +6531,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           <div className="bg-black/95 backdrop-blur-xl border border-zinc-700/60 rounded-xl md:rounded-2xl shadow-[0_-4px_30px_rgba(0,0,0,0.7)] pointer-events-auto animate-in slide-in-from-bottom-4 fade-in duration-300">
             <div className="flex items-center gap-3 p-2.5 md:p-3">
               {/* Waypoint info */}
-              <div className={`p-2 rounded-lg shrink-0 ${waypoints[0].type === 'PAID' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
+              <div className={`p-2 rounded-lg shrink-0 ${waypoints[0].type === 'PAID' ? 'bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/20' : 'bg-zinc-800 text-zinc-400 border border-zinc-700'}`}>
                 {waypoints[0].type === 'PAID' ? <CircleDollarSign className="w-4 h-4" /> : <Truck className="w-4 h-4" />}
               </div>
               <div className="flex flex-col flex-1 min-w-0">
@@ -6546,7 +6546,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     speak(`Arrived at ${waypoints[0].address}.`);
                     removeWaypoint(waypoints[0].id);
                   }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 hover:bg-emerald-500/25 hover:border-emerald-500/40 transition-all active:scale-95 text-[10px] md:text-xs font-black uppercase tracking-wider"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/25 hover:bg-[#D4AF37]/25 hover:border-[#D4AF37]/40 transition-all active:scale-95 text-[10px] md:text-xs font-black uppercase tracking-wider"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">Arrived</span>
@@ -6618,7 +6618,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       {currentRegion.state}
                     </span>
                   )}
-                  <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-700'}`} />
+                  <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-[#D4AF37] shadow-[0_0_6px_rgba(212,175,55,0.6)]' : 'bg-zinc-700'}`} />
                 </div>
               </div>
             )}
@@ -6701,7 +6701,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                     <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]' : 'bg-zinc-800'}`} />
                     <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-white tracking-tighter leading-none">{eta}</span>
                   </div>
-                  <span className="text-[6px] md:text-[8px] landscape:text-[6px] font-bold text-emerald-500/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
+                  <span className="text-[6px] md:text-[8px] landscape:text-[6px] font-bold text-[#D4AF37]/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
                 </div>
               </div>
             </div>
@@ -6717,7 +6717,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             <span className="text-[9px] md:text-[11px] font-black text-white/90 uppercase tracking-wider">
               {currentRegion.city ? `${currentRegion.city}, ` : ''}{currentRegion.state}
             </span>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
+            <div className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_4px_rgba(212,175,55,0.5)]" />
           </div>
         </div>
       )}

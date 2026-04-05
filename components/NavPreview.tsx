@@ -175,7 +175,7 @@ export default function NavPreview({
               <div className="flex items-center gap-1.5 bg-black/80 backdrop-blur-xl border border-zinc-800 rounded-full px-2.5 py-1 shadow-lg">
                 <MapPinned className="w-2 h-2 text-[#D4AF37]" />
                 <span className="text-[7px] font-black text-white/90 uppercase tracking-wider">Des Moines, Iowa</span>
-                <div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.5)]" />
+                <div className="w-1 h-1 rounded-full bg-[#D4AF37] shadow-[0_0_4px_rgba(212,175,55,0.5)]" />
               </div>
             </div>
             {/* Compass (idle) — tied to showCompassRose toggle */}
@@ -327,10 +327,10 @@ export default function NavPreview({
               )}
               {c.showHosStatus && (
                 <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-lg overflow-hidden">
-                  <div className="flex items-center justify-between px-2 py-1.5"><div className="flex items-center gap-1"><Clock className="w-3 h-3 text-emerald-400" /><span className="text-[6px] font-black text-white uppercase">HOS</span></div><span className="text-[5px] px-1 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold">OK</span></div>
+                  <div className="flex items-center justify-between px-2 py-1.5"><div className="flex items-center gap-1"><Clock className="w-3 h-3 text-[#D4AF37]" /><span className="text-[6px] font-black text-white uppercase">HOS</span></div><span className="text-[5px] px-1 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-bold">OK</span></div>
                   <div className="px-2 pb-1.5">
-                    <div className="flex items-center justify-between mb-0.5"><span className="text-[5px] text-zinc-500 font-bold">Drive Time</span><span className="text-[6px] font-black text-emerald-400">6h 22m</span></div>
-                    <div className="h-1 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full" style={{ width: '58%' }} /></div>
+                    <div className="flex items-center justify-between mb-0.5"><span className="text-[5px] text-zinc-500 font-bold">Drive Time</span><span className="text-[6px] font-black text-[#D4AF37]">6h 22m</span></div>
+                    <div className="h-1 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-[#D4AF37] rounded-full" style={{ width: '58%' }} /></div>
                   </div>
                 </div>
               )}
@@ -366,7 +366,7 @@ export default function NavPreview({
                   <span className="text-[6px] font-black text-white uppercase tracking-wider">I-95 N</span>
                   <svg width="16" height="12" viewBox="0 0 44 36"><path d="M22 0 L44 12 L38 36 L6 36 L0 12 Z" fill="#003F87" stroke="white" strokeWidth="1.5"/><text x="22" y="28" textAnchor="middle" fill="white" fontSize="14" fontWeight="900">95</text></svg>
                 </div>
-                <div className="flex items-center gap-1"><span className="text-[5px] font-black text-[#D4AF37]/80 uppercase tracking-wider">PA</span><div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.6)]" /></div>
+                <div className="flex items-center gap-1"><span className="text-[5px] font-black text-[#D4AF37]/80 uppercase tracking-wider">PA</span><div className="w-1 h-1 rounded-full bg-[#D4AF37] shadow-[0_0_4px_rgba(212,175,55,0.6)]" /></div>
               </div>
               <div className="flex items-center px-2 py-1.5 gap-1.5">
                 <div className="flex items-center gap-0.5 shrink-0">
@@ -380,7 +380,7 @@ export default function NavPreview({
                 <div className="h-4 w-px bg-zinc-800/60 shrink-0" />
                 <div className="flex flex-col items-center shrink-0"><span className="text-[4px] font-bold text-zinc-600 uppercase">Time</span><span className="text-[10px] font-[900] text-[#D4AF37] leading-none tabular-nums">2:15</span><span className="text-[4px] text-zinc-600 font-bold">hr</span></div>
                 <div className="h-4 w-px bg-zinc-800/60 shrink-0" />
-                <div className="flex flex-col items-center shrink-0"><span className="text-[4px] font-bold text-zinc-600 uppercase">ETA</span><div className="flex items-center gap-0.5"><div className="w-1 h-1 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_4px_#D4AF37]" /><span className="text-[11px] font-[900] text-white leading-none tabular-nums">3:45</span></div><span className="text-[4px] font-bold text-emerald-500/70 uppercase">LIVE</span></div>
+                <div className="flex flex-col items-center shrink-0"><span className="text-[4px] font-bold text-zinc-600 uppercase">ETA</span><div className="flex items-center gap-0.5"><div className="w-1 h-1 rounded-full bg-[#D4AF37] animate-pulse shadow-[0_0_4px_#D4AF37]" /><span className="text-[11px] font-[900] text-white leading-none tabular-nums">3:45</span></div><span className="text-[4px] font-bold text-[#D4AF37]/70 uppercase">LIVE</span></div>
               </div>
             </div>
           </DraggableItem>
@@ -409,8 +409,8 @@ export default function NavPreview({
                   <span className="text-[6px] font-bold text-white truncate">Pilot Travel Center</span>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
-                  <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/25">
-                    <CheckCircle2 className="w-2 h-2 text-emerald-400" />
+                  <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-[#D4AF37]/15 border border-[#D4AF37]/25">
+                    <CheckCircle2 className="w-2 h-2 text-[#D4AF37]" />
                   </div>
                   <div className="flex items-center gap-0.5 px-1 py-0.5 rounded bg-zinc-800 border border-zinc-700">
                     <SkipForward className="w-2 h-2 text-zinc-400" />

@@ -213,16 +213,16 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Activity className={`w-4 h-4 ${hasCritical ? 'text-red-500 animate-pulse' : hasWarning ? 'text-amber-400' : 'text-emerald-400'}`} />
+          <Activity className={`w-4 h-4 ${hasCritical ? 'text-red-500 animate-pulse' : hasWarning ? 'text-amber-400' : 'text-[#D4AF37]'}`} />
           <span className="text-sm font-bold text-white uppercase tracking-wide">HOS Status</span>
         </div>
         <div className="flex items-center gap-2">
           {hosState.isOnBreak ? (
-            <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-medium">On Break</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-medium">On Break</span>
           ) : hasCritical ? (
             <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 font-medium animate-pulse">Violation</span>
           ) : (
-            <span className="text-emerald-400 text-xs font-medium">{formatRemaining(drivingRemaining)} drive left</span>
+            <span className="text-[#D4AF37] text-xs font-medium">{formatRemaining(drivingRemaining)} drive left</span>
           )}
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-zinc-500" /> : <ChevronDown className="w-3.5 h-3.5 text-zinc-500" />}
         </div>
@@ -256,7 +256,7 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
               <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ${
-                    drivingPct >= 90 ? 'bg-red-500' : drivingPct >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                    drivingPct >= 90 ? 'bg-red-500' : drivingPct >= 75 ? 'bg-amber-500' : 'bg-[#D4AF37]'
                   }`}
                   style={{ width: `${drivingPct}%` }}
                 />
@@ -271,7 +271,7 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
               <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ${
-                    onDutyPct >= 90 ? 'bg-red-500' : onDutyPct >= 75 ? 'bg-amber-500' : 'bg-blue-500'
+                    onDutyPct >= 90 ? 'bg-red-500' : onDutyPct >= 75 ? 'bg-amber-500' : 'bg-[#D4AF37]'
                   }`}
                   style={{ width: `${onDutyPct}%` }}
                 />
@@ -286,7 +286,7 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
               <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
                 <div 
                   className={`h-full rounded-full transition-all duration-500 ${
-                    breakPct >= 90 ? 'bg-red-500' : breakPct >= 75 ? 'bg-amber-500' : 'bg-purple-500'
+                    breakPct >= 90 ? 'bg-red-500' : breakPct >= 75 ? 'bg-amber-500' : 'bg-[#D4AF37]'
                   }`}
                   style={{ width: `${breakPct}%` }}
                 />
@@ -307,7 +307,7 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
             </div>
             <div className="h-1.5 bg-zinc-700 rounded-full overflow-hidden mt-1.5">
               <div 
-                className="h-full rounded-full bg-cyan-500 transition-all"
+                className="h-full rounded-full bg-[#D4AF37] transition-all"
                 style={{ width: `${Math.min(100, (hosState.cycleHours / HOS_RULES.MAX_CYCLE_HOURS) * 100)}%` }}
               />
             </div>
@@ -322,7 +322,7 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-colors ${
                 hosState.isOnBreak 
                   ? 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
-                  : 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 border border-blue-500/30'
+                  : 'bg-[#D4AF37]/20 text-[#D4AF37] hover:bg-[#D4AF37]/30 border border-[#D4AF37]/30'
               }`}
             >
               <Coffee className="w-3.5 h-3.5" />
@@ -331,7 +331,7 @@ export const DriverFatigueAlert: React.FC<DriverFatigueAlertProps> = ({ isDrivin
             <button
               data-testid="hos-reset-shift"
               onClick={resetShift}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium bg-emerald-600/15 text-emerald-400 hover:bg-emerald-600/25 border border-emerald-500/30 transition-colors"
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium bg-[#D4AF37]/15 text-[#D4AF37] hover:bg-[#D4AF37]/25 border border-[#D4AF37]/30 transition-colors"
             >
               <Moon className="w-3.5 h-3.5" />
               10hr Off-Duty

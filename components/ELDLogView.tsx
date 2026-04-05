@@ -12,9 +12,9 @@ import {
 
 const STATUS_CONFIG: Record<DutyStatus, { label: string; color: string; bg: string; icon: any }> = {
   OFF: { label: 'Off Duty', color: 'text-zinc-400', bg: 'bg-zinc-600', icon: Moon },
-  SB: { label: 'Sleeper Berth', color: 'text-blue-400', bg: 'bg-blue-500', icon: Moon },
+  SB: { label: 'Sleeper Berth', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]', icon: Moon },
   ON: { label: 'On Duty', color: 'text-amber-400', bg: 'bg-amber-500', icon: Briefcase },
-  DRIVE: { label: 'Driving', color: 'text-emerald-400', bg: 'bg-emerald-500', icon: Truck },
+  DRIVE: { label: 'Driving', color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]', icon: Truck },
 };
 
 function formatTime(isoStr: string): string {
@@ -77,8 +77,8 @@ export default function ELDLogView() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-            <FileText className="w-5 h-5 text-emerald-400" />
+          <div className="p-2.5 rounded-xl bg-[#D4AF37]/10 border border-[#D4AF37]/20">
+            <FileText className="w-5 h-5 text-[#D4AF37]" />
           </div>
           <div>
             <h1 className="text-lg font-black text-white uppercase tracking-wider">ELD Logs</h1>
@@ -97,7 +97,7 @@ export default function ELDLogView() {
         </button>
         <div className="text-center">
           <span className="text-white font-black text-sm">{new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
-          {isToday && <span className="ml-2 text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-black uppercase">Today</span>}
+          {isToday && <span className="ml-2 text-[9px] px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] font-black uppercase">Today</span>}
         </div>
         <button onClick={() => navigateDate(1)} disabled={isToday} className="p-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white transition-colors disabled:opacity-30">
           <ChevronRight className="w-4 h-4" />
@@ -146,7 +146,7 @@ export default function ELDLogView() {
       {/* Daily Summary Cards */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: 'Drive', hours: todayLog.totalDrive, max: 11, color: 'emerald', icon: Truck },
+          { label: 'Drive', hours: todayLog.totalDrive, max: 11, color: 'amber', icon: Truck },
           { label: 'On-Duty', hours: todayLog.totalOnDuty, max: 14, color: 'amber', icon: Briefcase },
           { label: 'Sleeper', hours: todayLog.totalSleeper, max: 10, color: 'blue', icon: Moon },
           { label: 'Off-Duty', hours: todayLog.totalOff, max: 10, color: 'zinc', icon: Coffee },

@@ -11,9 +11,9 @@ import { FacilityReputation } from './ReputationScore';
 
 const TypeBadge: React.FC<{ type: FacilityType }> = ({ type }) => {
   const cfg = {
-    shipper:  { label: 'SHIPPER',  bg: 'bg-blue-500/20',   text: 'text-blue-300',   border: 'border-blue-500/40' },
-    receiver: { label: 'RECEIVER', bg: 'bg-green-500/20',  text: 'text-green-300',  border: 'border-green-500/40' },
-    both:     { label: 'SHIPPER / RECEIVER', bg: 'bg-purple-500/20', text: 'text-purple-300', border: 'border-purple-500/40' },
+    shipper:  { label: 'SHIPPER',  bg: 'bg-[#D4AF37]/20',   text: 'text-[#D4AF37]',   border: 'border-[#D4AF37]/40' },
+    receiver: { label: 'RECEIVER', bg: 'bg-[#D4AF37]/20',  text: 'text-[#D4AF37]',  border: 'border-[#D4AF37]/40' },
+    both:     { label: 'SHIPPER / RECEIVER', bg: 'bg-[#D4AF37]/20', text: 'text-[#D4AF37]', border: 'border-[#D4AF37]/40' },
   };
   const c = cfg[type] || cfg.both;
   return (
@@ -26,14 +26,14 @@ const TypeBadge: React.FC<{ type: FacilityType }> = ({ type }) => {
 const SpeedBar: React.FC<{ votes: { fast: number; average: number; slow: number }; label: string }> = ({ votes, label }) => {
   const { label: winner, pct } = getSpeedScore(votes);
   const total = votes.fast + votes.average + votes.slow;
-  const color = winner === 'fast' ? 'bg-emerald-400' : winner === 'average' ? 'bg-yellow-400' : winner === 'slow' ? 'bg-red-400' : 'bg-zinc-700';
+  const color = winner === 'fast' ? 'bg-[#D4AF37]' : winner === 'average' ? 'bg-yellow-400' : winner === 'slow' ? 'bg-red-400' : 'bg-zinc-700';
   return (
     <div className="flex items-center gap-3">
       <span className="text-[10px] text-zinc-400 w-24 shrink-0">{label}</span>
       <div className="flex-1 bg-zinc-800 rounded-full h-1.5 overflow-hidden">
         <div className={`h-full rounded-full transition-all duration-700 ${color}`} style={{ width: `${pct}%` }} />
       </div>
-      <span className={`text-[9px] font-bold w-14 text-right capitalize ${winner === 'fast' ? 'text-emerald-400' : winner === 'average' ? 'text-yellow-400' : winner === 'slow' ? 'text-red-400' : 'text-zinc-600'}`}>
+      <span className={`text-[9px] font-bold w-14 text-right capitalize ${winner === 'fast' ? 'text-[#D4AF37]' : winner === 'average' ? 'text-yellow-400' : winner === 'slow' ? 'text-red-400' : 'text-zinc-600'}`}>
         {winner || '—'} {total > 0 ? `(${total})` : ''}
       </span>
     </div>
@@ -53,9 +53,9 @@ const BoolRow: React.FC<{ label: string; votes: { yes: number; no: number } }> =
     <div className="flex items-center gap-3">
       <span className="text-[10px] text-zinc-400 w-24 shrink-0">{label}</span>
       {val === 'yes'
-        ? <Check className="w-3.5 h-3.5 text-emerald-400" />
+        ? <Check className="w-3.5 h-3.5 text-[#D4AF37]" />
         : <X className="w-3.5 h-3.5 text-red-400" />}
-      <span className={`text-[9px] font-bold ${val === 'yes' ? 'text-emerald-400' : 'text-red-400'}`}>
+      <span className={`text-[9px] font-bold ${val === 'yes' ? 'text-[#D4AF37]' : 'text-red-400'}`}>
         {val === 'yes' ? 'Allowed' : 'Not Allowed'}
         <span className="text-zinc-600 font-normal ml-1">({Math.max(votes.yes, votes.no)}/{total})</span>
       </span>
@@ -401,7 +401,7 @@ export const FacilityPanel: React.FC<FacilityPanelProps> = ({ facility, userLoca
               onClick={handleSubmit}
               disabled={submitting || submitted}
               className={`w-full py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 ${
-                submitted ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                submitted ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30' :
                 'bg-[#D4AF37] text-black hover:bg-[#c9a430] disabled:opacity-40'
               }`}
             >

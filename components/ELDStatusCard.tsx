@@ -25,7 +25,7 @@ export const ELDStatusCard = React.memo(({ eldStatus, setEldStatus, formatTime, 
             </div>
           </div>
         </div>
-        <span className={`px-4 md:px-6 py-1.5 md:py-2 ${eldStatus?.status === 'DRIVE' ? 'bg-emerald-500 text-black shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]'} text-[8px] md:text-[10px] font-bold rounded-full uppercase tracking-widest`}>
+        <span className={`px-4 md:px-6 py-1.5 md:py-2 ${eldStatus?.status === 'DRIVE' ? 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]' : 'bg-[#D4AF37] text-black shadow-[0_0_20px_rgba(212,175,55,0.3)]'} text-[8px] md:text-[10px] font-bold rounded-full uppercase tracking-widest`}>
           {eldStatus?.status === 'DRIVE' ? 'Driving' : eldStatus?.status === 'ON' ? 'On Duty' : eldStatus?.status === 'SB' ? 'Sleeper' : 'Off Duty'}
         </span>
       </div>

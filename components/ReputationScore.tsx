@@ -117,7 +117,7 @@ const ConfidenceBadge: React.FC<{ confidence: 'low' | 'medium' | 'high'; reports
   const cfg = {
     low:    { bg: 'bg-zinc-700/40', text: 'text-zinc-500', label: 'Few Reports' },
     medium: { bg: 'bg-yellow-500/15', text: 'text-yellow-500', label: 'Growing' },
-    high:   { bg: 'bg-emerald-500/15', text: 'text-emerald-400', label: 'Reliable' },
+    high:   { bg: 'bg-[#D4AF37]/15', text: 'text-[#D4AF37]', label: 'Reliable' },
   };
   const c = cfg[confidence];
   return (
@@ -154,7 +154,7 @@ export const FacilityReputation: React.FC<FacilityReputationProps> = ({ crowdDat
         <div className="flex items-center gap-2.5">
           <StarDisplay score={score} size={compact ? 12 : 14} />
           <span className="text-sm font-black text-white tabular-nums">{score.toFixed(1)}</span>
-          {trend === 'up' && <TrendingUp className="w-3 h-3 text-emerald-400" />}
+          {trend === 'up' && <TrendingUp className="w-3 h-3 text-[#D4AF37]" />}
           {trend === 'down' && <TrendingDown className="w-3 h-3 text-red-400" />}
           {trend === 'flat' && <Minus className="w-3 h-3 text-zinc-500" />}
         </div>
@@ -166,7 +166,7 @@ export const FacilityReputation: React.FC<FacilityReputationProps> = ({ crowdDat
           {breakdown.map(b => (
             <div key={b.label} className="flex items-center justify-between">
               <span className="text-[9px] text-zinc-500">{b.label}</span>
-              <span className={`text-[9px] font-bold tabular-nums ${b.value >= 4 ? 'text-emerald-400' : b.value >= 2.5 ? 'text-yellow-400' : 'text-red-400'}`}>
+              <span className={`text-[9px] font-bold tabular-nums ${b.value >= 4 ? 'text-[#D4AF37]' : b.value >= 2.5 ? 'text-yellow-400' : 'text-red-400'}`}>
                 {b.value.toFixed(1)}
               </span>
             </div>
@@ -199,7 +199,7 @@ export const TruckStopReputation: React.FC<TruckStopReputationProps> = ({ parkin
   }
 
   const label = score >= 4 ? 'Driver Favorite' : score >= 3 ? 'Solid Choice' : score >= 2 ? 'Use with Caution' : 'Avoid if Possible';
-  const labelColor = score >= 4 ? 'text-emerald-400' : score >= 3 ? 'text-yellow-400' : score >= 2 ? 'text-orange-400' : 'text-red-400';
+  const labelColor = score >= 4 ? 'text-[#D4AF37]' : score >= 3 ? 'text-yellow-400' : score >= 2 ? 'text-orange-400' : 'text-red-400';
 
   return (
     <div data-testid="truckstop-reputation-score" className="space-y-1.5">

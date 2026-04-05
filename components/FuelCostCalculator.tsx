@@ -67,12 +67,12 @@ export const FuelCostCalculator: React.FC<FuelCostCalculatorProps> = ({
         <div className="px-4 pb-4 space-y-4 border-t border-zinc-700/40 pt-3">
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-zinc-800/60 rounded-lg p-2.5 text-center">
-              <DollarSign className="w-3.5 h-3.5 text-emerald-400 mx-auto mb-1" />
+              <DollarSign className="w-3.5 h-3.5 text-[#D4AF37] mx-auto mb-1" />
               <div className="text-white font-bold text-sm">${calculations.totalCost.toFixed(2)}</div>
               <div className="text-zinc-500 text-[10px] uppercase">Total Cost</div>
             </div>
             <div className="bg-zinc-800/60 rounded-lg p-2.5 text-center">
-              <Fuel className="w-3.5 h-3.5 text-blue-400 mx-auto mb-1" />
+              <Fuel className="w-3.5 h-3.5 text-[#D4AF37] mx-auto mb-1" />
               <div className="text-white font-bold text-sm">{calculations.gallonsNeeded.toFixed(1)}</div>
               <div className="text-zinc-500 text-[10px] uppercase">Gallons</div>
             </div>

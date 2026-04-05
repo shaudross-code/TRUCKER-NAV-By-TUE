@@ -68,7 +68,7 @@ export const CompassRose: React.FC<CompassRoseProps> = ({ isCompassMode }) => {
   }, [isCompassMode]);
 
   const accentColor = isCompassMode ? '#3B82F6' : '#D4AF37';
-  const glowColor   = isCompassMode ? 'rgba(59,130,246,0.35)' : 'rgba(212,175,55,0.25)';
+  const glowColor   = isCompassMode ? 'rgba(212,175,55,0.35)' : 'rgba(212,175,55,0.25)';
 
   // ── SVG helpers ───────────────────────────────────────────────────────────
   const polar = (angle: number, r: number) => ({

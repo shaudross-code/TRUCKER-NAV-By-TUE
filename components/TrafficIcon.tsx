@@ -15,7 +15,7 @@ export const TrafficIcon: React.FC<TrafficIconProps> = ({ type, signType, value,
       <div className="flex flex-col items-center justify-center bg-black border-2 border-zinc-700 rounded-lg p-1 shadow-lg" style={{ width: size, height: size * 1.5 }}>
         <Circle className="w-3 h-3 fill-red-500 text-red-500 mb-0.5" />
         <Circle className="w-3 h-3 fill-yellow-500 text-yellow-500 mb-0.5" />
-        <Circle className="w-3 h-3 fill-green-500 text-green-500" />
+        <Circle className="w-3 h-3 fill-[#D4AF37] text-[#D4AF37]" />
       </div>
     );
   }
