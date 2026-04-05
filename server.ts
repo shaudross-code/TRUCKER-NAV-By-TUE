@@ -265,26 +265,28 @@ async function createServer() {
   app.get('/api/auth/google/callback', async (req, res) => {
     try {
       const { code, state } = req.query;
+      console.error('[AUTH] code:', !!code, 'state:', !!state);
+      
       if (!code) return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Missing auth code. Please try again.</h2></body></html>');
       
       // Read the redirect_uri from the state parameter (passed by frontend)
-      // This guarantees it matches exactly what was sent in the authorization request
       let redirectUri = '';
       try {
         if (state) {
           const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
           redirectUri = decoded.redirect_uri || '';
+          console.error('[AUTH] redirect_uri from state:', redirectUri);
         }
-      } catch {}
+      } catch (e: any) {
+        console.error('[AUTH] state decode error:', e.message);
+      }
       
-      // Fallback: construct from headers if state parsing failed
       if (!redirectUri) {
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host;
         redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+        console.error('[AUTH] fallback redirect_uri:', redirectUri);
       }
-      
-      console.log('Google OAuth callback - using redirect_uri:', redirectUri);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -298,23 +300,28 @@ async function createServer() {
         }),
       });
       
-      const tokenData = await tokenResponse.json();
+      const rawBody = await tokenResponse.text();
+      console.error('[AUTH] Google response:', tokenResponse.status, rawBody.substring(0, 300));
+      
+      let tokenData: any;
+      try { tokenData = JSON.parse(rawBody); } catch {
+        return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Invalid Google response</h2></body></html>');
+      }
       
       if (tokenData.error) {
-        console.error('Google token exchange error:', tokenData.error_description || tokenData.error);
-        return res.status(400).send(`<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>${tokenData.error_description || 'Authentication failed. Please try again.'}</h2></body></html>`);
+        return res.status(400).send(`<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>${tokenData.error_description || tokenData.error}</h2></body></html>`);
       }
       
       const idToken = tokenData.id_token;
       if (!idToken) {
-        return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>No ID token received. Please try again.</h2></body></html>');
+        return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>No ID token received</h2></body></html>');
       }
       
-      // Redirect back to the app with the ID token as a query param
+      console.error('[AUTH] SUCCESS');
       res.redirect(`/?__gauth=${encodeURIComponent(idToken)}`);
     } catch (err: any) {
-      console.error('Google OAuth callback error:', err.message);
-      res.status(500).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Authentication failed. Please try again.</h2></body></html>');
+      console.error('[AUTH] Exception:', err.message);
+      res.status(500).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Authentication failed</h2></body></html>');
     }
   });
   
