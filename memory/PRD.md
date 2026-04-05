@@ -15,6 +15,13 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## What's Been Implemented
 
+### POI System Cleanup & Weigh Stations (Apr 5, 2026)
+- **EV Charging Removed**: EV charging POIs (Tesla, ChargePoint, Electrify America, etc.) are now excluded from the entire POI system — no markers, no amenity badges, no filter entries
+- **Real Weigh Station Alerts**: Replaced fake halfway-point simulation with real POI-based detection. Alerts trigger when an actual DOT weigh station POI is within 3 miles of the driver's position
+- **Certified Scales**: CAT Scale / Certified Scale POIs remain in the filter menu and are displayed at truck stops
+- **Amenity Filtering**: EV-related amenity strings are stripped from popup HTML and detail modal views
+- **Fresh Defaults for New Users**: New users start with clean slate ($0.00 metrics, default settings). Migration only runs for the first user who owned pre-existing global data — subsequent new users are never contaminated
+
 ### Coming Soon Overlays, Multi-User Storage & Tutorial (Apr 5, 2026)
 - **Coming Soon Overlay**: Load Board and Truck Stops views now show a gold-themed "Coming Soon — In Development" overlay with blurred background, construction icon, and progress indicator
 - **Multi-User Data Isolation**: All localStorage keys are now prefixed with the Firebase user UID. Each user gets isolated settings, HUD layout, navigation preferences, POI filters, route history, and cached data. Migration runs automatically on first login.
