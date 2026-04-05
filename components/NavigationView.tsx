@@ -67,6 +67,8 @@ import { loadHudLayout, loadHudPositions, loadHudScales, DEFAULT_POSITIONS, DEFA
 import type { HudLayoutConfig } from '../types';
 import { useHudConfig } from '../hooks/useHudConfig';
 import { useSignPlacement } from '../hooks/useSignPlacement';
+import { useTrafficFlow } from '../hooks/useTrafficFlow';
+import { useRouteReasoning } from '../hooks/useRouteReasoning';
 
 interface Waypoint {
   id: string;
@@ -348,6 +350,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     placeSpeedLimitSigns, placeTrafficSlowdowns, placeCmvWarnings, placeTruckWarnings,
   } = useSignPlacement(mapInstanceRef, shieldLayerGroupRef);
 
+  // Traffic flow overlay system
+  const {
+    startTrafficFlow, stopTrafficFlow, refreshFlow, clearFlow,
+  } = useTrafficFlow(mapInstanceRef);
+
+  // Route reasoning overlay system
+  const {
+    renderReasoning, parseRouteReasoning, clearReasoning,
+    setEnabled: setReasoningEnabled, enabledRef: reasoningEnabledRef,
+  } = useRouteReasoning(mapInstanceRef);
+
+  // Overlay toggle states
+  const [showTrafficFlow, setShowTrafficFlow] = useState(false);
+  const [showRouteReasoning, setShowRouteReasoning] = useState(false);
+
   // Reload HUD config from localStorage when this view becomes active
   useEffect(() => {
     if (activeView === ViewType.NAVIGATION) {
@@ -366,6 +383,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     hudLayout.showSpeedLimitSigns, hudLayout.showTrafficIncidents, hudLayout.showCmvWarnings,
     hudLayout.showTruckRestrictions, updateSignVisibility, syncVisibleSigns,
   ]);
+
+  // Traffic flow overlay toggle
+  useEffect(() => {
+    if (showTrafficFlow) {
+      startTrafficFlow();
+    } else {
+      stopTrafficFlow();
+    }
+    return () => { stopTrafficFlow(); };
+  }, [showTrafficFlow]);
+
+  // Route reasoning overlay toggle
+  useEffect(() => {
+    setReasoningEnabled(showRouteReasoning);
+  }, [showRouteReasoning, setReasoningEnabled]);
 
   const userLocation = useMemo(() => {
     // console.log("NavigationView: userLocation calculation", { propUserLocation, locationContextUserLocation: locationContext?.userLocation });
@@ -4024,6 +4056,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         routeSpansRef.current = primaryRoute.spans;
       }
 
+      // Render route reasoning overlay if enabled
+      if (reasoningEnabledRef.current && primaryRoute.coords) {
+        try {
+          const firstRoute = hereRouteData?.routes?.[0];
+          if (firstRoute?.sections) {
+            const reasoningSegments = parseRouteReasoning(firstRoute.sections, primaryRoute.coords);
+            renderReasoning(reasoningSegments);
+          }
+        } catch (e) {
+          console.warn('Route reasoning parse error:', e);
+        }
+      }
+
       // Store alternative routes in state if needed
       setAlternativeRoutes(processedRoutes);
       setSelectedRouteIndex(0);
@@ -6757,6 +6802,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         onAddFacility={() => setShowAddFacility(true)}
         currentZoom={currentZoom}
         isDrivingMode={isDriving && milesRemaining > 0}
+        showTrafficFlow={showTrafficFlow}
+        setShowTrafficFlow={setShowTrafficFlow}
+        showRouteReasoning={showRouteReasoning}
+        setShowRouteReasoning={setShowRouteReasoning}
         className={hudPositions.mapControls && (hudPositions.mapControls.x !== DEFAULT_POSITIONS.mapControls.x || hudPositions.mapControls.y !== DEFAULT_POSITIONS.mapControls.y) ? '' : `-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
         hudScale={hudScales.mapControls || 1}
       /></div>}

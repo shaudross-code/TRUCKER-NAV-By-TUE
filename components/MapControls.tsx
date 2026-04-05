@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2, Menu, Star } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2, Menu, Star, Activity, Route } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 
 export const MapControls: React.FC<any> = React.memo(({ 
@@ -30,6 +30,10 @@ export const MapControls: React.FC<any> = React.memo(({
   onAddFacility,
   currentZoom,
   isDrivingMode,
+  showTrafficFlow,
+  setShowTrafficFlow,
+  showRouteReasoning,
+  setShowRouteReasoning,
   className = "",
   hudScale = 1
 }) => {
@@ -363,6 +367,44 @@ export const MapControls: React.FC<any> = React.memo(({
             >
               <Compass className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${isCompassMode ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
               {isCompassMode && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
+              )}
+            </button>
+          )}
+
+          {/* Traffic Flow overlay toggle — collapsible */}
+          {!isCollapsed && (
+            <button
+              onClick={() => setShowTrafficFlow?.(!showTrafficFlow)}
+              data-testid="traffic-flow-btn"
+              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
+                showTrafficFlow
+                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
+                  : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-[#D4AF37]'
+              }`}
+              title={showTrafficFlow ? 'Traffic Flow ON — tap to hide' : 'Show Real-Time Traffic Flow'}
+            >
+              <Activity className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${showTrafficFlow ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
+              {showTrafficFlow && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
+              )}
+            </button>
+          )}
+
+          {/* Route Reasoning overlay toggle — collapsible */}
+          {!isCollapsed && (
+            <button
+              onClick={() => setShowRouteReasoning?.(!showRouteReasoning)}
+              data-testid="route-reasoning-btn"
+              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
+                showRouteReasoning
+                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
+                  : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-[#D4AF37]'
+              }`}
+              title={showRouteReasoning ? 'Route Reasoning ON — tap to hide' : 'Show Route Reasoning (tolls, restrictions, highway preference)'}
+            >
+              <Route className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${showRouteReasoning ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
+              {showRouteReasoning && (
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
               )}
             </button>

@@ -547,6 +547,34 @@ async function createServer() {
     }
   });
 
+  // ── HERE Traffic Flow API v7 (with shape data for polyline rendering) ─────
+  app.post('/api/traffic-flow', async (req, res) => {
+    const { bbox } = req.body; // [west, south, east, north] or "west,south,east,north"
+    const bboxStr = Array.isArray(bbox) ? bbox.join(',') : bbox;
+    if (!bboxStr) {
+      return res.status(400).json({ error: 'bbox required' });
+    }
+    if (!process.env.HERE_API_KEY) {
+      return res.status(500).json({ error: 'HERE API key not configured' });
+    }
+    try {
+      const url = new URL('https://data.traffic.hereapi.com/v7/flow');
+      url.searchParams.append('locationReferencing', 'shape');
+      url.searchParams.append('in', `bbox:${bboxStr}`);
+      url.searchParams.append('apiKey', process.env.HERE_API_KEY!);
+
+      const response = await fetch(url.toString());
+      if (!response.ok) {
+        return res.status(response.status).json({ error: `HERE Traffic API: ${response.statusText}` });
+      }
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('Traffic flow fetch error:', error);
+      res.status(500).json({ error: 'Failed to fetch traffic flow' });
+    }
+  });
+
   app.post('/api/revgeocode', async (req, res) => {
     const { lat, lon } = req.body;
     try {
@@ -560,23 +588,6 @@ async function createServer() {
     } catch (error) {
       console.error('Error fetching revgeocode:', error);
       res.status(500).json({ error: 'Failed to fetch revgeocode' });
-    }
-  });
-
-  app.post('/api/traffic-flow', async (req, res) => {
-    const { bbox } = req.body; // e.g. "minLat,minLon,maxLat,maxLon"
-    try {
-      const hereUrl = new URL('https://data.traffic.hereapi.com/v7/flow');
-      hereUrl.searchParams.append('in', `bbox:${bbox}`);
-      hereUrl.searchParams.append('locationReferencing', 'olr');
-      hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
-      
-      const response = await fetch(hereUrl.toString());
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error('Error fetching traffic flow:', error);
-      res.status(500).json({ error: 'Failed to fetch traffic flow' });
     }
   });
 
