@@ -2,37 +2,6 @@ import { fileURLToPath, URL } from 'url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
-import firebaseConfig from './firebase-applet-config.json';
-
-// Vite plugin to proxy Firebase auth handler requests
-function firebaseAuthProxy() {
-  const FIREBASE_AUTH_DOMAIN = `${firebaseConfig.projectId}.firebaseapp.com`;
-  return {
-    name: 'firebase-auth-proxy',
-    configureServer(server: any) {
-      server.middlewares.use('/__/auth', async (req: any, res: any) => {
-        try {
-          const targetUrl = `https://${FIREBASE_AUTH_DOMAIN}/__/auth${req.url}`;
-          const response = await fetch(targetUrl, {
-            method: req.method,
-            headers: { 'Host': FIREBASE_AUTH_DOMAIN },
-          });
-          res.statusCode = response.status;
-          response.headers.forEach((value: string, key: string) => {
-            if (key !== 'transfer-encoding' && key !== 'content-encoding') {
-              res.setHeader(key, value);
-            }
-          });
-          const body = await response.text();
-          res.end(body);
-        } catch (err) {
-          res.statusCode = 502;
-          res.end('Firebase auth proxy error');
-        }
-      });
-    },
-  };
-}
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
@@ -51,7 +20,6 @@ export default defineConfig(({ mode }) => {
         allowedHosts: true,
       },
       plugins: [
-        firebaseAuthProxy(),
         tailwindcss(),
         react(),
         // VitePWA({

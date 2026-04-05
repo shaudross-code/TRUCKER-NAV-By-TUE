@@ -57,13 +57,18 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Verified deployment agent confirms no more hardcoded secrets or API keys in source code
 
 ## Firebase Auth Fix (Apr 5, 2026)
-- Fixed "authorizedDomains is not iterable" error that blocked Google/Apple Sign-In
-- Root cause: Firebase Identity Toolkit API (`/v1/projects`) returns response WITHOUT `authorizedDomains` for this project
-- Fix 1: Fetch interceptor in `firebase.ts` injects `authorizedDomains` into the API response
-- Fix 2: Changed `authDomain` to current domain (`window.location.host`) for self-hosted auth handler
-- Fix 3: Created `public/__/firebase/init.json` with config + `authorizedDomains` array
-- Fix 4: Added Vite plugin (`firebaseAuthProxy`) to proxy `/__/auth/*` to Firebase's real auth handler
-- All sign-in methods now working: Google, Apple, Email, Guest
+- Fixed "authorizedDomains is not iterable" error that blocked all OAuth sign-in
+- Root cause: Firebase Identity Toolkit API (`/v1/projects`) returns response WITHOUT `authorizedDomains`, AND Firebase Hosting handler.js stuck at v3.7.5 (incompatible with SDK v12)
+- Solution: Custom server-side OAuth flow for Google Sign-In:
+  - Backend `/api/auth/google` redirects to Google OAuth with Firebase's authorized redirect URI
+  - Backend `/api/auth/google/callback` exchanges auth code for ID token
+  - Frontend polls popup URL, extracts auth code, calls backend, uses `signInWithCredential`
+  - Fetch interceptor in `firebase.ts` patches missing `authorizedDomains` in Identity Toolkit response
+- Deployed Firebase Hosting (`firebase deploy --only hosting`) for init.json availability
+- Google Sign-In: WORKING (custom OAuth flow)
+- Apple Sign-In: PENDING (needs Apple Developer credentials for server-side flow)
+- Email Sign-In: WORKING
+- Guest Login: WORKING
 
 ## Future/Backlog
 - NavigationView.tsx refactoring (6800+ lines → target <3000)

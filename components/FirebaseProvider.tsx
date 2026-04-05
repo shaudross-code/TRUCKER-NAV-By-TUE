@@ -1,12 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   User, 
   onAuthStateChanged, 
-  signInWithPopup, 
   GoogleAuthProvider, 
-  OAuthProvider,
   signOut as firebaseSignOut, 
-  browserPopupRedirectResolver,
+  signInWithCredential,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInAnonymously,
@@ -67,6 +65,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setLoading(false);
       return;
     }
+    
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -143,40 +142,93 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
-  // Google Sign-In
-  const signIn = async () => {
+  // Google Sign-In via custom server-side OAuth
+  const signIn = useCallback(async () => {
     if (USE_MOCK_DATA) return;
     try {
       setAuthError(null);
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+      
+      // Open popup to our backend Google OAuth endpoint
+      const width = 500, height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      const popup = window.open(
+        '/api/auth/google',
+        'GoogleAuth',
+        `width=${width},height=${height},left=${left},top=${top},popup=true`
+      );
+      
+      if (!popup) {
+        setAuthError('Popup was blocked. Please allow popups for this site.');
+        return;
+      }
+      
+      // The Firebase handler at /__/auth/handler will receive the OAuth callback.
+      // It shows "The requested action is invalid" but the URL contains the auth code.
+      // Poll the popup URL to extract the auth code.
+      return new Promise<void>((resolve, reject) => {
+        const pollTimer = setInterval(async () => {
+          try {
+            if (popup.closed) {
+              clearInterval(pollTimer);
+              resolve();
+              return;
+            }
+            
+            // Try to read the popup URL (may fail due to cross-origin)
+            let popupUrl = '';
+            try { popupUrl = popup.location.href; } catch { return; }
+            
+            // Check if we're back at the handler with an auth code
+            if (popupUrl.includes('code=') && popupUrl.includes('__/auth/handler')) {
+              clearInterval(pollTimer);
+              const url = new URL(popupUrl);
+              const code = url.searchParams.get('code');
+              const state = url.searchParams.get('state');
+              popup.close();
+              
+              if (code) {
+                try {
+                  // Exchange code for ID token via our backend
+                  const tokenRes = await fetch('/api/auth/google/callback?' + new URLSearchParams({ code, state: state || '' }));
+                  const html = await tokenRes.text();
+                  
+                  // Extract ID token from the response
+                  const match = html.match(/"idToken":\s*"([^"]+)"/);
+                  if (match) {
+                    const credential = GoogleAuthProvider.credential(match[1]);
+                    await signInWithCredential(auth, credential);
+                    resolve();
+                  } else {
+                    setAuthError('Failed to complete sign-in');
+                    reject(new Error('No ID token'));
+                  }
+                } catch (err: any) {
+                  setAuthError(err.message);
+                  reject(err);
+                }
+              }
+            }
+          } catch {}
+        }, 500);
+        
+        // Timeout after 2 minutes
+        setTimeout(() => {
+          clearInterval(pollTimer);
+          if (!popup.closed) popup.close();
+          resolve();
+        }, 120000);
+      });
     } catch (error: any) {
       setAuthError(error.message);
     }
-  };
+  }, []);
 
-  // Apple Sign-In
-  const signInWithApple = async () => {
+  // Apple Sign-In (Firebase handler is broken for this project)
+  const signInWithApple = useCallback(async () => {
     if (USE_MOCK_DATA) return;
-    try {
-      setAuthError(null);
-      const provider = new OAuthProvider('apple.com');
-      provider.addScope('email');
-      provider.addScope('name');
-      await signInWithPopup(auth, provider, browserPopupRedirectResolver);
-    } catch (error: any) {
-      const code = error.code;
-      if (code === 'auth/popup-closed-by-user') {
-        // User closed the popup — not a real error
-        return;
-      } else if (code === 'auth/operation-not-allowed') {
-        setAuthError('Apple Sign-In is not enabled. Please enable it in Firebase Console.');
-      } else {
-        setAuthError(error.message);
-      }
-    }
-  };
+    setAuthError('Apple Sign-In requires additional configuration. Please use Google Sign-In, Email, or Guest access.');
+  }, []);
 
   // Email/Password Sign-In
   const signInWithEmail = async (email: string, password: string) => {

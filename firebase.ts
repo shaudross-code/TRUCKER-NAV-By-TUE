@@ -6,7 +6,7 @@ import { safeStringify } from './utils';
 
 // Patch: The Firebase Identity Toolkit REST API (/v1/projects) for this project
 // doesn't return `authorizedDomains`, causing "authorizedDomains is not iterable"
-// in signInWithPopup. Intercept that specific fetch call and inject the field.
+// in signInWithPopup. Intercept that specific fetch to inject the missing field.
 if (typeof window !== 'undefined') {
   const _origFetch = window.fetch;
   window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
@@ -33,20 +33,11 @@ if (typeof window !== 'undefined') {
   };
 }
 
-// Self-host Firebase Auth: use current domain as authDomain so the SDK
-// fetches /__/firebase/init.json and /__/auth/handler from our own server
-// (which proxies to the real Firebase authDomain). This fixes the popup
-// handler loading when Firebase Hosting isn't deployed.
-const config = {
-  ...firebaseConfig,
-  authDomain: typeof window !== 'undefined' ? window.location.host : firebaseConfig.authDomain,
-};
-
 // Initialize Firebase SDK
-const app = initializeApp(config);
+const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Use initializeAuth with browserPopupRedirectResolver to fix cookie issues in iframes
+// Initialize Auth with browserPopupRedirectResolver for signInWithPopup
 export const auth = initializeAuth(app, {
   persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
   popupRedirectResolver: browserPopupRedirectResolver,

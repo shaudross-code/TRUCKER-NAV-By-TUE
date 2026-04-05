@@ -235,9 +235,97 @@ async function createServer() {
   });
 
   // ────────────────────────────────────────────────────────────────────────────
-  // Note: Firebase Auth proxy handled by Vite plugin (firebaseAuthProxy).
-  // init.json served from public/__/firebase/init.json.
+  // Google & Apple OAuth Flow (server-side, bypasses broken Firebase handler)
   // ────────────────────────────────────────────────────────────────────────────
+  const GOOGLE_CLIENT_ID = '313371211306-9ipsh9pgilgcffafn8tc9rj4ii3d8uk1.apps.googleusercontent.com';
+  const GOOGLE_CLIENT_SECRET = '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';
+  
+  // Step 1: Start Google OAuth — redirect to Google's consent page
+  // Uses Firebase's own authorized redirect URI, with state containing our origin
+  // for the callback relay
+  app.get('/api/auth/google', (req, res) => {
+    const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || `https://${req.headers.host}`;
+    // Use the Firebase handler URL as redirect_uri (already authorized by Google)
+    const redirectUri = `https://project-4cbb6ad7-8e65-4988-ae7.firebaseapp.com/__/auth/handler`;
+    const params = new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      access_type: 'offline',
+      state: Buffer.from(JSON.stringify({ origin })).toString('base64'),
+    });
+    res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+  });
+  
+  // Step 2: Google OAuth callback — exchange code for tokens
+  app.get('/api/auth/google/callback', async (req, res) => {
+    try {
+      const { code, state } = req.query;
+      if (!code) return res.status(400).json({ error: 'Missing auth code' });
+      
+      const redirectUri = `https://project-4cbb6ad7-8e65-4988-ae7.firebaseapp.com/__/auth/handler`;
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code: code as string,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }),
+      });
+      
+      const responseText = await tokenResponse.text();
+      let tokenData: any;
+      try {
+        tokenData = JSON.parse(responseText);
+      } catch {
+        return res.status(400).json({ error: 'Invalid response from Google' });
+      }
+      
+      if (tokenData.error) {
+        return res.status(400).json({ error: tokenData.error_description || tokenData.error });
+      }
+      
+      res.json({ idToken: tokenData.id_token, accessToken: tokenData.access_token });
+    } catch (err: any) {
+      console.error('Google OAuth callback error:', err.message);
+      res.status(500).json({ error: 'Authentication failed' });
+    }
+  });
+  
+  // Google auth code exchange (fallback endpoint)
+  app.post('/api/google-auth-exchange', async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!code) return res.status(400).json({ error: 'Missing auth code' });
+      
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: 'postmessage',
+          grant_type: 'authorization_code',
+        }),
+      });
+      
+      const tokenData = await tokenResponse.json();
+      if (tokenData.error) {
+        return res.status(400).json({ error: tokenData.error_description || tokenData.error });
+      }
+      
+      res.json({ id_token: tokenData.id_token, access_token: tokenData.access_token });
+    } catch (err: any) {
+      console.error('Google auth exchange error:', err.message);
+      res.status(500).json({ error: 'Token exchange failed' });
+    }
+  });
 
   // IP-based geolocation fallback when browser geolocation fails
   app.get('/api/ip-location', async (req, res) => {
