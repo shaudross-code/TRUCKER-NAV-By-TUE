@@ -408,16 +408,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return propUserLocation || locationContext?.userLocation || FALLBACK_LOCATION;
   }, [propUserLocation, locationContext?.userLocation]); 
   const truckProfile = context?.truckProfile || { 
-    height: 13.5, 
-    weight: 78500, 
-    length: 53, 
-    width: 8.5, 
+    height: 0, 
+    weight: 0, 
+    length: 0, 
+    width: 0, 
     hazmat: false, 
     hazmatClasses: [], 
     tunnelCategory: 'NONE', 
-    axleCount: 5, 
-    axleWeight: 12000, 
-    trailerCount: 1 
+    axleCount: 0, 
+    axleWeight: 0, 
+    trailerCount: 0 
   };
   const routeDistancesRef = useRef<number[]>([]);
   const routeCoordsRef = useRef<[number, number][]>([]);

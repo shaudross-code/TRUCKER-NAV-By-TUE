@@ -82,10 +82,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         email: '',
         displayName: 'Guest Driver',
         truckProfile: {
-          height: 13.5, weight: 78500, length: 53, width: 8.5,
+          height: 0, weight: 0, length: 0, width: 0,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 5, axleWeight: 12000, trailerCount: 1,
-          make: 'Volvo', model: 'VNL 660', year: 2026
+          axleCount: 0, axleWeight: 0, trailerCount: 0,
+          make: '', model: '', year: 0
         }
       };
       setProfile(localProfile);
@@ -102,19 +102,19 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           email: user.email || '',
           displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
           truckProfile: {
-            height: 13.5,
-            weight: 78500,
-            length: 53,
-            width: 8.5,
+            height: 0,
+            weight: 0,
+            length: 0,
+            width: 0,
             hazmat: false,
             hazmatClasses: [],
             tunnelCategory: 'NONE',
-            axleCount: 5,
-            axleWeight: 12000,
-            trailerCount: 1,
-            make: 'Volvo',
-            model: 'VNL 660',
-            year: 2026
+            axleCount: 0,
+            axleWeight: 0,
+            trailerCount: 0,
+            make: '',
+            model: '',
+            year: 0
           }
         };
         setDoc(userDocRef, initialProfile).catch(() => {
@@ -130,10 +130,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         email: user.email || '',
         displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
         truckProfile: {
-          height: 13.5, weight: 78500, length: 53, width: 8.5,
+          height: 0, weight: 0, length: 0, width: 0,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 5, axleWeight: 12000, trailerCount: 1,
-          make: 'Volvo', model: 'VNL 660', year: 2026
+          axleCount: 0, axleWeight: 0, trailerCount: 0,
+          make: '', model: '', year: 0
         }
       };
       setProfile(localProfile);
