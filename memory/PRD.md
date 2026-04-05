@@ -12,68 +12,54 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 ## Brand Theme
 - **Primary Gold**: #D4AF37 (Navigation View only)
 - **Background Black**: #050505, #0a0a0a
-- **Other views**: Original color scheme (emerald/blue accents)
 
 ## What's Been Implemented
 
+### Coming Soon Overlays, Multi-User Storage & Tutorial (Apr 5, 2026)
+- **Coming Soon Overlay**: Load Board and Truck Stops views now show a gold-themed "Coming Soon — In Development" overlay with blurred background, construction icon, and progress indicator
+- **Multi-User Data Isolation**: All localStorage keys are now prefixed with the Firebase user UID. Each user gets isolated settings, HUD layout, navigation preferences, POI filters, route history, and cached data. Migration runs automatically on first login.
+- **Interactive Tutorial**: 5-step onboarding walkthrough (Truck Profile → Dashboard → Navigation → Display Layout → Fuel Network) with gold-themed cards, step dots, progress bar, Skip button, and tip badges. Shows on first login, replayable via Settings > "Replay Tutorial"
+
+### POI Marker Clustering (Apr 5, 2026)
+- Replaced `L.layerGroup()` with `L.markerClusterGroup()` for POI markers
+- Gold-themed cluster badges, expands at zoom 16+, capped at 200 nearest markers
+- Chunked loading (100ms intervals) prevents UI thread blocking
+
 ### Map & Alert Improvements (Apr 5, 2026)
-- **POI Marker Clustering**: Replaced `L.layerGroup()` with `L.markerClusterGroup()` to prevent map freezing. Gold-themed cluster badges group nearby POIs at lower zooms, expand at zoom 16+. Markers capped at 200 nearest, with chunked loading for smooth rendering.
-- **Thicker Traffic Flow Lines**: Road/highway overlaps now use weight 5/7/9 (up from 3/4/5) with smoothFactor 2 for smoother rendering
-- **Clickable Warning Alerts**: Truck Restrictions, Traffic Alerts, and Weather Hazards are now clickable, opening a detail modal with type, severity, location, and route progress info
-- **Collapsible Warning Alerts**: Each alert panel has an X button to collapse to a compact "+" badge with count, freeing map space
-- **Alert Detail Modal**: Gold-themed modal with dismiss button showing detailed alert information
-- **Weather Overlay Resizable**: Weather Overlay now supports XS/S/M/L/XL size controls in the Display Layout
-- **POI in Display Layout**: "Along Route" panel renamed to "POI" and added as a toggleable element in the Display Layout (Panels category)
-- **Brand Icons in POI List**: POI entries now show brand-specific SVG icons (Love's, Pilot, TA, Shell, etc.) instead of generic lucide icons
+- Thicker traffic flow lines (weight 5/7/9), smoother rendering (smoothFactor 2)
+- Clickable & collapsible warning alerts with detail modals
+- Weather Overlay resizable (XS-XL) in Display Layout
+- POI added to Display Layout with brand icons
 
-### Roads & Highways Overlay System (Apr 5, 2026)
-- **Real-Time Traffic Flow**: HERE Traffic API v7 flow data rendered as color-coded polylines (green=freeflow, gold=moderate, red=heavy) — auto-refreshes every 60s, only at zoom 10+
-- **Route Reasoning**: Visual explanation of WHY a route was chosen — toll road dashed gold lines with $ badges, truck restriction red highlights, highway preference segments
-- **Toggle Controls**: Two new buttons in MapControls (Activity icon for traffic, Route icon for reasoning) with gold highlight active states
-- **Backend**: `POST /api/traffic-flow` with bbox parameter, returns shape-referenced flow data
+### Roads & Highways Overlay System
+- Real-Time Traffic Flow via HERE Traffic API v7
+- Route Reasoning visualization
+- Toggle Controls in MapControls
 
-### Core Navigation
+### Core Features
 - Custom truck routing via HERE API v8.140.0
 - Turn-by-turn navigation with voice guidance
-- Route comparison (up to 3 alternatives)
-- Lane guidance, GPS interpolation
+- MUTCD-compliant road signs (Interstate shields, Speed Limits, etc.)
+- 22 toggleable HUD elements with resize/reorder
+- Google Sign-In (custom server-side OAuth), Email/Password, Guest login
 
-### Real FHWA Standard Road Signs
-- Interstate shields via HERE Map Image API + FHWA SVG fallback
-- Speed Limit (R2-1), Warning diamonds, Exit guide signs, CMV warnings
-- Speed limit sign offset at route start (LEFT of user icon)
-
-### HUD Layout Customization (Display Tab)
-- 22 toggleable HUD elements with live sync (including new POI toggle)
-- Sign visibility filtering synced with Display tab toggles
-- Drag-to-reorder, resize (XS-XL), position editing
-- Weather Overlay now resizable
-
-### Authentication
-- Google Sign-In (custom server-side OAuth flow), Email/Password, Guest login (Firebase Auth)
-- Apple Sign-In: PENDING (needs Apple Developer credentials)
-
-### Safety, ELD, Offline, Community, AI Crash Detection
-- All previously implemented features remain functional
+## Key Files
+- `/app/components/ComingSoonOverlay.tsx` - Coming Soon overlay
+- `/app/components/TutorialOverlay.tsx` - 5-step tutorial
+- `/app/utils/userStorage.ts` - User-scoped localStorage utility
+- `/app/utils/hudLayout.ts` - HUD layout with user-scoped storage
+- `/app/components/NavigationView.tsx` - Core map UI (~6970 lines)
 
 ## Key API Endpoints
 - `/api/route` - HERE Routing API v8.140.0
-- `/api/traffic-flow` - HERE Traffic API v7 (real-time flow with shapes)
-- `/api/road-shield` - HERE Map Image API v3
-- `/api/traffic-incidents` - HERE Traffic v7
-- `/api/crash-prediction` - AI incident analysis
-- `/api/poi/ratings`, `/api/poi/parking-predict`, `/api/community/reports`
+- `/api/traffic-flow` - HERE Traffic API v7
 - `/api/auth/google` & `/api/auth/google/callback` - Custom OAuth
 
-## Firebase Auth Fix (Apr 5, 2026)
-- Custom server-side OAuth flow for Google Sign-In (bypasses broken Firebase handler.js v3.7.5)
-- DO NOT revert to signInWithPopup
-
 ## Future/Backlog
-- NavigationView.tsx refactoring (6900+ lines -> target <3000)
-- PC*MILER integration (enterprise API key needed)
+- Refactor NavigationView.tsx (6970+ lines)
+- PC*MILER integration
 - Gemini API key rotation / TTS fallback
-- Route Safety Score badge on map
+- Route Safety Score badge
 - Apple Sign-In (blocked on credentials)
 - Viewport-based sign culling
 
