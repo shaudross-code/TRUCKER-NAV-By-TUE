@@ -14,34 +14,6 @@
     "meta": {}
   },
   {
-    "id": "cr_1775088946836_jzfzq1",
-    "category": "weigh_station",
-    "title": "Station Closed",
-    "description": "Bypass - station not active",
-    "lat": 38.9,
-    "lon": -99.3,
-    "locationName": "I-70 MM 242, Kansas",
-    "userName": "Hauler_Dave",
-    "upvotes": 0,
-    "createdAt": "2026-04-02T00:15:46.836Z",
-    "expiresAt": "2026-04-02T04:15:46.836Z",
-    "meta": {}
-  },
-  {
-    "id": "cr_1775088946848_o3yrd0",
-    "category": "hazard",
-    "title": "Road Debris",
-    "description": "Tire remnants blocking right lane",
-    "lat": 35.4,
-    "lon": -97.5,
-    "locationName": "I-35 NB Mile 185, Oklahoma",
-    "userName": "LoneStarTrucker",
-    "upvotes": 0,
-    "createdAt": "2026-04-02T00:15:46.848Z",
-    "expiresAt": "2026-04-02T04:15:46.848Z",
-    "meta": {}
-  },
-  {
     "id": "cr_1775088946859_mp3woz",
     "category": "fuel_price",
     "title": "Good Diesel Price",
@@ -53,20 +25,6 @@
     "upvotes": 0,
     "createdAt": "2026-04-02T00:15:46.859Z",
     "expiresAt": "2026-04-03T00:15:46.859Z",
-    "meta": {}
-  },
-  {
-    "id": "cr_1775089072240_uwjjed",
-    "category": "hazard",
-    "title": "Test Hazard Report",
-    "description": "Testing hazard report creation",
-    "lat": 41.5,
-    "lon": -93.5,
-    "locationName": "Test Location I-80",
-    "userName": "TestUser",
-    "upvotes": 0,
-    "createdAt": "2026-04-02T00:17:52.240Z",
-    "expiresAt": "2026-04-02T04:17:52.240Z",
     "meta": {}
   },
   {
@@ -95,20 +53,6 @@
     "upvotes": 1,
     "createdAt": "2026-04-02T00:19:14.917Z",
     "expiresAt": "2026-04-03T00:19:14.917Z",
-    "meta": {}
-  },
-  {
-    "id": "cr_1775094267387_n8qqd2",
-    "category": "hazard",
-    "title": "Test Hazard Report",
-    "description": "Testing hazard report creation",
-    "lat": 41.5,
-    "lon": -93.5,
-    "locationName": "Test Location I-80",
-    "userName": "TestUser",
-    "upvotes": 0,
-    "createdAt": "2026-04-02T01:44:27.387Z",
-    "expiresAt": "2026-04-02T05:44:27.387Z",
     "meta": {}
   },
   {
