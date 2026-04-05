@@ -1,46 +1,16 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAuth, browserPopupRedirectResolver, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from './firebase-applet-config.json';
 import { safeStringify } from './utils';
-
-// Patch: The Firebase Identity Toolkit REST API (/v1/projects) for this project
-// doesn't return `authorizedDomains`, causing "authorizedDomains is not iterable"
-// in signInWithPopup. Intercept that specific fetch to inject the missing field.
-if (typeof window !== 'undefined') {
-  const _origFetch = window.fetch;
-  window.fetch = async function patchedFetch(input: RequestInfo | URL, init?: RequestInit) {
-    const response = await _origFetch.call(this, input, init);
-    const url = typeof input === 'string' ? input : input instanceof Request ? input.url : input.toString();
-    if (url.includes('identitytoolkit.googleapis.com/v1/projects')) {
-      const clone = response.clone();
-      const body = await clone.json().catch(() => null);
-      if (body && !body.authorizedDomains) {
-        body.authorizedDomains = [
-          'localhost',
-          window.location.hostname,
-          `${firebaseConfig.projectId}.firebaseapp.com`,
-          `${firebaseConfig.projectId}.web.app`,
-        ];
-        return new Response(JSON.stringify(body), {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-        });
-      }
-    }
-    return response;
-  };
-}
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
-// Initialize Auth with browserPopupRedirectResolver for signInWithPopup
+// Initialize Auth — GSI handles Google sign-in directly, no popup resolver needed
 export const auth = initializeAuth(app, {
   persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence],
-  popupRedirectResolver: browserPopupRedirectResolver,
 });
 auth.useDeviceLanguage();
 

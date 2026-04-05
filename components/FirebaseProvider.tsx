@@ -5,7 +5,6 @@ import {
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   signInWithCredential,
-  signInWithPopup,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInAnonymously,
@@ -143,96 +142,79 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
-  // Google Sign-In — uses signInWithPopup (standard Firebase flow)
-  // Falls back to GSI if popup flow fails
+  // Google Sign-In — uses GSI (Google Identity Services) popup directly.
+  // This bypasses Firebase's /__/auth/handler which causes "missing initial state"
+  // errors in storage-partitioned browsers (Safari, Chrome).
   const signIn = useCallback(async () => {
     if (USE_MOCK_DATA) return;
     try {
       setAuthError(null);
       
-      const provider = new GoogleAuthProvider();
-      provider.addScope('email');
-      provider.addScope('profile');
+      // Primary: GSI popup flow (bypasses Firebase handler entirely)
+      const google = (window as any).google;
+      if (!google?.accounts?.oauth2) {
+        // GSI not loaded yet — wait briefly and retry
+        await new Promise(r => setTimeout(r, 1000));
+        const g = (window as any).google;
+        if (!g?.accounts?.oauth2) {
+          setAuthError('Google Sign-In is still loading. Please try again in a moment.');
+          return;
+        }
+      }
       
-      try {
-        // Primary: Firebase signInWithPopup
-        await signInWithPopup(auth, provider);
+      let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+      if (!clientId) {
+        const res = await fetch('/api/auth/google-client-id');
+        const data = await res.json();
+        clientId = data.clientId;
+      }
+      
+      if (!clientId) {
+        setAuthError('Google Sign-In configuration missing. Please contact support.');
         return;
-      } catch (popupError: any) {
-        console.warn('signInWithPopup failed, trying GSI fallback:', popupError.code, popupError.message);
-        
-        // If user closed popup or popup blocked, don't fallback
-        if (popupError.code === 'auth/popup-closed-by-user' || 
-            popupError.code === 'auth/cancelled-popup-request') {
-          return;
-        }
-        if (popupError.code === 'auth/popup-blocked') {
-          setAuthError('Popup was blocked. Please allow popups for this site.');
-          return;
-        }
       }
       
-      // Fallback: GSI (Google Identity Services)
-      try {
-        const google = (window as any).google;
-        if (!google?.accounts?.oauth2) {
-          throw new Error('GSI not loaded');
-        }
-        
-        let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-        if (!clientId) {
-          const res = await fetch('/api/auth/google-client-id');
-          const data = await res.json();
-          clientId = data.clientId;
-        }
-        
-        if (!clientId) {
-          throw new Error('Missing client ID');
-        }
-        
-        await new Promise<void>((resolve, reject) => {
-          const client = google.accounts.oauth2.initCodeClient({
-            client_id: clientId,
-            scope: 'openid email profile',
-            ux_mode: 'popup',
-            callback: async (response: any) => {
-              if (response.error) {
-                reject(new Error(response.error_description || response.error));
-                return;
+      const gsi = (window as any).google;
+      await new Promise<void>((resolve, reject) => {
+        const client = gsi.accounts.oauth2.initCodeClient({
+          client_id: clientId,
+          scope: 'openid email profile',
+          ux_mode: 'popup',
+          callback: async (response: any) => {
+            if (response.error) {
+              reject(new Error(response.error_description || response.error));
+              return;
+            }
+            try {
+              const tokenRes = await fetch('/api/google-auth-exchange', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code: response.code }),
+              });
+              const tokenData = await tokenRes.json();
+              if (tokenData.error) { reject(new Error(tokenData.error)); return; }
+              const idToken = tokenData.id_token || tokenData.idToken;
+              if (idToken) {
+                const credential = GoogleAuthProvider.credential(idToken);
+                await signInWithCredential(auth, credential);
+                resolve();
+              } else {
+                reject(new Error('No ID token received'));
               }
-              try {
-                const tokenRes = await fetch('/api/google-auth-exchange', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ code: response.code }),
-                });
-                const tokenData = await tokenRes.json();
-                if (tokenData.error) { reject(new Error(tokenData.error)); return; }
-                const idToken = tokenData.id_token || tokenData.idToken;
-                if (idToken) {
-                  const credential = GoogleAuthProvider.credential(idToken);
-                  await signInWithCredential(auth, credential);
-                  resolve();
-                } else {
-                  reject(new Error('No ID token'));
-                }
-              } catch (err) { reject(err); }
-            },
-          });
-          client.requestCode();
+            } catch (err) { reject(err); }
+          },
         });
-      } catch (gsiError: any) {
-        console.warn('GSI fallback also failed:', gsiError.message);
-        
-        // Final fallback: server-side redirect in popup
-        try {
-          await signInViaServerRedirect();
-        } catch (redirectError: any) {
-          setAuthError('Google Sign-In failed. Please try again or use email login.');
-        }
-      }
+        client.requestCode();
+      });
     } catch (error: any) {
-      setAuthError(error.message);
+      console.warn('GSI sign-in failed:', error.message);
+      
+      // Fallback: server-side redirect in popup window
+      try {
+        await signInViaServerRedirect();
+      } catch (redirectError: any) {
+        setAuthError('Google Sign-In failed. Please try again or use email/guest login.');
+      }
     }
   }, []);
 
