@@ -142,27 +142,26 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
-  // Helper: remove Google sign-in overlay
-  const removeGoogleOverlay = useCallback(() => {
-    const el = document.getElementById('google-signin-overlay');
-    if (el) el.remove();
+  // Check for Google OAuth callback token on mount (from full-page redirect flow)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gtoken = params.get('__gauth');
+    if (gtoken) {
+      // Clean the URL immediately
+      window.history.replaceState({}, '', '/');
+      // Sign into Firebase with the ID token
+      const credential = GoogleAuthProvider.credential(gtoken);
+      signInWithCredential(auth, credential).catch((err) => {
+        setAuthError('Google Sign-In failed: ' + (err.message || 'Unknown error'));
+      });
+    }
   }, []);
 
-  // Google Sign-In — uses google.accounts.id API (Sign In With Google).
-  // Returns an ID token directly via FedCM/iframe — NO redirect_uri involved.
-  // Eliminates "redirect_uri_mismatch" and "missing initial state" errors entirely.
+  // Google Sign-In — full-page redirect (no popups).
+  // Works on Safari, Chrome, all browsers. No COOP or redirect_uri issues.
   const signIn = useCallback(async () => {
     if (USE_MOCK_DATA) return;
     setAuthError(null);
-
-    const goog = (window as any).google;
-    if (!goog?.accounts?.id) {
-      await new Promise(r => setTimeout(r, 1500));
-      if (!(window as any).google?.accounts?.id) {
-        setAuthError('Google Sign-In is still loading. Please try again.');
-        return;
-      }
-    }
 
     let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
     if (!clientId) {
@@ -177,73 +176,18 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
 
-    const g = (window as any).google;
-
-    // Initialize with credential callback
-    g.accounts.id.initialize({
+    // Full-page redirect to Google — no popups, no COOP issues
+    const redirectUri = `${window.location.origin}/api/auth/google/callback`;
+    const params = new URLSearchParams({
       client_id: clientId,
-      callback: (response: any) => {
-        (async () => {
-          removeGoogleOverlay();
-          try {
-            const credential = GoogleAuthProvider.credential(response.credential);
-            await signInWithCredential(auth, credential);
-          } catch (err: any) {
-            setAuthError('Google Sign-In failed: ' + (err.message || 'Unknown error'));
-          }
-        })();
-      },
-      auto_select: false,
-      cancel_on_tap_outside: true,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      access_type: 'offline',
     });
-
-    // Try One Tap first
-    g.accounts.id.prompt((notification: any) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        // One Tap unavailable — show overlay with Google's rendered button
-        removeGoogleOverlay();
-
-        const overlay = document.createElement('div');
-        overlay.id = 'google-signin-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)';
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) removeGoogleOverlay(); });
-
-        const card = document.createElement('div');
-        card.style.cssText = 'background:#1a1a1a;border:1px solid rgba(212,175,55,0.3);border-radius:20px;padding:32px 40px;text-align:center;min-width:320px';
-
-        const title = document.createElement('div');
-        title.style.cssText = 'color:#D4AF37;font-size:16px;font-weight:700;margin-bottom:8px;font-family:Inter,sans-serif';
-        title.textContent = 'Sign In with Google';
-
-        const subtitle = document.createElement('div');
-        subtitle.style.cssText = 'color:#888;font-size:12px;margin-bottom:24px;font-family:Inter,sans-serif';
-        subtitle.textContent = 'Click the button below to continue';
-
-        const btnContainer = document.createElement('div');
-        btnContainer.style.cssText = 'display:flex;justify-content:center';
-
-        const cancel = document.createElement('button');
-        cancel.style.cssText = 'margin-top:20px;color:#666;font-size:12px;background:none;border:none;cursor:pointer;font-family:Inter,sans-serif';
-        cancel.textContent = 'Cancel';
-        cancel.onclick = removeGoogleOverlay;
-
-        card.appendChild(title);
-        card.appendChild(subtitle);
-        card.appendChild(btnContainer);
-        card.appendChild(cancel);
-        overlay.appendChild(card);
-        document.body.appendChild(overlay);
-
-        g.accounts.id.renderButton(btnContainer, {
-          theme: 'filled_black',
-          size: 'large',
-          shape: 'pill',
-          width: 280,
-          text: 'signin_with',
-        });
-      }
-    });
-  }, [removeGoogleOverlay]);
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  }, []);
 
   // Apple Sign-In (Firebase handler is broken for this project)
   const signInWithApple = useCallback(async () => {

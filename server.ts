@@ -239,7 +239,6 @@ async function createServer() {
   // ────────────────────────────────────────────────────────────────────────────
   const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
-  const FIREBASE_REDIRECT_URI = `https://${process.env.FIREBASE_PROJECT_ID || ''}.firebaseapp.com/__/auth/handler`;
   
   // Return Google Client ID for GSI initialization
   app.get('/api/auth/google-client-id', (req, res) => {
@@ -247,11 +246,10 @@ async function createServer() {
   });
 
   // Step 1: Start Google OAuth — redirect to Google's consent page
-  // Uses Firebase's own authorized redirect URI, with state containing our origin
-  // for the callback relay
   app.get('/api/auth/google', (req, res) => {
-    const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || `https://${req.headers.host}`;
-    const redirectUri = FIREBASE_REDIRECT_URI;
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host;
+    const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
@@ -259,26 +257,20 @@ async function createServer() {
       scope: 'openid email profile',
       prompt: 'select_account',
       access_type: 'offline',
-      state: Buffer.from(JSON.stringify({ origin })).toString('base64'),
     });
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   });
   
-  // Step 2: Google OAuth callback — exchange code for tokens and postMessage back to opener
+  // Step 2: Google OAuth callback — exchange code for tokens, redirect to app
   app.get('/api/auth/google/callback', async (req, res) => {
     try {
-      const { code, state } = req.query;
-      if (!code) return res.status(400).send('<html><body><h2>Missing auth code</h2></body></html>');
+      const { code } = req.query;
+      if (!code) return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Missing auth code. Please try again.</h2></body></html>');
       
-      let origin = '*';
-      try {
-        if (state) {
-          const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
-          origin = decoded.origin || '*';
-        }
-      } catch {}
+      const protocol = req.headers['x-forwarded-proto'] || 'https';
+      const host = req.headers.host;
+      const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
       
-      const redirectUri = FIREBASE_REDIRECT_URI;
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -291,39 +283,23 @@ async function createServer() {
         }),
       });
       
-      const responseText = await tokenResponse.text();
-      let tokenData: any;
-      try {
-        tokenData = JSON.parse(responseText);
-      } catch {
-        return res.status(400).send('<html><body><h2>Invalid response from Google</h2></body></html>');
-      }
+      const tokenData = await tokenResponse.json();
       
       if (tokenData.error) {
-        return res.status(400).send(`<html><body><h2>${tokenData.error_description || tokenData.error}</h2></body></html>`);
+        console.error('Google token exchange error:', tokenData.error_description || tokenData.error);
+        return res.status(400).send(`<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>${tokenData.error_description || 'Authentication failed. Please try again.'}</h2></body></html>`);
       }
       
       const idToken = tokenData.id_token;
-      // Return HTML page that posts the token back to the opener
-      res.send(`<!DOCTYPE html>
-<html><head><title>Signing in...</title></head>
-<body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-  <div style="text-align:center">
-    <h2>Signing in...</h2>
-    <p style="color:#666">This window will close automatically.</p>
-  </div>
-  <script>
-    if (window.opener) {
-      window.opener.postMessage({ type: 'google-auth-callback', idToken: '${idToken}' }, '${origin}');
-      setTimeout(function() { window.close(); }, 1000);
-    } else {
-      document.body.innerHTML = '<div style="text-align:center;padding:50px"><h2 style="color:#D4AF37">Sign-in complete</h2><p style="color:#666">You can close this window.</p></div>';
-    }
-  </script>
-</body></html>`);
+      if (!idToken) {
+        return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>No ID token received. Please try again.</h2></body></html>');
+      }
+      
+      // Redirect back to the app with the ID token as a query param
+      res.redirect(`/?__gauth=${encodeURIComponent(idToken)}`);
     } catch (err: any) {
       console.error('Google OAuth callback error:', err.message);
-      res.status(500).send('<html><body><h2>Authentication failed. Please try again.</h2></body></html>');
+      res.status(500).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Authentication failed. Please try again.</h2></body></html>');
     }
   });
   
