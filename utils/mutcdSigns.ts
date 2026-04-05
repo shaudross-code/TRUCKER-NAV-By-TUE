@@ -259,16 +259,16 @@ export function exitGuideSign(roadName: string, exitNumber?: string): string {
   const hasExit = !!exitNumber;
   const truncName = roadName.length > 26 ? roadName.substring(0, 24) + '...' : roadName;
   return `<div style="position:relative;filter:drop-shadow(1px 3px 8px rgba(0,0,0,0.7))">
-    <div style="background:linear-gradient(180deg,#007a42,#005c30);border:2.5px solid ${MUTCD.WHITE};border-radius:3px;padding:4px 10px;min-width:80px;text-align:center;position:relative">
-      ${hasExit ? `<div style="position:absolute;top:-2px;right:-2px;background:${MUTCD.GREEN};border:1.5px solid ${MUTCD.WHITE};border-radius:2px;padding:0 3px;display:flex;align-items:center;gap:2px">
-        <span style="font-size:6px;font-weight:800;color:${MUTCD.WHITE};letter-spacing:0.5px;font-family:${MUTCD.FONT}">EXIT</span>
-        <span style="font-size:9px;font-weight:900;color:${MUTCD.WHITE};font-family:${MUTCD.FONT}">${exitNumber}</span>
+    <div style="background:linear-gradient(180deg,#007a42,#005c30);border:2.5px solid ${MUTCD.WHITE};border-radius:3px;padding:5px 12px;min-width:90px;text-align:center;position:relative">
+      ${hasExit ? `<div style="position:absolute;top:-3px;right:-3px;background:${MUTCD.GREEN};border:2px solid ${MUTCD.WHITE};border-radius:2px;padding:1px 4px;display:flex;align-items:center;gap:2px">
+        <span style="font-size:7px;font-weight:800;color:${MUTCD.WHITE};letter-spacing:0.5px;font-family:${MUTCD.FONT}">EXIT</span>
+        <span style="font-size:11px;font-weight:900;color:${MUTCD.WHITE};font-family:${MUTCD.FONT}">${exitNumber}</span>
       </div>` : ''}
-      <div style="font-size:10px;font-weight:800;color:${MUTCD.WHITE};letter-spacing:0.3px;white-space:nowrap;max-width:130px;overflow:hidden;text-overflow:ellipsis;font-family:${MUTCD.FONT};${hasExit ? 'padding-right:30px' : ''}">${truncName}</div>
+      <div style="font-size:11px;font-weight:800;color:${MUTCD.WHITE};letter-spacing:0.3px;white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis;font-family:${MUTCD.FONT};${hasExit ? 'padding-right:35px' : ''}">${truncName}</div>
       <div style="height:1px;background:rgba(255,255,255,0.15);margin:3px -6px 2px"></div>
       <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M7 7l5-5 5 5M12 2v14M5 18h14" stroke="${MUTCD.WHITE}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/></svg>
-        <span style="font-size:6px;font-weight:700;color:rgba(255,255,255,0.75);letter-spacing:1px;font-family:${MUTCD.FONT}">EXIT</span>
+        <span style="font-size:7px;font-weight:700;color:rgba(255,255,255,0.75);letter-spacing:1px;font-family:${MUTCD.FONT}">EXIT</span>
       </div>
     </div>
     <div style="width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid ${MUTCD.WHITE};margin:0 auto"></div>

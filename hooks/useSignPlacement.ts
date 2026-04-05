@@ -158,7 +158,7 @@ export function useSignPlacement(
     exits.forEach(({ name, exitNumber, coord }) => {
       if (!coord || !coord[0] || !coord[1]) return;
       const iconHtml = `<div class="counter-rotate" data-testid="exit-sign-marker" style="cursor:default">${exitGuideSign(name, exitNumber)}</div>`;
-      registerSign(`exit-${exitNumber || name}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [100, 48], [50, 48], 480);
+      registerSign(`exit-${exitNumber || name}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [120, 56], [60, 56], 490);
     });
     syncVisibleSigns();
   }, [registerSign, syncVisibleSigns, shieldLayerGroupRef]);
