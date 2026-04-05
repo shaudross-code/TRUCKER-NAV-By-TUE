@@ -16,7 +16,10 @@ import {
   Ruler,
   X,
   ChevronDown,
-  GraduationCap
+  GraduationCap,
+  Megaphone,
+  Apple,
+  TabletSmartphone
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
@@ -591,6 +594,66 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
             </button>
           </section>
         )}
+
+        {/* Announcements */}
+        <section data-testid="announcements-section" className="lg:col-span-2 bg-[#0a0a0a] border border-zinc-900 rounded-2xl p-6">
+          <h2 className="text-white text-[18px] font-bold mb-5 flex items-center gap-2">
+            <Megaphone className="w-5 h-5 text-[#D4AF37]" /> Announcements
+          </h2>
+          <div className="space-y-4">
+            {/* iOS & Android Announcement */}
+            <div className="bg-gradient-to-br from-[#D4AF37]/10 to-transparent border border-[#D4AF37]/20 rounded-2xl p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-[#D4AF37] to-[#B8860B] flex items-center justify-center shadow-[0_0_20px_rgba(212,175,55,0.3)]">
+                  <TabletSmartphone className="w-6 h-6 text-black" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#D4AF37] bg-[#D4AF37]/10 px-2.5 py-0.5 rounded-full">In Development</span>
+                  </div>
+                  <h3 className="text-white font-bold text-base mb-2">iOS & Android App Coming Soon</h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed mb-4">
+                    We're actively developing native apps for both the Apple App Store and Google Play Store. 
+                    Get the full TRUCKERS NAV experience with offline support, push notifications for traffic alerts, 
+                    and optimized performance built specifically for your device.
+                  </p>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <Apple className="w-4 h-4 text-zinc-400" />
+                      <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">iOS</span>
+                      <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-[#D4AF37] to-[#FFD700] rounded-full" style={{ width: '20%' }} />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <TabletSmartphone className="w-4 h-4 text-zinc-400" />
+                      <span className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Android</span>
+                      <div className="w-16 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-[#D4AF37] to-[#FFD700] rounded-full" style={{ width: '15%' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* General Updates */}
+            <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5">
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-zinc-800 flex items-center justify-center">
+                  <ArrowUpCircle className="w-5 h-5 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-sm mb-1">Continuous Improvements</h3>
+                  <p className="text-zinc-500 text-xs leading-relaxed">
+                    We're constantly improving route accuracy, adding new truck-specific POIs, 
+                    and enhancing the navigation experience. Stay tuned for regular updates.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
 
       {/* Truck Profile Edit Modal */}

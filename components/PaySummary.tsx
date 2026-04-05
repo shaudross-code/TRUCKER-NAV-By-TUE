@@ -230,22 +230,10 @@ const PaySummary: React.FC = () => {
             <FileText className="w-5 h-5 text-[#D4AF37]" />
             Recent Pay Statements
           </h2>
-          <div className="space-y-4">
-            {[
-              { date: '2026-03-01', amount: '$4,850.00', status: 'PAID' },
-              { date: '2026-02-22', amount: '$4,920.00', status: 'PAID' },
-              { date: '2026-02-15', amount: '$4,780.00', status: 'PAID' },
-            ].map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between p-6 bg-white/5 rounded-2xl border border-white/5">
-                <div className="flex items-center gap-4">
-                  <div className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{item.date}</div>
-                  <div className="text-white font-bold text-lg">{item.amount}</div>
-                </div>
-                <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                  {item.status}
-                </div>
-              </div>
-            ))}
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <FileText className="w-10 h-10 text-zinc-700 mb-4" />
+            <p className="text-zinc-500 font-medium text-sm">No pay statements yet</p>
+            <p className="text-zinc-600 text-xs mt-1">Your statements will appear here as you log earnings</p>
           </div>
         </div>
       </div>

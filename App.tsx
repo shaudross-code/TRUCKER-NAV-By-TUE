@@ -487,7 +487,7 @@ const AppContent: React.FC = React.memo(() => {
       case ViewType.ELD_LOGS:
         return <Suspense fallback={<ContentLoader />}><ELDLogView /></Suspense>;
       case ViewType.OFFLINE_MAPS:
-        return <Suspense fallback={<ContentLoader />}><OfflineMapsView /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><ComingSoonOverlay title="Offline Maps"><OfflineMapsView /></ComingSoonOverlay></Suspense>;
       case ViewType.COMMUNITY:
         return <Suspense fallback={<ContentLoader />}><CommunityView /></Suspense>;
       default:

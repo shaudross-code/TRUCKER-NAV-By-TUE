@@ -41,6 +41,10 @@ https://hud-customizer-5.preview.emergentagent.com
 - [x] 2-hour Guest Session Timer with countdown warnings
 - [x] Google Sign-In (full-page redirect + Firebase custom token) - FIXED
 - [x] Clean slate truck profile for new users - DONE
+- [x] Clean slate pay summary (no fake statements) - DONE
+- [x] Coming Soon overlay on Maintenance tab - DONE
+- [x] Coming Soon overlay on Offline Maps tab - DONE
+- [x] Announcements section in Settings (iOS/Android development notice) - DONE
 
 ## Google Sign-In Implementation Details
 - Uses full-page redirect flow (no popups - avoids Safari COOP issues)
