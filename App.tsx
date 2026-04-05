@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import { LoadingScreen } from './components/LoadingScreen';
 import ComingSoonOverlay from './components/ComingSoonOverlay';
 import TutorialOverlay from './components/TutorialOverlay';
+import GuestSessionTimer from './components/GuestSessionTimer';
 import { setCurrentUserId, migrateLocalStorageForUser, getUserStorageKey } from './utils/userStorage';
 const Dashboard = lazy(() => import('./components/Dashboard'));
 const NavigationView = lazy(() => import('./components/NavigationView'));
@@ -570,6 +571,22 @@ const AppContent: React.FC = React.memo(() => {
     }
   }, [loading, contentReady]);
 
+  // Guest session handlers (must be before early returns to satisfy React hooks rules)
+  const handleGuestExpired = useCallback(() => {
+    sessionStorage.removeItem('guest_session_start');
+    signOut();
+  }, [signOut]);
+
+  const handleGuestCreateAccount = useCallback(() => {
+    sessionStorage.removeItem('guest_session_start');
+    signOut();
+  }, [signOut]);
+
+  const handleGuestGoogleSignIn = useCallback(() => {
+    sessionStorage.removeItem('guest_session_start');
+    signOut();
+  }, [signOut]);
+
   if (splashVisible) {
     return <LoadingScreen isExiting={splashExiting} />;
   }
@@ -629,6 +646,15 @@ const AppContent: React.FC = React.memo(() => {
               forceShow={forceTutorial}
               onComplete={() => { setShowTutorial(false); setForceTutorial(false); }}
             />
+
+            {/* Guest Session Timer */}
+            {user.isAnonymous && (
+              <GuestSessionTimer
+                onExpired={handleGuestExpired}
+                onCreateAccount={handleGuestCreateAccount}
+                onGoogleSignIn={handleGuestGoogleSignIn}
+              />
+            )}
           </div>
         </HOSProvider>
     </AppContext.Provider>

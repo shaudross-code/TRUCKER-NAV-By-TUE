@@ -87,19 +87,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 Sign In with Google
               </button>
 
-              {/* Apple Sign In */}
-              <button
-                data-testid="apple-signin-btn"
-                onClick={signInWithApple}
-                disabled={isSubmitting}
-                className="w-full py-3.5 bg-white text-black font-bold rounded-2xl transition-all flex items-center justify-center gap-3 hover:bg-zinc-100 disabled:opacity-50"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-                </svg>
-                Sign In with Apple
-              </button>
-
               <div className="flex items-center gap-3">
                 <div className="flex-1 h-px bg-zinc-700" />
                 <span className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">or</span>
@@ -142,6 +129,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                 Continue as Guest
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
+              <p className="text-[9px] text-zinc-600 text-center">Guest sessions are limited to 2 hours</p>
             </>
           )}
 
