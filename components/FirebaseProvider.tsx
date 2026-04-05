@@ -142,132 +142,108 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
-  // Google Sign-In — uses GSI (Google Identity Services) popup directly.
-  // This bypasses Firebase's /__/auth/handler which causes "missing initial state"
-  // errors in storage-partitioned browsers (Safari, Chrome).
+  // Helper: remove Google sign-in overlay
+  const removeGoogleOverlay = useCallback(() => {
+    const el = document.getElementById('google-signin-overlay');
+    if (el) el.remove();
+  }, []);
+
+  // Google Sign-In — uses google.accounts.id API (Sign In With Google).
+  // Returns an ID token directly via FedCM/iframe — NO redirect_uri involved.
+  // Eliminates "redirect_uri_mismatch" and "missing initial state" errors entirely.
   const signIn = useCallback(async () => {
     if (USE_MOCK_DATA) return;
-    try {
-      setAuthError(null);
-      
-      // Primary: GSI popup flow (bypasses Firebase handler entirely)
-      const google = (window as any).google;
-      if (!google?.accounts?.oauth2) {
-        // GSI not loaded yet — wait briefly and retry
-        await new Promise(r => setTimeout(r, 1000));
-        const g = (window as any).google;
-        if (!g?.accounts?.oauth2) {
-          setAuthError('Google Sign-In is still loading. Please try again in a moment.');
-          return;
-        }
+    setAuthError(null);
+
+    const goog = (window as any).google;
+    if (!goog?.accounts?.id) {
+      await new Promise(r => setTimeout(r, 1500));
+      if (!(window as any).google?.accounts?.id) {
+        setAuthError('Google Sign-In is still loading. Please try again.');
+        return;
       }
-      
-      let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
-      if (!clientId) {
+    }
+
+    let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+    if (!clientId) {
+      try {
         const res = await fetch('/api/auth/google-client-id');
         const data = await res.json();
         clientId = data.clientId;
-      }
-      
-      if (!clientId) {
-        setAuthError('Google Sign-In configuration missing. Please contact support.');
-        return;
-      }
-      
-      const gsi = (window as any).google;
-      await new Promise<void>((resolve, reject) => {
-        const client = gsi.accounts.oauth2.initCodeClient({
-          client_id: clientId,
-          scope: 'openid email profile',
-          ux_mode: 'popup',
-          callback: async (response: any) => {
-            if (response.error) {
-              reject(new Error(response.error_description || response.error));
-              return;
-            }
-            try {
-              const tokenRes = await fetch('/api/google-auth-exchange', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code: response.code }),
-              });
-              const tokenData = await tokenRes.json();
-              if (tokenData.error) { reject(new Error(tokenData.error)); return; }
-              const idToken = tokenData.id_token || tokenData.idToken;
-              if (idToken) {
-                const credential = GoogleAuthProvider.credential(idToken);
-                await signInWithCredential(auth, credential);
-                resolve();
-              } else {
-                reject(new Error('No ID token received'));
-              }
-            } catch (err) { reject(err); }
-          },
-        });
-        client.requestCode();
-      });
-    } catch (error: any) {
-      console.warn('GSI sign-in failed:', error.message);
-      
-      // Fallback: server-side redirect in popup window
-      try {
-        await signInViaServerRedirect();
-      } catch (redirectError: any) {
-        setAuthError('Google Sign-In failed. Please try again or use email/guest login.');
-      }
+      } catch {}
     }
-  }, []);
+    if (!clientId) {
+      setAuthError('Google Sign-In configuration missing.');
+      return;
+    }
 
-  // Server-side redirect fallback (opens popup to /api/auth/google)
-  const signInViaServerRedirect = useCallback(async () => {
-    return new Promise<void>((resolve, reject) => {
-      const width = 500, height = 600;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      const popup = window.open(
-        '/api/auth/google',
-        'GoogleAuth',
-        `width=${width},height=${height},left=${left},top=${top},popup=true`
-      );
-      
-      if (!popup) {
-        reject(new Error('Popup blocked'));
-        return;
-      }
-      
-      // Listen for postMessage from callback page
-      const messageHandler = async (event: MessageEvent) => {
-        if (event.data?.type === 'google-auth-callback' && event.data?.idToken) {
-          window.removeEventListener('message', messageHandler);
-          clearInterval(pollTimer);
-          popup.close();
+    const g = (window as any).google;
+
+    // Initialize with credential callback
+    g.accounts.id.initialize({
+      client_id: clientId,
+      callback: (response: any) => {
+        (async () => {
+          removeGoogleOverlay();
           try {
-            const credential = GoogleAuthProvider.credential(event.data.idToken);
+            const credential = GoogleAuthProvider.credential(response.credential);
             await signInWithCredential(auth, credential);
-            resolve();
-          } catch (err) { reject(err); }
-        }
-      };
-      window.addEventListener('message', messageHandler);
-      
-      // Also poll for popup closure
-      const pollTimer = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(pollTimer);
-          window.removeEventListener('message', messageHandler);
-          resolve();
-        }
-      }, 500);
-      
-      // Timeout
-      setTimeout(() => {
-        clearInterval(pollTimer);
-        window.removeEventListener('message', messageHandler);
-        if (!popup.closed) popup.close();
-        resolve();
-      }, 120000);
+          } catch (err: any) {
+            setAuthError('Google Sign-In failed: ' + (err.message || 'Unknown error'));
+          }
+        })();
+      },
+      auto_select: false,
+      cancel_on_tap_outside: true,
     });
-  }, []);
+
+    // Try One Tap first
+    g.accounts.id.prompt((notification: any) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        // One Tap unavailable — show overlay with Google's rendered button
+        removeGoogleOverlay();
+
+        const overlay = document.createElement('div');
+        overlay.id = 'google-signin-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(8px)';
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) removeGoogleOverlay(); });
+
+        const card = document.createElement('div');
+        card.style.cssText = 'background:#1a1a1a;border:1px solid rgba(212,175,55,0.3);border-radius:20px;padding:32px 40px;text-align:center;min-width:320px';
+
+        const title = document.createElement('div');
+        title.style.cssText = 'color:#D4AF37;font-size:16px;font-weight:700;margin-bottom:8px;font-family:Inter,sans-serif';
+        title.textContent = 'Sign In with Google';
+
+        const subtitle = document.createElement('div');
+        subtitle.style.cssText = 'color:#888;font-size:12px;margin-bottom:24px;font-family:Inter,sans-serif';
+        subtitle.textContent = 'Click the button below to continue';
+
+        const btnContainer = document.createElement('div');
+        btnContainer.style.cssText = 'display:flex;justify-content:center';
+
+        const cancel = document.createElement('button');
+        cancel.style.cssText = 'margin-top:20px;color:#666;font-size:12px;background:none;border:none;cursor:pointer;font-family:Inter,sans-serif';
+        cancel.textContent = 'Cancel';
+        cancel.onclick = removeGoogleOverlay;
+
+        card.appendChild(title);
+        card.appendChild(subtitle);
+        card.appendChild(btnContainer);
+        card.appendChild(cancel);
+        overlay.appendChild(card);
+        document.body.appendChild(overlay);
+
+        g.accounts.id.renderButton(btnContainer, {
+          theme: 'filled_black',
+          size: 'large',
+          shape: 'pill',
+          width: 280,
+          text: 'signin_with',
+        });
+      }
+    });
+  }, [removeGoogleOverlay]);
 
   // Apple Sign-In (Firebase handler is broken for this project)
   const signInWithApple = useCallback(async () => {
