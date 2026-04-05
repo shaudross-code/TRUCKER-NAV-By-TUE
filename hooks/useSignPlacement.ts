@@ -167,18 +167,21 @@ export function useSignPlacement(
     if (!shieldLayerGroupRef.current || curves.length === 0) return;
     curves.forEach(({ direction, coord }) => {
       if (!coord || !coord[0] || !coord[1]) return;
-      const iconHtml = `<div class="counter-rotate" data-testid="curve-sign-marker" style="cursor:default">${curveWarning(direction === 'left' ? 'left' : 'right', 36)}</div>`;
-      registerSign(`curve-${direction}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [36, 36], [18, 18], 450);
+      const iconHtml = `<div class="counter-rotate" data-testid="curve-sign-marker" style="cursor:default">${curveWarning(direction === 'left' ? 'left' : 'right', 40)}</div>`;
+      registerSign(`curve-${direction}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [40, 40], [20, 20], 450);
     });
     syncVisibleSigns();
   }, [registerSign, syncVisibleSigns, shieldLayerGroupRef]);
 
   const placeSpeedLimitSigns = useCallback((signs: { speed: number; coord: [number, number] }[]) => {
     if (!shieldLayerGroupRef.current || signs.length === 0) return;
-    signs.forEach(({ speed, coord }) => {
+    signs.forEach(({ speed, coord }, idx) => {
       if (!coord || !coord[0] || !coord[1]) return;
-      const iconHtml = `<div class="counter-rotate" data-testid="speed-limit-sign-marker" style="cursor:default">${speedLimitSign(speed, 38)}</div>`;
-      registerSign(`speed-${speed}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [38, 46], [19, 23], 460);
+      const iconHtml = `<div class="counter-rotate" data-testid="speed-limit-sign-marker" style="cursor:default">${speedLimitSign(speed, 42)}</div>`;
+      // First sign (route start): offset anchor to the right so sign appears LEFT of user icon
+      const isFirst = idx === 0;
+      const anchorX = isFirst ? 58 : 21;
+      registerSign(`speed-${speed}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [42, 54], [anchorX, 27], 460);
     });
     syncVisibleSigns();
   }, [registerSign, syncVisibleSigns, shieldLayerGroupRef]);
@@ -202,10 +205,10 @@ export function useSignPlacement(
       if (!coord || !coord[0] || !coord[1]) return;
       const sevBorder = severity === 'critical' ? '#dc2626' : severity === 'high' ? '#f59e0b' : '#eab308';
       let signHtml = '';
-      if (type === 'STEEP_DOWNGRADE') signHtml = steepGradeWarning('down', w.grade, 40);
-      else if (type === 'STEEP_HILL') signHtml = steepGradeWarning('up', w.grade, 40);
-      else if (type === 'ROLLOVER_RISK') signHtml = rolloverWarning(38);
-      else if (type === 'WINDING_ROAD') signHtml = windingRoadWarning(36);
+      if (type === 'STEEP_DOWNGRADE') signHtml = steepGradeWarning('down', w.grade, 44);
+      else if (type === 'STEEP_HILL') signHtml = steepGradeWarning('up', w.grade, 44);
+      else if (type === 'ROLLOVER_RISK') signHtml = rolloverWarning(42);
+      else if (type === 'WINDING_ROAD') signHtml = windingRoadWarning(40);
       const labelMap: Record<string, string> = { 'STEEP_DOWNGRADE': 'STEEP GRADE', 'STEEP_HILL': 'HILL', 'ROLLOVER_RISK': 'ROLLOVER', 'WINDING_ROAD': 'WINDING' };
       const iconHtml = `<div class="counter-rotate" data-testid="cmv-warning-marker" data-warning-type="${type}" style="cursor:default"><div style="display:flex;flex-direction:column;align-items:center">${signHtml}<div style="background:rgba(0,0,0,0.85);border:1px solid ${sevBorder};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:80px"><div style="font-size:6px;font-weight:900;color:${sevBorder};letter-spacing:0.5px;white-space:nowrap">${labelMap[type] || type}</div><div style="font-size:5px;color:rgba(255,255,255,0.8);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:76px">${message}</div></div></div></div>`;
       registerSign(`cmv-${type}-${coord[0].toFixed(4)}`, coord[0], coord[1], iconHtml, [44, 60], [22, 30], 550);
@@ -219,12 +222,12 @@ export function useSignPlacement(
     restrictions.forEach((r) => {
       if (!r.coords || !r.coords[0] || !r.coords[1]) return;
       let signHtml = '', labelText = '', labelColor = '#f59e0b';
-      if (r.type === 'BRIDGE') { signHtml = lowClearanceWarning(undefined, 36); labelText = 'LOW CLEARANCE'; labelColor = '#dc2626'; }
-      else if (r.type === 'WEIGHT') { signHtml = weightLimitSign(r.message.length > 15 ? 'RESTRICTED' : r.message, 30); labelText = 'WEIGHT LIMIT'; labelColor = '#f59e0b'; }
-      else if (r.type === 'TUNNEL') { signHtml = tunnelWarning(36); labelText = 'TUNNEL'; labelColor = '#8b5cf6'; }
-      else if (r.type === 'HAZMAT') { signHtml = noHazmatSign(36); labelText = 'NO HAZMAT'; labelColor = '#dc2626'; }
-      else if (r.type === 'TRUCK_PROHIBITED') { signHtml = noTrucksSign(36); labelText = 'NO TRUCKS'; labelColor = '#dc2626'; }
-      else if (r.type === 'NOTICE') { signHtml = noticeWarning(34); labelText = 'NOTICE'; labelColor = '#f59e0b'; }
+      if (r.type === 'BRIDGE') { signHtml = lowClearanceWarning(undefined, 40); labelText = 'LOW CLEARANCE'; labelColor = '#dc2626'; }
+      else if (r.type === 'WEIGHT') { signHtml = weightLimitSign(r.message.length > 15 ? 'RESTRICTED' : r.message, 34); labelText = 'WEIGHT LIMIT'; labelColor = '#f59e0b'; }
+      else if (r.type === 'TUNNEL') { signHtml = tunnelWarning(40); labelText = 'TUNNEL'; labelColor = '#8b5cf6'; }
+      else if (r.type === 'HAZMAT') { signHtml = noHazmatSign(40); labelText = 'NO HAZMAT'; labelColor = '#dc2626'; }
+      else if (r.type === 'TRUCK_PROHIBITED') { signHtml = noTrucksSign(40); labelText = 'NO TRUCKS'; labelColor = '#dc2626'; }
+      else if (r.type === 'NOTICE') { signHtml = noticeWarning(38); labelText = 'NOTICE'; labelColor = '#f59e0b'; }
       else return;
       const shortMsg = r.message.length > 35 ? r.message.substring(0, 33) + '...' : r.message;
       const iconHtml = `<div class="counter-rotate" data-testid="truck-warning-marker" data-warning-type="${r.type}" style="cursor:default"><div style="display:flex;flex-direction:column;align-items:center">${signHtml}<div style="background:rgba(0,0,0,0.9);border:1px solid ${labelColor};border-radius:3px;padding:1px 4px;margin-top:2px;text-align:center;max-width:90px"><div style="font-size:6px;font-weight:900;color:${labelColor};letter-spacing:0.5px;white-space:nowrap">${labelText}</div><div style="font-size:5.5px;color:rgba(255,255,255,0.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:86px">${shortMsg}</div></div></div></div>`;

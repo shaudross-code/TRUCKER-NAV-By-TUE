@@ -1215,7 +1215,7 @@ async function seedFacilitiesFromGoogle(lat: number, lon: number, gk: string): P
     });
   } else {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: { port: 24679 } },
       appType: 'spa'
     });
     app.use(vite.middlewares);
