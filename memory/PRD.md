@@ -43,6 +43,11 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Route Reasoning visualization
 - Toggle Controls in MapControls
 
+### Authentication & Guest Session (Apr 5, 2026)
+- **Apple Sign-In Disabled**: Button removed from login screen entirely (pending Apple Developer credentials)
+- **Guest 2-Hour Time Limit**: Guest sessions expire after 2 hours. Red countdown timer badge appears at 30 min. Warning overlay (app still visible behind) at 5min/1min/30sec with "Create Account" and "Sign In with Google" buttons
+- **Session Storage**: Guest timer uses sessionStorage (resets per browser tab)
+
 ### Core Features
 - Custom truck routing via HERE API v8.140.0
 - Turn-by-turn navigation with voice guidance
