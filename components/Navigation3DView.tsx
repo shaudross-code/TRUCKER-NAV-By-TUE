@@ -485,7 +485,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
             const typeStyles: Record<string, { bg: string; border: string; shadow: string; iconBg: string; iconStroke: string; labelColor: string; label: string }> = {
               BRIDGE: { bg: 'bg-red-950/90', border: 'border-red-500/60', shadow: '0 0 60px rgba(239,68,68,0.4), 0 0 120px rgba(239,68,68,0.15)', iconBg: 'bg-red-500/20', iconStroke: '#fca5a5', labelColor: 'text-red-400', label: 'Low Bridge Ahead' },
               WEIGHT: { bg: 'bg-orange-950/90', border: 'border-orange-500/60', shadow: '0 0 60px rgba(249,115,22,0.4), 0 0 120px rgba(249,115,22,0.15)', iconBg: 'bg-orange-500/20', iconStroke: '#fdba74', labelColor: 'text-orange-400', label: 'Weight Restriction' },
-              TUNNEL: { bg: 'bg-purple-950/90', border: 'border-[#D4AF37]/60', shadow: '0 0 60px rgba(168,85,247,0.4), 0 0 120px rgba(168,85,247,0.15)', iconBg: 'bg-[#D4AF37]/20', iconStroke: '#c4b5fd', labelColor: 'text-[#D4AF37]', label: 'Tunnel Restriction' },
+              TUNNEL: { bg: 'bg-purple-950/90', border: 'border-purple-500/60', shadow: '0 0 60px rgba(168,85,247,0.4), 0 0 120px rgba(168,85,247,0.15)', iconBg: 'bg-purple-500/20', iconStroke: '#c4b5fd', labelColor: 'text-purple-400', label: 'Tunnel Restriction' },
               HAZMAT: { bg: 'bg-yellow-950/90', border: 'border-yellow-500/60', shadow: '0 0 60px rgba(234,179,8,0.4), 0 0 120px rgba(234,179,8,0.15)', iconBg: 'bg-yellow-500/20', iconStroke: '#fde68a', labelColor: 'text-yellow-400', label: 'Hazmat Prohibited Zone' },
             };
             const s = typeStyles[activeWarning.type] || typeStyles.BRIDGE;
@@ -634,7 +634,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
                     {currentRegion.state}
                   </span>
                 )}
-                <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-[#D4AF37] shadow-[0_0_6px_rgba(212,175,55,0.6)]' : 'bg-zinc-700'}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]' : 'bg-zinc-700'}`} />
               </div>
             </div>
           )}
@@ -659,7 +659,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
                 <div className={`w-1.5 h-1.5 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]' : 'bg-zinc-800'}`} />
                 <span className="text-xl md:text-2xl font-[900] text-white tabular-nums tracking-tighter leading-none">{eta || '--:--'}</span>
               </div>
-              <span className="text-[6px] font-bold text-[#D4AF37]/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
+              <span className="text-[6px] font-bold text-emerald-500/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
             </div>
           </div>
         </div>

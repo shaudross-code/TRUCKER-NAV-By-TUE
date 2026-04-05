@@ -170,7 +170,7 @@ const Maintenance: React.FC = () => {
                   ) : (
                     <button 
                       onClick={() => handleComplete(alert.id)}
-                      className="px-6 py-2.5 bg-[#D4AF37]/10 hover:bg-[#D4AF37] border border-[#D4AF37]/20 hover:border-[#D4AF37] text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-[#D4AF37] hover:text-black shadow-lg"
+                      className="px-6 py-2.5 bg-emerald-500/10 hover:bg-emerald-500 border border-emerald-500/20 hover:border-emerald-500 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all text-emerald-500 hover:text-black shadow-lg"
                     >
                       Complete
                     </button>
@@ -198,7 +198,7 @@ const Maintenance: React.FC = () => {
                   <div className="text-zinc-600 font-mono text-[10px] uppercase">{item.date}</div>
                   <div>
                     <div className="text-sm font-bold text-zinc-300">{item.service || item.title}</div>
-                    <div className={`text-[9px] font-black uppercase tracking-widest ${item.status === 'Completed' ? 'text-[#D4AF37]' : 'text-[#D4AF37]'}`}>{item.status}</div>
+                    <div className={`text-[9px] font-black uppercase tracking-widest ${item.status === 'Completed' ? 'text-emerald-500' : 'text-[#D4AF37]'}`}>{item.status}</div>
                   </div>
                 </div>
                 <div className="text-sm font-black text-white italic">{item.cost}</div>

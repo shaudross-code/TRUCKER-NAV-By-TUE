@@ -141,7 +141,7 @@ const PaySummary: React.FC = () => {
         </div>
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
-            <div className="bg-[#D4AF37]/10 p-3 rounded-2xl text-[#D4AF37]">
+            <div className="bg-emerald-400/10 p-3 rounded-2xl text-emerald-400">
               <TrendingUp className="w-6 h-6" />
             </div>
             <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Weekly Net</h3>
@@ -159,7 +159,7 @@ const PaySummary: React.FC = () => {
         </div>
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
-            <div className="bg-[#D4AF37]/10 p-3 rounded-2xl text-[#D4AF37]">
+            <div className="bg-blue-400/10 p-3 rounded-2xl text-blue-400">
               <Truck className="w-6 h-6" />
             </div>
             <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Truck Cost</h3>
@@ -187,7 +187,7 @@ const PaySummary: React.FC = () => {
         </div>
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
-            <div className="bg-[#D4AF37]/10 p-3 rounded-2xl text-[#D4AF37]">
+            <div className="bg-emerald-400/10 p-3 rounded-2xl text-emerald-400">
               <TrendingUp className="w-6 h-6" />
             </div>
             <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Net Pay</h3>
@@ -218,7 +218,7 @@ const PaySummary: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
-            <div className="bg-[#D4AF37]/10 p-3 rounded-2xl text-[#D4AF37]">
+            <div className="bg-blue-400/10 p-3 rounded-2xl text-blue-400">
               <MapPin className="w-6 h-6" />
             </div>
             <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Miles This Week</h3>
@@ -241,7 +241,7 @@ const PaySummary: React.FC = () => {
                   <div className="text-zinc-500 font-bold text-xs uppercase tracking-widest">{item.date}</div>
                   <div className="text-white font-bold text-lg">{item.amount}</div>
                 </div>
-                <div className="px-4 py-1.5 bg-[#D4AF37]/10 text-[#D4AF37] rounded-full text-[10px] font-bold uppercase tracking-widest">
+                <div className="px-4 py-1.5 bg-emerald-500/10 text-emerald-500 rounded-full text-[10px] font-bold uppercase tracking-widest">
                   {item.status}
                 </div>
               </div>

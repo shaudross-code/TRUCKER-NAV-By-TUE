@@ -22,11 +22,11 @@ interface CommunityReport {
 }
 
 const CATEGORY_CONFIG: Record<ReportCategory, { label: string; icon: any; color: string; bg: string }> = {
-  parking: { label: 'Parking', icon: ParkingCircle, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/15 border-[#D4AF37]/25' },
-  fuel_price: { label: 'Fuel Price', icon: Fuel, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/15 border-[#D4AF37]/25' },
+  parking: { label: 'Parking', icon: ParkingCircle, color: 'text-blue-400', bg: 'bg-blue-500/15 border-blue-500/25' },
+  fuel_price: { label: 'Fuel Price', icon: Fuel, color: 'text-emerald-400', bg: 'bg-emerald-500/15 border-emerald-500/25' },
   weigh_station: { label: 'Weigh Station', icon: Scale, color: 'text-amber-400', bg: 'bg-amber-500/15 border-amber-500/25' },
   hazard: { label: 'Road Hazard', icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/15 border-red-500/25' },
-  road_condition: { label: 'Road Condition', icon: ShieldCheck, color: 'text-[#D4AF37]', bg: 'bg-[#D4AF37]/15 border-[#D4AF37]/25' },
+  road_condition: { label: 'Road Condition', icon: ShieldCheck, color: 'text-purple-400', bg: 'bg-purple-500/15 border-purple-500/25' },
 };
 
 const PRESET_REPORTS: Record<ReportCategory, { title: string; desc: string }[]> = {

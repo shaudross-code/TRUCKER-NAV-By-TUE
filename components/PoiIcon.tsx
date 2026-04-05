@@ -505,7 +505,7 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
 
 export const getEntranceIcon = () => {
   return (
-    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-[#D4AF37] border-2 border-white shadow-lg">
+    <div className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 border-2 border-white shadow-lg">
       <LogIn className="w-3.5 h-3.5 text-white" />
     </div>
   );
@@ -775,7 +775,7 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
 
   if (normalizedType.includes('weigh station') || normalizedType.includes('scale')) {
     return (
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] border-2 border-white shadow-lg">
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-emerald-600 border-2 border-white shadow-lg">
         <Scale className="w-5 h-5 text-white" />
       </div>
     );
@@ -791,7 +791,7 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
 
   if (normalizedType.includes('parking')) {
     return (
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] border-2 border-white shadow-lg">
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 border-2 border-white shadow-lg">
         <ParkingSquare className="w-5 h-5 text-white" />
       </div>
     );
@@ -799,7 +799,7 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
 
   if (normalizedType.includes('wash') || lowerName.includes('wash') || lowerName.includes('beacon')) {
     return (
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] border-2 border-white shadow-lg">
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-cyan-600 border-2 border-white shadow-lg">
         <Droplets className="w-5 h-5 text-white" />
       </div>
     );
@@ -807,7 +807,7 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
 
   if (normalizedType.includes('distribution') || normalizedType.includes('fulfillment') || lowerName.includes('amazon') || lowerName.includes('walmart') || lowerName.includes('fedex') || lowerName.includes('ups') || lowerName.includes('target') || lowerName.includes('depot') || lowerName.includes('sysco') || lowerName.includes('mclane')) {
     return (
-      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] border-2 border-white shadow-lg">
+      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-600 border-2 border-white shadow-lg">
         <Box className="w-5 h-5 text-white" />
       </div>
     );
@@ -820,7 +820,7 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
     case 'diesel':
       return <Fuel className="w-7 h-7 text-yellow-400 drop-shadow-lg" />;
     case 'parking':
-      return <ParkingSquare className="w-7 h-7 text-[#D4AF37] drop-shadow-lg" />;
+      return <ParkingSquare className="w-7 h-7 text-blue-400 drop-shadow-lg" />;
     case 'rest_area':
       return (
         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-700 border-2 border-white shadow-lg">
@@ -829,7 +829,7 @@ export const getPoiIcon = (type: any = '', name: any = '') => {
       );
     case 'restaurant':
     case 'food':
-      return <UtensilsCrossed className="w-7 h-7 text-[#D4AF37] drop-shadow-lg" />;
+      return <UtensilsCrossed className="w-7 h-7 text-green-400 drop-shadow-lg" />;
     case 'service':
     case 'repair':
     case 'wrench':

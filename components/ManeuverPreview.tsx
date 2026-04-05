@@ -59,7 +59,7 @@ export const ManeuverPreview: React.FC<ManeuverPreviewProps> = ({
         <div className={`w-2 h-2 rounded-full ${
           detailLevel === 'immediate' ? 'bg-red-500 animate-pulse' :
           detailLevel === 'close' ? 'bg-amber-500' :
-          'bg-[#D4AF37]'
+          'bg-emerald-500'
         }`} />
         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
           {detailLevel === 'immediate' ? 'Now' :

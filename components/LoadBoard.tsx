@@ -185,7 +185,7 @@ const EditableField: React.FC<{
               onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
             />
             {suffix && <span className="text-zinc-500 text-sm font-bold ml-0.5">{suffix}</span>}
-            <button onClick={commit} className="text-[#D4AF37] hover:text-[#D4AF37]/80 ml-1"><Check className="w-3.5 h-3.5" /></button>
+            <button onClick={commit} className="text-emerald-400 hover:text-emerald-300 ml-1"><Check className="w-3.5 h-3.5" /></button>
             <button onClick={() => setEditing(false)} className="text-zinc-600 hover:text-zinc-400"><X className="w-3.5 h-3.5" /></button>
           </div>
         ) : (
@@ -209,7 +209,7 @@ const LoadCard: React.FC<{
   targetRate: number;
   maxWeight: number;
 }> = ({ load, onBook, isBooking, targetRate, maxWeight }) => {
-  const rateColor = load.rate >= targetRate ? 'text-[#D4AF37]' : 'text-orange-400';
+  const rateColor = load.rate >= targetRate ? 'text-emerald-400' : 'text-orange-400';
   const weightOk = load.weight <= maxWeight;
 
   return (
@@ -449,7 +449,7 @@ const LoadBoard: React.FC = () => {
       {/* ── Stats bar ── */}
       <div className="flex flex-wrap items-center gap-4 mb-6 p-4 bg-[#0a0a0a] border border-zinc-900 rounded-2xl">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-[#D4AF37] rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
           <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{filteredLoads.length} loads nearby</span>
         </div>
         <div className="h-4 w-px bg-zinc-800" />

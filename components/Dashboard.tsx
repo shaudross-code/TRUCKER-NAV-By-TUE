@@ -407,20 +407,20 @@ const Dashboard: React.FC = React.memo(() => {
         {/* Active Load Card */}
         {profile?.currentLoad && (
           <div className="md:col-span-2 lg:col-span-2 xl:col-span-2">
-            <div className="bg-[#D4AF37]/10 backdrop-blur-3xl border border-[#D4AF37]/30 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] relative overflow-hidden group transition-all duration-500 hover:border-[#D4AF37]/50">
+            <div className="bg-emerald-500/10 backdrop-blur-3xl border border-emerald-500/30 p-6 md:p-8 rounded-[1.5rem] md:rounded-[2.5rem] relative overflow-hidden group transition-all duration-500 hover:border-emerald-500/50">
               <div className="flex justify-between items-start mb-6">
                 <div className="flex items-center gap-4">
-                  <div className="bg-[#D4AF37] p-3 rounded-2xl text-black shadow-[0_0_20px_rgba(212,175,55,0.4)]">
+                  <div className="bg-emerald-500 p-3 rounded-2xl text-black shadow-[0_0_20px_rgba(16,185,129,0.4)]">
                     <Package className="w-6 h-6" />
                   </div>
                   <div>
-                    <div className="text-[#D4AF37] text-[10px] font-black uppercase tracking-[0.2em] mb-1">Active Load</div>
+                    <div className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Active Load</div>
                     <div className="text-2xl font-black text-white tracking-tighter uppercase italic">{profile.currentLoad.commodity}</div>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className="text-zinc-500 text-[10px] font-black uppercase tracking-widest mb-1">Rate</div>
-                  <div className="text-2xl font-black text-[#D4AF37] italic">{profile.currentLoad.rate}</div>
+                  <div className="text-2xl font-black text-emerald-500 italic">{profile.currentLoad.rate}</div>
                 </div>
               </div>
 
@@ -448,7 +448,7 @@ const Dashboard: React.FC = React.memo(() => {
                 </button>
                 <button 
                   onClick={handleCompleteLoad}
-                  className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]/80 text-black py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20"
+                  className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black py-3 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   Complete Load
@@ -456,7 +456,7 @@ const Dashboard: React.FC = React.memo(() => {
               </div>
 
               {/* Decorative background element */}
-              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-[#D4AF37]/5 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
             </div>
           </div>
         )}
@@ -571,8 +571,8 @@ const Dashboard: React.FC = React.memo(() => {
             icon={Truck} 
             label="TRUCK COST" 
             value={formatCurrency(truckCost)} 
-            iconBg="bg-[#D4AF37]/10"
-            iconColor="text-[#D4AF37]"
+            iconBg="bg-blue-400/10"
+            iconColor="text-blue-400"
             isInteractive={true}
             onClick={() => {
               setIsTruckCostInputOpen(!isTruckCostInputOpen);
@@ -583,7 +583,7 @@ const Dashboard: React.FC = React.memo(() => {
             }}
           />
           {isTruckCostInputOpen && (
-            <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+            <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-blue-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
                 <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Truck Cost</span>
                 <button onClick={() => setIsTruckCostInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
@@ -591,9 +591,9 @@ const Dashboard: React.FC = React.memo(() => {
               <form onSubmit={handleAddTruckCost} className="flex gap-2">
                 <div className="relative flex-1">
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
-                  <input autoFocus type="number" step="0.01" value={newTruckCostEntry} onChange={(e) => setNewTruckCostEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
+                  <input autoFocus type="number" step="0.01" value={newTruckCostEntry} onChange={(e) => setNewTruckCostEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-blue-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
-                <button type="submit" className="bg-[#D4AF37] hover:bg-[#c9a430] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+                <button type="submit" className="bg-blue-400 hover:bg-blue-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-blue-400/20"><Plus className="w-5 h-5" /></button>
               </form>
             </div>
           )}

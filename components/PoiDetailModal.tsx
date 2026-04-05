@@ -104,15 +104,15 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
             const cheapest = findCheapestDiesel(fuelStations);
             const isCheapest = cheapest && matchedStation.id === cheapest.id;
             return (
-              <div data-testid="poi-diesel-price" className={`flex items-center justify-between p-3 md:p-4 rounded-2xl landscape:rounded-xl border ${isCheapest ? 'bg-[#D4AF37]/10 border-[#D4AF37]/30' : 'bg-zinc-900/60 border-zinc-800'}`}>
+              <div data-testid="poi-diesel-price" className={`flex items-center justify-between p-3 md:p-4 rounded-2xl landscape:rounded-xl border ${isCheapest ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-zinc-900/60 border-zinc-800'}`}>
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-xl ${isCheapest ? 'bg-[#D4AF37]/20' : 'bg-[#D4AF37]/15'}`}>
-                    <Fuel className={`w-5 h-5 ${isCheapest ? 'text-[#D4AF37]' : 'text-[#D4AF37]'}`} />
+                  <div className={`p-2 rounded-xl ${isCheapest ? 'bg-emerald-500/20' : 'bg-[#D4AF37]/15'}`}>
+                    <Fuel className={`w-5 h-5 ${isCheapest ? 'text-emerald-400' : 'text-[#D4AF37]'}`} />
                   </div>
                   <div>
                     <div className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Diesel Price</div>
                     <div className="flex items-baseline gap-1.5">
-                      <span className={`text-2xl font-black tabular-nums ${isCheapest ? 'text-[#D4AF37]' : 'text-white'}`}>
+                      <span className={`text-2xl font-black tabular-nums ${isCheapest ? 'text-emerald-400' : 'text-white'}`}>
                         ${matchedStation.dieselPrice.toFixed(3)}
                       </span>
                       <span className="text-[9px] text-zinc-500 font-bold">/gal</span>
@@ -120,7 +120,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
                   </div>
                 </div>
                 {isCheapest && (
-                  <span className="text-[8px] font-black uppercase tracking-wider text-[#D4AF37] bg-[#D4AF37]/15 px-3 py-1.5 rounded-full">Best Price</span>
+                  <span className="text-[8px] font-black uppercase tracking-wider text-emerald-400 bg-emerald-500/15 px-3 py-1.5 rounded-full">Best Price</span>
                 )}
                 {matchedStation.lastUpdated && (
                   <span className="text-[7px] text-zinc-600 font-medium">{new Date(matchedStation.lastUpdated).toLocaleDateString()}</span>
@@ -314,9 +314,9 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 p-3 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl animate-in fade-in duration-300">
-                  <Star className="w-4 h-4 text-[#D4AF37]" fill="currentColor" />
-                  <span className="text-xs font-bold text-[#D4AF37]">Thanks for your review!</span>
+                <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl animate-in fade-in duration-300">
+                  <Star className="w-4 h-4 text-emerald-400" fill="currentColor" />
+                  <span className="text-xs font-bold text-emerald-400">Thanks for your review!</span>
                 </div>
               )}
             </div>
@@ -326,21 +326,21 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
           {selectedPoi.type === 'distribution' && (
             <div className={`border rounded-2xl landscape:rounded-xl overflow-hidden ${
               isParkingLoading ? 'border-zinc-700' :
-              poiParkingStatus?.status === 'light' ? 'border-[#D4AF37]/40' :
+              poiParkingStatus?.status === 'light' ? 'border-emerald-500/40' :
               poiParkingStatus?.status === 'medium' ? 'border-yellow-500/40' :
               poiParkingStatus?.status === 'heavy' ? 'border-orange-500/40' :
               poiParkingStatus?.status === 'maxed' ? 'border-red-500/40' : 'border-zinc-700/50'
             }`}>
               <div className={`flex items-center justify-between px-4 py-2.5 border-b ${
                 isParkingLoading ? 'bg-zinc-900/60 border-zinc-700/30' :
-                poiParkingStatus?.status === 'light' ? 'bg-[#D4AF37]/10 border-[#D4AF37]/20' :
+                poiParkingStatus?.status === 'light' ? 'bg-emerald-500/10 border-emerald-500/20' :
                 poiParkingStatus?.status === 'medium' ? 'bg-yellow-500/10 border-yellow-500/20' :
                 poiParkingStatus?.status === 'heavy' ? 'bg-orange-500/10 border-orange-500/20' :
                 poiParkingStatus?.status === 'maxed' ? 'bg-red-500/10 border-red-500/20' : 'bg-zinc-900/60 border-zinc-700/30'
               }`}>
                 <div className="flex items-center gap-2">
                   <svg className={`w-4 h-4 flex-shrink-0 ${
-                    poiParkingStatus?.status === 'light' ? 'text-[#D4AF37]' :
+                    poiParkingStatus?.status === 'light' ? 'text-emerald-400' :
                     poiParkingStatus?.status === 'medium' ? 'text-yellow-400' :
                     poiParkingStatus?.status === 'heavy' ? 'text-orange-400' :
                     poiParkingStatus?.status === 'maxed' ? 'text-red-400' : 'text-zinc-400'
@@ -353,7 +353,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
                   <div className="w-3 h-3 rounded-full border-2 border-zinc-500 border-t-white animate-spin" />
                 ) : (
                   <span className={`text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
-                    poiParkingStatus?.status === 'light' ? 'bg-[#D4AF37]/20 text-[#D4AF37]' :
+                    poiParkingStatus?.status === 'light' ? 'bg-emerald-500/20 text-emerald-300' :
                     poiParkingStatus?.status === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
                     poiParkingStatus?.status === 'heavy' ? 'bg-orange-500/20 text-orange-300' :
                     poiParkingStatus?.status === 'maxed' ? 'bg-red-500/20 text-red-300' : 'bg-zinc-700/50 text-zinc-500'
@@ -377,7 +377,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
                     return (
                       <div key={seg} className={`h-2 landscape:h-1.5 flex-1 rounded-full transition-all duration-500 ${
                         filled
-                          ? (poiParkingStatus?.status === 'light' ? 'bg-[#D4AF37]' :
+                          ? (poiParkingStatus?.status === 'light' ? 'bg-emerald-400' :
                              poiParkingStatus?.status === 'medium' ? 'bg-yellow-400' :
                              poiParkingStatus?.status === 'heavy' ? 'bg-orange-400' : 'bg-red-400')
                           : 'bg-zinc-800'
@@ -387,7 +387,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
                 </div>
                 <p className="text-[9px] landscape:text-[8px] font-medium leading-snug">
                   {isParkingLoading ? <span className="text-zinc-500 animate-pulse">Checking driver reports...</span>
-                    : poiParkingStatus?.status === 'light' ? <span className="text-[#D4AF37]">Plenty of truck parking available based on recent driver reports</span>
+                    : poiParkingStatus?.status === 'light' ? <span className="text-emerald-400">Plenty of truck parking available based on recent driver reports</span>
                     : poiParkingStatus?.status === 'medium' ? <span className="text-yellow-400">Moderate parking availability reported by drivers</span>
                     : poiParkingStatus?.status === 'heavy' ? <span className="text-orange-400">Limited space - very few spots remaining</span>
                     : poiParkingStatus?.status === 'maxed' ? <span className="text-red-400">Reported full - no truck parking available right now</span>
@@ -413,7 +413,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
               {isParkingLoading && <div className="w-3 h-3 rounded-full border-2 border-[#D4AF37]/40 border-t-[#D4AF37] animate-spin" />}
               {!isParkingLoading && poiParkingStatus?.status && (
                 <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                  poiParkingStatus.status === 'light' ? 'bg-[#D4AF37]/20 text-[#D4AF37]' :
+                  poiParkingStatus.status === 'light' ? 'bg-emerald-500/20 text-emerald-400' :
                   poiParkingStatus.status === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
                   poiParkingStatus.status === 'heavy' ? 'bg-orange-500/20 text-orange-400' : 'bg-red-500/20 text-red-400'
                 }`}>
@@ -431,7 +431,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
               <p className="text-[10px] landscape:text-[9px] font-bold text-zinc-400">Report current parking availability:</p>
               <div className="grid grid-cols-4 gap-1.5 landscape:gap-1">
                 {([
-                  { key: 'light', label: 'Light', bg: 'bg-[#D4AF37]/15 hover:bg-[#D4AF37] border-[#D4AF37]/30 hover:border-[#D4AF37]', text: 'text-[#D4AF37]', dot: 'bg-[#D4AF37]', activeBg: 'bg-[#D4AF37] border-[#D4AF37]' },
+                  { key: 'light', label: 'Light', bg: 'bg-emerald-600/15 hover:bg-emerald-600 border-emerald-600/30 hover:border-emerald-600', text: 'text-emerald-400', dot: 'bg-emerald-400', activeBg: 'bg-emerald-600 border-emerald-600' },
                   { key: 'medium', label: 'Medium', bg: 'bg-yellow-600/15 hover:bg-yellow-600 border-yellow-600/30 hover:border-yellow-600', text: 'text-yellow-400', dot: 'bg-yellow-400', activeBg: 'bg-yellow-600 border-yellow-600' },
                   { key: 'heavy', label: 'Heavy', bg: 'bg-orange-600/15 hover:bg-orange-600 border-orange-600/30 hover:border-orange-600', text: 'text-orange-400', dot: 'bg-orange-400', activeBg: 'bg-orange-600 border-orange-600' },
                   { key: 'maxed', label: 'Maxed', bg: 'bg-red-600/15 hover:bg-red-600 border-red-600/30 hover:border-red-600', text: 'text-red-400', dot: 'bg-red-400', activeBg: 'bg-red-600 border-red-600' },
@@ -449,7 +449,7 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
                   );
                 })}
               </div>
-              {parkingSubmitDone && <p className="text-[9px] landscape:text-[8px] text-[#D4AF37] font-bold text-center animate-in fade-in duration-300">Thanks for reporting! Status updated.</p>}
+              {parkingSubmitDone && <p className="text-[9px] landscape:text-[8px] text-emerald-400 font-bold text-center animate-in fade-in duration-300">Thanks for reporting! Status updated.</p>}
             </div>
           </div>
 
@@ -495,9 +495,9 @@ export const PoiDetailModal: React.FC<PoiDetailModalProps> = ({
               <button 
                 data-testid="poi-add-paid"
                 onClick={() => { addWaypoint(selectedPoi, 'PAID'); onClose(); }}
-                className="flex flex-col items-center justify-center gap-1.5 md:gap-2 landscape:gap-1 p-3 md:p-4 landscape:p-2 bg-[#D4AF37]/10 border border-[#D4AF37]/20 rounded-xl landscape:rounded-lg hover:bg-[#D4AF37] hover:border-[#D4AF37] transition-all group">
-                <CircleDollarSign className="w-4 h-4 md:w-5 md:h-5 landscape:w-3.5 landscape:h-3.5 text-[#D4AF37] group-hover:text-white group-hover:scale-110 transition-transform" />
-                <span className="text-[8px] md:text-[9px] landscape:text-[7px] font-black text-[#D4AF37] group-hover:text-white uppercase tracking-widest">+ Paid</span>
+                className="flex flex-col items-center justify-center gap-1.5 md:gap-2 landscape:gap-1 p-3 md:p-4 landscape:p-2 bg-emerald-600/10 border border-emerald-600/20 rounded-xl landscape:rounded-lg hover:bg-emerald-600 hover:border-emerald-600 transition-all group">
+                <CircleDollarSign className="w-4 h-4 md:w-5 md:h-5 landscape:w-3.5 landscape:h-3.5 text-emerald-500 group-hover:text-white group-hover:scale-110 transition-transform" />
+                <span className="text-[8px] md:text-[9px] landscape:text-[7px] font-black text-emerald-500 group-hover:text-white uppercase tracking-widest">+ Paid</span>
               </button>
             </div>
           </div>
