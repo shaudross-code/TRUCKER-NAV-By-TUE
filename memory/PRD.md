@@ -14,6 +14,8 @@ Build a professional trucking GPS navigation application with:
 - Timed guest sessions (2 hours)
 - Gold/black themed navigation interface
 - Professional highway overlays with comprehensive exit signs
+- Permanent hardcoded highway/road overlay on the map
+- Inline road name labels along route polyline
 
 ## Architecture
 - **Frontend**: React + Vite + TypeScript + Leaflet
@@ -21,7 +23,7 @@ Build a professional trucking GPS navigation application with:
 - **Frontend Proxy**: Nginx (port 3000)
 - **Auth**: Firebase Auth (Google via custom token flow, Email/Password, Anonymous/Guest)
 - **Database**: Firebase Firestore + localStorage (user-scoped)
-- **Maps**: HERE Maps API (routing v8), Mapbox (tiles), Google Maps (Places API)
+- **Maps**: HERE Maps API (routing v8), Mapbox (tiles + road overlay), Google Maps (Places API)
 
 ## Preview URL
 https://hud-customizer-5.preview.emergentagent.com
@@ -45,22 +47,31 @@ https://hud-customizer-5.preview.emergentagent.com
 - [x] Clean slate pay summary (no fake statements)
 - [x] Coming Soon overlay on Maintenance, Offline Maps tabs
 - [x] Announcements section (iOS/Android development notice)
-- [x] Professional wider route polyline (glow=34, border=24, inner=16) - Apr 2026
-- [x] Denser highway shield placement along routes - Apr 2026
-- [x] Enhanced exit sign extraction from all action types - Apr 2026
-- [x] Larger, more professional exit guide sign visuals - Apr 2026
-- [x] Wider traveled/active navigation segment styling - Apr 2026
+- [x] Denser highway shield placement along routes
+- [x] Enhanced exit sign extraction from all action types
+- [x] Larger, more professional exit guide sign visuals
+- [x] Permanent highway/road network overlay (Mapbox navigation-night-v1, mix-blend-mode:screen) - Apr 2026
+- [x] Pure satellite base tiles (satellite-v9) for cleaner overlay effect - Apr 2026
+- [x] Inline road name labels along route polyline with mini highway emblems - Apr 2026
+- [x] Labels oriented to road bearing, rotate with user heading - Apr 2026
 
 ## Google Sign-In Implementation Details
 - Uses full-page redirect flow (no popups - avoids Safari COOP issues)
 - Server exchanges Google auth code for tokens, then creates Firebase custom token via Admin SDK
 - Frontend uses signInWithCustomToken to complete sign-in
 
+## Road Overlay Architecture
+- **Base tiles**: Mapbox `satellite-v9` (pure satellite, no built-in streets)
+- **Road overlay**: 2x Mapbox `navigation-night-v1` layers on `roadOverlayPane` (z-index 350)
+- **Blend mode**: `mix-blend-mode: screen` makes dark background invisible, keeps bright roads
+- **Road labels**: `placeRoadLabels()` in `useSignPlacement.ts` places labels every ~80 polyline points
+- **Label orientation**: Each label rotated to match road bearing at that point
+- **No counter-rotate**: Labels rotate WITH map heading during navigation
+
 ## Upcoming Tasks (Priority Order)
-1. **P1**: Refactor NavigationView.tsx (~6970 lines) into smaller hooks/components
+1. **P1**: Refactor NavigationView.tsx (~7000 lines) into smaller hooks/components
 2. **P2**: Apple Sign-In integration (requires Apple Developer credentials)
 3. **P2**: Speed limit warning system
-4. **P2**: Map filtering for Reputation Scores
 
 ## Future/Backlog
 - PC*MILER Data integration (requires enterprise API)
@@ -70,16 +81,16 @@ https://hud-customizer-5.preview.emergentagent.com
 - iOS and Android Store Submission
 
 ## Key Files
-- `/app/components/NavigationView.tsx` - Core map UI (~6970 lines, needs refactoring)
+- `/app/components/NavigationView.tsx` - Core map UI (~7000+ lines, needs refactoring)
 - `/app/components/FirebaseProvider.tsx` - Auth context + Google OAuth
 - `/app/components/HudLayoutView.tsx` - HUD customization
 - `/app/components/GuestSessionTimer.tsx` - 2hr guest timer
-- `/app/hooks/useSignPlacement.ts` - Sign placement and rendering
+- `/app/hooks/useSignPlacement.ts` - Sign placement, road labels, and rendering
 - `/app/utils/mutcdSigns.ts` - MUTCD road sign SVG generation
 - `/app/server.ts` - Express backend (HERE API, Google OAuth)
 - `/app/utils/userStorage.ts` - User-scoped localStorage
 
 ## Known Issues
-- NavigationView.tsx is dangerously large (~6970 lines) - needs refactoring
+- NavigationView.tsx is dangerously large (~7000+ lines) - needs refactoring
 - Apple Sign-In disabled (requires Apple Developer credentials)
-- CORS issues with nominatim.openstreetmap.org (non-blocking, IP fallback works)
+- Some state road shield API requests fail intermittently (non-blocking, SVG fallback used)

@@ -27,6 +27,7 @@ const SIGN_PREFIX_TO_HUD_KEY: Record<string, string> = {
   'slowdown': 'showTrafficIncidents',
   'cmv': 'showCmvWarnings',
   'truckwarn': 'showTruckRestrictions',
+  'roadlabel': 'showHighwayShields', // road labels share visibility with shields
 };
 
 function getSignCategory(signId: string): string {
@@ -237,6 +238,110 @@ export function useSignPlacement(
     if (placed > 0) { syncVisibleSigns(); console.log(`[Signs] Placed ${placed} truck warning signs`); }
   }, [registerSign, syncVisibleSigns, shieldLayerGroupRef]);
 
+  // ── Road Name Labels Along Route Polyline ─────────────────────────
+  // Places inline road-name + mini highway emblem labels directly on the route,
+  // oriented to match the road bearing so they rotate WITH the user's heading.
+  const placeRoadLabels = useCallback((segments: {
+    name: string;
+    shieldType: 'interstate' | 'us' | 'state' | 'local';
+    shieldLabel: string;
+    direction: string;
+    startIdx: number;
+    endIdx: number;
+    coords: [number, number][];
+  }[]) => {
+    if (!shieldLayerGroupRef.current || segments.length === 0) return;
+
+    // Helper: bearing between two [lat,lng] points (degrees from north, clockwise)
+    const bearing = (a: [number, number], b: [number, number]) => {
+      const toRad = Math.PI / 180;
+      const dLon = (b[1] - a[1]) * toRad;
+      const y = Math.sin(dLon) * Math.cos(b[0] * toRad);
+      const x = Math.cos(a[0] * toRad) * Math.sin(b[0] * toRad) - Math.sin(a[0] * toRad) * Math.cos(b[0] * toRad) * Math.cos(dLon);
+      return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+    };
+
+    let placedCount = 0;
+    const LABEL_INTERVAL = 80; // Place a label every ~80 polyline points along each segment
+
+    segments.forEach((seg) => {
+      const segLen = seg.endIdx - seg.startIdx;
+      if (segLen < 30) return; // Skip very short segments
+
+      // How many labels to place for this segment
+      const labelCount = Math.max(1, Math.floor(segLen / LABEL_INTERVAL));
+      const step = Math.floor(segLen / (labelCount + 1));
+
+      for (let i = 1; i <= labelCount; i++) {
+        const idx = seg.startIdx + i * step;
+        if (idx < 0 || idx >= seg.coords.length - 1) continue;
+        const coord = seg.coords[idx];
+        const nextCoord = seg.coords[Math.min(idx + 3, seg.coords.length - 1)];
+        if (!coord || !nextCoord) continue;
+
+        // Calculate road bearing at this point
+        const deg = bearing(coord, nextCoord);
+        // Adjust so text reads left-to-right (flip if facing left)
+        const textAngle = (deg > 90 && deg < 270) ? deg - 180 : deg;
+
+        // Build mini shield emblem
+        let miniShield = '';
+        if (seg.shieldType === 'interstate') {
+          miniShield = `<svg width="26" height="20" viewBox="0 0 40 32"><polygon points="20,0 40,6 38,28 20,32 2,28 0,6" fill="#003DA5" stroke="white" stroke-width="2"/><text x="20" y="22" text-anchor="middle" fill="white" font-size="14" font-weight="900" font-family="Highway Gothic,Arial Black,sans-serif">${seg.shieldLabel}</text></svg>`;
+        } else if (seg.shieldType === 'us') {
+          miniShield = `<svg width="22" height="22" viewBox="0 0 36 36"><rect x="1" y="1" width="34" height="34" rx="2" fill="white" stroke="black" stroke-width="2"/><text x="18" y="25" text-anchor="middle" fill="black" font-size="15" font-weight="900" font-family="Highway Gothic,Arial Black,sans-serif">${seg.shieldLabel}</text></svg>`;
+        } else if (seg.shieldType === 'state') {
+          miniShield = `<svg width="22" height="22" viewBox="0 0 36 36"><circle cx="18" cy="18" r="16" fill="white" stroke="black" stroke-width="2"/><text x="18" y="24" text-anchor="middle" fill="black" font-size="13" font-weight="900" font-family="Highway Gothic,Arial Black,sans-serif">${seg.shieldLabel}</text></svg>`;
+        }
+
+        // Build direction arrow
+        const dirText = seg.direction ? ` ${seg.direction}` : '';
+
+        // Build the road label HTML — NO counter-rotate so it rotates with the map heading
+        const truncName = seg.name.length > 22 ? seg.name.substring(0, 20) + '…' : seg.name;
+        const html = `<div data-testid="road-label-marker" style="
+          transform: rotate(${textAngle - 90}deg);
+          transform-origin: center center;
+          white-space: nowrap;
+          pointer-events: none;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          filter: drop-shadow(0 2px 6px rgba(0,0,0,0.95));
+        ">
+          ${miniShield ? `<span style="flex-shrink:0;line-height:0">${miniShield}</span>` : ''}
+          <span style="
+            font-family: 'Highway Gothic', 'Arial Black', sans-serif;
+            font-size: 13px;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: 0.8px;
+            text-shadow: 0 0 8px rgba(0,0,0,1), 0 0 4px rgba(0,0,0,0.9), 1px 1px 2px rgba(0,0,0,1);
+            background: rgba(0,0,0,0.7);
+            padding: 2px 7px;
+            border-radius: 3px;
+            border: 1px solid rgba(255,255,255,0.15);
+          ">${truncName}${dirText}</span>
+        </div>`;
+
+        registerSign(
+          `roadlabel-${seg.shieldLabel || seg.name}-${idx}`,
+          coord[0], coord[1],
+          html,
+          [160, 28],
+          [80, 14],
+          410 // Below shields (500) but above route pane
+        );
+        placedCount++;
+      }
+    });
+
+    if (placedCount > 0) {
+      syncVisibleSigns();
+      console.log(`[RoadLabels] Placed ${placedCount} inline road name labels along route`);
+    }
+  }, [registerSign, syncVisibleSigns, shieldLayerGroupRef]);
+
   return {
     signDataStoreRef,
     visibleSignMarkersRef,
@@ -253,5 +358,6 @@ export function useSignPlacement(
     placeTrafficSlowdowns,
     placeCmvWarnings,
     placeTruckWarnings,
+    placeRoadLabels,
   };
 }

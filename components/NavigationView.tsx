@@ -353,6 +353,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     updateSignVisibility,
     placeHighwayShields, placeExitSigns, placeCurveSigns,
     placeSpeedLimitSigns, placeTrafficSlowdowns, placeCmvWarnings, placeTruckWarnings,
+    placeRoadLabels,
   } = useSignPlacement(mapInstanceRef, shieldLayerGroupRef);
 
   // Traffic flow overlay system
@@ -3425,7 +3426,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     curveSigns: any[];
     speedLimitSigns: any[];
     trafficSlowdowns: any[];
-    cmvWarnings: any[]
+    cmvWarnings: any[];
+    roadSegments: any[];
   }[] | null> => {
     if (!userLocation) return null;
 
@@ -3629,6 +3631,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const speedLimitSigns: { speed: number; coord: [number, number] }[] = [];
         const trafficSlowdowns: { severity: string; message: string; coord: [number, number] }[] = [];
         const cmvWarnings: { type: string; severity: string; message: string; grade?: number; coord: [number, number] }[] = [];
+        const roadSegments: { name: string; shieldType: 'interstate' | 'us' | 'state' | 'local'; shieldLabel: string; direction: string; startIdx: number; endIdx: number; }[] = [];
         
         if (section.notices) {
           section.notices.forEach((notice: any) => {
@@ -3705,6 +3708,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let prevSpeedLimit = -1;
           const MIN_SPEED_SIGN_GAP = Math.max(20, Math.floor(totalPoints * 0.015)); // Min gap between speed signs
           let lastSpeedSignIdx = -99999;
+
+          // Track road segments for inline road labels
+          let currentRoadName = '';
+          let currentRoadShieldType: 'interstate' | 'us' | 'state' | 'local' = 'local';
+          let currentRoadShieldLabel = '';
+          let currentRoadDirection = '';
+          let currentRoadStartIdx = 0;
 
           section.spans.forEach((span: any) => {
             const progress = currentPointIndex / (totalPoints - 1 || 1);
@@ -3857,6 +3867,36 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               }
             }
             
+            // ── Track road name segments for inline labels ──
+            {
+              let spanRoadName = '';
+              let spanShieldType: 'interstate' | 'us' | 'state' | 'local' = 'local';
+              let spanShieldLabel = '';
+              let spanDirection = '';
+              // Prefer routeNumbers for road identification
+              if (span.routeNumbers && span.routeNumbers.length > 0) {
+                const rn = span.routeNumbers[0];
+                spanRoadName = rn.value || '';
+                spanDirection = rn.direction || '';
+                if (/^I[- ]?(\d+)/i.test(spanRoadName)) { spanShieldType = 'interstate'; spanShieldLabel = spanRoadName.match(/^I[- ]?(\d+[A-Z]?)/i)?.[1] || ''; }
+                else if (/^US[- ]?(\d+)/i.test(spanRoadName)) { spanShieldType = 'us'; spanShieldLabel = spanRoadName.match(/^US[- ]?(\d+[A-Z]?)/i)?.[1] || ''; }
+                else if (/^[A-Z]{2}[- ]?\d+/i.test(spanRoadName)) { spanShieldType = 'state'; spanShieldLabel = spanRoadName.match(/^[A-Z]{2}[- ]?(\d+[A-Z]?)/i)?.[2] || spanRoadName; }
+              } else if (span.names && span.names.length > 0) {
+                spanRoadName = span.names[0].value || '';
+              }
+              // If road changed, close previous segment and start new one
+              if (spanRoadName && spanRoadName !== currentRoadName) {
+                if (currentRoadName && currentPointIndex - currentRoadStartIdx > 10) {
+                  roadSegments.push({ name: currentRoadName, shieldType: currentRoadShieldType, shieldLabel: currentRoadShieldLabel, direction: currentRoadDirection, startIdx: currentRoadStartIdx, endIdx: currentPointIndex });
+                }
+                currentRoadName = spanRoadName;
+                currentRoadShieldType = spanShieldType;
+                currentRoadShieldLabel = spanShieldLabel;
+                currentRoadDirection = spanDirection;
+                currentRoadStartIdx = currentPointIndex;
+              }
+            }
+
             // Detect speed limit changes
             if (span.speedLimit !== undefined && span.speedLimit > 0) {
               const mph = Math.round(span.speedLimit * 2.23694);
@@ -3923,6 +3963,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             
             currentPointIndex += (span.length || 0);
           });
+          // Close the final road segment
+          if (currentRoadName && currentPointIndex - currentRoadStartIdx > 10) {
+            roadSegments.push({ name: currentRoadName, shieldType: currentRoadShieldType, shieldLabel: currentRoadShieldLabel, direction: currentRoadDirection, startIdx: currentRoadStartIdx, endIdx: currentPointIndex });
+          }
         }
 
         // ── CMV Warning Detection from 3D Elevation Data ──────────────────
@@ -4128,7 +4172,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         }
 
-        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings, tolls };
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings, roadSegments, tolls };
       }).filter(Boolean);
 
       if (processedRoutes.length === 0) return null;
@@ -4527,6 +4571,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Place truck restriction warning signs (low bridges, weight limits, tunnel, etc.)
         if (hudLayout.showTruckRestrictions && primaryRoute.restrictions && primaryRoute.restrictions.length > 0) {
           placeTruckWarnings(primaryRoute.restrictions);
+        }
+
+        // Place inline road name labels along the route polyline
+        if (hudLayout.showHighwayShields && primaryRoute.roadSegments && primaryRoute.roadSegments.length > 0) {
+          placeRoadLabels(primaryRoute.roadSegments.map((seg: any) => ({ ...seg, coords })));
         }
 
         // Draw lane count visualization on highway segments
