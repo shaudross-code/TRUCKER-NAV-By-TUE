@@ -237,16 +237,16 @@ async function createServer() {
   // ────────────────────────────────────────────────────────────────────────────
   // Google & Apple OAuth Flow (server-side, bypasses broken Firebase handler)
   // ────────────────────────────────────────────────────────────────────────────
-  const GOOGLE_CLIENT_ID = '313371211306-9ipsh9pgilgcffafn8tc9rj4ii3d8uk1.apps.googleusercontent.com';
-  const GOOGLE_CLIENT_SECRET = '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';
+  const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+  const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+  const FIREBASE_REDIRECT_URI = `https://${process.env.FIREBASE_PROJECT_ID || ''}.firebaseapp.com/__/auth/handler`;
   
   // Step 1: Start Google OAuth — redirect to Google's consent page
   // Uses Firebase's own authorized redirect URI, with state containing our origin
   // for the callback relay
   app.get('/api/auth/google', (req, res) => {
     const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || `https://${req.headers.host}`;
-    // Use the Firebase handler URL as redirect_uri (already authorized by Google)
-    const redirectUri = `https://project-4cbb6ad7-8e65-4988-ae7.firebaseapp.com/__/auth/handler`;
+    const redirectUri = FIREBASE_REDIRECT_URI;
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
@@ -265,7 +265,7 @@ async function createServer() {
       const { code, state } = req.query;
       if (!code) return res.status(400).json({ error: 'Missing auth code' });
       
-      const redirectUri = `https://project-4cbb6ad7-8e65-4988-ae7.firebaseapp.com/__/auth/handler`;
+      const redirectUri = FIREBASE_REDIRECT_URI;
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
