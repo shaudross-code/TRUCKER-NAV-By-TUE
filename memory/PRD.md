@@ -44,6 +44,7 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - Toggle Controls in MapControls
 
 ### Authentication & Guest Session (Apr 5, 2026)
+- **Google Sign-In Fixed**: Replaced Firebase's broken `__/auth/handler` redirect with Google Identity Services (GSI) popup flow. Eliminates "missing initial state" error in Safari and storage-partitioned browsers. Flow: GSI popup → Google consent → auth code → `/api/google-auth-exchange` → `signInWithCredential`
 - **Apple Sign-In Disabled**: Button removed from login screen entirely (pending Apple Developer credentials)
 - **Guest 2-Hour Time Limit**: Guest sessions expire after 2 hours. Red countdown timer badge appears at 30 min. Warning overlay (app still visible behind) at 5min/1min/30sec with "Create Account" and "Sign In with Google" buttons
 - **Session Storage**: Guest timer uses sessionStorage (resets per browser tab)
