@@ -142,86 +142,88 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
-  // Google Sign-In via custom server-side OAuth
+  // Google Sign-In via Google Identity Services (GSI) — avoids Firebase handler/sessionStorage issues
   const signIn = useCallback(async () => {
     if (USE_MOCK_DATA) return;
     try {
       setAuthError(null);
       
-      // Open popup to our backend Google OAuth endpoint
-      const width = 500, height = 600;
-      const left = window.screenX + (window.outerWidth - width) / 2;
-      const top = window.screenY + (window.outerHeight - height) / 2;
-      const popup = window.open(
-        '/api/auth/google',
-        'GoogleAuth',
-        `width=${width},height=${height},left=${left},top=${top},popup=true`
-      );
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 
+        (typeof window !== 'undefined' && (window as any).__GOOGLE_CLIENT_ID) || '';
       
-      if (!popup) {
-        setAuthError('Popup was blocked. Please allow popups for this site.');
+      if (!clientId) {
+        // Fallback: fetch client ID from backend
+        try {
+          const res = await fetch('/api/auth/google-client-id');
+          const data = await res.json();
+          if (data.clientId) {
+            (window as any).__GOOGLE_CLIENT_ID = data.clientId;
+            return signInWithGSI(data.clientId);
+          }
+        } catch {}
+        setAuthError('Google Sign-In configuration missing.');
         return;
       }
       
-      // The Firebase handler at /__/auth/handler will receive the OAuth callback.
-      // It shows "The requested action is invalid" but the URL contains the auth code.
-      // Poll the popup URL to extract the auth code.
-      return new Promise<void>((resolve, reject) => {
-        const pollTimer = setInterval(async () => {
-          try {
-            if (popup.closed) {
-              clearInterval(pollTimer);
-              resolve();
-              return;
-            }
-            
-            // Try to read the popup URL (may fail due to cross-origin)
-            let popupUrl = '';
-            try { popupUrl = popup.location.href; } catch (_e) { return; }
-            
-            // Check if we're back at the handler with an auth code
-            if (popupUrl.includes('code=') && popupUrl.includes('__/auth/handler')) {
-              clearInterval(pollTimer);
-              const url = new URL(popupUrl);
-              const code = url.searchParams.get('code');
-              const state = url.searchParams.get('state');
-              popup.close();
-              
-              if (code) {
-                try {
-                  // Exchange code for ID token via our backend
-                  const tokenRes = await fetch('/api/auth/google/callback?' + new URLSearchParams({ code, state: state || '' }));
-                  const html = await tokenRes.text();
-                  
-                  // Extract ID token from the response
-                  const match = html.match(/"idToken":\s*"([^"]+)"/);
-                  if (match) {
-                    const credential = GoogleAuthProvider.credential(match[1]);
-                    await signInWithCredential(auth, credential);
-                    resolve();
-                  } else {
-                    setAuthError('Failed to complete sign-in');
-                    reject(new Error('No ID token'));
-                  }
-                } catch (err: any) {
-                  setAuthError(err.message);
-                  reject(err);
-                }
-              }
-            }
-          } catch (_e2) {}
-        }, 500);
-        
-        // Timeout after 2 minutes
-        setTimeout(() => {
-          clearInterval(pollTimer);
-          if (!popup.closed) popup.close();
-          resolve();
-        }, 120000);
-      });
+      return signInWithGSI(clientId);
     } catch (error: any) {
       setAuthError(error.message);
     }
+  }, []);
+
+  const signInWithGSI = useCallback(async (clientId: string) => {
+    return new Promise<void>((resolve, reject) => {
+      const google = (window as any).google;
+      if (!google?.accounts?.oauth2) {
+        setAuthError('Google Sign-In library not loaded. Please refresh the page.');
+        reject(new Error('GSI not loaded'));
+        return;
+      }
+
+      const client = google.accounts.oauth2.initCodeClient({
+        client_id: clientId,
+        scope: 'openid email profile',
+        ux_mode: 'popup',
+        callback: async (response: any) => {
+          if (response.error) {
+            setAuthError(response.error_description || 'Google Sign-In failed.');
+            reject(new Error(response.error));
+            return;
+          }
+          
+          try {
+            // Exchange authorization code for tokens via our backend
+            const tokenRes = await fetch('/api/google-auth-exchange', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: response.code }),
+            });
+            
+            const tokenData = await tokenRes.json();
+            if (tokenData.error) {
+              setAuthError(tokenData.error);
+              reject(new Error(tokenData.error));
+              return;
+            }
+            
+            const idToken = tokenData.id_token || tokenData.idToken;
+            if (idToken) {
+              const credential = GoogleAuthProvider.credential(idToken);
+              await signInWithCredential(auth, credential);
+              resolve();
+            } else {
+              setAuthError('Failed to complete sign-in. Please try again.');
+              reject(new Error('No ID token received'));
+            }
+          } catch (err: any) {
+            setAuthError(err.message || 'Authentication failed.');
+            reject(err);
+          }
+        },
+      });
+      
+      client.requestCode();
+    });
   }, []);
 
   // Apple Sign-In (Firebase handler is broken for this project)

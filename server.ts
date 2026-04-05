@@ -241,6 +241,11 @@ async function createServer() {
   const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
   const FIREBASE_REDIRECT_URI = `https://${process.env.FIREBASE_PROJECT_ID || ''}.firebaseapp.com/__/auth/handler`;
   
+  // Return Google Client ID for GSI initialization
+  app.get('/api/auth/google-client-id', (req, res) => {
+    res.json({ clientId: GOOGLE_CLIENT_ID });
+  });
+
   // Step 1: Start Google OAuth — redirect to Google's consent page
   // Uses Firebase's own authorized redirect URI, with state containing our origin
   // for the callback relay
