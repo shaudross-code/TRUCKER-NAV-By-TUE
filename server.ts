@@ -264,11 +264,19 @@ async function createServer() {
     res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
   });
   
-  // Step 2: Google OAuth callback — exchange code for tokens
+  // Step 2: Google OAuth callback — exchange code for tokens and postMessage back to opener
   app.get('/api/auth/google/callback', async (req, res) => {
     try {
       const { code, state } = req.query;
-      if (!code) return res.status(400).json({ error: 'Missing auth code' });
+      if (!code) return res.status(400).send('<html><body><h2>Missing auth code</h2></body></html>');
+      
+      let origin = '*';
+      try {
+        if (state) {
+          const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
+          origin = decoded.origin || '*';
+        }
+      } catch {}
       
       const redirectUri = FIREBASE_REDIRECT_URI;
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -288,17 +296,34 @@ async function createServer() {
       try {
         tokenData = JSON.parse(responseText);
       } catch {
-        return res.status(400).json({ error: 'Invalid response from Google' });
+        return res.status(400).send('<html><body><h2>Invalid response from Google</h2></body></html>');
       }
       
       if (tokenData.error) {
-        return res.status(400).json({ error: tokenData.error_description || tokenData.error });
+        return res.status(400).send(`<html><body><h2>${tokenData.error_description || tokenData.error}</h2></body></html>`);
       }
       
-      res.json({ idToken: tokenData.id_token, accessToken: tokenData.access_token });
+      const idToken = tokenData.id_token;
+      // Return HTML page that posts the token back to the opener
+      res.send(`<!DOCTYPE html>
+<html><head><title>Signing in...</title></head>
+<body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
+  <div style="text-align:center">
+    <h2>Signing in...</h2>
+    <p style="color:#666">This window will close automatically.</p>
+  </div>
+  <script>
+    if (window.opener) {
+      window.opener.postMessage({ type: 'google-auth-callback', idToken: '${idToken}' }, '${origin}');
+      setTimeout(function() { window.close(); }, 1000);
+    } else {
+      document.body.innerHTML = '<div style="text-align:center;padding:50px"><h2 style="color:#D4AF37">Sign-in complete</h2><p style="color:#666">You can close this window.</p></div>';
+    }
+  </script>
+</body></html>`);
     } catch (err: any) {
       console.error('Google OAuth callback error:', err.message);
-      res.status(500).json({ error: 'Authentication failed' });
+      res.status(500).send('<html><body><h2>Authentication failed. Please try again.</h2></body></html>');
     }
   });
   

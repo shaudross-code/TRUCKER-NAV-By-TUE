@@ -5,6 +5,7 @@ import {
   GoogleAuthProvider, 
   signOut as firebaseSignOut, 
   signInWithCredential,
+  signInWithPopup,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInAnonymously,
@@ -142,87 +143,147 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return () => unsubscribe();
   }, [user]);
 
-  // Google Sign-In via Google Identity Services (GSI) — avoids Firebase handler/sessionStorage issues
+  // Google Sign-In — uses signInWithPopup (standard Firebase flow)
+  // Falls back to GSI if popup flow fails
   const signIn = useCallback(async () => {
     if (USE_MOCK_DATA) return;
     try {
       setAuthError(null);
       
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 
-        (typeof window !== 'undefined' && (window as any).__GOOGLE_CLIENT_ID) || '';
+      const provider = new GoogleAuthProvider();
+      provider.addScope('email');
+      provider.addScope('profile');
       
-      if (!clientId) {
-        // Fallback: fetch client ID from backend
-        try {
-          const res = await fetch('/api/auth/google-client-id');
-          const data = await res.json();
-          if (data.clientId) {
-            (window as any).__GOOGLE_CLIENT_ID = data.clientId;
-            return signInWithGSI(data.clientId);
-          }
-        } catch {}
-        setAuthError('Google Sign-In configuration missing.');
+      try {
+        // Primary: Firebase signInWithPopup
+        await signInWithPopup(auth, provider);
         return;
+      } catch (popupError: any) {
+        console.warn('signInWithPopup failed, trying GSI fallback:', popupError.code, popupError.message);
+        
+        // If user closed popup or popup blocked, don't fallback
+        if (popupError.code === 'auth/popup-closed-by-user' || 
+            popupError.code === 'auth/cancelled-popup-request') {
+          return;
+        }
+        if (popupError.code === 'auth/popup-blocked') {
+          setAuthError('Popup was blocked. Please allow popups for this site.');
+          return;
+        }
       }
       
-      return signInWithGSI(clientId);
+      // Fallback: GSI (Google Identity Services)
+      try {
+        const google = (window as any).google;
+        if (!google?.accounts?.oauth2) {
+          throw new Error('GSI not loaded');
+        }
+        
+        let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+        if (!clientId) {
+          const res = await fetch('/api/auth/google-client-id');
+          const data = await res.json();
+          clientId = data.clientId;
+        }
+        
+        if (!clientId) {
+          throw new Error('Missing client ID');
+        }
+        
+        await new Promise<void>((resolve, reject) => {
+          const client = google.accounts.oauth2.initCodeClient({
+            client_id: clientId,
+            scope: 'openid email profile',
+            ux_mode: 'popup',
+            callback: async (response: any) => {
+              if (response.error) {
+                reject(new Error(response.error_description || response.error));
+                return;
+              }
+              try {
+                const tokenRes = await fetch('/api/google-auth-exchange', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ code: response.code }),
+                });
+                const tokenData = await tokenRes.json();
+                if (tokenData.error) { reject(new Error(tokenData.error)); return; }
+                const idToken = tokenData.id_token || tokenData.idToken;
+                if (idToken) {
+                  const credential = GoogleAuthProvider.credential(idToken);
+                  await signInWithCredential(auth, credential);
+                  resolve();
+                } else {
+                  reject(new Error('No ID token'));
+                }
+              } catch (err) { reject(err); }
+            },
+          });
+          client.requestCode();
+        });
+      } catch (gsiError: any) {
+        console.warn('GSI fallback also failed:', gsiError.message);
+        
+        // Final fallback: server-side redirect in popup
+        try {
+          await signInViaServerRedirect();
+        } catch (redirectError: any) {
+          setAuthError('Google Sign-In failed. Please try again or use email login.');
+        }
+      }
     } catch (error: any) {
       setAuthError(error.message);
     }
   }, []);
 
-  const signInWithGSI = useCallback(async (clientId: string) => {
+  // Server-side redirect fallback (opens popup to /api/auth/google)
+  const signInViaServerRedirect = useCallback(async () => {
     return new Promise<void>((resolve, reject) => {
-      const google = (window as any).google;
-      if (!google?.accounts?.oauth2) {
-        setAuthError('Google Sign-In library not loaded. Please refresh the page.');
-        reject(new Error('GSI not loaded'));
+      const width = 500, height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+      const popup = window.open(
+        '/api/auth/google',
+        'GoogleAuth',
+        `width=${width},height=${height},left=${left},top=${top},popup=true`
+      );
+      
+      if (!popup) {
+        reject(new Error('Popup blocked'));
         return;
       }
-
-      const client = google.accounts.oauth2.initCodeClient({
-        client_id: clientId,
-        scope: 'openid email profile',
-        ux_mode: 'popup',
-        callback: async (response: any) => {
-          if (response.error) {
-            setAuthError(response.error_description || 'Google Sign-In failed.');
-            reject(new Error(response.error));
-            return;
-          }
-          
-          try {
-            // Exchange authorization code for tokens via our backend
-            const tokenRes = await fetch('/api/google-auth-exchange', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ code: response.code }),
-            });
-            
-            const tokenData = await tokenRes.json();
-            if (tokenData.error) {
-              setAuthError(tokenData.error);
-              reject(new Error(tokenData.error));
-              return;
-            }
-            
-            const idToken = tokenData.id_token || tokenData.idToken;
-            if (idToken) {
-              const credential = GoogleAuthProvider.credential(idToken);
-              await signInWithCredential(auth, credential);
-              resolve();
-            } else {
-              setAuthError('Failed to complete sign-in. Please try again.');
-              reject(new Error('No ID token received'));
-            }
-          } catch (err: any) {
-            setAuthError(err.message || 'Authentication failed.');
-            reject(err);
-          }
-        },
-      });
       
-      client.requestCode();
+      // Listen for postMessage from callback page
+      const messageHandler = async (event: MessageEvent) => {
+        if (event.data?.type === 'google-auth-callback' && event.data?.idToken) {
+          window.removeEventListener('message', messageHandler);
+          clearInterval(pollTimer);
+          popup.close();
+          try {
+            const credential = GoogleAuthProvider.credential(event.data.idToken);
+            await signInWithCredential(auth, credential);
+            resolve();
+          } catch (err) { reject(err); }
+        }
+      };
+      window.addEventListener('message', messageHandler);
+      
+      // Also poll for popup closure
+      const pollTimer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(pollTimer);
+          window.removeEventListener('message', messageHandler);
+          resolve();
+        }
+      }, 500);
+      
+      // Timeout
+      setTimeout(() => {
+        clearInterval(pollTimer);
+        window.removeEventListener('message', messageHandler);
+        if (!popup.closed) popup.close();
+        resolve();
+      }, 120000);
     });
   }, []);
 
