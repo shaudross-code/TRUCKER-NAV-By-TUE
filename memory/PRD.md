@@ -51,10 +51,15 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 - `/api/crash-prediction` - AI incident analysis
 - `/api/poi/ratings`, `/api/poi/parking-predict`, `/api/community/reports`
 
+## Deployment Fix (Apr 5, 2026)
+- Replaced hardcoded Firebase Project ID in `server.ts` with `process.env.FIREBASE_PROJECT_ID`
+- Added `FIREBASE_PROJECT_ID` to `.env`, `backend/.env`, and supervisor config
+- Verified deployment agent confirms no more hardcoded secrets or API keys in source code
+
 ## Future/Backlog
 - NavigationView.tsx refactoring (6800+ lines → target <3000)
 - PC*MILER integration (enterprise API key needed)
-- Gemini API key rotation
+- Gemini API key rotation / TTS fallback
 - Route Safety Score badge on map
 
 ## Preview URL
