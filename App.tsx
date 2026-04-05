@@ -470,7 +470,7 @@ const AppContent: React.FC = React.memo(() => {
       case ViewType.LOAD_BOARD:
         return <Suspense fallback={<ContentLoader />}><ComingSoonOverlay title="Load Board"><LoadBoard /></ComingSoonOverlay></Suspense>;
       case ViewType.MAINTENANCE:
-        return <Suspense fallback={<ContentLoader />}><Maintenance /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><ComingSoonOverlay title="Maintenance"><Maintenance /></ComingSoonOverlay></Suspense>;
       case ViewType.NAVIGATION:
         return null; // Handled separately to keep it mounted
       case ViewType.SETTINGS:
