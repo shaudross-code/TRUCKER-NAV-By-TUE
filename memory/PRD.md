@@ -53,8 +53,11 @@ Build app from GitHub repository TRUCKER-NAV-By-TUE. Implement real POIs using H
 
 ## Deployment Fix (Apr 5, 2026)
 - Replaced hardcoded Firebase Project ID in `server.ts` with `process.env.FIREBASE_PROJECT_ID`
-- Added `FIREBASE_PROJECT_ID` to `.env`, `backend/.env`, and supervisor config
-- Verified deployment agent confirms no more hardcoded secrets or API keys in source code
+- Moved Google OAuth credentials (CLIENT_ID, CLIENT_SECRET) from hardcoded values to `process.env`
+- Added `FIREBASE_PROJECT_ID`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` to `.env`, `backend/.env`, and supervisor config
+- Created `/app/frontend/.env` (empty, required by deployment pipeline)
+- Deployed Firebase Hosting (`firebase deploy --only hosting`) for auth handler availability
+- Deployment agent confirms: no hardcoded secrets, all env vars properly loaded ✅
 
 ## Firebase Auth Fix (Apr 5, 2026)
 - Fixed "authorizedDomains is not iterable" error that blocked all OAuth sign-in
