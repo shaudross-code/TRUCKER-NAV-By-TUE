@@ -263,30 +263,32 @@ async function createServer() {
   
   // Step 2: Google OAuth callback — exchange code for tokens, redirect to app
   app.get('/api/auth/google/callback', async (req, res) => {
+    const fs = await import('fs');
+    const log = (msg: string) => { try { fs.appendFileSync('/tmp/auth_debug.log', new Date().toISOString() + ' ' + msg + '\n'); } catch {} };
     try {
       const { code, state } = req.query;
-      console.error('[AUTH] code:', !!code, 'state:', !!state);
+      log(`code: ${!!code}, state: ${!!state}`);
       
-      if (!code) return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Missing auth code. Please try again.</h2></body></html>');
+      if (!code) return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Missing auth code.</h2></body></html>');
       
-      // Read the redirect_uri from the state parameter (passed by frontend)
       let redirectUri = '';
       try {
         if (state) {
           const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
           redirectUri = decoded.redirect_uri || '';
-          console.error('[AUTH] redirect_uri from state:', redirectUri);
+          log(`redirect_uri from state: ${redirectUri}`);
         }
-      } catch (e: any) {
-        console.error('[AUTH] state decode error:', e.message);
-      }
+      } catch (e: any) { log(`state decode error: ${e.message}`); }
       
       if (!redirectUri) {
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host;
         redirectUri = `${protocol}://${host}/api/auth/google/callback`;
-        console.error('[AUTH] fallback redirect_uri:', redirectUri);
+        log(`fallback redirect_uri: ${redirectUri}, host: ${req.headers.host}, x-fwd: ${req.headers['x-forwarded-host']}`);
       }
+      
+      log(`client_id: ${GOOGLE_CLIENT_ID?.substring(0, 25)}...`);
+      log(`client_secret: ${GOOGLE_CLIENT_SECRET?.substring(0, 10)}...`);
       
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
@@ -301,7 +303,7 @@ async function createServer() {
       });
       
       const rawBody = await tokenResponse.text();
-      console.error('[AUTH] Google response:', tokenResponse.status, rawBody.substring(0, 300));
+      log(`Google response ${tokenResponse.status}: ${rawBody.substring(0, 500)}`);
       
       let tokenData: any;
       try { tokenData = JSON.parse(rawBody); } catch {
@@ -314,13 +316,13 @@ async function createServer() {
       
       const idToken = tokenData.id_token;
       if (!idToken) {
-        return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>No ID token received</h2></body></html>');
+        return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>No ID token</h2></body></html>');
       }
       
-      console.error('[AUTH] SUCCESS');
+      log('SUCCESS - signing in');
       res.redirect(`/?__gauth=${encodeURIComponent(idToken)}`);
     } catch (err: any) {
-      console.error('[AUTH] Exception:', err.message);
+      log(`Exception: ${err.message}`);
       res.status(500).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Authentication failed</h2></body></html>');
     }
   });
