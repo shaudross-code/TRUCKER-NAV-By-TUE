@@ -2,9 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   User, 
   onAuthStateChanged, 
-  GoogleAuthProvider, 
   signOut as firebaseSignOut, 
-  signInWithCredential,
+  signInWithCustomToken,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signInAnonymously,
@@ -145,13 +144,12 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Check for Google OAuth callback token on mount (from full-page redirect flow)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const gtoken = params.get('__gauth');
-    if (gtoken) {
+    const customToken = params.get('__gauth_custom');
+    if (customToken) {
       // Clean the URL immediately
       window.history.replaceState({}, '', '/');
-      // Sign into Firebase with the ID token
-      const credential = GoogleAuthProvider.credential(gtoken);
-      signInWithCredential(auth, credential).catch((err) => {
+      // Sign into Firebase with the custom token (created by our server)
+      signInWithCustomToken(auth, customToken).catch((err) => {
         setAuthError('Google Sign-In failed: ' + (err.message || 'Unknown error'));
       });
     }

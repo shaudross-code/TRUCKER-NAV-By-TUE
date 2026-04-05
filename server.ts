@@ -267,7 +267,6 @@ async function createServer() {
     const log = (msg: string) => { try { fs.appendFileSync('/tmp/auth_debug.log', new Date().toISOString() + ' ' + msg + '\n'); } catch {} };
     try {
       const { code, state } = req.query;
-      log(`code: ${!!code}, state: ${!!state}`);
       
       if (!code) return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Missing auth code.</h2></body></html>');
       
@@ -276,20 +275,16 @@ async function createServer() {
         if (state) {
           const decoded = JSON.parse(Buffer.from(state as string, 'base64').toString());
           redirectUri = decoded.redirect_uri || '';
-          log(`redirect_uri from state: ${redirectUri}`);
         }
-      } catch (e: any) { log(`state decode error: ${e.message}`); }
+      } catch {}
       
       if (!redirectUri) {
         const protocol = req.headers['x-forwarded-proto'] || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host;
         redirectUri = `${protocol}://${host}/api/auth/google/callback`;
-        log(`fallback redirect_uri: ${redirectUri}, host: ${req.headers.host}, x-fwd: ${req.headers['x-forwarded-host']}`);
       }
       
-      log(`client_id: ${GOOGLE_CLIENT_ID?.substring(0, 25)}...`);
-      log(`client_secret: ${GOOGLE_CLIENT_SECRET?.substring(0, 10)}...`);
-      
+      // Exchange auth code for tokens
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -303,7 +298,7 @@ async function createServer() {
       });
       
       const rawBody = await tokenResponse.text();
-      log(`Google response ${tokenResponse.status}: ${rawBody.substring(0, 500)}`);
+      log(`Google token response ${tokenResponse.status}: ${rawBody.substring(0, 300)}`);
       
       let tokenData: any;
       try { tokenData = JSON.parse(rawBody); } catch {
@@ -314,13 +309,51 @@ async function createServer() {
         return res.status(400).send(`<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>${tokenData.error_description || tokenData.error}</h2></body></html>`);
       }
       
+      // Decode the Google ID token to get user info
       const idToken = tokenData.id_token;
       if (!idToken) {
         return res.status(400).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>No ID token</h2></body></html>');
       }
       
-      log('SUCCESS - signing in');
-      res.redirect(`/?__gauth=${encodeURIComponent(idToken)}`);
+      // Parse the JWT payload (base64url decode the middle section)
+      const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64url').toString());
+      const googleUid = payload.sub;
+      const email = payload.email || '';
+      const displayName = payload.name || '';
+      const photoURL = payload.picture || '';
+      
+      log(`Google user: ${email} (${googleUid})`);
+      
+      // Create or update the Firebase Auth user with this Google account
+      let firebaseUid: string;
+      try {
+        // Try to find existing user by email
+        const existingUser = await admin.auth().getUserByEmail(email);
+        firebaseUid = existingUser.uid;
+        // Update their profile if needed
+        await admin.auth().updateUser(firebaseUid, { displayName, photoURL }).catch(() => {});
+      } catch {
+        // User doesn't exist — create them
+        try {
+          const newUser = await admin.auth().createUser({
+            email,
+            displayName,
+            photoURL,
+            emailVerified: true,
+          });
+          firebaseUid = newUser.uid;
+        } catch (createErr: any) {
+          log(`Create user error: ${createErr.message}`);
+          return res.status(500).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Failed to create account</h2></body></html>');
+        }
+      }
+      
+      // Create a Firebase custom token for this user
+      const customToken = await admin.auth().createCustomToken(firebaseUid);
+      log(`Custom token created for uid: ${firebaseUid}`);
+      
+      // Redirect back to the app with the custom token
+      res.redirect(`/?__gauth_custom=${encodeURIComponent(customToken)}`);
     } catch (err: any) {
       log(`Exception: ${err.message}`);
       res.status(500).send('<html><body style="background:#050505;color:#D4AF37;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh"><h2>Authentication failed</h2></body></html>');
