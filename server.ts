@@ -242,7 +242,7 @@ async function createServer() {
   
   // Return Google Client ID for GSI initialization
   app.get('/api/auth/google-client-id', (req, res) => {
-    res.json({ clientId: GOOGLE_CLIENT_ID });
+    res.json({ clientId: GOOGLE_CLIENT_ID, v: 'custom-token-v2' });
   });
 
   // Step 1: Start Google OAuth — redirect to Google's consent page
