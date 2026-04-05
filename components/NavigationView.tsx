@@ -324,6 +324,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
   const shieldLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const roadOverlayRef = useRef<L.TileLayer | null>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<L.Marker | null>(null);
@@ -906,6 +907,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           mapInstanceRef.current = map;
           
           // Create custom Leaflet panes for proper z-ordering:
+          // Road overlay pane — between base tiles (200) and route line
+          const roadOverlayPane = map.createPane('roadOverlayPane');
+          roadOverlayPane.style.zIndex = '350';
+          roadOverlayPane.style.pointerEvents = 'none';
+          roadOverlayPane.style.mixBlendMode = 'screen';
+
           // Route line renders BELOW signs and markers
           const routePane = map.createPane('routePane');
           routePane.style.zIndex = '420';  // Above tiles (200), below markers (600)
@@ -1228,7 +1235,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // 1. Outer glow effect (soft shadow)
       L.polyline(coords, { 
         color: '#D4AF37', 
-        weight: 50, 
+        weight: 24, 
         opacity: 0.15, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -1238,7 +1245,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // 2. Outer black border line (creates the outline effect)
       L.polyline(coords, { 
         color: '#111111', 
-        weight: 40, 
+        weight: 16, 
         opacity: 0.9, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -1248,7 +1255,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // 3. Inner route line (the main navigation path)
       L.polyline(coords, { 
         color: color, 
-        weight: 30, 
+        weight: 10, 
         opacity: 1, 
         lineCap: 'round', 
         lineJoin: 'round',
@@ -1290,7 +1297,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Dashed outline for alt routes
       L.polyline(route.coords, {
         color: altColor,
-        weight: 14,
+        weight: 6,
         opacity: 0.35,
         dashArray: '12, 8',
         lineCap: 'round',
@@ -1739,14 +1746,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     const map = mapInstanceRef.current;
     
-    // Remove existing tile layers
+    // Remove existing tile layers (including previous road overlay)
     map.eachLayer((layer) => {
       if (layer instanceof L.TileLayer || (layer as any).options?.style) {
         map.removeLayer(layer);
       }
     });
-
-    // Reset filter
+    roadOverlayRef.current = null;
     (map.getContainer() as HTMLElement).style.filter = 'none';
     console.log("NavigationView: map container style", (map.getContainer() as HTMLElement).style.cssText);
     console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
@@ -1762,7 +1768,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }).addTo(map);
     } else if (MAPBOX_TOKEN) {
       console.log("NavigationView: Using Mapbox satellite-streets-v12 raster tiles");
-      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
+      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
         attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         tileSize: 512,
         zoomOffset: -1,
@@ -1790,6 +1796,31 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
       }).addTo(map);
     }
+
+    // ── Permanent Highway/Road Network Overlay ─────────────────────────
+    // Adds a roads-focused tile layer using Mapbox navigation-night style
+    // with mix-blend-mode:screen on the pane, making the dark background
+    // invisible while keeping bright road lines visible over satellite tiles.
+    // Uses tileSize:256 (no zoomOffset) so tiles load at +1 zoom, making
+    // road lines appear wider/thicker on the map.
+    // Two stacked layers make highways appear bolder and more professional.
+    if (MAPBOX_TOKEN && !dataSaver) {
+      const overlayUrl = `https://api.mapbox.com/styles/v1/mapbox/navigation-night-v1/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
+      const overlayOpts: any = {
+        tileSize: 256,
+        maxZoom: 22,
+        crossOrigin: true,
+        opacity: 1,
+        pane: 'roadOverlayPane',
+      };
+      // First layer — base road overlay
+      L.tileLayer(overlayUrl, overlayOpts).addTo(map);
+      // Second layer — doubles brightness of roads for extra-wide professional look
+      const overlay2 = L.tileLayer(overlayUrl, { ...overlayOpts, opacity: 0.6 }).addTo(map);
+      roadOverlayRef.current = overlay2;
+      console.log('[Map] Highway/road overlay added (2x navigation-night-v1, blend:screen, wide)');
+    }
+
     map.invalidateSize();
   }, [isMapReady, showTruckRestrictions, dataSaver]);
 
@@ -2312,7 +2343,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       if (routeLineRef.current && routeCoordsRef.current.length > nearestIndex) {
         const remainingCoords = [currentLocation, ...routeCoordsRef.current.slice(nearestIndex + 1)];
-        updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 30);
+        updateMapLine(mapInstanceRef.current, routeLineRef.current.id, remainingCoords, routeLineRef.current.color, 8);
         
         // Draw completed (traveled) portion as dimmed gray
         if (nearestIndex > 0) {
@@ -2323,7 +2354,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           } else {
             const traveledLine = L.polyline(traveledCoords, {
               color: '#555555',
-              weight: 28,
+              weight: 8,
               opacity: 0.4,
               lineCap: 'round',
               lineJoin: 'round',
@@ -2343,7 +2374,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           // Glow layer
           const glowLine = L.polyline(segmentCoords, {
             color: '#ffffff',
-            weight: 40,
+            weight: 18,
             opacity: 0.2,
             lineCap: 'round',
             pane: 'routePane',
@@ -2352,7 +2383,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           glowLine.addTo(mapInstanceRef.current!);
           mapLayersRef.current['segment_glow'] = glowLine;
           
-          updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 30);
+          updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
           currentSegmentLineRef.current = 'segment';
         } else {
           if (mapLayersRef.current['segment_glow']) {
@@ -4454,7 +4485,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         currentSegmentLineRef.current = null;
         
         // Draw route polyline using updateMapLine for consistency
-        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 30);
+        updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
 
         // Draw alternative routes with distinct colors if available
@@ -5797,7 +5828,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (mapInstanceRef.current) {
                 clearRouteMarkers();
                 currentSegmentLineRef.current = null;
-                updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 30);
+                updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 8);
                 routeLineRef.current = { id: 'route', color: '#D4AF37' };
                 // Redraw alt routes with new selection
                 drawAlternativeRoutes(mapInstanceRef.current, alternativeRoutes, idx);
