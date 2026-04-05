@@ -2086,18 +2086,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       spokenDistancesRef.current.clear();
       lastLaneSpokenRef.current = '';
       
+      const spokenText = convertInstructionToImperial(nextInstruction.text);
       shouldSpeak = true;
       if (dist > 2) {
-        phrase = `Continue for ${dist} miles, then ${nextInstruction.text}.`;
+        phrase = `Continue for ${dist} miles, then ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
       } else if (dist > 0.5) {
-        phrase = `In ${dist} miles, ${nextInstruction.text}.`;
+        phrase = `In ${dist} miles, ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         if (dist <= 2) spokenDistancesRef.current.add('2');
         if (dist <= 1.5) spokenDistancesRef.current.add('1.5');
         if (dist <= 1) spokenDistancesRef.current.add('1');
       } else {
-        phrase = `In ${(dist * 5280).toFixed(0)} feet, ${nextInstruction.text}.`;
+        phrase = `In ${(dist * 5280).toFixed(0)} feet, ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         spokenDistancesRef.current.add('2');
         spokenDistancesRef.current.add('1.5');
@@ -2109,21 +2110,22 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
     // Distance-based progressive announcements
     if (!shouldSpeak) {
+      const spokenText = convertInstructionToImperial(nextInstruction.text);
       if (dist <= 2.0 && dist > 1.8 && !spokenDistancesRef.current.has('2')) {
         shouldSpeak = true;
-        phrase = `In 2 miles, ${nextInstruction.text}.`;
+        phrase = `In 2 miles, ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         spokenDistancesRef.current.add('2');
       } else if (dist <= 1.5 && dist > 1.3 && !spokenDistancesRef.current.has('1.5') && (hasLaneGuidance || isComplexManeuver)) {
         // 1.5 mile announcement only for complex maneuvers or when lane change needed
         shouldSpeak = true;
         phrase = hasLaneGuidance 
-          ? `In 1 and a half miles, ${nextInstruction.text}. ${lanePhrase}` 
-          : `In 1 and a half miles, ${nextInstruction.text}.`;
+          ? `In 1 and a half miles, ${spokenText}. ${lanePhrase}` 
+          : `In 1 and a half miles, ${spokenText}.`;
         spokenDistancesRef.current.add('1.5');
       } else if (dist <= 1.0 && dist > 0.9 && !spokenDistancesRef.current.has('1')) {
         shouldSpeak = true;
-        phrase = `In 1 mile, ${nextInstruction.text}.`;
+        phrase = `In 1 mile, ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         spokenDistancesRef.current.add('1');
       } else if (dist <= 0.75 && dist > 0.65 && hasLaneGuidance && !spokenDistancesRef.current.has('0.75')) {
@@ -2134,7 +2136,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         lastLaneSpokenRef.current = lanePhrase;
       } else if (dist <= 0.5 && dist > 0.4 && !spokenDistancesRef.current.has('0.5')) {
         shouldSpeak = true;
-        phrase = `In half a mile, ${nextInstruction.text}.`;
+        phrase = `In half a mile, ${spokenText}.`;
         if (hasLaneGuidance && lastLaneSpokenRef.current !== lanePhrase) {
           phrase += ` ${lanePhrase}`;
           lastLaneSpokenRef.current = lanePhrase;
@@ -2149,8 +2151,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         shouldSpeak = true;
         const feetRemaining = Math.round(dist * 5280);
         phrase = feetRemaining > 500 
-          ? `In ${feetRemaining} feet, ${nextInstruction.text}.` 
-          : `${nextInstruction.text} now.`;
+          ? `In ${feetRemaining} feet, ${spokenText}.` 
+          : `${spokenText} now.`;
         spokenDistancesRef.current.add('0.2');
       }
     }
@@ -2495,19 +2497,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         });
 
         // Traffic Alerts (Traffic Lights, Stop Signs)
+        // Stop signs: announce ONCE at 1 mile ahead, minimum 1 mile spacing between alerts
+        let lastStopSignAnnouncedDistMi = Infinity;
         trafficAlerts.forEach((alert, idx) => {
           if (!alert.progress) return;
           const alertDistMi = initialMilesRef.current * alert.progress;
           const distToAlert = alertDistMi - (initialMilesRef.current - remainingMiles);
           
-          if (distToAlert > 0 && distToAlert <= 0.5) {
-            const alertKey = `traffic_${alert.type}_${idx}`;
-            if (distToAlert <= 0.5 && distToAlert > 0.4 && !spokenDistancesRef.current.has(`${alertKey}_0.5`)) {
+          const alertKey = `traffic_${alert.type}_${idx}`;
+          
+          if (alert.type === 'STOP_SIGN') {
+            // Only announce at ~1 mile ahead, once per sign, with 1mi min spacing
+            if (distToAlert > 0 && distToAlert <= 1.0 && distToAlert > 0.85 && !spokenDistancesRef.current.has(alertKey)) {
+              const distFromLastAnnounced = lastStopSignAnnouncedDistMi - alertDistMi;
+              if (distFromLastAnnounced >= 1.0) {
+                speak(`Stop sign ahead in 1 mile.`);
+                spokenDistancesRef.current.add(alertKey);
+                lastStopSignAnnouncedDistMi = alertDistMi;
+              }
+            }
+          } else {
+            // Traffic lights: announce at 0.5 miles
+            if (distToAlert > 0 && distToAlert <= 0.5 && distToAlert > 0.4 && !spokenDistancesRef.current.has(alertKey)) {
               speak(`Upcoming ${alert.message} in half a mile.`);
-              spokenDistancesRef.current.add(`${alertKey}_0.5`);
-            } else if (distToAlert <= 0.1 && distToAlert > 0.05 && !spokenDistancesRef.current.has(`${alertKey}_0.1`)) {
-              speak(`${alert.message} ahead.`);
-              spokenDistancesRef.current.add(`${alertKey}_0.1`);
+              spokenDistancesRef.current.add(alertKey);
             }
           }
         });
