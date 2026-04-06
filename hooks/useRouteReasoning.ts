@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import L from 'leaflet';
+import { createGroup, createPolyline, createDomMarker } from '../utils/hereMapUtils';
 
 /**
  * Route Reasoning Overlay — Visual explanation of WHY a route was chosen
@@ -14,16 +14,12 @@ import L from 'leaflet';
 interface RouteSpan {
   offset: number;
   length?: number;
-  // Toll info
   tollSystems?: { name: string }[];
-  // Road attributes
-  functionalClass?: number; // 1=motorway, 2=trunk, 3=primary, 4=secondary, 5=local
+  functionalClass?: number;
   names?: { value: string; language?: string }[];
   routeNumbers?: { value: string; direction?: string }[];
   speedLimit?: number;
-  // Truck restrictions
   truckRestrictions?: { type: string; value?: any }[];
-  // Dynamic
   typicalDuration?: number;
   currentSpeed?: number;
 }
@@ -39,7 +35,7 @@ interface RouteSection {
 
 interface ReasoningSegment {
   type: 'toll' | 'restriction' | 'highway' | 'avoided';
-  coords: L.LatLngExpression[];
+  coords: [number, number][];
   label: string;
   detail?: string;
 }
@@ -47,102 +43,65 @@ interface ReasoningSegment {
 export function useRouteReasoning(
   mapInstanceRef: { current: any },
 ) {
-  const reasoningLayerRef = useRef<L.LayerGroup | null>(null);
+  const reasoningGroupRef = useRef<any>(null);
   const enabledRef = useRef(false);
 
   const clearReasoning = useCallback(() => {
-    if (reasoningLayerRef.current) {
-      reasoningLayerRef.current.clearLayers();
+    if (reasoningGroupRef.current) {
+      reasoningGroupRef.current.removeAll();
     }
   }, []);
 
-  // Render reasoning segments on the map
   const renderReasoning = useCallback((segments: ReasoningSegment[]) => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    if (!reasoningLayerRef.current) {
-      reasoningLayerRef.current = L.layerGroup().addTo(map);
+    if (!reasoningGroupRef.current) {
+      reasoningGroupRef.current = createGroup();
+      map.addObject(reasoningGroupRef.current);
     }
-    reasoningLayerRef.current.clearLayers();
+    reasoningGroupRef.current.removeAll();
 
     if (!enabledRef.current) return;
 
     for (const seg of segments) {
       if (seg.coords.length < 2) continue;
 
-      let style: L.PolylineOptions;
+      let color: string, width: number, opacity: number, dash: number[] | undefined;
       switch (seg.type) {
         case 'toll':
-          style = { color: '#D4AF37', weight: 6, opacity: 0.7, dashArray: '12, 8' };
-          break;
+          color = '#D4AF37'; width = 6; opacity = 0.7; dash = [12, 8]; break;
         case 'restriction':
-          style = { color: '#dc2626', weight: 5, opacity: 0.6, dashArray: '6, 4' };
-          break;
+          color = '#dc2626'; width = 5; opacity = 0.6; dash = [6, 4]; break;
         case 'highway':
-          style = { color: '#D4AF37', weight: 4, opacity: 0.5 };
-          break;
+          color = '#D4AF37'; width = 4; opacity = 0.5; dash = undefined; break;
         case 'avoided':
-          style = { color: '#f59e0b', weight: 4, opacity: 0.5, dashArray: '4, 8' };
-          break;
+          color = '#f59e0b'; width = 4; opacity = 0.5; dash = [4, 8]; break;
         default:
-          style = { color: '#fff', weight: 3, opacity: 0.4 };
+          color = '#fff'; width = 3; opacity = 0.4; dash = undefined;
       }
 
-      const polyline = L.polyline(seg.coords, {
-        ...style,
-        interactive: true,
-        pane: 'routePane',
-      });
+      const polyline = createPolyline(seg.coords, color, width, { opacity, dash });
+      reasoningGroupRef.current!.addObject(polyline);
 
-      // Tooltip on hover showing reason
-      polyline.bindTooltip(
-        `<div style="background:#111;color:#fff;padding:4px 8px;border-radius:6px;border:1px solid #D4AF37;font-size:11px;font-weight:700;max-width:200px">
-          <div style="color:#D4AF37;text-transform:uppercase;font-size:9px;letter-spacing:1px;margin-bottom:2px">${seg.type === 'toll' ? 'TOLL ROAD' : seg.type === 'restriction' ? 'TRUCK RESTRICTION' : seg.type === 'highway' ? 'PREFERRED HIGHWAY' : 'AVOIDED SEGMENT'}</div>
-          <div>${seg.label}</div>
-          ${seg.detail ? `<div style="color:#999;font-size:10px;margin-top:2px">${seg.detail}</div>` : ''}
-        </div>`,
-        { sticky: true, direction: 'top', offset: [0, -10], className: 'route-reasoning-tooltip' }
-      );
-
-      reasoningLayerRef.current!.addLayer(polyline);
-
-      // Place badges at midpoint of each segment
       if (seg.type === 'toll' && seg.coords.length >= 2) {
         const midIdx = Math.floor(seg.coords.length / 2);
-        const mid = seg.coords[midIdx] as [number, number];
-        const badge = L.marker(mid, {
-          icon: L.divIcon({
-            html: `<div style="background:#D4AF37;color:#000;font-size:10px;font-weight:900;padding:2px 6px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5)">$ TOLL</div>`,
-            className: 'route-toll-badge',
-            iconSize: [50, 20],
-            iconAnchor: [25, 10],
-          }),
-          interactive: false,
-          pane: 'signPane',
-        });
-        reasoningLayerRef.current!.addLayer(badge);
+        const mid = seg.coords[midIdx];
+        const html = `<div style="background:#D4AF37;color:#000;font-size:10px;font-weight:900;padding:2px 6px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5)">$ TOLL</div>`;
+        const badge = createDomMarker(mid[0], mid[1], html, [50, 20], [25, 10], 500);
+        reasoningGroupRef.current!.addObject(badge);
       }
 
       if (seg.type === 'restriction' && seg.coords.length >= 2) {
         const midIdx = Math.floor(seg.coords.length / 2);
-        const mid = seg.coords[midIdx] as [number, number];
-        const badge = L.marker(mid, {
-          icon: L.divIcon({
-            html: `<div style="background:#dc2626;color:#fff;font-size:9px;font-weight:900;padding:2px 5px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5)">RESTRICTED</div>`,
-            className: 'route-restriction-badge',
-            iconSize: [70, 18],
-            iconAnchor: [35, 9],
-          }),
-          interactive: false,
-          pane: 'signPane',
-        });
-        reasoningLayerRef.current!.addLayer(badge);
+        const mid = seg.coords[midIdx];
+        const html = `<div style="background:#dc2626;color:#fff;font-size:9px;font-weight:900;padding:2px 5px;border-radius:10px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.5)">RESTRICTED</div>`;
+        const badge = createDomMarker(mid[0], mid[1], html, [70, 18], [35, 9], 500);
+        reasoningGroupRef.current!.addObject(badge);
       }
     }
   }, [mapInstanceRef]);
 
-  // Parse route sections from HERE API response to extract reasoning segments
   const parseRouteReasoning = useCallback((
     sections: RouteSection[],
     decodedCoords: [number, number][],
@@ -150,7 +109,6 @@ export function useRouteReasoning(
     const segments: ReasoningSegment[] = [];
 
     for (const section of sections) {
-      // Toll detection
       if (section.tolls && section.tolls.length > 0) {
         const tollNames = section.tolls.map(t => t.tollSystem).filter(Boolean).join(', ');
         segments.push({
@@ -161,7 +119,6 @@ export function useRouteReasoning(
         });
       }
 
-      // Restriction notices
       if (section.notices) {
         for (const notice of section.notices) {
           if (notice.severity === 'critical' || notice.code?.includes('restriction')) {
@@ -175,7 +132,6 @@ export function useRouteReasoning(
         }
       }
 
-      // Span-based analysis
       if (section.spans) {
         let tollStart = -1;
         let hwStart = -1;
@@ -185,7 +141,6 @@ export function useRouteReasoning(
           const span = section.spans[i];
           const idx = span.offset;
 
-          // Toll spans
           if (span.tollSystems && span.tollSystems.length > 0) {
             if (tollStart === -1) tollStart = idx;
           } else if (tollStart !== -1) {
@@ -200,7 +155,6 @@ export function useRouteReasoning(
             tollStart = -1;
           }
 
-          // Highway classification
           const fc = span.functionalClass;
           const routeNums = span.routeNumbers?.map(r => r.value).join('/') || '';
           if (fc && fc <= 2 && routeNums) {
@@ -218,7 +172,6 @@ export function useRouteReasoning(
             }
           }
 
-          // Truck restrictions
           if (span.truckRestrictions && span.truckRestrictions.length > 0) {
             const nextIdx = section.spans[i + 1]?.offset ?? decodedCoords.length;
             if (nextIdx - idx > 1 && nextIdx <= decodedCoords.length) {
@@ -232,7 +185,6 @@ export function useRouteReasoning(
           }
         }
 
-        // Close any open highway segment
         if (hwStart !== -1 && decodedCoords.length - hwStart > 5) {
           segments.push({
             type: 'highway',
@@ -253,7 +205,7 @@ export function useRouteReasoning(
   }, [clearReasoning]);
 
   return {
-    reasoningLayerRef,
+    reasoningLayerRef: reasoningGroupRef,
     renderReasoning,
     parseRouteReasoning,
     clearReasoning,

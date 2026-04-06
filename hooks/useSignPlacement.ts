@@ -89,12 +89,22 @@ export function useSignPlacement(
     const vis = signVisibilityRef.current;
     const newVisibleIds = new Set<string>();
 
+    // Manual bounds check helper (H.geo.Rect may not have containsPoint)
+    const isInBounds = (lat: number, lng: number) => {
+      if (!boundsRect) return true;
+      try {
+        const top = boundsRect.getTop();
+        const bottom = boundsRect.getBottom();
+        const left = boundsRect.getLeft();
+        const right = boundsRect.getRight();
+        return lat >= bottom && lat <= top && lng >= left && lng <= right;
+      } catch (_) { return true; }
+    };
+
     for (const sign of store) {
       const category = getSignCategory(sign.id);
       const isAllowed = vis[category] !== false;
-      const inBounds = boundsRect
-        ? boundsRect.containsPoint({ lat: sign.lat, lng: sign.lon })
-        : true; // If no bounds, show all
+      const inBounds = isInBounds(sign.lat, sign.lon);
       if (isAllowed && inBounds) newVisibleIds.add(sign.id);
     }
     // Remove markers no longer visible

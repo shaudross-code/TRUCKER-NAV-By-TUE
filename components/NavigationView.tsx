@@ -1238,15 +1238,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const map = mapInstanceRef.current;
 
     // HERE Maps context menu (right-click / long-press)
-    map.addEventListener('contextmenu', (e: any) => {
+    const ctxListener = (e: any) => {
       const coord = map.screenToGeo(e.viewportX, e.viewportY);
       if (!coord) return;
       console.log('contextmenu at:', coord);
-      // TODO: Implement HERE-compatible popup for context menu
-    });
+    };
+    (map as any).__ctxListener = ctxListener;
+    map.addEventListener('contextmenu', ctxListener);
 
     let moveEndTimeout: any = null;
-    map.addEventListener('mapviewchangeend', () => {
+    const moveEndListener = () => {
       if (moveEndTimeout) clearTimeout(moveEndTimeout);
       moveEndTimeout = setTimeout(() => {
         if (!mapInstanceRef.current) return;
@@ -1314,11 +1315,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             });
         }
       }, 1000);
-    });
+    };
+    (map as any).__moveEndListener = moveEndListener;
+    map.addEventListener('mapviewchangeend', moveEndListener);
 
     return () => {
-      map.off('contextmenu');
-      map.off('moveend');
+      // HERE Maps: dispose listeners by removing all on dispose (no direct .off)
+      try { map.removeEventListener('contextmenu', (map as any).__ctxListener); } catch(_){}
+      try { map.removeEventListener('mapviewchangeend', (map as any).__moveEndListener); } catch(_){}
       Object.values(mapLayersRef.current).forEach(layer => { try { mapInstanceRef.current?.removeObject(layer); } catch(_){} });
       mapLayersRef.current = {};
     };
@@ -1681,7 +1685,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // North-up: reset rotation to 0
       mapRef.current.style.setProperty('--map-rotation', '0deg');
     }
-    map.invalidateSize();
+    map.getViewPort().resize();
   }, [isNorthUp]);
 
   const poiFiltersString = useMemo(() => Array.from(poiFilters).join(','), [poiFilters]);
@@ -4780,11 +4784,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           const nLat = lerp(cLat, tLat, t);
           const nLon = lerp(cLon, tLon, t);
           markerCurrentRef.current = [nLat, nLon];
-          userMarkerRef.current.setLatLng([nLat, nLon]);
+          userMarkerRef.current.setGeometry({lat: nLat, lng: nLon});
         } else {
           // Large jump (new route, teleport) — snap immediately
           markerCurrentRef.current = [...markerTargetRef.current];
-          userMarkerRef.current.setLatLng(markerTargetRef.current);
+          userMarkerRef.current.setGeometry({lat: markerTargetRef.current[0], lng: markerTargetRef.current[1]});
         }
       }
       markerAnimFrameRef.current = requestAnimationFrame(animate);
@@ -5073,7 +5077,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     lastPoiRenderCenterRef.current = mapCenter;
 
     console.log(`Rendering POIs for center: ${mapCenter[0]}, ${mapCenter[1]}`);
-    markerClusterGroupRef.current?.clearLayers();
+    markerClusterGroupRef.current?.removeAll();
     poiMarkersRef.current = [];
 
     let validPoisCount = 0;
@@ -5165,14 +5169,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               }
             }
             addWaypoint(poi, type, position);
-            mapInstanceRef.current?.closePopup();
+            // Close any open info bubbles
+            try { hereUiRef.current?.getBubbles()?.forEach((b: any) => hereUiRef.current?.removeBubble(b)); } catch(_) {}
           }
         } else if (target.classList.contains('view-poi-details-btn')) {
           const poiId = target.getAttribute('data-poi-id');
           const poi = pois.find(p => `${p.name}-${p.lat}-${p.lon}` === poiId);
           if (poi) {
             setSelectedPoi(poi);
-            mapInstanceRef.current?.closePopup();
+            try { hereUiRef.current?.getBubbles()?.forEach((b: any) => hereUiRef.current?.removeBubble(b)); } catch(_) {}
           }
         }
       };
@@ -5372,7 +5377,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setIsNorthUp(false); // Default to Heading Up mode
       if (mapInstanceRef.current && userMarkerRef.current) {
         // The marker is at the start of the route, which is the user's location
-        const startPosition = userMarkerRef.current.getLatLng(); 
+        const startPosition = userMarkerRef.current.getGeometry(); 
         if (startPosition && !isNaN(startPosition.lat) && !isNaN(startPosition.lng)) {
           try {
             mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: startPosition.lat, lng: startPosition.lng }, zoom: 17 }, true);

@@ -111,14 +111,17 @@ export function createPolyline(
     ls.pushLatLngAlt(c[0], c[1], 0);
   }
   const rgba = hexToRgba(color, opts?.opacity ?? 1);
+  const style: any = {
+    strokeColor: rgba,
+    lineWidth: width,
+    lineCap: opts?.cap || 'round',
+    lineJoin: opts?.join || 'round',
+  };
+  if (opts?.dash && opts.dash.length > 0) {
+    style.lineDash = opts.dash;
+  }
   return new H.map.Polyline(ls, {
-    style: {
-      strokeColor: rgba,
-      lineWidth: width,
-      lineCap: opts?.cap || 'round',
-      lineJoin: opts?.join || 'round',
-      lineDash: opts?.dash,
-    },
+    style,
     zIndex: opts?.zIndex,
   });
 }
@@ -212,7 +215,11 @@ export function isInViewport(map: any, lat: number, lng: number): boolean {
   try {
     const bounds = map.getViewModel().getLookAtData().bounds;
     if (!bounds) return true;
-    return bounds.containsPoint({ lat, lng });
+    const top = bounds.getTop();
+    const bottom = bounds.getBottom();
+    const left = bounds.getLeft();
+    const right = bounds.getRight();
+    return lat >= bottom && lat <= top && lng >= left && lng <= right;
   } catch {
     return true;
   }
