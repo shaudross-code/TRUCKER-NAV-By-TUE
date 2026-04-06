@@ -330,7 +330,7 @@ export function useSignPlacement(
           html,
           [160, 28],
           [80, 14],
-          410 // Below shields (500) but above route pane
+          550 // Above route pane, visible on top of polyline
         );
         placedCount++;
       }

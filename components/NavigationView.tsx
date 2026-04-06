@@ -908,9 +908,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           mapInstanceRef.current = map;
           
           // Create custom Leaflet panes for proper z-ordering:
-          // Road overlay pane — between base tiles (200) and route line
+          // Road overlay pane — ABOVE route so road info is visible on top of the polyline
           const roadOverlayPane = map.createPane('roadOverlayPane');
-          roadOverlayPane.style.zIndex = '350';
+          roadOverlayPane.style.zIndex = '500';
           roadOverlayPane.style.pointerEvents = 'none';
           roadOverlayPane.style.mixBlendMode = 'screen';
 
