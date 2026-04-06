@@ -54,7 +54,8 @@ import {
   Mic,
   MapPinned,
   CheckCircle2,
-  SkipForward
+  SkipForward,
+  ChevronDown
 } from 'lucide-react';
 import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
 import { TrafficIcon } from './TrafficIcon';
@@ -766,10 +767,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const saved = uGet('poi_filters');
     const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest', 'truck_wash'];
     try {
-      return saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'low_clearance', 'other']);
+      const parsed = saved ? new Set(JSON.parse(saved)) : new Set([...brandIds, 'parking', 'rest_area', 'cat_scale', 'food', 'low_clearance', 'other']);
+      parsed.delete('weigh_station'); // Remove weigh stations
+      return parsed;
     } catch (e) {
       console.error("Failed to parse poi_filters from localStorage", e);
-      return new Set([...brandIds, 'parking', 'rest_area', 'weigh_station', 'cat_scale', 'food', 'low_clearance', 'other']);
+      return new Set([...brandIds, 'parking', 'rest_area', 'cat_scale', 'food', 'low_clearance', 'other']);
     }
   });
 
@@ -988,6 +991,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [restrictionsCollapsed, setRestrictionsCollapsed] = useState(false);
   const [trafficAlertsCollapsed, setTrafficAlertsCollapsed] = useState(false);
   const [weatherAlertsCollapsed, setWeatherAlertsCollapsed] = useState(false);
+  const [poiPanelOpen, setPoiPanelOpen] = useState(true);
   // Alert detail modal
   const [alertDetailModal, setAlertDetailModal] = useState<{ type: string; title: string; items: { label: string; value: string; color?: string }[] } | null>(null);
   
@@ -4777,26 +4781,37 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return () => clearInterval(etaInterval);
   }, [isDriving, updateNavigationState]);
 
-  // Smooth marker interpolation loop
+  // Smooth marker interpolation loop — dampened to prevent jitter
   useEffect(() => {
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+    let lastSetTime = 0;
+    const MIN_FRAME_MS = 50; // Cap updates to ~20fps for smooth visuals without jitter
+    const DEAD_ZONE = 0.000005; // ~0.5m — ignore micro-movements
+
     const animate = () => {
-      if (markerTargetRef.current && markerCurrentRef.current && userMarkerRef.current) {
+      const now = performance.now();
+      if (markerTargetRef.current && markerCurrentRef.current && userMarkerRef.current && now - lastSetTime >= MIN_FRAME_MS) {
         const [cLat, cLon] = markerCurrentRef.current;
         const [tLat, tLon] = markerTargetRef.current;
         const dLat = Math.abs(tLat - cLat);
         const dLon = Math.abs(tLon - cLon);
-        // Only interpolate if close enough (avoid teleporting across the map)
-        if (dLat < 0.01 && dLon < 0.01) {
-          const t = 0.15; // Smooth factor: higher = faster convergence
+
+        // Dead-zone: skip if change is too tiny (prevents micro-jitter)
+        if (dLat < DEAD_ZONE && dLon < DEAD_ZONE) {
+          // Already at target, no update needed
+        } else if (dLat < 0.01 && dLon < 0.01) {
+          // Gentle smoothing (t=0.06 = ~6% per frame for very smooth glide)
+          const t = 0.06;
           const nLat = lerp(cLat, tLat, t);
           const nLon = lerp(cLon, tLon, t);
           markerCurrentRef.current = [nLat, nLon];
           userMarkerRef.current.setGeometry({lat: nLat, lng: nLon});
+          lastSetTime = now;
         } else {
           // Large jump (new route, teleport) — snap immediately
           markerCurrentRef.current = [...markerTargetRef.current];
           userMarkerRef.current.setGeometry({lat: markerTargetRef.current[0], lng: markerTargetRef.current[1]});
+          lastSetTime = now;
         }
       }
       markerAnimFrameRef.current = requestAnimationFrame(animate);
@@ -6005,15 +6020,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           )}
 
-          {/* Upcoming POIs */}
+          {/* Route POIs — clickable & scrollable */}
           {hudLayout.showAlongRoute && upcomingPois.length > 0 && (
-            <div className="mt-2 bg-black/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-56 transition-all">
-              <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2">
-                <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
-                  <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
+            <div data-testid="route-poi-panel" className="mt-2 bg-black/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-56 transition-all">
+              <div className="flex items-center justify-between mb-1.5 md:mb-2 cursor-pointer" onClick={() => setPoiPanelOpen(!poiPanelOpen)}>
+                <div className="flex items-center gap-1.5 md:gap-2">
+                  <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
+                    <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
+                  </div>
+                  <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI ({upcomingPois.filter(p => getPoiCategory(p.type, p.name) !== 'excluded').length})</span>
                 </div>
-                <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI</span>
+                <ChevronDown className={`w-3 h-3 text-[#D4AF37] transition-transform ${poiPanelOpen ? '' : '-rotate-90'}`} />
               </div>
+              {poiPanelOpen && (
+                <>
               {/* Cheapest Fuel Banner */}
               {(() => {
                 const cheapest = findCheapestDiesel(fuelStations);
@@ -6030,8 +6050,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   </div>
                 );
               })()}
-              <div className="flex flex-col gap-1 md:gap-1.5">
+              <div className="flex flex-col gap-1 md:gap-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-0.5" data-testid="route-poi-list">
                 {upcomingPois.filter(poi => {
+                  const cat = getPoiCategory(poi.type, poi.name);
+                  if (cat === 'excluded') return false;
                   if (minRatingFilter <= 0) return true;
                   const rid = `${poi.lat.toFixed(4)}_${poi.lon.toFixed(4)}`;
                   const r = poiRatingsCache[rid];
@@ -6049,11 +6071,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   else if (category === 'food') { Icon = UtensilsCrossed; iconColor = "text-[#D4AF37]"; }
                   else if (category === 'service') { Icon = Wrench; iconColor = "text-red-400"; }
                   else if (category === 'distribution') { Icon = Box; iconColor = "text-[#D4AF37]"; }
-                  else if (category === 'weigh_station') { Icon = Scale; iconColor = "text-[#D4AF37]"; }
                   else if (category === 'cat_scale') { Icon = Scale; iconColor = "text-[#D4AF37]"; }
 
                   return (
-                    <div key={idx} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors" onClick={() => setSelectedPoi(poi)}>
+                    <div key={idx} data-testid={`route-poi-item-${idx}`} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors active:bg-[#D4AF37]/10" onClick={() => {
+                      setSelectedPoi(poi);
+                      // Center map on this POI
+                      if (mapInstanceRef.current) {
+                        mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: poi.lat, lng: poi.lon }, zoom: 15 }, true);
+                      }
+                    }}>
                       <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden">
                         {hasBrandIcon ? (
                           <span className="shrink-0 flex items-center justify-center w-4 h-4 md:w-5 md:h-5">{brandIcon}</span>
@@ -6090,6 +6117,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   );
                 })}
               </div>
+              </>
+              )}
             </div>
           )}
         </>
