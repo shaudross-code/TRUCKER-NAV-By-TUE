@@ -1,9 +1,10 @@
 /**
- * HERE Maps Utility Module
- * Provides helper functions that bridge HERE Maps JS API v3 with the existing codebase.
+ * HERE Maps Utility Module — TRUCKERS NAV BY TUE Signature Edition
+ * Satellite hybrid base with dark-gold branding + clustering support.
  */
 
 const HERE_MAP_API_KEY = 'Hl5tRH0k6AOm2-XpzP95ADCabelFTPLUyQF_ISOvgwg';
+const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
 
 let _platform: any = null;
 let _defaultLayers: any = null;
@@ -17,7 +18,7 @@ export function getHerePlatform() {
   return { platform: _platform, defaultLayers: _defaultLayers };
 }
 
-/** Create a HERE Map on a DOM element with logistics trucking layer */
+/** Create a HERE Map on a DOM element — TRUCKERS NAV dark-gold signature theme */
 export function createHereMap(
   element: HTMLElement,
   center: { lat: number; lng: number },
@@ -25,16 +26,24 @@ export function createHereMap(
 ): { map: any; platform: any; defaultLayers: any; behavior: any; ui: any } {
   const { platform, defaultLayers } = getHerePlatform();
 
-  // Use logistics layer optimised for trucking, fallback to normal map
-  const baseLayer = defaultLayers.vector?.normal?.logistics
-    || defaultLayers.vector?.normal?.map
-    || defaultLayers.raster?.normal?.map;
+  // Mapbox satellite-streets as base layer (HERE tile APIs return 401 for this key)
+  const tileProvider = new H.map.provider.ImageTileProvider({
+    label: 'Satellite Streets',
+    min: 1,
+    max: 20,
+    getURL: (col: number, row: number, level: number) =>
+      `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/${level}/${col}/${row}?access_token=${MAPBOX_TOKEN}`,
+  });
+  const baseLayer = new H.map.layer.TileLayer(tileProvider);
 
   const map = new H.Map(element, baseLayer, {
     center,
     zoom,
     pixelRatio: window.devicePixelRatio || 1,
   });
+
+  // Apply the dark-gold CSS class for the TRUCKERS NAV signature look
+  element.classList.add('here-map-satellite-dark');
 
   // Resize listener
   const onResize = () => map.getViewPort().resize();
@@ -46,40 +55,6 @@ export function createHereMap(
 
   // Default UI (zoom, scale bar)
   const ui = H.ui.UI.createDefault(map, defaultLayers);
-
-  // Enable vehicle restrictions feature if available
-  try {
-    const provider = map.getBaseLayer().getProvider();
-    if (provider?.getStyle) {
-      const style = provider.getStyle();
-      style.addEventListener('change', () => {
-        try {
-          const config = style.getConfig();
-          // Enable vehicle restriction layers (truck overlays)
-          if (config) {
-            // This attempts to make truck-relevant features visible
-            style.setProperty('global.vehicle', 'truck');
-          }
-        } catch (_) { /* style API varies by version */ }
-      });
-    }
-  } catch (_) {}
-
-  // Add traffic flow layer
-  try {
-    if (defaultLayers.vector?.traffic?.map) {
-      map.addLayer(defaultLayers.vector.traffic.map);
-    } else if (defaultLayers.vector?.normal?.traffic) {
-      map.addLayer(defaultLayers.vector.normal.traffic);
-    }
-  } catch (_) {}
-
-  // Add truck restrictions layer if available
-  try {
-    if (defaultLayers.vector?.normal?.truck) {
-      map.addLayer(defaultLayers.vector.normal.truck);
-    }
-  } catch (_) {}
 
   return { map, platform, defaultLayers, behavior, ui };
 }
@@ -193,10 +168,100 @@ export function fitBounds(map: any, coords: [number, number][], padding?: number
   map.getViewModel().setLookAtData({ bounds: rect }, true);
 }
 
+// ─── POI Clustering ───────────────────────────────────────────────────
+
+/** TRUCKERS NAV gold/black cluster theme */
+const CLUSTER_THEME = {
+  getClusterPresentation(cluster: any) {
+    const weight = cluster.getWeight();
+    const pos = cluster.getPosition();
+    const size = weight < 10 ? 36 : weight < 50 ? 44 : weight < 100 ? 52 : 60;
+    const fontSize = weight < 10 ? 12 : weight < 50 ? 13 : weight < 100 ? 14 : 15;
+    const label = weight > 999 ? Math.round(weight / 1000) + 'k' : String(weight);
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <defs>
+        <radialGradient id="cg" cx="40%" cy="35%">
+          <stop offset="0%" stop-color="#F5D76E"/>
+          <stop offset="60%" stop-color="#D4AF37"/>
+          <stop offset="100%" stop-color="#8A6914"/>
+        </radialGradient>
+        <filter id="gs"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+      <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="url(#cg)" stroke="#D4AF37" stroke-width="2" filter="url(#gs)"/>
+      <text x="${size/2}" y="${size/2 + fontSize * 0.36}" text-anchor="middle" font-family="Space Grotesk,Inter,sans-serif" font-size="${fontSize}" font-weight="900" fill="#050505">${label}</text>
+    </svg>`;
+
+    const icon = new H.map.Icon(svg, {
+      size: { w: size, h: size },
+      anchor: { x: size / 2, y: size / 2 },
+    });
+    const marker = new H.map.Marker(pos, { icon, min: cluster.getMinZoom(), max: cluster.getMaxZoom() });
+    marker.setData(cluster);
+    return marker;
+  },
+
+  getNoisePresentation(noisePoint: any) {
+    const pos = noisePoint.getPosition();
+    const data = noisePoint.getData();
+
+    // Use custom POI icon if provided in the data, otherwise default gold dot
+    const html = data?.iconHtml || '';
+    if (html) {
+      const el = document.createElement('div');
+      el.innerHTML = `<div class="custom-poi-icon">${html}</div>`;
+      el.style.position = 'relative';
+      el.style.width = '24px';
+      el.style.height = '24px';
+      el.style.marginLeft = '-12px';
+      el.style.marginTop = '-24px';
+      el.style.pointerEvents = 'none';
+      const domIcon = new H.map.DomIcon(el);
+      const marker = new H.map.DomMarker(pos, { icon: domIcon, min: noisePoint.getMinZoom() });
+      marker.setData(noisePoint.getData());
+      return marker;
+    }
+
+    // Fallback: small gold dot
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="5" fill="#D4AF37" stroke="#050505" stroke-width="1.5"/></svg>`;
+    const icon = new H.map.Icon(svg, { size: { w: 12, h: 12 }, anchor: { x: 6, y: 6 } });
+    const marker = new H.map.Marker(pos, { icon, min: noisePoint.getMinZoom() });
+    marker.setData(noisePoint.getData());
+    return marker;
+  }
+};
+
+/**
+ * Create a clustered POI layer.
+ * Returns { provider, layer } — add layer to map, use provider to setDataPoints().
+ */
+export function createClusterProvider(): { provider: any; layer: any } {
+  const provider = new H.clustering.Provider([], {
+    clusteringOptions: {
+      eps: 48,
+      minWeight: 2,
+    },
+    theme: CLUSTER_THEME,
+  });
+  const layer = new H.map.layer.ObjectLayer(provider);
+  return { provider, layer };
+}
+
+/**
+ * Build an array of H.clustering.DataPoint from POI data.
+ * Each DataPoint carries the iconHtml for use in the noise theme.
+ */
+export function buildClusterDataPoints(
+  pois: { lat: number; lon: number; iconHtml?: string; name?: string; type?: string; [key: string]: any }[]
+): any[] {
+  return pois.map(poi =>
+    new H.clustering.DataPoint(poi.lat, poi.lon, 1, { iconHtml: poi.iconHtml, name: poi.name, type: poi.type, poi })
+  );
+}
+
 /** Convert hex color to rgba string */
 function hexToRgba(hex: string, opacity: number): string {
   if (hex.startsWith('rgba') || hex.startsWith('rgb')) {
-    // Already rgba/rgb, inject opacity
     if (opacity < 1 && hex.startsWith('rgb(')) {
       return hex.replace('rgb(', 'rgba(').replace(')', `,${opacity})`);
     }

@@ -65,6 +65,28 @@ declare namespace H {
       addEventListener(type: string, handler: Function): void;
     }
 
+    namespace layer {
+      class TileLayer {
+        constructor(provider: any, options?: any);
+      }
+      class ObjectLayer {
+        constructor(provider: any, options?: any);
+      }
+    }
+
+    namespace provider {
+      class ImageTileProvider {
+        constructor(options: {
+          label?: string;
+          min?: number;
+          max?: number;
+          getURL: (col: number, row: number, level: number) => string;
+          crossOrigin?: boolean | string;
+          tileSize?: number;
+        });
+      }
+    }
+
     class Polyline {
       constructor(strip: geo.LineString | geo.MultiLineString, options?: {
         style?: {
@@ -170,6 +192,32 @@ declare namespace H {
       removeControl(name: string): void;
       getControl(name: string): any;
       getBubbles(): any[];
+      removeBubble(bubble: any): void;
+    }
+  }
+
+  namespace clustering {
+    class Provider {
+      constructor(dataPoints: DataPoint[], options?: {
+        clusteringOptions?: { eps?: number; minWeight?: number; strategy?: any };
+        theme?: {
+          getClusterPresentation: (cluster: any) => any;
+          getNoisePresentation: (noisePoint: any) => any;
+        };
+        min?: number;
+        max?: number;
+      });
+      setDataPoints(dataPoints: DataPoint[]): void;
+      getLayer(): any;
+      addEventListener(type: string, handler: Function): void;
+      removeEventListener(type: string, handler: Function): void;
+    }
+
+    class DataPoint {
+      constructor(lat: number, lng: number, weight?: number, data?: any);
+      getPosition(): { lat: number; lng: number };
+      getData(): any;
+      getWeight(): number;
     }
   }
 }

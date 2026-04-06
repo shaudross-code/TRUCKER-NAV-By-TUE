@@ -9,6 +9,7 @@
     <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js" type="text/javascript" charset="utf-8"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js" type="text/javascript" charset="utf-8"></script>
     <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js" type="text/javascript" charset="utf-8"></script>
+    <script src="https://js.api.here.com/v3/3.1/mapsjs-clustering.js" type="text/javascript" charset="utf-8"></script>
     <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
@@ -28,6 +29,36 @@
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #262626;
             border-radius: 3px;
+        }
+        /* TRUCKERS NAV BY TUE signature dark-gold map theme
+           Darkens satellite imagery and adds warm gold tint */
+        .here-map-satellite-dark canvas {
+            filter: brightness(0.6) contrast(1.3) saturate(0.6) sepia(0.4) hue-rotate(-5deg);
+        }
+        /* Ensure DomMarkers (POI icons, signs) render normally above the filtered canvas */
+        .here-map-satellite-dark .H_ui,
+        .here-map-satellite-dark [class^="H_"] > div:not(canvas) {
+            filter: none !important;
+        }
+        /* Gold glow on cluster badges */
+        .trucker-cluster-badge {
+            background: radial-gradient(ellipse at center, #D4AF37 0%, #AA8B2F 70%, #050505 100%);
+            color: #050505;
+            font-family: 'Space Grotesk', 'Inter', sans-serif;
+            font-weight: 900;
+            border: 2px solid #D4AF37;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 12px 3px rgba(212,175,55,0.5), inset 0 1px 2px rgba(255,255,255,0.25);
+            text-shadow: 0 1px 1px rgba(0,0,0,0.4);
+            pointer-events: auto;
+            cursor: pointer;
+        }
+        .trucker-cluster-badge:hover {
+            transform: scale(1.12);
+            box-shadow: 0 0 20px 6px rgba(212,175,55,0.7), inset 0 1px 2px rgba(255,255,255,0.25);
         }
     </style>
     <script src="https://accounts.google.com/gsi/client" async defer></script>

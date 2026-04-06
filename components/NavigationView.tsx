@@ -4,7 +4,7 @@ import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 // HERE Maps JS API loaded via script tags in index.html (global H namespace)
-import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds } from '../utils/hereMapUtils';
+import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds, createClusterProvider, buildClusterDataPoints } from '../utils/hereMapUtils';
 import { 
   Plus, 
   Search,
@@ -326,6 +326,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const shieldLayerGroupRef = useRef<any>(null); // H.map.Group
   const roadOverlayRef = useRef<any>(null);
   const markerClusterGroupRef = useRef<any>(null);
+  const clusterProviderRef = useRef<any>(null);
+  const clusterLayerRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const userMarkerRef = useRef<any>(null);
   const userMarkerElRef = useRef<HTMLElement | null>(null);
@@ -715,6 +717,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       shieldLayerGroupRef.current = null;
       clearSigns();
       markerClusterGroupRef.current = null;
+      clusterProviderRef.current = null;
+      clusterLayerRef.current = null;
       userMarkerRef.current = null;
       userMarkerElRef.current = null;
       poiMarkersRef.current = [];
@@ -902,9 +906,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           shieldLayerGroupRef.current = createGroup();
           map.addObject(shieldLayerGroupRef.current);
 
-          // POI group (replaces markerClusterGroup — HERE doesn't have built-in clustering)
-          markerClusterGroupRef.current = createGroup();
-          map.addObject(markerClusterGroupRef.current);
+          // POI clustering layer (H.clustering.Provider for proper cluster/zoom behavior)
+          const { provider: clusterProv, layer: clusterLay } = createClusterProvider();
+          clusterProviderRef.current = clusterProv;
+          clusterLayerRef.current = clusterLay;
+          map.addLayer(clusterLay);
+          // Keep a reference for backwards-compat with existing code
+          markerClusterGroupRef.current = clusterProv;
 
           clearTimeout(timeoutId);
           setIsMapReady(true);
@@ -5063,7 +5071,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (!isMapReady || !mapInstanceRef.current) return;
 
     if (!showPois) {
-      markerClusterGroupRef.current?.removeAll();
+      // Clear the cluster provider
+      if (clusterProviderRef.current) {
+        clusterProviderRef.current.setDataPoints([]);
+      }
       poiMarkersRef.current = [];
       lastPoiRenderCenterRef.current = null;
       return;
@@ -5077,10 +5088,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     lastPoiRenderCenterRef.current = mapCenter;
 
     console.log(`Rendering POIs for center: ${mapCenter[0]}, ${mapCenter[1]}`);
-    markerClusterGroupRef.current?.removeAll();
     poiMarkersRef.current = [];
 
-    let validPoisCount = 0;
     // Pre-filter POIs to only those within 100 miles of map center, then cap at 200 nearest
     const nearbyPois = pois.filter(poi => {
       if (typeof poi.lat !== 'number' || typeof poi.lon !== 'number' || isNaN(poi.lat) || isNaN(poi.lon)) return false;
@@ -5095,57 +5104,34 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     .sort((a, b) => a._dist - b._dist)
     .slice(0, 200);
 
+    // Build clustering data points with custom icon HTML
+    const clusterPoints: { lat: number; lon: number; iconHtml?: string; name?: string; type?: string }[] = [];
+
     nearbyPois.forEach(poi => {
-        try {
-          validPoisCount++;
-          const iconHtml = getCachedPoiIcon(poi.type, poi.name);
-          if (iconHtml) {
-            const marker = createDomMarker(poi.lat, poi.lon, `<div class="custom-poi-icon">${iconHtml}</div>`, [24, 24], [12, 24], 200);
-            if (markerClusterGroupRef.current) {
-              markerClusterGroupRef.current.addObject(marker);
-            } else {
-              mapInstanceRef.current!.addObject(marker);
-            }
+      try {
+        const iconHtml = getCachedPoiIcon(poi.type, poi.name);
+        clusterPoints.push({
+          lat: poi.lat,
+          lon: poi.lon,
+          iconHtml: iconHtml || undefined,
+          name: poi.name,
+          type: poi.type,
+        });
+      } catch (err) {
+        console.error("Failed to prepare POI for cluster:", err instanceof Error ? err.message : String(err));
+      }
+    });
 
-            poiMarkersRef.current.push(marker);
+    // Feed data points into the clustering provider
+    if (clusterProviderRef.current) {
+      const dataPoints = buildClusterDataPoints(clusterPoints);
+      clusterProviderRef.current.setDataPoints(dataPoints);
+      console.log(`Clustered ${clusterPoints.length} POIs via H.clustering.Provider`);
+    }
 
-            // Add Entrance Marker if available
-            if (poi.entrance) {
-              if (!poiIconsCacheRef.current['entrance']) {
-                poiIconsCacheRef.current['entrance'] = renderToStaticMarkup(getEntranceIcon());
-              }
-              const entranceMarker = createDomMarker(poi.entrance.lat, poi.entrance.lon, `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, [24, 24], [12, 12], 150);
-              if (markerClusterGroupRef.current) {
-                markerClusterGroupRef.current.addObject(entranceMarker);
-              } else {
-                mapInstanceRef.current!.addObject(entranceMarker);
-              }
-              poiMarkersRef.current.push(entranceMarker);
-            }
-
-            // Add Exit Marker if available
-            if (poi.exit) {
-              if (!poiIconsCacheRef.current['exit']) {
-                poiIconsCacheRef.current['exit'] = renderToStaticMarkup(getExitIcon());
-              }
-              const exitMarker = createDomMarker(poi.exit.lat, poi.exit.lon, `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, [24, 24], [12, 12], 150);
-              if (markerClusterGroupRef.current) {
-                markerClusterGroupRef.current.addObject(exitMarker);
-              } else {
-                mapInstanceRef.current!.addObject(exitMarker);
-              }
-              poiMarkersRef.current.push(exitMarker);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to render POI icon:", err instanceof Error ? err.message : String(err), poi.id);
-        }
-      });
-
-      console.log(`Rendering ${poiMarkersRef.current.length} POI markers out of ${validPoisCount} valid POIs within range`);
-      console.log("Show POIs:", showPois);
-      console.log("POI Filters:", Array.from(poiFilters).join(', '));
-      console.log("Marker Cluster Group:", markerClusterGroupRef.current ? "exists" : "null");
+    console.log("Show POIs:", showPois);
+    console.log("POI Filters:", Array.from(poiFilters).join(', '));
+    console.log("Cluster Provider:", clusterProviderRef.current ? "exists" : "null");
 
       // Add event delegation for the "Add as Stop" button in popups
       const handlePopupClick = (e: MouseEvent) => {
