@@ -8,18 +8,18 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - **Backend**: Node.js/Express (`server.ts`) on port 8001 with Vite dev server middleware
 - **Database**: Firebase Firestore (user profiles), LocalStorage (HUD layout, guest settings)
 - **Maps**: HERE logistics.satellite.day tiles (55° tilt, native colors) + Mapbox satellite-streets-v12 (SAT 2D)
+- **HERE Project**: `hrn:here:authorization::org675124033:project/trucking-nav`
 
 ## Completed Features
-- [x] HERE Maps JS API v3.1 (replaced Leaflet) — Apr 6, 2026
-- [x] HERE logistics.satellite.day hybrid tiles with native colors (no CSS filter) — Apr 6, 2026
-- [x] 55° map tilt for cinematic GPS perspective — Apr 6, 2026
-- [x] Converted Mapbox 3D → 2D SAT view with pitch:55 — Apr 6, 2026
-- [x] H.clustering.Provider POI clustering with gold/black SVG theme — Apr 6, 2026
-- [x] Fixed user location icon jitter (lerp=0.06, dead-zone 0.5m, 20fps cap) — Apr 6, 2026
-- [x] Simplified MapControls: 7 buttons only — Apr 6, 2026
-- [x] Merged heading-up + follow-me into single default button — Apr 6, 2026
-- [x] POI panel: collapsible header with count, scrollable — Apr 6, 2026
-- [x] Removed weigh stations from POI — Apr 6, 2026
+- [x] HERE Maps JS API v3.1 (replaced Leaflet)
+- [x] HERE logistics.satellite.day hybrid tiles with native colors
+- [x] 55° map tilt for cinematic GPS perspective
+- [x] Mapbox 2D SAT view with pitch:55
+- [x] H.clustering.Provider POI clustering with gold/black SVG theme
+- [x] Fixed user location icon jitter (lerp=0.06, dead-zone 0.5m, 20fps cap)
+- [x] Simplified MapControls: 7 buttons only
+- [x] Merged heading-up + follow-me into single default button
+- [x] POI panel: collapsible header with count, scrollable max-h-[35vh]
 - [x] Turn-by-turn navigation with voice + route comparison (3 alternatives)
 - [x] MUTCD road signs (Interstate shields, Speed Limits, Truck Warnings)
 - [x] Real-time truck restrictions and toll warnings
@@ -31,8 +31,10 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - [x] Removed CSS dark-gold map tint — native HERE satellite colors — Apr 6, 2026
 - [x] Signature gold/black theme on NavigationHUD Lane Guidance — Apr 6, 2026
 - [x] Signature gold/black theme on Route Comparison Panel — Apr 6, 2026
-- [x] Fixed truck profile defaults (13.5'/78500lbs/53'/8.5') — Apr 6, 2026
-- [x] Fixed heading-up mode spinning when stationary (dead-zone 5m, speed gate 2mph) — Apr 6, 2026
+- [x] Fixed truck profile defaults (13.5'/78500lbs/53'/8.5'/5axles/12000/1trailer) — Apr 6, 2026
+- [x] Fixed heading-up mode spinning when stationary (5m dead-zone, 2mph speed gate) — Apr 6, 2026
+- [x] Enhanced Route Comparison Panel: FASTEST/CHEAPEST/SHORTEST/SAFEST badges, time/cost savings, fuel gallon breakdown, toll breakdown, restriction count, total est. cost — Apr 6, 2026
+- [x] Upgraded HERE Routing API: fuel[type]=diesel with consumption tables, consumption spans for per-segment diesel data — Apr 6, 2026
 
 ## Known Issues
 - Gemini TTS key degraded (403) — falls back to native speech
