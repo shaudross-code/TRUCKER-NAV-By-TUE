@@ -3,12 +3,8 @@ import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import * as L from 'leaflet';
-import { MaptilerLayer } from "@maptiler/leaflet-maptilersdk";
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
-import 'leaflet.markercluster';
+// HERE Maps JS API loaded via script tags in index.html (global H namespace)
+import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds } from '../utils/hereMapUtils';
 import { 
   Plus, 
   Search,
@@ -321,22 +317,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     () => telemetryContext?.speedRef.current || 0
   );
   const mapInstanceRef = useRef<any>(null);
-  const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
-  const routeGroupRef = useRef<L.LayerGroup | null>(null);
-  const shieldLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  const roadOverlayRef = useRef<L.TileLayer | null>(null);
+  const mapboxMapRef = useRef<any>(null); // kept for 3D compat - unused with HERE
+  const herePlatformRef = useRef<any>(null);
+  const hereDefaultLayersRef = useRef<any>(null);
+  const hereBehaviorRef = useRef<any>(null);
+  const hereUiRef = useRef<any>(null);
+  const routeGroupRef = useRef<any>(null); // H.map.Group
+  const shieldLayerGroupRef = useRef<any>(null); // H.map.Group
+  const roadOverlayRef = useRef<any>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
-  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userMarkerRef = useRef<any>(null);
   const userMarkerElRef = useRef<HTMLElement | null>(null);
   // Smooth marker interpolation
   const markerTargetRef = useRef<[number, number] | null>(null);
   const markerCurrentRef = useRef<[number, number] | null>(null);
   const markerAnimFrameRef = useRef<number>(0);
-  const mapLayersRef = useRef<Record<string, L.Polyline>>({});
-  const poiMarkersRef = useRef<L.Marker[]>([]);
-  const waypointMarkersRef = useRef<L.Marker[]>([]);
-  const trafficIncidentMarkersRef = useRef<L.Marker[]>([]);
+  const mapLayersRef = useRef<Record<string, any>>({});
+  const poiMarkersRef = useRef<any[]>([]);
+  const waypointMarkersRef = useRef<any[]>([]);
+  const trafficIncidentMarkersRef = useRef<any[]>([]);
   const trafficIncidentIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [autoRerouteCountdown, setAutoRerouteCountdown] = useState<number | null>(null);
   const autoRerouteTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -694,19 +694,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   );
   const was3DRef = useRef(is3DMode);
 
-  // Re-initialize Leaflet map when switching from 3D back to 2D
+  // Re-initialize HERE map when switching from 3D back to 2D
   useEffect(() => {
     const wasIn3D = was3DRef.current;
     was3DRef.current = is3DMode;
     
     // Only act when transitioning FROM 3D TO 2D (not on initial mount)
     if (wasIn3D && !is3DMode) {
-      // Destroy old disconnected Leaflet instance
+      // Destroy old HERE map instance
       if (mapInstanceRef.current) {
         try {
-          mapInstanceRef.current.off();
-          mapInstanceRef.current.remove();
-        } catch (e) { /* already disconnected from DOM */ }
+          const handler = (mapInstanceRef.current as any).__resizeHandler;
+          if (handler) window.removeEventListener('resize', handler);
+          mapInstanceRef.current.dispose();
+        } catch (e) { /* already disposed */ }
         mapInstanceRef.current = null;
       }
       // Reset all map-attached refs so they get recreated on the new instance
@@ -754,8 +755,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [showAddFacility, setShowAddFacility] = useState(false);
-  const facilityLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  const facilityMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const facilityLayerGroupRef = useRef<any>(null);
+  const facilityMarkersRef = useRef<Map<string, any>>(new Map());
 
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = uGet('poi_filters');
@@ -817,7 +818,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (!mapInstanceRef.current) {
         initializeMap();
       } else {
-        mapInstanceRef.current.invalidateSize();
+        mapInstanceRef.current.getViewPort().resize();
       }
     }
   }, [activeView]);
@@ -856,122 +857,59 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             }
           }, 30000); // 30 seconds timeout
 
-          const L_obj = (window as any).L || L;
-          
-          if (!mapRef.current) {
-            // console.log("NavigationView: mapRef.current is null before map initialization");
-            return;
-          }
-          if ((mapRef.current as any)._leaflet_id) {
-            // console.log("NavigationView: deleting _leaflet_id");
-            delete (mapRef.current as any)._leaflet_id;
-          }
-
-          // console.log("NavigationView: initializing map with center", isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION);
-          let map;
+          const centerLoc = isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION;
+          let map: any;
           try {
-            // console.log("NavigationView: calling L.map");
-            map = L.map(mapRef.current!, {
-              center: isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION,
-              zoom: 13,
-              maxZoom: 20,
-              zoomControl: false,
-            });
-            // console.log("NavigationView: map initialized successfully");
+            // Initialize HERE Maps
+            const hereResult = createHereMap(
+              mapRef.current!,
+              { lat: centerLoc[0], lng: centerLoc[1] },
+              13
+            );
+            map = hereResult.map;
+            herePlatformRef.current = hereResult.platform;
+            hereDefaultLayersRef.current = hereResult.defaultLayers;
+            hereBehaviorRef.current = hereResult.behavior;
+            hereUiRef.current = hereResult.ui;
           } catch (e) {
-            console.error("NavigationView: L.map() failed", e);
+            console.error("NavigationView: HERE Map init failed", e);
             throw e;
           }
-          // console.log("NavigationView: map initialized, setting up event listeners");
           
-          map.on('dragstart', () => {
+          // Map event listeners
+          map.addEventListener('dragstart', () => {
             setIsFollowMode(false);
           });
-          map.on('moveend', () => {
+          map.addEventListener('mapviewchangeend', () => {
             const center = map.getCenter();
             setMapCenter([center.lat, center.lng]);
-            // Viewport-based sign culling: only render signs in current view
             syncVisibleSignsRef.current();
           });
-          map.on('zoomend', () => {
+          map.addEventListener('mapviewchangeend', () => {
             const z = map.getZoom();
             setCurrentZoom(z);
-            // If user manually zoomed (not auto-zoom), save as preferred level
             if (!isManeuverZoomActiveRef.current) {
               userPreferredZoomRef.current = z;
             }
-            // Viewport-based sign culling: sync on zoom changes too
             syncVisibleSignsRef.current();
           });
-          // console.log("Map created successfully");
 
           mapInstanceRef.current = map;
           
-          // Create custom Leaflet panes for proper z-ordering:
-          // Road overlay pane — ABOVE route so road info is visible on top of the polyline
-          const roadOverlayPane = map.createPane('roadOverlayPane');
-          roadOverlayPane.style.zIndex = '500';
-          roadOverlayPane.style.pointerEvents = 'none';
-          roadOverlayPane.style.mixBlendMode = 'screen';
+          // Initialize layer groups (H.map.Group replaces L.layerGroup)
+          routeGroupRef.current = createGroup();
+          map.addObject(routeGroupRef.current);
+          shieldLayerGroupRef.current = createGroup();
+          map.addObject(shieldLayerGroupRef.current);
 
-          // Route line renders BELOW signs and markers
-          const routePane = map.createPane('routePane');
-          routePane.style.zIndex = '420';  // Above tiles (200), below markers (600)
-          routePane.style.pointerEvents = 'none';
-          
-          // Sign pane renders ABOVE the route line
-          const signPane = map.createPane('signPane');
-          signPane.style.zIndex = '630';  // Above default marker pane (600)
-          signPane.style.pointerEvents = 'none';
-
-          // Initialize layer groups on custom panes
-          routeGroupRef.current = L.layerGroup().addTo(map);
-          shieldLayerGroupRef.current = L.layerGroup().addTo(map);
-
-          // Add rotation class to the main pane
-          map.getPane('mapPane')?.classList.add('leaflet-rotate-pane');
-
-          // Log layers
-          map.eachLayer((_layer) => {
-            // console.log("Layer:", layer);
-          });
-
-          const L_any = L_obj as any;
-          // Initialize POI layer group with marker clustering for performance
-          try {
-            markerClusterGroupRef.current = (L_any as any).markerClusterGroup({
-              maxClusterRadius: 60,
-              spiderfyOnMaxZoom: true,
-              showCoverageOnHover: false,
-              zoomToBoundsOnClick: true,
-              disableClusteringAtZoom: 16,
-              chunkedLoading: true,
-              chunkInterval: 100,
-              chunkDelay: 20,
-              iconCreateFunction: (cluster: any) => {
-                const count = cluster.getChildCount();
-                let size = 'small';
-                let dim = 36;
-                if (count > 50) { size = 'large'; dim = 48; }
-                else if (count > 10) { size = 'medium'; dim = 42; }
-                return L.divIcon({
-                  html: `<div class="poi-cluster poi-cluster-${size}"><span>${count}</span></div>`,
-                  className: 'poi-cluster-icon',
-                  iconSize: L.point(dim, dim),
-                });
-              },
-            });
-            map.addLayer(markerClusterGroupRef.current);
-          } catch (e) {
-            console.error("NavigationView: MarkerClusterGroup initialization failed, falling back to LayerGroup", e);
-            markerClusterGroupRef.current = L.layerGroup();
-            map.addLayer(markerClusterGroupRef.current);
-          }
+          // POI group (replaces markerClusterGroup — HERE doesn't have built-in clustering)
+          markerClusterGroupRef.current = createGroup();
+          map.addObject(markerClusterGroupRef.current);
 
           clearTimeout(timeoutId);
           setIsMapReady(true);
           setTimeout(() => {
-            map.invalidateSize();
+            map.getViewPort().resize();
           }, 100);
         } catch (error) {
           console.error("Map initialization caught error:", error);
@@ -992,7 +930,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const map = mapInstanceRef.current;
     
     const observer = new ResizeObserver(() => {
-      map.invalidateSize();
+      map.getViewPort().resize();
     });
     
     observer.observe(mapRef.current);
@@ -1033,9 +971,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [trafficAlerts, setTrafficAlerts] = useState<any[]>([]);
   const cmvWarningsRef = useRef<{ type: string; severity: string; message: string; grade?: number; coord: [number, number]; progress: number }[]>([]);
   const routeSignsRef = useRef<{ speedLimitSigns: any[]; exitSigns: any[]; restrictions: any[] }>({ speedLimitSigns: [], exitSigns: [], restrictions: [] });
-  const restrictionAlertMarkersRef = useRef<L.Marker[]>([]);
-  const trafficAlertMarkersRef = useRef<L.Marker[]>([]);
-  const weatherAlertMarkersRef = useRef<L.Marker[]>([]);
+  const restrictionAlertMarkersRef = useRef<any[]>([]);
+  const trafficAlertMarkersRef = useRef<any[]>([]);
+  const weatherAlertMarkersRef = useRef<any[]>([]);
   const [weighStationAlert, setWeighStationAlert] = useState<{ distance: number, status: 'OPEN' | 'CLOSED' | 'BYPASS' } | null>(null);
   
   // Collapsible alert panels state
@@ -1226,122 +1164,69 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return html;
   };
 
-  const updateMapLine = (map: L.Map | null, id: string, coords: [number, number][], color: string, width: number) => {
+  const updateMapLine = (map: any, id: string, coords: [number, number][], color: string, width: number) => {
     if (!map) return;
     
     if (id === 'route' && routeGroupRef.current) {
       // Clear any existing route lines
-      routeGroupRef.current.clearLayers();
+      routeGroupRef.current.removeAll();
       
       // 1. Outer glow effect (soft shadow)
-      L.polyline(coords, { 
-        color: '#D4AF37', 
-        weight: 24, 
-        opacity: 0.15, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        pane: 'routePane'
-      }).addTo(routeGroupRef.current);
+      routeGroupRef.current.addObject(createPolyline(coords, '#D4AF37', 24, { opacity: 0.15, zIndex: 1 }));
       
       // 2. Outer black border line (creates the outline effect)
-      L.polyline(coords, { 
-        color: '#111111', 
-        weight: 16, 
-        opacity: 0.9, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        pane: 'routePane'
-      }).addTo(routeGroupRef.current);
+      routeGroupRef.current.addObject(createPolyline(coords, '#111111', 16, { opacity: 0.9, zIndex: 2 }));
 
       // 3. Inner route line (the main navigation path)
-      L.polyline(coords, { 
-        color: color, 
-        weight: 10, 
-        opacity: 1, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        pane: 'routePane'
-      }).addTo(routeGroupRef.current);
+      routeGroupRef.current.addObject(createPolyline(coords, color, 10, { opacity: 1, zIndex: 3 }));
       return;
     }
 
     const layer = mapLayersRef.current[id];
     if (layer) {
-      layer.setLatLngs(coords);
+      updatePolylineCoords(layer, coords);
       return;
     }
     
-    const polyline = L.polyline(coords, {
-      color: color,
-      weight: width,
-      pane: 'routePane'
-    });
-    polyline.addTo(map);
+    const polyline = createPolyline(coords, color, width);
+    map.addObject(polyline);
     mapLayersRef.current[id] = polyline;
   };
 
   // Draw alternative routes with distinct colors (dimmed, dashed)
-  const altRouteLayersRef = useRef<L.LayerGroup | null>(null);
+  const altRouteLayersRef = useRef<any>(null);
   const ALT_ROUTE_COLORS = ['#4A9EFF', '#8B5CF6', '#FF6B4A'];
 
-  const drawAlternativeRoutes = (map: L.Map, routes: any[], selectedIdx: number) => {
+  const drawAlternativeRoutes = (map: any, routes: any[], selectedIdx: number) => {
     if (!altRouteLayersRef.current) {
-      altRouteLayersRef.current = L.layerGroup().addTo(map);
+      altRouteLayersRef.current = createGroup();
+      map.addObject(altRouteLayersRef.current);
     } else {
-      altRouteLayersRef.current.clearLayers();
+      altRouteLayersRef.current.removeAll();
     }
 
     routes.forEach((route, idx) => {
-      if (idx === selectedIdx) return; // Skip active route (drawn separately)
+      if (idx === selectedIdx) return;
       const altColor = ALT_ROUTE_COLORS[(idx > selectedIdx ? idx - 1 : idx) % ALT_ROUTE_COLORS.length];
-      
-      // Dashed outline for alt routes
-      L.polyline(route.coords, {
-        color: altColor,
-        weight: 6,
-        opacity: 0.35,
-        dashArray: '12, 8',
-        lineCap: 'round',
-        lineJoin: 'round',
-        pane: 'routePane',
-        interactive: false,
-      }).addTo(altRouteLayersRef.current!);
+      altRouteLayersRef.current.addObject(createPolyline(route.coords, altColor, 6, { opacity: 0.35, dash: [12, 8] }));
     });
 
-    // Mark diverge/converge points where routes split/rejoin
+    // Mark diverge points
     if (routes.length > 1 && routes[selectedIdx]) {
       const primary = routes[selectedIdx].coords;
       routes.forEach((route, idx) => {
         if (idx === selectedIdx) return;
         const alt = route.coords;
         const altColor = ALT_ROUTE_COLORS[(idx > selectedIdx ? idx - 1 : idx) % ALT_ROUTE_COLORS.length];
-        
-        // Find first diverge point (where routes separate)
         let divergeIdx = -1;
         for (let i = 0; i < Math.min(primary.length, alt.length); i++) {
           const dist = Math.abs(primary[i][0] - alt[i][0]) + Math.abs(primary[i][1] - alt[i][1]);
-          if (dist > 0.001) { // ~100m separation
-            divergeIdx = Math.max(0, i - 1);
-            break;
-          }
+          if (dist > 0.001) { divergeIdx = Math.max(0, i - 1); break; }
         }
-
         if (divergeIdx >= 0 && divergeIdx < primary.length) {
           const dp = primary[divergeIdx];
-          const icon = L.divIcon({
-            className: 'diverge-marker counter-rotate',
-            html: `<div style="
-              width: 12px; height: 12px;
-              background: ${altColor};
-              border: 2px solid white;
-              border-radius: 50%;
-              box-shadow: 0 0 8px ${altColor}80;
-            "></div>`,
-            iconSize: [12, 12],
-            iconAnchor: [6, 6],
-          });
-          L.marker([dp[0], dp[1]], { icon, interactive: false, pane: 'signPane' })
-            .addTo(altRouteLayersRef.current!);
+          const markerHtml = `<div style="width:12px;height:12px;background:${altColor};border:2px solid white;border-radius:50%;box-shadow:0 0 8px ${altColor}80"></div>`;
+          altRouteLayersRef.current.addObject(createDomMarker(dp[0], dp[1], markerHtml, [12, 12], [6, 6], 50));
         }
       });
     }
@@ -1352,26 +1237,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (!isMapReady || !mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    map.on('contextmenu', (e: L.LeafletMouseEvent) => {
-      console.log('contextmenu at:', e.latlng);
-      const { lat, lng } = e.latlng;
-      L.popup()
-        .setLatLng(e.latlng)
-        .setContent(`
-          <div class="flex flex-col gap-2 p-1">
-            <button class="set-location-btn bg-[#D4AF37] text-black px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider" data-lat="${lat}" data-lng="${lng}">
-              Set as Current Location
-            </button>
-            <button class="add-waypoint-btn bg-zinc-800 text-white px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider border border-zinc-700" data-lat="${lat}" data-lng="${lng}">
-              Add as Stop
-            </button>
-          </div>
-        `)
-        .openOn(map);
+    // HERE Maps context menu (right-click / long-press)
+    map.addEventListener('contextmenu', (e: any) => {
+      const coord = map.screenToGeo(e.viewportX, e.viewportY);
+      if (!coord) return;
+      console.log('contextmenu at:', coord);
+      // TODO: Implement HERE-compatible popup for context menu
     });
 
     let moveEndTimeout: any = null;
-    map.on('moveend', () => {
+    map.addEventListener('mapviewchangeend', () => {
       if (moveEndTimeout) clearTimeout(moveEndTimeout);
       moveEndTimeout = setTimeout(() => {
         if (!mapInstanceRef.current) return;
@@ -1444,7 +1319,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return () => {
       map.off('contextmenu');
       map.off('moveend');
-      Object.values(mapLayersRef.current).forEach(layer => layer.remove());
+      Object.values(mapLayersRef.current).forEach(layer => { try { mapInstanceRef.current?.removeObject(layer); } catch(_){} });
       mapLayersRef.current = {};
     };
   }, [isMapReady]);
@@ -1478,14 +1353,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       pointerEl.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
     }
 
-    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [40, 40], iconAnchor: [20, 20] }) }).addTo(mapInstanceRef.current);
+    userMarkerRef.current = createDomMarker(userLocation[0], userLocation[1], el.outerHTML, [40, 40], [20, 20], 100);
+    mapInstanceRef.current.addObject(userMarkerRef.current);
     userMarkerElRef.current = pointerEl;
   }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   // Numbered waypoint markers on the map
   useEffect(() => {
     // Clear old waypoint markers
-    waypointMarkersRef.current.forEach(m => m.remove());
+    waypointMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
     waypointMarkersRef.current = [];
 
     if (!mapInstanceRef.current || !isMapReady || waypoints.length === 0 || milesRemaining <= 0 || !hudLayout.showWaypointMarkers) return;
@@ -1493,9 +1369,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     waypoints.forEach((wp: any, idx: number) => {
       if (!wp.lat || !wp.lon) return;
       const num = idx + 1;
-      const el = document.createElement('div');
-      el.className = 'counter-rotate';
-      el.innerHTML = `<div style="
+      const html = `<div style="
         display:flex;align-items:center;justify-content:center;
         width:28px;height:28px;
         background:#D4AF37;
@@ -1505,17 +1379,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         font-weight:900;font-size:13px;color:#000;
         font-family:system-ui,sans-serif;
       ">${num}</div>`;
-      const marker = L.marker([wp.lat, wp.lon], {
-        icon: L.divIcon({
-          html: el,
-          className: 'waypoint-number-marker',
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        }),
-        interactive: false,
-        zIndexOffset: 600,
-        pane: 'signPane'
-      }).addTo(mapInstanceRef.current!);
+      const marker = createDomMarker(wp.lat, wp.lon, html, [28, 28], [14, 14], 600);
+      mapInstanceRef.current!.addObject(marker);
       waypointMarkersRef.current.push(marker);
     });
   }, [isMapReady, waypoints, milesRemaining, hudLayout.showWaypointMarkers]);
@@ -1524,7 +1389,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     // Clear previous markers and intervals on cleanup
     const clearIncidentMarkers = () => {
-      trafficIncidentMarkersRef.current.forEach(m => m.remove());
+      trafficIncidentMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
       trafficIncidentMarkersRef.current = [];
     };
 
@@ -1623,19 +1488,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             cursor:pointer;
           " title="${desc.replace(/"/g, '&quot;')}">${iconSvg}</div>`;
 
-          const marker = L.marker([iLat, iLon], {
-            icon: L.divIcon({
-              html: el,
-              className: 'traffic-incident-icon',
-              iconSize: [26, 26],
-              iconAnchor: [13, 13],
-            }),
-            interactive: true,
-            zIndexOffset: 580,
-            pane: 'signPane'
-          }).addTo(mapInstanceRef.current!);
+          const marker = createDomMarker(iLat, iLon, el.outerHTML, [26, 26], [13, 13], 580);
+          mapInstanceRef.current!.addObject(marker);
 
-          marker.bindPopup(`<div style="font-family:system-ui;font-size:12px;max-width:200px;"><strong style="color:${bgColor}">${incType.charAt(0).toUpperCase() + incType.slice(1)}</strong><br/>${desc}</div>`, { className: 'traffic-incident-popup' });
+          // No popup binding in HERE Maps — tooltip shown via title attribute
           trafficIncidentMarkersRef.current.push(marker);
         }
 
@@ -1742,87 +1598,25 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
 
+  // HERE Maps handles its own vector tiles (logistics + traffic + vehicle restrictions).
+  // No Leaflet tile layer setup needed — the base layer was set during createHereMap().
+  // Data saver mode & truck restrictions can toggle layers on/off.
   useEffect(() => {
     if (!mapInstanceRef.current || !isMapReady) return;
-    
     const map = mapInstanceRef.current;
-    
-    // Remove existing tile layers (including previous road overlay)
-    map.eachLayer((layer) => {
-      if (layer instanceof L.TileLayer || (layer as any).options?.style) {
-        map.removeLayer(layer);
-      }
-    });
-    roadOverlayRef.current = null;
-    (map.getContainer() as HTMLElement).style.filter = 'none';
-    console.log("NavigationView: map container style", (map.getContainer() as HTMLElement).style.cssText);
-    console.log("NavigationView: map container visibility", (map.getContainer() as HTMLElement).style.visibility);
 
-    // Use Mapbox raster tiles for the 2D view (satellite-streets-v12 style)
-    // In Data Saver mode, use lighter OSM tiles instead of satellite imagery
-    if (dataSaver) {
-      console.log("NavigationView: Data Saver ON — using lightweight OSM tiles");
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19,
-        crossOrigin: true
-      }).addTo(map);
-    } else if (MAPBOX_TOKEN) {
-      console.log("NavigationView: Using Mapbox satellite-streets-v12 raster tiles");
-      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
-        attribution: '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        tileSize: 512,
-        zoomOffset: -1,
-        maxZoom: 22,
-        crossOrigin: true
-      }).addTo(map);
-    } else if (MAPTILER_KEY) {
-      console.log("NavigationView: Falling back to MapTiler tiles");
-      try {
-        if (typeof MaptilerLayer === 'function') {
-          new MaptilerLayer({ apiKey: MAPTILER_KEY, style: MAPTILER_STYLE_ID }).addTo(map);
+    // Toggle traffic layer based on settings
+    try {
+      if (hereDefaultLayersRef.current?.vector?.traffic?.map) {
+        if (dataSaver) {
+          try { map.removeLayer(hereDefaultLayersRef.current.vector.traffic.map); } catch (_) {}
         } else {
-          L.tileLayer(`https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
-            attribution: '&copy; MapTiler &copy; OpenStreetMap',
-            maxZoom: 20
-          }).addTo(map);
+          try { map.addLayer(hereDefaultLayersRef.current.vector.traffic.map); } catch (_) {}
         }
-      } catch {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
-        }).addTo(map);
       }
-    } else {
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
-      }).addTo(map);
-    }
+    } catch (_) {}
 
-    // ── Permanent Highway/Road Network Overlay ─────────────────────────
-    // Adds a roads-focused tile layer using Mapbox navigation-night style
-    // with mix-blend-mode:screen on the pane, making the dark background
-    // invisible while keeping bright road lines visible over satellite tiles.
-    // Uses tileSize:256 (no zoomOffset) so tiles load at +1 zoom, making
-    // road lines appear wider/thicker on the map.
-    // Two stacked layers make highways appear bolder and more professional.
-    if (MAPBOX_TOKEN && !dataSaver) {
-      const overlayUrl = `https://api.mapbox.com/styles/v1/mapbox/navigation-night-v1/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
-      const overlayOpts: any = {
-        tileSize: 256,
-        maxZoom: 22,
-        crossOrigin: true,
-        opacity: 1,
-        pane: 'roadOverlayPane',
-      };
-      // First layer — base road overlay
-      L.tileLayer(overlayUrl, overlayOpts).addTo(map);
-      // Second layer — doubles brightness of roads for extra-wide professional look
-      const overlay2 = L.tileLayer(overlayUrl, { ...overlayOpts, opacity: 0.6 }).addTo(map);
-      roadOverlayRef.current = overlay2;
-      console.log('[Map] Highway/road overlay added (2x navigation-night-v1, blend:screen, wide)');
-    }
-
-    map.invalidateSize();
+    console.log('[HERE Map] Tile layers updated (dataSaver:', dataSaver, ')');
   }, [isMapReady, showTruckRestrictions, dataSaver]);
 
   useEffect(() => {
@@ -1830,7 +1624,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const map = mapInstanceRef.current;
     
     const observer = new ResizeObserver(() => {
-      map.invalidateSize();
+      map.getViewPort().resize();
     });
     
     observer.observe(mapRef.current);
@@ -1840,9 +1634,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // ─── Facility layer group setup ──────────────────────────────────────────
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
-    const group = L.layerGroup().addTo(mapInstanceRef.current);
+    const group = createGroup();
+    mapInstanceRef.current.addObject(group);
     facilityLayerGroupRef.current = group;
-    return () => { group.remove(); facilityLayerGroupRef.current = null; };
+    return () => { try { mapInstanceRef.current?.removeObject(group); } catch(_){} facilityLayerGroupRef.current = null; };
   }, [isMapReady]);
 
   // ─── Fetch facilities when location changes ──────────────────────────────
@@ -1861,7 +1656,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // ─── Render facility markers on map ─────────────────────────────────────
   useEffect(() => {
     if (!facilityLayerGroupRef.current) return;
-    facilityLayerGroupRef.current.clearLayers();
+    facilityLayerGroupRef.current.removeAll();
     facilityMarkersRef.current.clear();
     if (!showFacilities) return;
 
@@ -1871,13 +1666,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       iconEl.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))';
       iconEl.innerHTML = facilityIconSVG(type, 32);
 
-      const marker = L.marker([facility.lat, facility.lon], {
-        icon: L.divIcon({ html: iconEl, className: '', iconSize: [32, 36], iconAnchor: [16, 36] }),
-        zIndexOffset: 200,
-      });
-
-      marker.on('click', () => setSelectedFacility(facility));
-      marker.addTo(facilityLayerGroupRef.current!);
+      const marker = createDomMarker(facility.lat, facility.lon, iconEl.outerHTML, [32, 36], [16, 36], 200);
+      facilityLayerGroupRef.current!.addObject(marker);
       facilityMarkersRef.current.set(facility.id, marker);
     });
   }, [facilities, showFacilities]);
@@ -2351,18 +2141,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           const traveledCoords = routeCoordsRef.current.slice(0, nearestIndex + 1);
           traveledCoords.push(currentLocation);
           if (mapLayersRef.current['traveled']) {
-            mapLayersRef.current['traveled'].setLatLngs(traveledCoords);
+            updatePolylineCoords(mapLayersRef.current['traveled'], traveledCoords);
           } else {
-            const traveledLine = L.polyline(traveledCoords, {
-              color: '#555555',
-              weight: 8,
-              opacity: 0.4,
-              lineCap: 'round',
-              lineJoin: 'round',
-              pane: 'routePane',
-              interactive: false,
-            });
-            traveledLine.addTo(mapInstanceRef.current!);
+            const traveledLine = createPolyline(traveledCoords, '#555555', 8, { opacity: 0.4 });
+            mapInstanceRef.current!.addObject(traveledLine);
             mapLayersRef.current['traveled'] = traveledLine;
           }
         }
@@ -2373,22 +2155,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Active segment: bright white with glow
         if (!currentSegmentLineRef.current) {
           // Glow layer
-          const glowLine = L.polyline(segmentCoords, {
-            color: '#ffffff',
-            weight: 18,
-            opacity: 0.2,
-            lineCap: 'round',
-            pane: 'routePane',
-            interactive: false,
-          });
-          glowLine.addTo(mapInstanceRef.current!);
+          const glowLine = createPolyline(segmentCoords, '#ffffff', 18, { opacity: 0.2 });
+          mapInstanceRef.current!.addObject(glowLine);
           mapLayersRef.current['segment_glow'] = glowLine;
           
           updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
           currentSegmentLineRef.current = 'segment';
         } else {
           if (mapLayersRef.current['segment_glow']) {
-            mapLayersRef.current['segment_glow'].setLatLngs(segmentCoords);
+            updatePolylineCoords(mapLayersRef.current['segment_glow'], segmentCoords);
           }
           updateMapLine(mapInstanceRef.current, currentSegmentLineRef.current, segmentCoords, '#ffffff', 12);
         }
@@ -2707,19 +2482,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (distMi <= zoomThreshold && !isManeuverZoomActiveRef.current) {
                 // Zoom in for the upcoming maneuver
                 isManeuverZoomActiveRef.current = true;
-                mapInstanceRef.current.flyTo(
-                  mapInstanceRef.current.getCenter(),
-                  maneuverZoomLevel,
-                  { duration: 1.2, easeLinearity: 0.25 }
-                );
+                mapInstanceRef.current.getViewModel().setLookAtData({
+                  position: mapInstanceRef.current.getCenter(),
+                  zoom: maneuverZoomLevel,
+                }, true);
               } else if (distMi > 0.6 && isManeuverZoomActiveRef.current) {
                 // Maneuver passed — zoom back to user's preferred level
                 isManeuverZoomActiveRef.current = false;
-                mapInstanceRef.current.flyTo(
-                  mapInstanceRef.current.getCenter(),
-                  userPreferredZoomRef.current,
-                  { duration: 1.5, easeLinearity: 0.25 }
-                );
+                mapInstanceRef.current.getViewModel().setLookAtData({
+                  position: mapInstanceRef.current.getCenter(),
+                  zoom: userPreferredZoomRef.current,
+                }, true);
               }
             }
 
@@ -3162,7 +2935,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (mapLayersRef.current) {
       Object.values(mapLayersRef.current).forEach(layer => {
         try {
-          layer.remove();
+          mapInstanceRef.current?.removeObject(layer);
         } catch (e) {
           console.warn("Failed to remove layer:", e);
         }
@@ -3172,10 +2945,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     clearRouteMarkers();
     // Clear waypoint numbered markers
-    waypointMarkersRef.current.forEach(m => m.remove());
+    waypointMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
     waypointMarkersRef.current = [];
     // Clear traffic incident markers
-    trafficIncidentMarkersRef.current.forEach(m => m.remove());
+    trafficIncidentMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
     trafficIncidentMarkersRef.current = [];
     if (trafficIncidentIntervalRef.current) {
       clearInterval(trafficIncidentIntervalRef.current);
@@ -3193,7 +2966,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
     // Clear alternative route overlays
     if (altRouteLayersRef.current) {
-      altRouteLayersRef.current.clearLayers();
+      altRouteLayersRef.current.removeAll();
     }
     // Clear truck intelligence data
     gradeWarningsRef.current = [];
@@ -3202,11 +2975,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setManeuverPreviewData(null);
     // Clear traveled segment
     if (mapLayersRef.current['traveled']) {
-      mapLayersRef.current['traveled'].remove();
+      try { mapInstanceRef.current?.removeObject(mapLayersRef.current['traveled']); } catch(_){}
       delete mapLayersRef.current['traveled'];
     }
     if (mapLayersRef.current['segment_glow']) {
-      mapLayersRef.current['segment_glow'].remove();
+      try { mapInstanceRef.current?.removeObject(mapLayersRef.current['segment_glow']); } catch(_){}
       delete mapLayersRef.current['segment_glow'];
     }
     currentSegmentLineRef.current = null;
@@ -4358,7 +4131,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (mapLayersRef.current) {
       Object.values(mapLayersRef.current).forEach(layer => {
         try {
-          layer.remove();
+          mapInstanceRef.current?.removeObject(layer);
         } catch (e) {
           console.warn("Failed to remove layer:", e);
         }
@@ -4519,11 +4292,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (mapInstanceRef.current) {
         // Clear existing route lines from mapLayersRef
         if (mapLayersRef.current['route']) {
-          mapLayersRef.current['route'].remove();
+          try { mapInstanceRef.current.removeObject(mapLayersRef.current['route']); } catch(_){}
           delete mapLayersRef.current['route'];
         }
         if (mapLayersRef.current['segment']) {
-          mapLayersRef.current['segment'].remove();
+          try { mapInstanceRef.current.removeObject(mapLayersRef.current['segment']); } catch(_){}
           delete mapLayersRef.current['segment'];
         }
         currentSegmentLineRef.current = null;
@@ -4539,7 +4312,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         
         // Clear all previous route overlay signs before placing new ones
         if (shieldLayerGroupRef.current) {
-          shieldLayerGroupRef.current.clearLayers();
+          shieldLayerGroupRef.current.removeAll();
         }
         // Reset viewport culling stores for new route
         clearSigns();
@@ -4590,20 +4363,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         }
         
         // Fit map to route
-        const bounds = L.latLngBounds(coords.map(c => [c[0], c[1]]));
-        mapInstanceRef.current.fitBounds(bounds, { 
-          padding: [100, 100], 
-          animate: true, 
-          duration: 1.5 
-        });
+        const bounds = boundsFromCoords(coords);
+        if (bounds) mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
 
         // After a short delay, zoom into the starting position
         setTimeout(() => {
           try {
             if (isValidLatLng(userLocation) && mapInstanceRef.current) {
-              mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17, {
-                duration: 1.5
-              }); 
+              mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: userLocation[0], lng: userLocation[1] }, zoom: 17 }, true); 
             }
           } catch (error) {
             console.error(`[handleNavigate] FlyTo error:`, error);
@@ -4870,7 +4637,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!isMapReady) return;
 
-    restrictionAlertMarkersRef.current.forEach(m => m.remove());
+    restrictionAlertMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
     restrictionAlertMarkersRef.current = [];
 
     restrictionAlerts.forEach((alert) => {
@@ -4894,33 +4661,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       );
       
-      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
-        icon: L.divIcon({ 
-          html: iconHtml, 
-          className: 'restriction-marker', 
-          iconAnchor: [12, 24] 
-        }) 
-      });
-
-      if (mapInstanceRef.current) {
-        marker.addTo(mapInstanceRef.current);
-      }
-      
-      const popup = L.popup({ offset: [0, -25] }).setContent(`
-          <div class="p-3 min-w-[150px]">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="p-1.5 rounded-lg ${alert.type === 'BRIDGE' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}">
-                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-              </div>
-              <div class="font-black text-zinc-900 text-sm uppercase tracking-tight">${alert.type === 'BRIDGE' ? 'Low Bridge' : 'Weight Limit'}</div>
-            </div>
-            <div class="p-2 bg-zinc-50 rounded-xl border border-zinc-100 mb-3">
-              <div class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Restriction</div>
-              <div class="text-xs font-bold text-zinc-900">${alert.message}</div>
-            </div>
-          </div>
-        `);
-      marker.bindPopup(popup);
+      const marker = createDomMarker(alert.coords[0], alert.coords[1], iconHtml, [24, 48], [12, 24], 500);
+      if (mapInstanceRef.current) mapInstanceRef.current.addObject(marker);
       restrictionAlertMarkersRef.current.push(marker);
     });
   }, [restrictionAlerts, isMapReady]);
@@ -4928,7 +4670,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!isMapReady) return;
 
-    trafficAlertMarkersRef.current.forEach(m => m.remove());
+    trafficAlertMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
     trafficAlertMarkersRef.current = [];
 
     trafficAlerts.forEach((alert) => {
@@ -4952,33 +4694,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       );
       
-      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
-        icon: L.divIcon({ 
-          html: iconHtml, 
-          className: 'traffic-marker', 
-          iconAnchor: [12, 24] 
-        }) 
-      });
-
-      if (mapInstanceRef.current) {
-        marker.addTo(mapInstanceRef.current);
-      }
-      
-      const popup = L.popup({ offset: [0, -25] }).setContent(`
-          <div class="p-3 min-w-[150px]">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="p-1.5 rounded-lg ${alert.type === 'STOP_SIGN' ? 'bg-red-100 text-red-600' : 'bg-[#D4AF37]/20 text-[#9A7B2C]'}">
-                ${alert.type === 'STOP_SIGN' ? '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"></polygon></svg>' : '<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><path d="M9.47 20.28l-6.75-6.75a2.5 2.5 0 0 1 0-3.54l6.75-6.75a2.5 2.5 0 0 1 3.54 0l6.75 6.75a2.5 2.5 0 0 1 0 3.54l-6.75 6.75a2.5 2.5 0 0 1-3.54 0z"></path></svg>'}
-              </div>
-              <div class="font-black text-zinc-900 text-sm uppercase tracking-tight">${alert.type === 'STOP_SIGN' ? 'Stop Sign' : 'Traffic Light'}</div>
-            </div>
-            <div class="p-2 bg-zinc-50 rounded-xl border border-zinc-100 mb-3">
-              <div class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Alert</div>
-              <div class="text-xs font-bold text-zinc-900">${alert.message}</div>
-            </div>
-          </div>
-        `);
-      marker.bindPopup(popup);
+      const marker = createDomMarker(alert.coords[0], alert.coords[1], iconHtml, [24, 48], [12, 24], 520);
+      if (mapInstanceRef.current) mapInstanceRef.current.addObject(marker);
       trafficAlertMarkersRef.current.push(marker);
     });
   }, [trafficAlerts, isMapReady]);
@@ -4986,7 +4703,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!isMapReady) return;
 
-    weatherAlertMarkersRef.current.forEach(m => m.remove());
+    weatherAlertMarkersRef.current.forEach(m => { try { mapInstanceRef.current?.removeObject(m); } catch(_){} });
     weatherAlertMarkersRef.current = [];
 
     weatherAlerts.forEach((alert) => {
@@ -5014,27 +4731,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         );
       }
       
-      const marker = L.marker([alert.lat, alert.lon], { icon: L.divIcon({ html: weatherIconsCacheRef.current[cacheKey], className: 'alert-marker', iconAnchor: [12, 24] }) });
+      const marker = createDomMarker(alert.lat, alert.lon, weatherIconsCacheRef.current[cacheKey], [24, 24], [12, 24], 480);
       if (mapInstanceRef.current) {
-        marker.addTo(mapInstanceRef.current);
+        mapInstanceRef.current.addObject(marker);
       }
       
-      const popup = L.popup({ offset: [0, -25] }).setContent(`
-          <div class="p-3 min-w-[150px]">
-            <div class="flex items-center gap-2 mb-2">
-              <div class="p-1.5 rounded-lg ${alert.severity === 'SEVERE' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}">
-                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="3" fill="none"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-              </div>
-              <div class="font-black text-zinc-900 text-sm uppercase tracking-tight">${alert.severity} ${alert.type}</div>
-            </div>
-            <div class="text-xs font-bold text-zinc-600 mb-3">Expected around ${alert.time}</div>
-            <div class="p-2 bg-zinc-50 rounded-xl border border-zinc-100 mb-3">
-              <div class="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Condition</div>
-              <div class="text-xs font-bold text-zinc-900">${alert.condition} - ${alert.value}</div>
-            </div>
-          </div>
-        `);
-      marker.bindPopup(popup);
+      // Popup not used in HERE Maps — marker is informational only
       weatherAlertMarkersRef.current.push(marker);
     });
   }, [weatherAlerts, isMapReady]);
@@ -5043,13 +4745,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   useEffect(() => {
     if (isOverviewMode && mapInstanceRef.current) {
-      const bounds = routeCoordsRef.current.length > 0 ? L.latLngBounds(routeCoordsRef.current.map(c => [c[0], c[1]])) : null;
+      const bounds = routeCoordsRef.current.length > 0 ? boundsFromCoords(routeCoordsRef.current) : null;
       if (bounds) {
-        mapInstanceRef.current.fitBounds(bounds, {
-          padding: [50, 50],
-          animate: true,
-          duration: 1.5
-        });
+        mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
       }
     }
   }, [isOverviewMode]);
@@ -5228,14 +4926,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               const compassH = compassHeadingRef.current;
               const zoom = mapInstanceRef.current.getZoom();
               const offsetPixels = window.innerHeight * 0.2;
-              const point = mapInstanceRef.current.project(currentLoc, zoom);
+              const point = mapInstanceRef.current.geoToScreen({ lat: currentLoc[0], lng: currentLoc[1] });
+              if (!point) throw new Error('geoToScreen returned null');
               const compassRad = compassH * Math.PI / 180;
-              const offsetPoint = point.add(L.point(
-                offsetPixels * Math.sin(compassRad),
-                -offsetPixels * Math.cos(compassRad)
-              ));
-              const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
-              mapInstanceRef.current.panTo([unprojected.lat, unprojected.lng], { animate: true, duration: 0.8, easeLinearity: 0.25 });
+              const offsetX = offsetPixels * Math.sin(compassRad);
+              const offsetY = -offsetPixels * Math.cos(compassRad);
+              const unprojected = mapInstanceRef.current.screenToGeo(point.x + offsetX, point.y + offsetY);
+              if (unprojected) {
+                mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: unprojected.lat, lng: unprojected.lng } }, true);
+              }
             } catch (e) { /* ignore */ }
           }
         }
@@ -5327,20 +5026,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             let center: [number, number] = [currentLoc[0], currentLoc[1]];
             
             if (!isNorthUp) {
-              const zoom = mapInstanceRef.current.getZoom();
               const offsetPixels = window.innerHeight * 0.2; // Offset by 20% of screen height
-              const point = mapInstanceRef.current.project(center, zoom);
+              const point = mapInstanceRef.current.geoToScreen({ lat: center[0], lng: center[1] });
               
-              const headingRad = currentHeading * Math.PI / 180;
-              const offsetPoint = point.add(L.point(
-                offsetPixels * Math.sin(headingRad),
-                -offsetPixels * Math.cos(headingRad)
-              ));
-              const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
-              center = [unprojected.lat, unprojected.lng];
+              if (point) {
+                const headingRad = currentHeading * Math.PI / 180;
+                const unprojected = mapInstanceRef.current.screenToGeo(
+                  point.x + offsetPixels * Math.sin(headingRad),
+                  point.y - offsetPixels * Math.cos(headingRad)
+                );
+                if (unprojected) center = [unprojected.lat, unprojected.lng];
+              }
             }
             
-            mapInstanceRef.current.panTo(center, { animate: true, duration: 1.2, easeLinearity: 0.15 }); 
+            mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: center[0], lng: center[1] } }, true); 
           } catch (e) {
             console.error("PanTo error:", e instanceof Error ? e.message : String(e));
           }
@@ -5360,7 +5059,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (!isMapReady || !mapInstanceRef.current) return;
 
     if (!showPois) {
-      markerClusterGroupRef.current?.clearLayers();
+      markerClusterGroupRef.current?.removeAll();
       poiMarkersRef.current = [];
       lastPoiRenderCenterRef.current = null;
       return;
@@ -5397,76 +5096,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           validPoisCount++;
           const iconHtml = getCachedPoiIcon(poi.type, poi.name);
           if (iconHtml) {
-            const marker = L.marker([poi.lat, poi.lon], { icon: L.divIcon({ html: `<div class="custom-poi-icon"><div class="counter-rotate">${iconHtml}</div></div>`, className: 'poi-marker', iconAnchor: [12, 24] }) });
+            const marker = createDomMarker(poi.lat, poi.lon, `<div class="custom-poi-icon">${iconHtml}</div>`, [24, 24], [12, 24], 200);
             if (markerClusterGroupRef.current) {
-              marker.addTo(markerClusterGroupRef.current);
+              markerClusterGroupRef.current.addObject(marker);
             } else {
-              marker.addTo(mapInstanceRef.current!);
+              mapInstanceRef.current!.addObject(marker);
             }
-            
-            marker.on('click', () => {
-              setSelectedPoi(poi);
-            });
 
-            const popup = L.popup({ offset: [0, -25] }).setContent(`
-              <div class="p-3 min-w-[180px]">
-                <div class="font-black text-zinc-900 text-sm mb-1">${poi.name}</div>
-                <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">${poi.type}</div>
-                ${poi.address ? `<div class="text-[9px] text-zinc-600 mb-2">${poi.address}</div>` : ''}
-                ${poi.amenities && poi.amenities.filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a)).length > 0 ? `
-                  <div class="flex flex-wrap gap-1 mb-2">
-                    ${poi.amenities.filter((a: string) => !/(ev\s*charg|electric\s*vehicle|tesla|supercharg|chargepoint|electrify|blink\s*charg)/i.test(a)).map((a: string) => `<span class="text-[8px] px-1.5 py-0.5 bg-[#D4AF37]/20 text-[#9A7B2C] rounded font-bold">${a}</span>`).join('')}
-                  </div>
-                ` : ''}
-                ${poi.distance ? `<div class="text-[9px] text-zinc-500 mb-2">${(poi.distance / 1609.34).toFixed(1)} mi away</div>` : ''}
-                <button 
-                  class="view-poi-details-btn w-full py-2 bg-[#D4AF37] text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#B8860B] transition-colors mb-2"
-                  data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
-                >
-                  View Details
-                </button>
-                <div class="flex flex-col gap-1.5">
-                  <button 
-                    class="add-poi-stop-btn add-next-stop w-full py-2 bg-[#D4AF37]/90 text-black rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-[#D4AF37] transition-colors"
-                    data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
-                    data-type="DEADHEAD"
-                    data-position="0"
-                  >
-                    Add as Next Stop
-                  </button>
-                  <div class="flex gap-1.5">
-                    <select class="stop-position-select flex-1 py-1.5 px-2 bg-zinc-100 border border-zinc-300 rounded-lg text-[9px] font-bold text-zinc-700" data-poi-id="${poi.name}-${poi.lat}-${poi.lon}">
-                      ${Array.from({length: Math.min(10, (waypoints.length || 0) + 1)}, (_, i) => `<option value="${i}">Stop #${i + 1}</option>`).join('')}
-                    </select>
-                    <button 
-                      class="add-poi-stop-btn add-at-position py-1.5 px-3 bg-zinc-600 text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-zinc-500 transition-colors whitespace-nowrap"
-                      data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
-                      data-type="DEADHEAD"
-                      data-use-select="true"
-                    >
-                      Add at #
-                    </button>
-                  </div>
-                  <div class="flex gap-1.5">
-                    <button 
-                      class="add-poi-stop-btn w-1/2 py-1.5 bg-zinc-500 text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-zinc-400 transition-colors"
-                      data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
-                      data-type="DEADHEAD"
-                    >
-                      + Deadhead
-                    </button>
-                    <button 
-                      class="add-poi-stop-btn w-1/2 py-1.5 bg-[#D4AF37] text-white rounded-lg text-[8px] font-black uppercase tracking-wider hover:bg-[#D4AF37] transition-colors"
-                      data-poi-id="${poi.name}-${poi.lat}-${poi.lon}"
-                      data-type="PAID"
-                    >
-                      + Paid
-                    </button>
-                  </div>
-                </div>
-              </div>
-            `);
-            marker.bindPopup(popup);
             poiMarkersRef.current.push(marker);
 
             // Add Entrance Marker if available
@@ -5474,13 +5110,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (!poiIconsCacheRef.current['entrance']) {
                 poiIconsCacheRef.current['entrance'] = renderToStaticMarkup(getEntranceIcon());
               }
-              const entranceMarker = L.marker([poi.entrance.lat, poi.entrance.lon], { icon: L.divIcon({ html: `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, className: 'entrance-marker', iconAnchor: [12, 12] }) });
+              const entranceMarker = createDomMarker(poi.entrance.lat, poi.entrance.lon, `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, [24, 24], [12, 12], 150);
               if (markerClusterGroupRef.current) {
-                entranceMarker.addTo(markerClusterGroupRef.current);
+                markerClusterGroupRef.current.addObject(entranceMarker);
               } else {
-                entranceMarker.addTo(mapInstanceRef.current!);
+                mapInstanceRef.current!.addObject(entranceMarker);
               }
-              entranceMarker.bindPopup(`<div class="p-2 font-bold text-xs">${poi.name} Entrance</div>`);
               poiMarkersRef.current.push(entranceMarker);
             }
 
@@ -5489,13 +5124,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (!poiIconsCacheRef.current['exit']) {
                 poiIconsCacheRef.current['exit'] = renderToStaticMarkup(getExitIcon());
               }
-              const exitMarker = L.marker([poi.exit.lat, poi.exit.lon], { icon: L.divIcon({ html: `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, className: 'exit-marker', iconAnchor: [12, 12] }) });
+              const exitMarker = createDomMarker(poi.exit.lat, poi.exit.lon, `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, [24, 24], [12, 12], 150);
               if (markerClusterGroupRef.current) {
-                exitMarker.addTo(markerClusterGroupRef.current);
+                markerClusterGroupRef.current.addObject(exitMarker);
               } else {
-                exitMarker.addTo(mapInstanceRef.current!);
+                mapInstanceRef.current!.addObject(exitMarker);
               }
-              exitMarker.bindPopup(`<div class="p-2 font-bold text-xs">${poi.name} Exit</div>`);
               poiMarkersRef.current.push(exitMarker);
             }
           }
@@ -5550,7 +5184,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   // Render traffic infrastructure markers — only on-route, only next 15 ahead, smaller icons
   useEffect(() => {
-    const trafficMarkersRef: L.Marker[] = [];
+    const trafficMarkersRef: any[] = [];
 
     if (!mapInstanceRef.current || !showTrafficSigns || trafficInfrastructure.length === 0 || milesRemaining <= 0) {
       return;
@@ -5612,18 +5246,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           />
         );
 
-        const marker = L.marker([item.position[0], item.position[1]], {
-          icon: L.divIcon({
-            html: `<div class="traffic-infrastructure-icon">${iconHtml}</div>`,
-            className: 'traffic-marker',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9]
-          }),
-          zIndexOffset: 500
-        });
-
-        marker.addTo(mapInstanceRef.current!);
-        marker.bindTooltip(`<span class="text-xs font-bold">${item.name}</span>`, { permanent: false, direction: 'top', offset: [0, -12] });
+        const marker = createDomMarker(item.position[0], item.position[1], `<div class="traffic-infrastructure-icon">${iconHtml}</div>`, [18, 18], [9, 9], 500);
+        mapInstanceRef.current!.addObject(marker);
         trafficMarkersRef.push(marker);
       } catch (error) {
         console.error('Error rendering traffic marker:', error);
@@ -5631,7 +5255,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     });
 
     return () => {
-      trafficMarkersRef.forEach(marker => marker.remove());
+      trafficMarkersRef.forEach(marker => { try { mapInstanceRef.current?.removeObject(marker); } catch(_){} });
     };
   }, [trafficInfrastructure, showTrafficSigns, isMapReady, milesRemaining, userLocation, routePoints]);
 
@@ -5751,10 +5375,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const startPosition = userMarkerRef.current.getLatLng(); 
         if (startPosition && !isNaN(startPosition.lat) && !isNaN(startPosition.lng)) {
           try {
-            mapInstanceRef.current.flyTo([startPosition.lat, startPosition.lng], 17, {
-              animate: true,
-              duration: 1.5 
-            });
+            mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: startPosition.lat, lng: startPosition.lng }, zoom: 17 }, true);
           } catch (e) {
             console.error("FlyTo error in toggleDriving:", e instanceof Error ? e.message : String(e));
           }

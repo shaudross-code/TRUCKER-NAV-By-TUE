@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import L from 'leaflet';
+import { createDomMarker } from '../utils/hereMapUtils';
 import {
   interstateShield, usRouteShield, stateRouteShield, speedLimitSign,
   curveWarning, exitGuideSign, directionBadge, directionLabel,
@@ -37,10 +37,10 @@ function getSignCategory(signId: string): string {
 
 export function useSignPlacement(
   mapInstanceRef: { current: any },
-  shieldLayerGroupRef: { current: L.LayerGroup | null },
+  shieldLayerGroupRef: { current: any },
 ) {
   const signDataStoreRef = useRef<SignData[]>([]);
-  const visibleSignMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const visibleSignMarkersRef = useRef<Map<string, any>>(new Map());
   const syncVisibleSignsRef = useRef<() => void>(() => {});
   const shieldBlobCacheRef = useRef<Map<string, string>>(new Map());
   const regionStateRef = useRef('');
@@ -76,28 +76,39 @@ export function useSignPlacement(
   const syncVisibleSigns = useCallback(() => {
     const map = mapInstanceRef.current;
     if (!map || !shieldLayerGroupRef.current) return;
-    const bounds = map.getBounds();
-    const padded = bounds.pad(0.2);
+
+    // Get current viewport bounds from HERE Map
+    let boundsRect: any = null;
+    try {
+      const vm = map.getViewModel().getLookAtData();
+      boundsRect = vm?.bounds;
+    } catch (_) {}
+
     const store = signDataStoreRef.current;
     const visible = visibleSignMarkersRef.current;
     const vis = signVisibilityRef.current;
     const newVisibleIds = new Set<string>();
 
     for (const sign of store) {
-      // Check both viewport bounds AND hudLayout visibility
       const category = getSignCategory(sign.id);
-      const isAllowed = vis[category] !== false; // default true
-      if (isAllowed && padded.contains([sign.lat, sign.lon])) newVisibleIds.add(sign.id);
+      const isAllowed = vis[category] !== false;
+      const inBounds = boundsRect
+        ? boundsRect.containsPoint({ lat: sign.lat, lng: sign.lon })
+        : true; // If no bounds, show all
+      if (isAllowed && inBounds) newVisibleIds.add(sign.id);
     }
-    // Remove markers that should no longer be visible
+    // Remove markers no longer visible
     for (const [id, marker] of visible) {
-      if (!newVisibleIds.has(id)) { shieldLayerGroupRef.current!.removeLayer(marker); visible.delete(id); }
+      if (!newVisibleIds.has(id)) {
+        try { shieldLayerGroupRef.current!.removeObject(marker); } catch (_) {}
+        visible.delete(id);
+      }
     }
     // Add markers that should now be visible
     for (const sign of store) {
       if (newVisibleIds.has(sign.id) && !visible.has(sign.id)) {
-        const icon = L.divIcon({ html: sign.iconHtml, className: 'highway-shield-icon', iconSize: sign.iconSize, iconAnchor: sign.iconAnchor });
-        const marker = L.marker([sign.lat, sign.lon], { icon, interactive: false, zIndexOffset: sign.zIndexOffset, pane: 'signPane' }).addTo(shieldLayerGroupRef.current!);
+        const marker = createDomMarker(sign.lat, sign.lon, sign.iconHtml, sign.iconSize, sign.iconAnchor, sign.zIndexOffset);
+        shieldLayerGroupRef.current!.addObject(marker);
         visible.set(sign.id, marker);
       }
     }
@@ -112,7 +123,7 @@ export function useSignPlacement(
   const clearSigns = useCallback(() => {
     signDataStoreRef.current = [];
     visibleSignMarkersRef.current.clear();
-    if (shieldLayerGroupRef.current) shieldLayerGroupRef.current.clearLayers();
+    if (shieldLayerGroupRef.current) shieldLayerGroupRef.current.removeAll();
   }, [shieldLayerGroupRef]);
 
   const placeHighwayShields = useCallback((shields: { label: string; routeLevel: number; type: string; coord: [number, number]; pointIndex: number; direction?: string }[]) => {

@@ -328,7 +328,7 @@ export const MapControls: React.FC<any> = React.memo(({
                       duration: 1000 
                     });
                   } else if (mapInstanceRef.current) {
-                    mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17); 
+                    mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: userLocation[0], lng: userLocation[1] }, zoom: 17 }, true); 
                   }
                   setIsFollowMode(true); 
                   setIsOverviewMode(false);
