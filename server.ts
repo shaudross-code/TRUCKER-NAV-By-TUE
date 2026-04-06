@@ -460,7 +460,13 @@ async function createServer() {
       
       hereUrl.searchParams.append('destination', destination);
       hereUrl.searchParams.append('return', 'summary,actions,instructions,incidents,polyline,turnByTurnActions,elevation,tolls');
-      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names,routeNumbers,notices,functionalClass,maxSpeed,countryCode');
+      hereUrl.searchParams.append('spans', 'length,truckAttributes,incidents,speedLimit,streetAttributes,names,routeNumbers,notices,functionalClass,maxSpeed,countryCode,consumption');
+      // Add fuel consumption parameters for diesel trucks
+      hereUrl.searchParams.append('fuel[type]', 'diesel');
+      // Diesel truck consumption table (liters per km at various speeds in km/h)
+      // Based on typical Class 8 truck fuel consumption: ~6-8 mpg = 0.29-0.39 L/km
+      hereUrl.searchParams.append('fuel[freeFlowSpeedTable]', '10,0.45,20,0.38,30,0.34,40,0.32,50,0.31,60,0.30,70,0.31,80,0.32,90,0.34,100,0.37,110,0.40,120,0.44');
+      hereUrl.searchParams.append('fuel[trafficSpeedTable]', '10,0.50,20,0.42,30,0.37,40,0.34,50,0.32,60,0.31,70,0.32,80,0.33,90,0.35,100,0.38,110,0.42,120,0.46');
       hereUrl.searchParams.append('vehicle[height]', heightCm.toString());
       hereUrl.searchParams.append('vehicle[grossWeight]', weightKg.toString());
       hereUrl.searchParams.append('vehicle[currentWeight]', weightKg.toString());

@@ -3961,7 +3961,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         }
 
-        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings, roadSegments, tolls };
+        // Extract HERE fuel consumption data (liters → gallons)
+        let hereFuelGallons = 0;
+        if (route.sections) {
+          for (const sec of route.sections) {
+            if (sec.summary?.fuelConsumption) {
+              hereFuelGallons += sec.summary.fuelConsumption / 3.78541; // liters to gallons
+            }
+          }
+        }
+
+        return { coords, distMi, durationSec, steps, alerts, restrictions, trafficAlerts: trafficAlertsList, spans: route.sections[0].spans, highwayShields, exitSigns, curveSigns, speedLimitSigns, trafficSlowdowns, cmvWarnings, roadSegments, tolls, hereFuelGallons };
       }).filter(Boolean);
 
       if (processedRoutes.length === 0) return null;
