@@ -16,11 +16,10 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - [x] Converted Mapbox 3D → 2D SAT view with pitch:55 — Apr 6, 2026
 - [x] H.clustering.Provider POI clustering with gold/black SVG theme — Apr 6, 2026
 - [x] Fixed user location icon jitter (lerp=0.06, dead-zone 0.5m, 20fps cap) — Apr 6, 2026
-- [x] Simplified MapControls: 7 buttons only (hamburger, filter, zoom+/-, level, HERE/SAT, follow/heading-up) — Apr 6, 2026
+- [x] Simplified MapControls: 7 buttons only — Apr 6, 2026
 - [x] Merged heading-up + follow-me into single default button — Apr 6, 2026
-- [x] Removed duplicate controls (north-up, compass, traffic flow, route reasoning, overview) — Apr 6, 2026
-- [x] POI panel: collapsible header with count, scrollable max-h-[35vh], click-to-center — Apr 6, 2026
-- [x] Removed weigh stations from POI (excluded in getPoiCategory) — Apr 6, 2026
+- [x] POI panel: collapsible header with count, scrollable — Apr 6, 2026
+- [x] Removed weigh stations from POI — Apr 6, 2026
 - [x] Turn-by-turn navigation with voice + route comparison (3 alternatives)
 - [x] MUTCD road signs (Interstate shields, Speed Limits, Truck Warnings)
 - [x] Real-time truck restrictions and toll warnings
@@ -29,10 +28,11 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - [x] Traffic incident overlays + auto-reroute countdown
 - [x] Guest login + Google Sign-In + 2-hour session timer
 - [x] HERE Routing API v8.140.0 truck routing
-- [x] Removed CSS dark-gold map tint — native HERE satellite colors restored — Apr 6, 2026
-- [x] Signature gold/black theme on NavigationHUD Lane Guidance header — Apr 6, 2026
+- [x] Removed CSS dark-gold map tint — native HERE satellite colors — Apr 6, 2026
+- [x] Signature gold/black theme on NavigationHUD Lane Guidance — Apr 6, 2026
 - [x] Signature gold/black theme on Route Comparison Panel — Apr 6, 2026
-- [x] Fixed truck profile defaults (13.5'/78500lbs/53'/8.5'/5axles/12000lbs/1trailer) — Apr 6, 2026
+- [x] Fixed truck profile defaults (13.5'/78500lbs/53'/8.5') — Apr 6, 2026
+- [x] Fixed heading-up mode spinning when stationary (dead-zone 5m, speed gate 2mph) — Apr 6, 2026
 
 ## Known Issues
 - Gemini TTS key degraded (403) — falls back to native speech

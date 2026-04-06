@@ -4972,13 +4972,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const speed = telemetryContext.speedRef.current || 0;
 
       // Calculate heading from position changes as fallback
+      // Use a 5m dead-zone to ignore GPS jitter when stationary
       if (prevLocationRef.current && currentLoc) {
         const [pLat, pLon] = prevLocationRef.current;
         const [cLat, cLon] = currentLoc;
         const dLat = cLat - pLat;
         const dLon = (cLon - pLon) * Math.cos(pLat * Math.PI / 180);
         const dist = Math.sqrt(dLat * dLat + dLon * dLon);
-        if (dist > 0.00001) { // ~1m movement threshold
+        if (dist > 0.00005) { // ~5m movement threshold (avoids GPS jitter)
           const posHeading = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
           positionHeadingRef.current = posHeading;
         }
@@ -4986,6 +4987,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       prevLocationRef.current = currentLoc ? [currentLoc[0], currentLoc[1]] : null;
 
       // If no GPS heading, use position-based heading or route-based heading
+      // Only use fallbacks when actually moving (speed > 2 mph) to prevent stationary spinning
       if (!rawHeading || rawHeading === 0) {
         // Try route-based heading first (most reliable when actively navigating)
         if (isDriving && routeCoordsRef.current.length > 1) {
@@ -5007,14 +5009,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             rawHeading = (90 - angle + 360) % 360;
           }
         }
-        // Fall back to position-based heading if route heading unavailable
-        if ((!rawHeading || rawHeading === 0) && positionHeadingRef.current > 0) {
+        // Fall back to position-based heading only when moving meaningfully
+        if ((!rawHeading || rawHeading === 0) && positionHeadingRef.current > 0 && speed > 2) {
           rawHeading = positionHeadingRef.current;
         }
       }
 
-      // Smooth the heading — faster convergence when driving on route for precise alignment
-      if (speed > 0.3 || rawHeading !== 0) {
+      // Smooth the heading — only when actually moving to prevent stationary spinning
+      if (speed > 2 || (rawHeading !== 0 && speed > 0.3)) {
         const diff = rawHeading - smoothedHeadingRef.current;
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
