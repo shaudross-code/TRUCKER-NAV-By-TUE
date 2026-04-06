@@ -42,18 +42,18 @@ export const RouteComparisonPanel: React.FC<RouteComparisonPanelProps> = ({
 
   return (
     <div data-testid="route-comparison-panel" className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[1200] w-[95vw] max-w-[720px]">
-      <div className="bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-700/50">
+      <div className="bg-black/95 backdrop-blur-xl border border-[#D4AF37]/40 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[#D4AF37]/30 bg-[#D4AF37]/10">
           <div className="flex items-center gap-2">
             <Route className="w-4 h-4 text-[#D4AF37]" />
-            <span className="text-sm font-bold text-white tracking-wide uppercase">Route Comparison</span>
+            <span className="text-sm font-bold text-[#D4AF37] tracking-wide uppercase">Route Comparison</span>
           </div>
           <button
             data-testid="route-comparison-close"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-zinc-800/50 hover:bg-zinc-700/50 transition-colors"
+            className="text-[#D4AF37] hover:text-white text-xs px-2 py-1 rounded bg-black/50 hover:bg-[#D4AF37] hover:text-black border border-[#D4AF37]/30 transition-colors font-bold uppercase tracking-wider"
           >
-            Close
+            GO
           </button>
         </div>
 
@@ -78,8 +78,8 @@ export const RouteComparisonPanel: React.FC<RouteComparisonPanelProps> = ({
                 onClick={() => onSelectRoute(idx)}
                 className={`flex-shrink-0 w-[200px] rounded-xl p-3 transition-all duration-200 text-left border ${
                   isSelected 
-                    ? 'bg-zinc-800 border-[#D4AF37]/60 ring-1 ring-[#D4AF37]/30' 
-                    : 'bg-zinc-800/40 border-zinc-700/30 hover:bg-zinc-800/70 hover:border-zinc-600/50'
+                    ? 'bg-[#D4AF37]/10 border-[#D4AF37]/60 ring-1 ring-[#D4AF37]/30' 
+                    : 'bg-zinc-900/60 border-zinc-700/30 hover:bg-zinc-800/70 hover:border-[#D4AF37]/20'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">

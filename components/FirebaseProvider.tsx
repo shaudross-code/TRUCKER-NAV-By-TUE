@@ -82,9 +82,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         email: '',
         displayName: 'Guest Driver',
         truckProfile: {
-          height: 0, weight: 0, length: 0, width: 0,
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 0, axleWeight: 0, trailerCount: 0,
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
           make: '', model: '', year: 0
         }
       };
@@ -102,16 +102,16 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           email: user.email || '',
           displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
           truckProfile: {
-            height: 0,
-            weight: 0,
-            length: 0,
-            width: 0,
+            height: 13.5,
+            weight: 78500,
+            length: 53,
+            width: 8.5,
             hazmat: false,
             hazmatClasses: [],
             tunnelCategory: 'NONE',
-            axleCount: 0,
-            axleWeight: 0,
-            trailerCount: 0,
+            axleCount: 5,
+            axleWeight: 12000,
+            trailerCount: 1,
             make: '',
             model: '',
             year: 0
@@ -130,9 +130,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         email: user.email || '',
         displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
         truckProfile: {
-          height: 0, weight: 0, length: 0, width: 0,
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 0, axleWeight: 0, trailerCount: 0,
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
           make: '', model: '', year: 0
         }
       };

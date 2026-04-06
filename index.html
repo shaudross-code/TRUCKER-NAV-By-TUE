@@ -30,16 +30,7 @@
             background: #262626;
             border-radius: 3px;
         }
-        /* TRUCKERS NAV BY TUE signature dark-gold satellite theme
-           Darkens satellite imagery with warm gold tint for signature branded look */
-        .here-map-satellite-dark canvas {
-            filter: brightness(0.65) contrast(1.25) saturate(0.65) sepia(0.3) hue-rotate(-5deg);
-        }
-        /* Ensure DomMarkers (POI icons, signs) render normally above the filtered canvas */
-        .here-map-satellite-dark .H_ui,
-        .here-map-satellite-dark [class^="H_"] > div:not(canvas) {
-            filter: none !important;
-        }
+        /* HERE Maps logistics.satellite.day — native colors, no CSS filter */
         /* Gold glow on cluster badges */
         .trucker-cluster-badge {
             background: radial-gradient(ellipse at center, #D4AF37 0%, #AA8B2F 70%, #050505 100%);

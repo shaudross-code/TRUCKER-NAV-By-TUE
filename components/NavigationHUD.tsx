@@ -91,13 +91,13 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
         width: 'min(480px, calc(100% - 1.5rem))',
       }}
     >
-      <div className={`bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-2xl border overflow-hidden transition-all duration-300 ${
-        detailLevel === 'immediate' ? 'border-[#D4AF37]/60 ring-1 ring-[#D4AF37]/20' : 'border-zinc-700/40'
+      <div className={`bg-black/95 backdrop-blur-xl rounded-2xl shadow-2xl border overflow-hidden transition-all duration-300 ${
+        detailLevel === 'immediate' ? 'border-[#D4AF37] ring-1 ring-[#D4AF37]/30' : 'border-[#D4AF37]/40'
       }`}>
         <div className="flex items-stretch">
           {/* Direction icon */}
           <div className={`flex items-center justify-center px-4 py-3 ${
-            detailLevel === 'immediate' ? 'bg-[#D4AF37]/15' : 'bg-zinc-800/50'
+            detailLevel === 'immediate' ? 'bg-[#D4AF37]/20' : 'bg-[#D4AF37]/10'
           }`}>
             <div className="flex flex-col items-center gap-1">
               {getDirectionIcon(maneuverType, maneuverModifier)}
@@ -159,7 +159,7 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
 
 const LaneArrow: React.FC<{ direction: string; active: boolean }> = ({ direction, active }) => {
   const dirs = direction.toLowerCase().split(';').map(d => d.trim()).filter(Boolean);
-  const color = active ? '#4285F4' : 'rgba(255,255,255,0.2)';
+  const color = active ? '#D4AF37' : 'rgba(255,255,255,0.2)';
   
   const getArrowPath = (dir: string): string => {
     switch (dir) {
@@ -213,9 +213,9 @@ const LaneRibbon: React.FC<{ parseLane: (step: any) => any; nextInstruction: any
   const hasRecommendation = activeCount > 0 && activeCount < lanes.length;
 
   return (
-    <div data-testid="lane-ribbon" className="border-t border-zinc-700/30 px-3 py-2 bg-zinc-800/40">
+    <div data-testid="lane-ribbon" className="border-t border-[#D4AF37]/30 px-3 py-2 bg-black/60">
       {hasRecommendation && (
-        <div className="text-[9px] uppercase tracking-wider text-zinc-500 text-center mb-1 font-medium">
+        <div className="text-[9px] uppercase tracking-wider text-[#D4AF37] text-center mb-1 font-bold">
           Lane Guidance
         </div>
       )}
@@ -225,12 +225,12 @@ const LaneRibbon: React.FC<{ parseLane: (step: any) => any; nextInstruction: any
             data-testid={`lane-${idx}-${lane.active ? 'active' : 'inactive'}`}
             className={`flex flex-col items-center justify-center py-1 flex-1 max-w-[44px] transition-all rounded-md ${
               lane.active 
-                ? 'bg-[#4285F4]/15 ring-1 ring-[#4285F4]/40' 
+                ? 'bg-[#D4AF37]/15 ring-1 ring-[#D4AF37]/40' 
                 : 'bg-white/[0.02]'
             }`}>
             <LaneArrow direction={lane.direction} active={lane.active} />
             {lane.active && (
-              <div className="w-1.5 h-1.5 bg-[#4285F4] rounded-full mt-0.5 shadow-[0_0_4px_rgba(66,133,244,0.6)]" />
+              <div className="w-1.5 h-1.5 bg-[#D4AF37] rounded-full mt-0.5 shadow-[0_0_4px_rgba(212,175,55,0.6)]" />
             )}
           </div>
         ))}
