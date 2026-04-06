@@ -3,8 +3,7 @@
  * Satellite hybrid base with dark-gold branding + clustering support.
  */
 
-const HERE_MAP_API_KEY = 'Hl5tRH0k6AOm2-XpzP95ADCabelFTPLUyQF_ISOvgwg';
-const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+const HERE_MAP_API_KEY = 'hDGCtu7ZoFAYNU1ajczKchoOm5o06iUjOAjZmLi-hLI';
 
 let _platform: any = null;
 let _defaultLayers: any = null;
@@ -26,15 +25,15 @@ export function createHereMap(
 ): { map: any; platform: any; defaultLayers: any; behavior: any; ui: any } {
   const { platform, defaultLayers } = getHerePlatform();
 
-  // Mapbox satellite-streets as base layer (HERE tile APIs return 401 for this key)
-  const tileProvider = new H.map.provider.ImageTileProvider({
-    label: 'Satellite Streets',
+  // Native HERE logistics satellite hybrid (satellite + road labels/logistics overlays)
+  const satelliteProvider = new H.map.provider.ImageTileProvider({
+    label: 'TRUCKERS NAV Satellite',
     min: 1,
     max: 20,
     getURL: (col: number, row: number, level: number) =>
-      `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/256/${level}/${col}/${row}?access_token=${MAPBOX_TOKEN}`,
+      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=logistics.satellite.day&apiKey=${HERE_MAP_API_KEY}`,
   });
-  const baseLayer = new H.map.layer.TileLayer(tileProvider);
+  const baseLayer = new H.map.layer.TileLayer(satelliteProvider);
 
   const map = new H.Map(element, baseLayer, {
     center,
@@ -45,12 +44,17 @@ export function createHereMap(
   // Apply the dark-gold CSS class for the TRUCKERS NAV signature look
   element.classList.add('here-map-satellite-dark');
 
+  // Set default tilt for cinematic trucking GPS perspective (45-80°)
+  try {
+    map.getViewModel().setLookAtData({ tilt: 55 }, true);
+  } catch (_) {}
+
   // Resize listener
   const onResize = () => map.getViewPort().resize();
   window.addEventListener('resize', onResize);
   (map as any).__resizeHandler = onResize;
 
-  // Interactivity
+  // Interactivity — enable tilt via ctrl+drag/pinch
   const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
 
   // Default UI (zoom, scale bar)

@@ -300,7 +300,7 @@ export const MapControls: React.FC<any> = React.memo(({
             </button>
           )}
           
-          {/* 2D/3D toggle — collapsible */}
+          {/* HERE/SAT toggle — collapsible */}
           {!isCollapsed && (
             <button 
               onClick={() => { 
@@ -309,9 +309,9 @@ export const MapControls: React.FC<any> = React.memo(({
                 localStorage.setItem(getUserStorageKey(getCurrentUserId(), 'nav_3d_mode'), String(newMode));
               }} 
               className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${is3DMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
-              title={is3DMode ? '3D View Active' : 'Switch to 3D'}
+              title={is3DMode ? 'Satellite View Active' : 'Switch to Satellite View'}
             >
-              <span className="font-black text-[10px] md:text-xs">{is3DMode ? '3D' : '2D'}</span>
+              <span className="font-black text-[10px] md:text-xs">{is3DMode ? 'SAT' : 'HERE'}</span>
             </button>
           )}
 
