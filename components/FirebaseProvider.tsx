@@ -75,17 +75,23 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (USE_MOCK_DATA || !user) return;
 
-    // For anonymous users, skip Firestore entirely — use local profile
+    // For anonymous users, skip Firestore entirely — use local profile from localStorage
     if (user.isAnonymous) {
-      const localProfile: UserProfile = {
+      const storageKey = `trucker_profile_${user.uid}`;
+      let stored: UserProfile | null = null;
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (raw) stored = JSON.parse(raw);
+      } catch {}
+      const localProfile: UserProfile = stored || {
         uid: user.uid,
         email: '',
         displayName: 'Guest Driver',
         truckProfile: {
-          height: 0, weight: 0, length: 0, width: 0,
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 0, axleWeight: 0, trailerCount: 0,
-          make: '', model: '', year: 0
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
+          make: '', model: '', year: 2024
         }
       };
       setProfile(localProfile);
@@ -262,9 +268,15 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
     if (!user) return;
-    // Skip Firestore writes for anonymous users — data is saved locally via localStorage
+    // Skip Firestore writes for anonymous users — persist locally via localStorage
     if (user.isAnonymous) {
-      setProfile(prev => prev ? { ...prev, ...data } : null);
+      setProfile(prev => {
+        const updated = prev ? { ...prev, ...data } : null;
+        if (updated) {
+          try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(updated)); } catch {}
+        }
+        return updated;
+      });
       return;
     }
     try {

@@ -5113,18 +5113,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       // Smooth the heading — professional-grade: lock to route direction when navigating,
       // heavy damping to prevent erratic spinning (CMV-grade stability)
-      if (speed > 0.3 || rawHeading !== 0) {
+      //
+      // CRITICAL: When truly stationary (speed < 1 mph), FREEZE the heading completely.
+      // GPS heading data at rest is pure noise and causes the icon to spin randomly.
+      if (speed < 1 && !isDriving) {
+        // Completely stationary and not on an active route — freeze icon orientation
+        // Do nothing: keep smoothedHeadingRef at its current value
+      } else if (speed > 0.5 || (isDriving && routeCoordsRef.current.length > 1)) {
         const diff = rawHeading - smoothedHeadingRef.current;
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
         
-        // Ignore micro-heading changes (< 5°) to prevent jitter when stationary/crawling
-        if (Math.abs(normalizedDiff) < 5 && speed < 3) {
-          // Skip update — heading is stable enough
+        // Dynamic dead zone: wider when slow, narrower when fast
+        const deadZone = speed < 5 ? 10 : speed < 15 ? 5 : 2;
+        
+        if (Math.abs(normalizedDiff) < deadZone && speed < 5) {
+          // Skip update — heading is stable enough at this speed
         } else {
           // Lower factor = smoother, more stable rotation
           // Route-driving: 0.12 (very stable, locks to route heading)
-          // Free-driving: 0.06 (heavy damping for GPS noise suppression)
+          // Free-driving at speed: 0.06 (heavy damping for GPS noise suppression)
           const factor = (isDriving && routeCoordsRef.current.length > 1) ? 0.12 : 0.06;
           smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * factor + 360) % 360;
         }

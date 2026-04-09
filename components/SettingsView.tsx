@@ -722,7 +722,7 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
         isOpen={showTruckModal}
         onClose={() => setShowTruckModal(false)}
         profile={truckProfile}
-        onSave={(p: any) => { setTruckProfile(p); localStorage.setItem('trucker_truck_profile', JSON.stringify(p)); }}
+        onSave={(p: any) => { setTruckProfile(p); }}
       />
     </div>
   );
