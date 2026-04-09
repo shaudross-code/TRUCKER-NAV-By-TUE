@@ -25,11 +25,11 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - [x] Map flat by default + tilt toggle button
 - [x] Auto-responsive UI scaling (viewport + orientation)
 - [x] Weather overlay swipe-to-dismiss + restore button
-- [x] **Driver Profile feature** (first name, last name, phone, email, CDL number, license expiry) — Apr 9
-- [x] **Fixed Truck Profile input bug** (string state, no '0' display, RECOMMENDED defaults, Reset Defaults btn) — Apr 9
-- [x] **Lane Guidance gold #D4AF37 theme** (replaced blue #4285F4) — Apr 9
-- [x] **Route Comparison gold/black theme** (bg-black/95, gold borders, italic title) — Apr 9
-- [x] **Removed all CSS gold/black tint filters** — Apr 9
+- [x] Driver Profile feature (6 fields + localStorage persistence)
+- [x] Fixed Truck Profile input bug (string state, RECOMMENDED defaults, Reset btn)
+- [x] Lane Guidance gold #D4AF37 theme
+- [x] Route Comparison gold/black theme
+- [x] Removed all CSS gold/black tint filters
 - [x] Turn-by-turn navigation with voice + route comparison
 - [x] MUTCD road signs (Interstate shields, Speed Limits, Truck Warnings)
 - [x] Real-time truck restrictions and toll warnings
@@ -39,15 +39,20 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - [x] Guest login + Google Sign-In + 2-hour session timer
 - [x] HERE Routing API v8.140.0 truck routing
 - [x] Nginx proxy config (port 3000 to 8001)
+- [x] **Sign Clutter Fix** (thinSigns utility: shields=30, exits=25, curves=20, speed=20, cmv=20) — Apr 9
+- [x] **Search Results Above Recommendations** (search results appear first when typing) — Apr 9
+- [x] **START NAV gold button** (replaced "Close" in RouteComparisonPanel) — Apr 9
+- [x] **User Icon Spin Fix** (compass mode sync, 5-degree dead zone, 0.8s CSS transition) — Apr 9
+- [x] **Route Overview Button** (Maximize2 icon, fit-bounds with H.geo.Rect) — Apr 9
 
 ## Known Issues
 - Gemini TTS key degraded (403) — falls back to native speech
 - Overpass API 504 timeouts (intermittent corridor POI fetch)
 - Intermittent trucker-nav service drops
-- HERE API fuelConsumption parameter returns 400 (non-blocking)
+- HERE API fuelConsumption parameter returns 400 (removed from return params)
 
 ## Upcoming Tasks (P1)
-- [ ] Refactor NavigationView.tsx (~6900 lines) into smaller hooks/components
+- [ ] Refactor NavigationView.tsx (~7000 lines) into smaller hooks/components
 - [ ] Speed limit warning system (red flash + audio when exceeding)
 - [ ] Viewport-based sign culling for DOM performance
 
