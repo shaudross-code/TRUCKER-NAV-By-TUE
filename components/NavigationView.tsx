@@ -4415,39 +4415,58 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         }
         // Reset viewport culling stores for new route
         clearSigns();
-        // Place highway shield markers on the route
+
+        // Anti-clutter: thin signs with minimum distance spacing for long routes
+        const thinSigns = <T extends { coord: [number, number] }>(signs: T[], minDistDeg: number, maxCount: number): T[] => {
+          if (!signs || signs.length <= maxCount) return signs || [];
+          const kept: T[] = [];
+          for (const s of signs) {
+            if (!s.coord) continue;
+            const tooClose = kept.some(k => 
+              Math.abs(k.coord[0] - s.coord[0]) < minDistDeg && Math.abs(k.coord[1] - s.coord[1]) < minDistDeg
+            );
+            if (!tooClose) kept.push(s);
+            if (kept.length >= maxCount) break;
+          }
+          return kept;
+        };
+
+        // Place highway shield markers on the route (limit: every ~5mi, max 30)
         if (hudLayout.showHighwayShields && primaryRoute.highwayShields && primaryRoute.highwayShields.length > 0) {
-          placeHighwayShields(primaryRoute.highwayShields);
+          placeHighwayShields(thinSigns(primaryRoute.highwayShields, 0.07, 30));
         }
-        // Place exit signs
+        // Place exit signs (limit: every ~3mi, max 25)
         if (hudLayout.showExitSigns && primaryRoute.exitSigns && primaryRoute.exitSigns.length > 0) {
-          placeExitSigns(primaryRoute.exitSigns);
+          placeExitSigns(thinSigns(primaryRoute.exitSigns, 0.04, 25));
         }
-        // Place sharp curve warnings
+        // Place sharp curve warnings (limit: every ~2mi, max 20)
         if (hudLayout.showCurveWarnings && primaryRoute.curveSigns && primaryRoute.curveSigns.length > 0) {
-          placeCurveSigns(primaryRoute.curveSigns);
+          placeCurveSigns(thinSigns(primaryRoute.curveSigns, 0.03, 20));
         }
-        // Place speed limit change signs
+        // Place speed limit change signs (limit: every ~5mi, max 20)
         if (hudLayout.showSpeedLimitSigns && primaryRoute.speedLimitSigns && primaryRoute.speedLimitSigns.length > 0) {
-          placeSpeedLimitSigns(primaryRoute.speedLimitSigns);
+          placeSpeedLimitSigns(thinSigns(primaryRoute.speedLimitSigns, 0.07, 20));
         }
-        // Place traffic slowdown markers
+        // Place traffic slowdown markers (max 15)
         if (hudLayout.showTrafficIncidents && primaryRoute.trafficSlowdowns && primaryRoute.trafficSlowdowns.length > 0) {
-          placeTrafficSlowdowns(primaryRoute.trafficSlowdowns);
+          const slimSlowdowns = (primaryRoute.trafficSlowdowns || []).slice(0, 15);
+          placeTrafficSlowdowns(slimSlowdowns);
         }
-        // Place CMV warning signs (steep grades, rollover risk, winding roads)
+        // Place CMV warning signs — these are critical, keep more (max 20)
         if (hudLayout.showCmvWarnings && primaryRoute.cmvWarnings && primaryRoute.cmvWarnings.length > 0) {
-          placeCmvWarnings(primaryRoute.cmvWarnings);
+          placeCmvWarnings(thinSigns(primaryRoute.cmvWarnings, 0.02, 20));
         }
         
-        // Place truck restriction warning signs (low bridges, weight limits, tunnel, etc.)
+        // Place truck restriction warning signs — critical safety, keep more (max 20)
         if (hudLayout.showTruckRestrictions && primaryRoute.restrictions && primaryRoute.restrictions.length > 0) {
-          placeTruckWarnings(primaryRoute.restrictions);
+          const thinRestrictions = primaryRoute.restrictions.filter((r: any) => r.coords).slice(0, 20);
+          placeTruckWarnings(thinRestrictions);
         }
 
-        // Place inline road name labels along the route polyline
+        // Place inline road name labels — thin aggressively (max 15)
         if (hudLayout.showHighwayShields && primaryRoute.roadSegments && primaryRoute.roadSegments.length > 0) {
-          placeRoadLabels(primaryRoute.roadSegments.map((seg: any) => ({ ...seg, coords })));
+          const thinLabels = primaryRoute.roadSegments.slice(0, 15);
+          placeRoadLabels(thinLabels.map((seg: any) => ({ ...seg, coords })));
         }
 
         // Draw lane count visualization on highway segments
