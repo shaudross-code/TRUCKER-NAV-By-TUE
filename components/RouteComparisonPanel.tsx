@@ -49,11 +49,12 @@ export const RouteComparisonPanel: React.FC<RouteComparisonPanelProps> = ({
             <span className="text-sm font-black text-[#D4AF37] tracking-widest uppercase italic">Route Comparison</span>
           </div>
           <button
-            data-testid="route-comparison-close"
+            data-testid="route-comparison-start-nav"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white text-xs px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors"
+            className="flex items-center gap-1.5 text-black text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-lg bg-[#D4AF37] hover:bg-[#C5A028] transition-all shadow-[0_0_12px_rgba(212,175,55,0.3)]"
           >
-            Close
+            <Zap className="w-3 h-3" strokeWidth={3} />
+            Start Nav
           </button>
         </div>
 

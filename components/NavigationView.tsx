@@ -652,7 +652,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       compassHeadingRef.current = bearing;
 
-      // Rotate vehicle icon to match compass bearing
+      // Compass mode exclusively controls vehicle icon rotation (no competing writers)
+      smoothedHeadingRef.current = bearing; // Sync smoothed heading so telemetry loop won't fight
       if (userMarkerElRef.current) {
         userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${bearing}deg`);
       }
@@ -1860,7 +1861,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           return true;
         });
         
-        const finalResults = [...nearby, ...uniqueResults.slice(0, 10)];
+        // Search results appear ABOVE nearby recommendations when user is actively typing
+        const finalResults = [...uniqueResults.slice(0, 10), ...nearby];
         console.log(`Setting ${finalResults.length} final suggestions`);
         setSuggestions(finalResults);
       } catch (error) {
@@ -5045,7 +5047,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const currentLoc = userLocationRef.current;
       if (!currentLoc) return;
 
-      // Compass mode handles its own rotation — only do the follow-pan here
+      // Compass mode handles its own rotation exclusively — skip vehicle rotation and map rotation here
+      // Only do follow-pan so the map stays centered on the user
       if (isCompassMode) {
         if (isFollowMode && mapInstanceRef.current) {
           const now = Date.now();
@@ -5053,7 +5056,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             lastPanRef.current = now;
             try {
               const compassH = compassHeadingRef.current;
-              const zoom = mapInstanceRef.current.getZoom();
               const offsetPixels = window.innerHeight * 0.2;
               const point = mapInstanceRef.current.geoToScreen({ lat: currentLoc[0], lng: currentLoc[1] });
               if (!point) throw new Error('geoToScreen returned null');
@@ -5067,7 +5069,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             } catch (e) { /* ignore */ }
           }
         }
-        return;
+        return; // EXIT: compass mode exclusively controls icon + map rotation
       }
 
       let rawHeading = telemetryContext.headingRef.current || 0;
@@ -5120,14 +5122,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
         
-        // Ignore micro-heading changes (< 3°) to prevent jitter when stationary/crawling
-        if (Math.abs(normalizedDiff) < 3 && speed < 2) {
+        // Ignore micro-heading changes (< 5°) to prevent jitter when stationary/crawling
+        if (Math.abs(normalizedDiff) < 5 && speed < 3) {
           // Skip update — heading is stable enough
         } else {
           // Lower factor = smoother, more stable rotation
-          // Route-driving: 0.15 (very stable, locks to route heading)
-          // Free-driving: 0.08 (heavy damping for GPS noise suppression)
-          const factor = (isDriving && routeCoordsRef.current.length > 1) ? 0.15 : 0.08;
+          // Route-driving: 0.12 (very stable, locks to route heading)
+          // Free-driving: 0.06 (heavy damping for GPS noise suppression)
+          const factor = (isDriving && routeCoordsRef.current.length > 1) ? 0.12 : 0.06;
           smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * factor + 360) % 360;
         }
       }
@@ -6981,6 +6983,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setShowRouteReasoning={setShowRouteReasoning}
         isTilted={isTilted}
         setIsTilted={setIsTilted}
+        hasActiveRoute={routePoints.length > 1}
+        onRouteOverview={() => {
+          if (mapInstanceRef.current && routePoints.length > 1) {
+            const bounds = new H.geo.Rect(
+              Math.max(...routePoints.map(p => p[0])),
+              Math.min(...routePoints.map(p => p[1])),
+              Math.min(...routePoints.map(p => p[0])),
+              Math.max(...routePoints.map(p => p[1]))
+            );
+            mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
+            setIsFollowMode(false);
+            setIsOverviewMode(true);
+          }
+        }}
         className={hudPositions.mapControls && (hudPositions.mapControls.x !== DEFAULT_POSITIONS.mapControls.x || hudPositions.mapControls.y !== DEFAULT_POSITIONS.mapControls.y) ? '' : `-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
         hudScale={autoScale('mapControls')}
       /></div>}

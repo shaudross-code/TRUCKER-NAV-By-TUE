@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2 } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
@@ -37,6 +37,8 @@ export const MapControls: React.FC<any> = React.memo(({
   setShowRouteReasoning,
   isTilted,
   setIsTilted,
+  onRouteOverview,
+  hasActiveRoute,
   className = "",
   hudScale = 1
 }) => {
@@ -345,6 +347,18 @@ export const MapControls: React.FC<any> = React.memo(({
               <NavIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
             </div>
           </button>
+
+          {/* Route Overview — fit entire route in view (only when a route is active) */}
+          {hasActiveRoute && (
+            <button
+              data-testid="route-overview-btn"
+              onClick={() => onRouteOverview?.()}
+              className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all"
+              title="Route Overview — Fit entire route in view"
+            >
+              <Maximize2 className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
+            </button>
+          )}
 
         </div>
     </div>
