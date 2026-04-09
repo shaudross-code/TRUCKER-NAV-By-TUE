@@ -5039,7 +5039,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!telemetryContext || !userMarkerElRef.current || !isValidLatLng(userLocationRef.current)) return;
 
+    const lastRotationTickRef = useRef(0);
     const updateRotationAndPan = () => {
+      // Throttle rotation updates to 1.5s tick rate
+      const now = Date.now();
+      if (now - lastRotationTickRef.current < 1500) return;
+      lastRotationTickRef.current = now;
+
       const currentLoc = userLocationRef.current;
       if (!currentLoc) return;
 
@@ -5124,11 +5130,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
         
-        // Dynamic dead zone: wider when slow, narrower when fast
-        const deadZone = speed < 5 ? 10 : speed < 15 ? 5 : 2;
+        // Fixed 10° dead zone — suppress micro-jitter at all speeds
+        const deadZone = 10;
         
-        if (Math.abs(normalizedDiff) < deadZone && speed < 5) {
-          // Skip update — heading is stable enough at this speed
+        if (Math.abs(normalizedDiff) < deadZone) {
+          // Skip update — heading change too small
         } else {
           // Lower factor = smoother, more stable rotation
           // Route-driving: 0.12 (very stable, locks to route heading)
