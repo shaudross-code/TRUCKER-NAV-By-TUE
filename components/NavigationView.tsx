@@ -6216,20 +6216,48 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           )}
 
-          {/* Route POIs — clickable & scrollable */}
-          {hudLayout.showAlongRoute && upcomingPois.length > 0 && (
-            <div data-testid="route-poi-panel" className="mt-2 bg-black/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-56 transition-all">
-              <div className="flex items-center justify-between mb-1.5 md:mb-2 cursor-pointer" onClick={() => setPoiPanelOpen(!poiPanelOpen)}>
-                <div className="flex items-center gap-1.5 md:gap-2">
-                  <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
-                    <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
-                  </div>
-                  <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI ({upcomingPois.filter(p => p.isExit || getPoiCategory(p.type, p.name) !== 'excluded').length})</span>
+          {/* Route POIs extracted to independent section below */}
+        </>
+        )}
+        </div>
+      )}
+
+      {/* Weather dismissed — show restore button */}
+      {weatherDismissed && !selectedPoi && !isExploreMode && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
+        <button
+          data-testid="weather-restore-btn"
+          onClick={() => setWeatherDismissed(false)}
+          className="absolute z-[2000] left-2 top-[45%] bg-black/80 backdrop-blur-xl border border-[#D4AF37]/30 rounded-xl p-2 shadow-2xl hover:bg-[#D4AF37]/10 transition-colors"
+          title="Show weather & alerts"
+        >
+          <Cloud className="w-4 h-4 text-[#D4AF37]" />
+        </button>
+      )}
+
+      {/* ─── Route POIs — Independent Panel (not tied to weather swipe) ─── */}
+      {!selectedPoi && !isExploreMode && hudLayout.showAlongRoute && upcomingPois.length > 0 && (
+        <div data-testid="route-poi-panel" className="absolute z-[1900] transition-all duration-300"
+          style={{
+            left: '0.5rem',
+            bottom: '1rem',
+            transform: `scale(${autoScale('weatherPanel')})`,
+            transformOrigin: 'left bottom',
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
+          <div className="bg-black/90 backdrop-blur-2xl border border-white/10 rounded-xl md:rounded-2xl p-2 md:p-3 shadow-2xl w-36 md:w-56">
+            <div className="flex items-center justify-between mb-1.5 md:mb-2 cursor-pointer" onClick={() => setPoiPanelOpen(!poiPanelOpen)}>
+              <div className="flex items-center gap-1.5 md:gap-2">
+                <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
+                  <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
                 </div>
-                <ChevronDown className={`w-3 h-3 text-[#D4AF37] transition-transform ${poiPanelOpen ? '' : '-rotate-90'}`} />
+                <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI ({upcomingPois.filter(p => p.isExit || getPoiCategory(p.type, p.name) !== 'excluded').length})</span>
               </div>
-              {poiPanelOpen && (
-                <>
+              <ChevronDown className={`w-3 h-3 text-[#D4AF37] transition-transform ${poiPanelOpen ? '' : '-rotate-90'}`} />
+            </div>
+            {poiPanelOpen && (
+              <>
               {/* Cheapest Fuel Banner */}
               {(() => {
                 const cheapest = findCheapestDiesel(fuelStations);
@@ -6246,9 +6274,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   </div>
                 );
               })()}
-              <div className="flex flex-col gap-1 md:gap-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-0.5" data-testid="route-poi-list">
+              <div className="flex flex-col gap-1 md:gap-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-0.5" data-testid="route-poi-list"
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+              >
                 {upcomingPois.filter(poi => {
-                  if (poi.isExit) return true; // Always show exits
+                  if (poi.isExit) return true;
                   const cat = getPoiCategory(poi.type, poi.name);
                   if (cat === 'excluded') return false;
                   if (minRatingFilter <= 0) return true;
@@ -6256,7 +6287,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   const r = poiRatingsCache[rid];
                   return r && r.averageRating >= minRatingFilter;
                 }).map((poi, idx) => {
-                  // Exit items — special rendering with highway shield
                   if (poi.isExit) {
                     return (
                       <div key={`exit-${idx}`} data-testid={`route-exit-item-${idx}`} 
@@ -6267,7 +6297,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                           }
                         }}>
                         <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden">
-                          {/* Interstate shield icon */}
                           <div className="shrink-0 flex items-center justify-center">
                             <svg viewBox="0 0 28 20" width="24" height="17" xmlns="http://www.w3.org/2000/svg">
                               <path d="M2,2 L14,0 L26,2 L26,18 L14,20 L2,18 Z" fill="#003DA5" stroke="#fff" strokeWidth="1"/>
@@ -6285,21 +6314,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       </div>
                     );
                   }
-
-                  const category = getPoiCategory(poi.type, poi.name);
-                  const brandIcon = getPoiFilterIcon(category);
-                  const hasBrandIcon = !['other', 'excluded'].includes(category);
-                  let Icon = MapIcon;
-                  let iconColor = "text-zinc-400";
-                  
-                  const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest'];
-                  if (category === 'fuel' || brandIds.includes(category)) { Icon = Fuel; iconColor = "text-yellow-400"; }
-                  else if (category === 'parking') { Icon = ParkingSquare; iconColor = "text-[#D4AF37]"; }
-                  else if (category === 'food') { Icon = UtensilsCrossed; iconColor = "text-[#D4AF37]"; }
-                  else if (category === 'service') { Icon = Wrench; iconColor = "text-red-400"; }
-                  else if (category === 'distribution') { Icon = Box; iconColor = "text-[#D4AF37]"; }
-                  else if (category === 'cat_scale') { Icon = Scale; iconColor = "text-[#D4AF37]"; }
-
+                  const { icon: Icon, color: iconColor, brandIcon, hasBrandIcon } = getPoiIcon(poi.type, poi.name);
                   return (
                     <div key={idx} data-testid={`route-poi-item-${idx}`} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors active:bg-[#D4AF37]/10" onClick={() => {
                       setSelectedPoi(poi);
@@ -6348,24 +6363,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 })}
               </div>
               </>
-              )}
-            </div>
-          )}
-        </>
-        )}
+            )}
+          </div>
         </div>
-      )}
-
-      {/* Weather dismissed — show restore button */}
-      {weatherDismissed && !selectedPoi && !isExploreMode && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
-        <button
-          data-testid="weather-restore-btn"
-          onClick={() => setWeatherDismissed(false)}
-          className="absolute z-[2000] left-2 top-[45%] bg-black/80 backdrop-blur-xl border border-[#D4AF37]/30 rounded-xl p-2 shadow-2xl hover:bg-[#D4AF37]/10 transition-colors"
-          title="Show weather & alerts"
-        >
-          <Cloud className="w-4 h-4 text-[#D4AF37]" />
-        </button>
       )}
 
       {/* ─── Route Warning Signs — Right Side Stacked Badges (MUTCD Gold/Black) ─── */}

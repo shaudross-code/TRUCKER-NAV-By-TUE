@@ -20,7 +20,7 @@ export const DEFAULT_HUD_LAYOUT: HudLayoutConfig = {
   showManeuverPreview: true,
   showRouteComparison: true,
   showLaneGuidance: true,
-  showCompassRose: true,
+  showCompassRose: false,
   showNextStop: true,
   showSpeedWarning: true,
   showAlongRoute: true,
