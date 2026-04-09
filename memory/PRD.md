@@ -10,25 +10,26 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - **Maps**: HERE logistics.satellite.day tiles (vehicle_restrictions, ppi=400, flat default + tilt toggle) + Mapbox satellite-streets-v12 (SAT 2D)
 
 ## Completed Features
-- [x] HERE Maps JS API v3.1 (replaced Leaflet) — Apr 6
-- [x] HERE logistics.satellite.day hybrid tiles — Apr 6
-- [x] Converted Mapbox 3D to 2D SAT view — Apr 6
-- [x] H.clustering.Provider POI clustering — Apr 6
-- [x] Fixed user location icon jitter (lerp, dead-zone) — Apr 6
-- [x] Simplified MapControls: 7+ buttons — Apr 6
-- [x] POI panel: collapsible, scrollable, click-to-center — Apr 6
-- [x] Removed weigh stations from POI — Apr 6
-- [x] Vehicle restrictions overlay (no-truck, weight limits, height) — Apr 9
-- [x] High-res tiles (ppi=400) — Apr 9
-- [x] Removed CSS tint/filter classes — Apr 9
-- [x] Explicit z-index layering: routes(100) < facilities(200) < signs(900) — Apr 9
-- [x] Removed default 55deg tilt — flat by default — Apr 9
-- [x] Added tilt toggle button (Mountain icon) — Apr 9
-- [x] Fixed user icon spinning: DomIcon element ref fix + CMV-grade heading stabilization — Apr 9
+- [x] HERE Maps JS API v3.1 (replaced Leaflet)
+- [x] HERE logistics.satellite.day hybrid tiles
+- [x] Converted Mapbox 3D to 2D SAT view
+- [x] H.clustering.Provider POI clustering
+- [x] Fixed user location icon jitter (lerp, dead-zone)
+- [x] Simplified MapControls: 8 buttons (hamburger, filter, zoom+/-, level, HERE/SAT, tilt, follow)
+- [x] POI panel: collapsible, scrollable, click-to-center
+- [x] Removed weigh stations from POI
+- [x] Vehicle restrictions overlay (no-truck, weight limits, height)
+- [x] High-res tiles (ppi=400)
+- [x] Removed CSS tint/filter classes
+- [x] Explicit z-index layering: routes(100) < facilities(200) < signs(900)
+- [x] Map flat by default + tilt toggle button (Mountain icon)
+- [x] Fixed user icon spinning: DomIcon element ref fix + CMV-grade heading stabilization
 - [x] Auto-responsive UI scaling (screenScale 0.6-1.0 based on viewport + orientation) — Apr 9
 - [x] Weather overlay swipe-to-dismiss + Cloud icon restore button — Apr 9
 - [x] All route POIs displayed (removed 6-POI cap, full route search, sorted by routeIdx) — Apr 9
 - [x] Fixed zoom buttons for HERE Maps API (setZoom instead of zoomIn/Out) — Apr 9
+- [x] Highway exit items in POI panel (blue interstate shield icons, exit numbers, names, distance) — Apr 9
+- [x] Warning signs panel (right side, gold/black MUTCD badges: height restrictions, weight limits, curve warnings) — Apr 9
 - [x] Turn-by-turn navigation with voice + route comparison
 - [x] MUTCD road signs (Interstate shields, Speed Limits, Truck Warnings)
 - [x] Real-time truck restrictions and toll warnings
@@ -45,7 +46,7 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - Intermittent trucker-nav service drops
 
 ## Upcoming Tasks (P1)
-- [ ] Refactor NavigationView.tsx (~6800 lines) into smaller hooks/components
+- [ ] Refactor NavigationView.tsx (~6900 lines) into smaller hooks/components
 - [ ] Speed limit warning system (red flash + audio when exceeding)
 - [ ] Viewport-based sign culling for DOM performance
 
