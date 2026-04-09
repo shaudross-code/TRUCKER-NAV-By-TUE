@@ -42,9 +42,6 @@ export function createHereMap(
     pixelRatio: window.devicePixelRatio || 1,
   });
 
-  // Apply the dark-gold CSS class for the TRUCKERS NAV signature look
-  element.classList.add('here-map-satellite-dark');
-
   // Set default tilt for cinematic trucking GPS perspective (45-80°)
   try {
     map.getViewModel().setLookAtData({ tilt: 55 }, true);

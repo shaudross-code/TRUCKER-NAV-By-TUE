@@ -120,18 +120,6 @@
 }
 
 
-.white-gold-map-tiles {
-  filter: sepia(0.3) saturate(1.5) hue-rotate(-10deg) brightness(1.1) contrast(0.9);
-}
-
-.tue-gold-black-tiles {
-  filter: invert(100%) hue-rotate(180deg) brightness(0.9) contrast(1.1) sepia(1) saturate(5) hue-rotate(-15deg) brightness(0.7);
-}
-
-.tue-gold-black-tiles-v2 {
-  filter: grayscale(1) sepia(1) saturate(5) hue-rotate(-15deg) brightness(1.2) contrast(1.1);
-}
-
 @keyframes poiFadeIn {
   from {
     opacity: 0;
@@ -179,9 +167,6 @@
   transform-origin: center center !important;
 }
 
-.map-dark-theme {
-  filter: invert(90%) hue-rotate(180deg) brightness(0.8) contrast(1.2);
-}
 
 /* POI Cluster Icons — Gold/Black theme */
 .poi-cluster-icon {

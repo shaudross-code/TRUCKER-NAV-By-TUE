@@ -904,9 +904,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           mapInstanceRef.current = map;
           
           // Initialize layer groups (H.map.Group replaces L.layerGroup)
+          // Route polylines sit below signs/shields
           routeGroupRef.current = createGroup();
+          routeGroupRef.current.setZIndex(100);
           map.addObject(routeGroupRef.current);
+          // Signs, shields, weight limits, bridge heights, truck restrictions — always on TOP
           shieldLayerGroupRef.current = createGroup();
+          shieldLayerGroupRef.current.setZIndex(900);
           map.addObject(shieldLayerGroupRef.current);
 
           // POI clustering layer (H.clustering.Provider for proper cluster/zoom behavior)
@@ -1212,6 +1216,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const drawAlternativeRoutes = (map: any, routes: any[], selectedIdx: number) => {
     if (!altRouteLayersRef.current) {
       altRouteLayersRef.current = createGroup();
+      altRouteLayersRef.current.setZIndex(90);
       map.addObject(altRouteLayersRef.current);
     } else {
       altRouteLayersRef.current.removeAll();
@@ -1651,6 +1656,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
     const group = createGroup();
+    group.setZIndex(200);
     mapInstanceRef.current.addObject(group);
     facilityLayerGroupRef.current = group;
     return () => { try { mapInstanceRef.current?.removeObject(group); } catch(_){} facilityLayerGroupRef.current = null; };
