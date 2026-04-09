@@ -16,10 +16,15 @@ import {
   Ruler,
   X,
   ChevronDown,
-  GraduationCap
+  GraduationCap,
+  Phone,
+  Mail,
+  CreditCard,
+  Calendar
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
+import DriverProfileModal from './DriverProfileModal';
 
 const MapFolder: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -270,6 +275,20 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
   const [downloadedMaps, setDownloadedMaps] = useState<string[]>(['California']);
   const [editField, setEditField] = useState<string | null>(null);
   const [editInitialValue, setEditInitialValue] = useState('');
+  
+  // Driver Profile state — persisted in localStorage
+  const [driverProfile, setDriverProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('trucker_driver_profile');
+      return saved ? JSON.parse(saved) : { firstName: '', lastName: '', phone: '', email: '', licenseNumber: '', licenseExpiry: '' };
+    } catch { return { firstName: '', lastName: '', phone: '', email: '', licenseNumber: '', licenseExpiry: '' }; }
+  });
+  const [showDriverModal, setShowDriverModal] = useState(false);
+
+  const saveDriverProfile = (profile: typeof driverProfile) => {
+    setDriverProfile(profile);
+    localStorage.setItem('trucker_driver_profile', JSON.stringify(profile));
+  };
 
   if (!context) return null;
 
@@ -480,6 +499,53 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
           </div>
         </section>
 
+        {/* Driver Profile Section */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <User className="w-4 h-4 text-[#D4AF37]" />
+            <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">Driver Profile</h2>
+          </div>
+          <div className="space-y-3">
+            <ProfileField 
+              label="Name" 
+              value={driverProfile.firstName && driverProfile.lastName ? `${driverProfile.firstName} ${driverProfile.lastName}` : 'Not Set'} 
+              icon={User} 
+              onEdit={() => setShowDriverModal(true)}
+            />
+            <ProfileField 
+              label="Phone" 
+              value={driverProfile.phone || 'Not Set'} 
+              icon={Phone} 
+              onEdit={() => setShowDriverModal(true)}
+            />
+            <ProfileField 
+              label="Email" 
+              value={driverProfile.email || 'Not Set'} 
+              icon={Mail} 
+              onEdit={() => setShowDriverModal(true)}
+            />
+            <ProfileField 
+              label="CDL Number" 
+              value={driverProfile.licenseNumber || 'Not Set'} 
+              icon={CreditCard} 
+              onEdit={() => setShowDriverModal(true)}
+            />
+            <ProfileField 
+              label="License Expires" 
+              value={driverProfile.licenseExpiry ? new Date(driverProfile.licenseExpiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not Set'} 
+              icon={Calendar} 
+              onEdit={() => setShowDriverModal(true)}
+            />
+            <button 
+              data-testid="edit-driver-profile-btn"
+              onClick={() => setShowDriverModal(true)}
+              className="w-full py-3 mt-2 rounded-xl font-bold text-black uppercase tracking-widest text-xs bg-[#D4AF37] hover:bg-[#b5952f] transition-colors"
+            >
+              Edit Driver Profile
+            </button>
+          </div>
+        </section>
+
         {/* Safety Protocols */}
         <section>
           <div className="flex items-center gap-3 mb-6">
@@ -602,6 +668,14 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
           onClose={() => setEditField(null)}
         />
       )}
+      
+      {/* Driver Profile Modal */}
+      <DriverProfileModal
+        isOpen={showDriverModal}
+        onClose={() => setShowDriverModal(false)}
+        profile={driverProfile}
+        onSave={saveDriverProfile}
+      />
     </div>
   );
 };
