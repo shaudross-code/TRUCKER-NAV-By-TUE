@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
         'process.env.REACT_APP_MAPBOX_TOKEN': JSON.stringify(env.REACT_APP_MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN || ''),
         'import.meta.env.REACT_APP_MAPBOX_TOKEN': JSON.stringify(env.REACT_APP_MAPBOX_TOKEN || env.MAPBOX_ACCESS_TOKEN || ''),
       },
+      build: {
+        outDir: 'dist',
+      },
       server: {
         port: 3000,
         host: '0.0.0.0',

@@ -93,6 +93,7 @@ async function addAuthorizedDomains() {
     'poi-fuel-tracker.preview.emergentagent.com',
     'nav-corridor-live.preview.emergentagent.com',
     'navigation-staging.preview.emergentagent.com',
+    'truckers-nav-by-tue.app',
     'localhost',
   ];
   
