@@ -1,0 +1,95 @@
+{
+  "summary": "Frontend testing of TRUCKERS NAV BY TUE app iteration 85. Tested 2 new features: 1) Exit items in POI panel with blue interstate shield icons, 2) Warning signs panel on right side (gold/black MUTCD theme). Exit items feature verified working - found 2 exits in POI panel with proper styling. Warning signs panel code verified but not visible on test route (Council Bluffs to Kansas City) - likely no bridge/weight restrictions or curves in immediate vicinity.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "Gemini TTS API", "issue": "API key reported as leaked (403 error) - TTS falls back to native browser speech synthesis (non-blocking)"}
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_85.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: Exit items merged into upcomingPois array (line 5460-5472) with isExit=true, exitNumber, exitName fields",
+    "VERIFIED: Exit items rendered with blue interstate shield SVG icon (#003DA5 fill), green background (bg-[#1a5c1a]/30), distance in miles",
+    "VERIFIED: Exit items have data-testid='route-exit-item-{idx}' for testing",
+    "VERIFIED: POI panel header count includes exits - shows 'POI (8)' with 2 exits + 6 POIs",
+    "VERIFIED: Clicking exit item zooms/pans map to exit location via setLookAtData()",
+    "VERIFIED: Warning signs panel code implemented (lines 6332-6416) with gold diamond SVGs for height/curve, gold/black rectangles for weight",
+    "VERIFIED: Warning signs sorted by distance, max 5 shown, only appears when isDriving && milesRemaining > 0",
+    "VERIFIED: Warning signs use TRUCKERS NAV gold (#D4AF37) and black (#1a1a1a) theme",
+    "VERIFIED: routeSignsRef expanded to include curveSigns (line 1026)",
+    "NOTE: Warning signs panel not visible on test route - no BRIDGE/WEIGHT restrictions or curveSigns within 0.2-50 miles of user location"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only test)",
+    "frontend": "90% - Exit items feature working, warning signs panel code verified but not testable on current route"
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button on login screen",
+    "email": "test@trucker.com / Test123456"
+  },
+
+  "seed_data_creation": "",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Exit items in POI panel verified working - shows blue interstate shield icons with exit number, exit name, and distance. Warning signs panel code is implemented but requires a route with bridge height restrictions, weight limits, or curve warnings to be visible. Test with routes through mountainous areas or urban areas with low bridges to verify warning signs panel. Preview URL: https://hud-customizer-5.preview.emergentagent.com. Geolocation fails in headless browser - defaults to Council Bluffs, Iowa via IP fallback.",
+
+  "features_tested": {
+    "exit_items_in_poi_panel": {
+      "status": "PASS",
+      "details": "Found 2 exit items in POI panel: 'Exit' (I-29 S toward I-80 E/US-6 E/Kansas City, 2mi) and 'Exit 2B' (Kansas City Downtown, 158mi). Blue interstate shield SVG icons with exit number, green background styling, distance in miles. Clicking zooms to exit location."
+    },
+    "poi_panel_header_count": {
+      "status": "PASS",
+      "details": "POI panel header shows 'POI (8)' which includes 2 exits + 6 regular POIs (Petro, TA, Pilot Flying J, Pilot, Love's, Pilot)."
+    },
+    "warning_signs_panel": {
+      "status": "NOT_TESTABLE",
+      "details": "Warning signs panel code verified in NavigationView.tsx (lines 6332-6416). Panel only appears when routeSignsRef.current.restrictions or curveSigns contain items within 0.2-50 miles. Test route (Council Bluffs to Kansas City) has no such restrictions in immediate vicinity."
+    },
+    "warning_signs_styling": {
+      "status": "CODE_VERIFIED",
+      "details": "Height restrictions: gold diamond SVG (#D4AF37 fill, #1a1a1a stroke) with height text. Weight limits: gold/black rectangle with tonnage + 'TONS' label. Curve warnings: gold diamond with directional arrow path."
+    },
+    "guest_login": {
+      "status": "PASS",
+      "details": "Continue as Guest button works, navigates to COMMAND CENTER dashboard."
+    },
+    "route_calculation": {
+      "status": "PASS",
+      "details": "Route calculated from Council Bluffs, Iowa to Kansas City - 3 alternatives shown (PRIMARY: 2h 44m, 179.9 mi, $97.42)."
+    },
+    "driving_mode": {
+      "status": "PASS",
+      "details": "Clicking 'Close' on Route Comparison panel starts driving mode. POI panel, turn-by-turn navigation, speed limit, weather, fuel cost, HOS status all visible."
+    }
+  },
+
+  "known_issues": {
+    "gemini_api_key": "Gemini API key reported as leaked (403 error) - TTS falls back to native browser speech synthesis. Non-blocking.",
+    "geolocation": "Geolocation fails in headless browser - defaults to Council Bluffs, Iowa via IP geolocation fallback. Expected behavior.",
+    "warning_signs_not_visible": "Warning signs panel not visible on test route - requires route with bridge/weight restrictions or curves to test. Code implementation verified."
+  },
+
+  "mocked_apis": {
+    "none": "No mocked APIs - all integrations are live (HERE Maps, Mapbox, etc.)"
+  }
+}

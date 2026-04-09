@@ -1023,7 +1023,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [restrictionAlerts, setRestrictionAlerts] = useState<RestrictionAlert[]>([]);
   const [trafficAlerts, setTrafficAlerts] = useState<any[]>([]);
   const cmvWarningsRef = useRef<{ type: string; severity: string; message: string; grade?: number; coord: [number, number]; progress: number }[]>([]);
-  const routeSignsRef = useRef<{ speedLimitSigns: any[]; exitSigns: any[]; restrictions: any[] }>({ speedLimitSigns: [], exitSigns: [], restrictions: [] });
+  const routeSignsRef = useRef<{ speedLimitSigns: any[]; exitSigns: any[]; restrictions: any[]; curveSigns: any[] }>({ speedLimitSigns: [], exitSigns: [], restrictions: [], curveSigns: [] });
   const restrictionAlertMarkersRef = useRef<any[]>([]);
   const trafficAlertMarkersRef = useRef<any[]>([]);
   const weatherAlertMarkersRef = useRef<any[]>([]);
@@ -4057,7 +4057,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       routeSignsRef.current = {
         speedLimitSigns: primaryRoute.speedLimitSigns || [],
         exitSigns: primaryRoute.exitSigns || [],
-        restrictions: primaryRoute.restrictions || []
+        restrictions: primaryRoute.restrictions || [],
+        curveSigns: primaryRoute.curveSigns || []
       };
       if (primaryRoute.spans) {
         routeSpansRef.current = primaryRoute.spans;
@@ -4286,7 +4287,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     setRestrictionAlerts([]);
     setTrafficAlerts([]);
     cmvWarningsRef.current = [];
-    routeSignsRef.current = { speedLimitSigns: [], exitSigns: [], restrictions: [] };
+    routeSignsRef.current = { speedLimitSigns: [], exitSigns: [], restrictions: [], curveSigns: [] };
     
     if (isCalculating) {
       console.warn(`[handleNavigate] Already calculating, ignoring request.`);
@@ -5438,7 +5439,37 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return { ...poi, dieselPrice: matched?.dieselPrice || null };
     });
 
-    setUpcomingPois(withPrices);
+    // Merge highway exits from route data into the POI list
+    const exits = (routeSignsRef.current.exitSigns || [])
+      .filter((exit: any) => exit.coord)
+      .map((exit: any) => {
+        // Find this exit's closest route point
+        let exitRouteIdx = 0;
+        let minD = Infinity;
+        for (let i = 0; i < routePoints.length; i += 3) {
+          const d = Math.pow(routePoints[i][0] - exit.coord[0], 2) + Math.pow(routePoints[i][1] - exit.coord[1], 2);
+          if (d < minD) { minD = d; exitRouteIdx = i; }
+        }
+        const dist = userLocation ? calcDistMi(userLocation[0], userLocation[1], exit.coord[0], exit.coord[1]) : 0;
+        return {
+          name: exit.exitNumber ? `Exit ${exit.exitNumber}` : 'Exit',
+          type: 'exit',
+          lat: exit.coord[0],
+          lon: exit.coord[1],
+          routeIdx: exitRouteIdx,
+          distance: dist,
+          corridorDist: 0,
+          dieselPrice: null,
+          isExit: true,
+          exitNumber: exit.exitNumber || '',
+          exitName: exit.name || '',
+        };
+      })
+      .filter((exit: any) => exit.routeIdx >= (userRouteIdx - 5));
+
+    // Combine POIs + exits, sorted by position along route
+    const combined = [...withPrices, ...exits].sort((a, b) => a.routeIdx - b.routeIdx);
+    setUpcomingPois(combined);
   }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(','), fuelStations.length]);;
 
   // Batch-fetch ratings for upcoming POIs
@@ -6156,7 +6187,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   <div className="p-1 md:p-1.5 bg-[#D4AF37]/20 rounded-lg">
                     <MapIcon className="w-3 h-3 md:w-4 md:h-4 text-[#D4AF37]" />
                   </div>
-                  <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI ({upcomingPois.filter(p => getPoiCategory(p.type, p.name) !== 'excluded').length})</span>
+                  <span className="text-[8px] md:text-[10px] font-black text-[#D4AF37] uppercase tracking-wider">POI ({upcomingPois.filter(p => p.isExit || getPoiCategory(p.type, p.name) !== 'excluded').length})</span>
                 </div>
                 <ChevronDown className={`w-3 h-3 text-[#D4AF37] transition-transform ${poiPanelOpen ? '' : '-rotate-90'}`} />
               </div>
@@ -6180,6 +6211,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               })()}
               <div className="flex flex-col gap-1 md:gap-1.5 max-h-[35vh] overflow-y-auto custom-scrollbar pr-0.5" data-testid="route-poi-list">
                 {upcomingPois.filter(poi => {
+                  if (poi.isExit) return true; // Always show exits
                   const cat = getPoiCategory(poi.type, poi.name);
                   if (cat === 'excluded') return false;
                   if (minRatingFilter <= 0) return true;
@@ -6187,6 +6219,36 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   const r = poiRatingsCache[rid];
                   return r && r.averageRating >= minRatingFilter;
                 }).map((poi, idx) => {
+                  // Exit items — special rendering with highway shield
+                  if (poi.isExit) {
+                    return (
+                      <div key={`exit-${idx}`} data-testid={`route-exit-item-${idx}`} 
+                        className="flex items-center justify-between p-1.5 md:p-2 bg-[#1a5c1a]/30 border border-[#2a8c2a]/40 rounded-lg cursor-pointer hover:bg-[#1a5c1a]/50 transition-colors active:bg-[#2a8c2a]/30"
+                        onClick={() => {
+                          if (mapInstanceRef.current) {
+                            mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: poi.lat, lng: poi.lon }, zoom: 15 }, true);
+                          }
+                        }}>
+                        <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden">
+                          {/* Interstate shield icon */}
+                          <div className="shrink-0 flex items-center justify-center">
+                            <svg viewBox="0 0 28 20" width="24" height="17" xmlns="http://www.w3.org/2000/svg">
+                              <path d="M2,2 L14,0 L26,2 L26,18 L14,20 L2,18 Z" fill="#003DA5" stroke="#fff" strokeWidth="1"/>
+                              <text x="14" y="13" textAnchor="middle" fill="white" fontSize="8" fontWeight="900" fontFamily="Arial">{poi.exitNumber || 'EXIT'}</text>
+                            </svg>
+                          </div>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-[8px] md:text-[10px] font-black text-white truncate">{poi.name}</span>
+                            <span className="text-[6px] md:text-[8px] text-green-300/70 truncate">{poi.exitName}</span>
+                          </div>
+                        </div>
+                        <span className="text-[8px] md:text-[10px] font-black text-green-300 whitespace-nowrap shrink-0 ml-1">
+                          {poi.distance.toFixed(0)}<span className="text-[6px] md:text-[7px]">mi</span>
+                        </span>
+                      </div>
+                    );
+                  }
+
                   const category = getPoiCategory(poi.type, poi.name);
                   const brandIcon = getPoiFilterIcon(category);
                   const hasBrandIcon = !['other', 'excluded'].includes(category);
@@ -6264,6 +6326,93 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         >
           <Cloud className="w-4 h-4 text-[#D4AF37]" />
         </button>
+      )}
+
+      {/* ─── Route Warning Signs — Right Side Stacked Badges (MUTCD Gold/Black) ─── */}
+      {isDriving && !isExploreMode && !is3DMode && milesRemaining > 0 && (
+        (() => {
+          // Compute upcoming warnings sorted by distance to user
+          const warnings: { type: string; label: string; distance: number; icon: string; coord: [number, number] }[] = [];
+          const userLoc = userLocation || [0, 0];
+          
+          // Height restrictions (Low bridges)
+          (routeSignsRef.current.restrictions || []).forEach((r: any) => {
+            if (!r.coords) return;
+            const dist = calcDistMi(userLoc[0], userLoc[1], r.coords[0], r.coords[1]);
+            if (dist > 0.2 && dist < 50) {
+              if (r.type === 'BRIDGE') {
+                const heightFt = r.value ? (r.value / 30.48).toFixed(0) : '';
+                const heightIn = r.value ? Math.round(((r.value / 30.48) % 1) * 12) : 0;
+                warnings.push({ type: 'height', label: heightFt ? `${Math.floor(r.value / 30.48)}'-${heightIn}"` : 'Low', distance: dist, icon: 'height', coord: r.coords });
+              } else if (r.type === 'WEIGHT') {
+                const tons = r.value ? Math.round(r.value * 2.20462 / 2000) : 0;
+                warnings.push({ type: 'weight', label: tons ? `${tons}` : '??', distance: dist, icon: 'weight', coord: r.coords });
+              }
+            }
+          });
+          
+          // Curve warnings
+          (routeSignsRef.current.curveSigns || []).forEach((c: any) => {
+            if (!c.coord) return;
+            const dist = calcDistMi(userLoc[0], userLoc[1], c.coord[0], c.coord[1]);
+            if (dist > 0.2 && dist < 50) {
+              warnings.push({ type: 'curve', label: c.direction, distance: dist, icon: c.direction === 'left' ? 'curveLeft' : 'curveRight', coord: c.coord });
+            }
+          });
+          
+          // Sort by distance, take closest 5
+          const sorted = warnings.sort((a, b) => a.distance - b.distance).slice(0, 5);
+          if (sorted.length === 0) return null;
+
+          return (
+            <div data-testid="warning-signs-panel" className="absolute z-[2050] right-2 md:right-14 flex flex-col gap-1.5 md:gap-2 transition-all duration-500"
+              style={{ top: milesRemaining > 0 ? '30%' : '35%', transform: `scale(${autoScale('weatherPanel')})`, transformOrigin: 'top right' }}>
+              {sorted.map((w, i) => (
+                <div key={`warn-${i}`} data-testid={`warning-sign-${i}`} 
+                  className="flex items-center gap-1.5 cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => {
+                    if (mapInstanceRef.current && w.coord) {
+                      mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: w.coord[0], lng: w.coord[1] }, zoom: 16 }, true);
+                    }
+                  }}>
+                  {/* Warning sign icon */}
+                  {w.type === 'height' && (
+                    <div className="flex flex-col items-center">
+                      <svg viewBox="0 0 44 44" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="40" height="40" rx="3" fill="#D4AF37" stroke="#1a1a1a" strokeWidth="2.5" transform="rotate(45 22 22)"/>
+                        <text x="22" y="20" textAnchor="middle" fill="#1a1a1a" fontSize="10" fontWeight="900" fontFamily="Arial">{w.label.split("'")[0]}'</text>
+                        <text x="22" y="31" textAnchor="middle" fill="#1a1a1a" fontSize="8" fontWeight="800" fontFamily="Arial">{w.label.includes('"') ? w.label.split("'")[1] : ''}</text>
+                      </svg>
+                      <span className="text-[8px] md:text-[9px] font-black text-white mt-0.5">{w.distance.toFixed(0)}<span className="text-[6px] text-zinc-400">mi</span></span>
+                    </div>
+                  )}
+                  {w.type === 'weight' && (
+                    <div className="flex flex-col items-center">
+                      <div className="bg-[#1a1a1a] border-2 border-[#D4AF37] rounded-md px-2 py-1 flex flex-col items-center">
+                        <span className="text-[14px] md:text-[16px] font-black text-[#D4AF37] leading-none">{w.label}</span>
+                        <span className="text-[7px] md:text-[8px] font-black text-[#D4AF37]/70 uppercase leading-tight">TONS</span>
+                      </div>
+                      <span className="text-[8px] md:text-[9px] font-black text-white mt-0.5">{w.distance.toFixed(0)}<span className="text-[6px] text-zinc-400">mi</span></span>
+                    </div>
+                  )}
+                  {w.type === 'curve' && (
+                    <div className="flex flex-col items-center">
+                      <svg viewBox="0 0 44 44" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                        <rect x="2" y="2" width="40" height="40" rx="3" fill="#D4AF37" stroke="#1a1a1a" strokeWidth="2.5" transform="rotate(45 22 22)"/>
+                        {w.icon === 'curveLeft' ? (
+                          <path d="M28,30 Q14,22 20,12 L16,15 M20,12 L23,16" fill="none" stroke="#1a1a1a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        ) : (
+                          <path d="M16,30 Q30,22 24,12 L28,15 M24,12 L21,16" fill="none" stroke="#1a1a1a" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        )}
+                      </svg>
+                      <span className="text-[8px] md:text-[9px] font-black text-white mt-0.5">{w.distance.toFixed(0)}<span className="text-[6px] text-zinc-400">mi</span></span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })()
       )}
 
       {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}
