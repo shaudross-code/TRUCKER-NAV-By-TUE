@@ -20,11 +20,13 @@ import {
   Phone,
   Mail,
   CreditCard,
-  Calendar
+  Calendar,
+  Hash
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
 import DriverProfileModal from './DriverProfileModal';
+import TruckProfileModal from './TruckProfileModal';
 
 const MapFolder: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -280,10 +282,11 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
   const [driverProfile, setDriverProfile] = useState(() => {
     try {
       const saved = localStorage.getItem('trucker_driver_profile');
-      return saved ? JSON.parse(saved) : { firstName: '', lastName: '', phone: '', email: '', licenseNumber: '', licenseExpiry: '' };
-    } catch { return { firstName: '', lastName: '', phone: '', email: '', licenseNumber: '', licenseExpiry: '' }; }
+      return saved ? JSON.parse(saved) : { firstName: '', lastName: '', phone: '', email: '', licenseNumber: '', licenseExpiry: '', licensePlate: '' };
+    } catch { return { firstName: '', lastName: '', phone: '', email: '', licenseNumber: '', licenseExpiry: '', licensePlate: '' }; }
   });
   const [showDriverModal, setShowDriverModal] = useState(false);
+  const [showTruckModal, setShowTruckModal] = useState(false);
 
   const saveDriverProfile = (profile: typeof driverProfile) => {
     setDriverProfile(profile);
@@ -432,59 +435,83 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
           </div>
           <div className="space-y-3">
             <ProfileField 
+              label="Truck #" 
+              value={truckProfile.truckNumber || 'Not Set'} 
+              icon={Hash} 
+              onEdit={() => setShowTruckModal(true)}
+            />
+            <ProfileField 
+              label="Trailer #" 
+              value={truckProfile.trailerNumber || 'Not Set'} 
+              icon={Hash} 
+              onEdit={() => setShowTruckModal(true)}
+            />
+            <ProfileField 
+              label="Truck Plate" 
+              value={truckProfile.truckPlate || 'Not Set'} 
+              icon={Hash} 
+              onEdit={() => setShowTruckModal(true)}
+            />
+            <ProfileField 
+              label="Trailer Plate" 
+              value={truckProfile.trailerPlate || 'Not Set'} 
+              icon={Hash} 
+              onEdit={() => setShowTruckModal(true)}
+            />
+            <ProfileField 
               label="Current Height" 
               value={unitSystem === 'imperial' ? `${truckProfile.height}' (Truck Height)` : `${(truckProfile.height * 0.3048).toFixed(1)} m (Truck Height)`}
               icon={ArrowUpCircle} 
-              onEdit={() => handleEdit('height')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Gross Weight" 
               value={unitSystem === 'imperial' ? `${truckProfile.weight.toLocaleString()} lbs (GVW)` : `${Math.round(truckProfile.weight * 0.453592).toLocaleString()} kg (GVW)`}
               icon={Scale} 
-              onEdit={() => handleEdit('weight')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Trailer Length" 
               value={unitSystem === 'imperial' ? `${truckProfile.length}' (Trailer Length)` : `${(truckProfile.length * 0.3048).toFixed(1)} m (Trailer Length)`}
               icon={RotateCcw} 
-              onEdit={() => handleEdit('length')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Truck Width" 
               value={unitSystem === 'imperial' ? `${truckProfile.width}' (Width)` : `${(truckProfile.width * 0.3048).toFixed(1)} m (Width)`}
               icon={ArrowUpCircle} 
-              onEdit={() => handleEdit('width')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Axle Count" 
               value={`${truckProfile.axleCount} Axles`} 
               icon={Scale} 
-              onEdit={() => handleEdit('axleCount')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Axle Weight" 
               value={unitSystem === 'imperial' ? `${truckProfile.axleWeight.toLocaleString()} lbs (Per Axle)` : `${Math.round(truckProfile.axleWeight * 0.453592).toLocaleString()} kg (Per Axle)`}
               icon={Scale} 
-              onEdit={() => handleEdit('axleWeight')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Trailer Count" 
               value={`${truckProfile.trailerCount} Units`} 
               icon={Truck} 
-              onEdit={() => handleEdit('trailerCount')}
+              onEdit={() => setShowTruckModal(true)}
             />
             <ProfileField 
               label="Tunnel Category" 
               value={`${truckProfile.tunnelCategory} (ADR)`} 
               icon={Shield} 
-              onEdit={() => handleEdit('tunnelCategory')}
+              onEdit={() => setShowTruckModal(true)}
             />
             {truckProfile.hazmat && (
               <ProfileField 
                 label="Hazmat Classes" 
                 value={truckProfile.hazmatClasses.length > 0 ? truckProfile.hazmatClasses.join(', ') : 'All Classes'} 
                 icon={Shield} 
-                onEdit={() => handleEdit('hazmatClasses')}
+                onEdit={() => setShowTruckModal(true)}
               />
             )}
             <div className="mt-6 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-2xl">
@@ -496,6 +523,13 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
                 Routing algorithm is currently synchronized with the dimensions above. Ensure these match your actual load for legal compliance.
               </p>
             </div>
+            <button 
+              data-testid="edit-truck-profile-btn"
+              onClick={() => setShowTruckModal(true)}
+              className="w-full py-3 mt-4 rounded-xl font-bold text-black uppercase tracking-widest text-xs bg-[#D4AF37] hover:bg-[#b5952f] transition-colors shadow-[0_0_20px_rgba(212,175,55,0.3)]"
+            >
+              Edit Truck Profile
+            </button>
           </div>
         </section>
 
@@ -534,6 +568,12 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
               label="License Expires" 
               value={driverProfile.licenseExpiry ? new Date(driverProfile.licenseExpiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not Set'} 
               icon={Calendar} 
+              onEdit={() => setShowDriverModal(true)}
+            />
+            <ProfileField 
+              label="License Plate" 
+              value={driverProfile.licensePlate || 'Not Set'} 
+              icon={Hash} 
               onEdit={() => setShowDriverModal(true)}
             />
             <button 
@@ -675,6 +715,14 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
         onClose={() => setShowDriverModal(false)}
         profile={driverProfile}
         onSave={saveDriverProfile}
+      />
+      
+      {/* Truck Profile Modal */}
+      <TruckProfileModal
+        isOpen={showTruckModal}
+        onClose={() => setShowTruckModal(false)}
+        profile={truckProfile}
+        onSave={(p: any) => { setTruckProfile(p); localStorage.setItem('trucker_truck_profile', JSON.stringify(p)); }}
       />
     </div>
   );

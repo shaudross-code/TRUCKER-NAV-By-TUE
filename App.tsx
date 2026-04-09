@@ -267,17 +267,33 @@ const AppContent: React.FC = React.memo(() => {
   }, [user?.uid]);
 
   // Sync profile data to local state or just use profile directly
-  const truckProfile = useMemo(() => profile?.truckProfile || {
-    height: 13.5,
-    weight: 78500,
-    length: 53,
-    width: 8.5,
-    hazmat: false,
-    hazmatClasses: [],
-    tunnelCategory: 'NONE',
-    axleCount: 5,
-    axleWeight: 12000,
-    trailerCount: 1
+  const truckProfile = useMemo(() => {
+    const stored = profile?.truckProfile;
+    if (!stored) return {
+      height: 13.5, weight: 78500, length: 53, width: 8.5,
+      hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
+      axleCount: 5, axleWeight: 12000, trailerCount: 1,
+      model: '', year: 2024, make: '',
+      truckNumber: '', trailerNumber: '', truckPlate: '', trailerPlate: ''
+    };
+    // Fix "0" bug: ensure numeric fields that shouldn't be 0 use defaults
+    return {
+      ...stored,
+      height: stored.height || 13.5,
+      weight: stored.weight || 78500,
+      length: stored.length || 53,
+      width: stored.width || 8.5,
+      axleCount: stored.axleCount || 5,
+      axleWeight: stored.axleWeight || 12000,
+      trailerCount: stored.trailerCount != null && stored.trailerCount > 0 ? stored.trailerCount : 1,
+      model: stored.model || '',
+      year: stored.year || 2024,
+      make: stored.make || '',
+      truckNumber: stored.truckNumber || '',
+      trailerNumber: stored.trailerNumber || '',
+      truckPlate: stored.truckPlate || '',
+      trailerPlate: stored.trailerPlate || '',
+    };
   }, [profile]);
 
   const setTruckProfile = useCallback((newProfile: any) => {

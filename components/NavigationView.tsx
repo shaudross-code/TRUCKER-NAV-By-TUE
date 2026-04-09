@@ -4465,11 +4465,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           placeTruckWarnings(thinRestrictions);
         }
 
-        // Place inline road name labels — thin aggressively (max 15)
-        if (hudLayout.showHighwayShields && primaryRoute.roadSegments && primaryRoute.roadSegments.length > 0) {
-          const thinLabels = primaryRoute.roadSegments.slice(0, 15);
-          placeRoadLabels(thinLabels.map((seg: any) => ({ ...seg, coords })));
-        }
+        // Road name labels removed — user reported they cause confusion and screen clutter
 
         // Draw lane count visualization on highway segments
         if (primaryRoute.spans && primaryRoute.spans.length > 0) {
@@ -5489,7 +5485,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       .filter((exit: any) => exit.routeIdx >= (userRouteIdx - 5));
 
     // Combine POIs + exits, sorted by position along route
-    const combined = [...withPrices, ...exits].sort((a, b) => a.routeIdx - b.routeIdx);
+    // Attach nearest exit info to each non-exit POI
+    const enrichedPois = withPrices.map(poi => {
+      if (poi.isExit) return poi;
+      let nearestExit: any = null;
+      let nearestDist = Infinity;
+      for (const ex of exits) {
+        const d = Math.abs(ex.routeIdx - poi.routeIdx);
+        if (d < nearestDist) { nearestDist = d; nearestExit = ex; }
+      }
+      return { ...poi, nearestExit: nearestExit ? { name: nearestExit.exitName || nearestExit.name, number: nearestExit.exitNumber } : null };
+    });
+
+    const combined = [...enrichedPois, ...exits].sort((a, b) => a.routeIdx - b.routeIdx);
     setUpcomingPois(combined);
   }, [isDriving, pois.length, routePoints.length, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null, Array.from(poiFilters).join(','), fuelStations.length]);;
 
@@ -6287,7 +6295,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   return (
                     <div key={idx} data-testid={`route-poi-item-${idx}`} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors active:bg-[#D4AF37]/10" onClick={() => {
                       setSelectedPoi(poi);
-                      // Center map on this POI
                       if (mapInstanceRef.current) {
                         mapInstanceRef.current.getViewModel().setLookAtData({ position: { lat: poi.lat, lng: poi.lon }, zoom: 15 }, true);
                       }
@@ -6301,7 +6308,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                         <div className="flex flex-col overflow-hidden">
                           <span className="text-[8px] md:text-[10px] font-bold text-white truncate w-full">{poi.name}</span>
                           <div className="flex items-center gap-1.5">
-                            <span className="text-[6px] md:text-[8px] font-black text-zinc-500 uppercase truncate">{poi.type}</span>
+                            {poi.nearestExit && (
+                              <span className="text-[6px] md:text-[7px] font-black text-green-400/80 truncate">
+                                Exit {poi.nearestExit.number || poi.nearestExit.name}
+                              </span>
+                            )}
                             {poi.dieselPrice && (
                               <span className="text-[7px] md:text-[9px] font-black text-[#D4AF37] tabular-nums">
                                 ${poi.dieselPrice.toFixed(2)}

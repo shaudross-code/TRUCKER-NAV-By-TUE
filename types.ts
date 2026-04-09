@@ -155,6 +155,13 @@ export interface AppContextType {
     axleCount: number;
     axleWeight: number;
     trailerCount: number;
+    model?: string;
+    year?: number;
+    make?: string;
+    truckNumber?: string;
+    trailerNumber?: string;
+    truckPlate?: string;
+    trailerPlate?: string;
   };
   setTruckProfile: React.Dispatch<React.SetStateAction<{
     height: number;
@@ -167,6 +174,13 @@ export interface AppContextType {
     axleCount: number;
     axleWeight: number;
     trailerCount: number;
+    model?: string;
+    year?: number;
+    make?: string;
+    truckNumber?: string;
+    trailerNumber?: string;
+    truckPlate?: string;
+    trailerPlate?: string;
   }>>;
   weeklyEarnings: number;
   setWeeklyEarnings: React.Dispatch<React.SetStateAction<number>>;

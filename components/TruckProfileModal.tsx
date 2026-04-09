@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Truck, Scale, ArrowUpCircle, RotateCcw, Shield } from 'lucide-react';
+import { X, Truck, Scale, ArrowUpCircle, RotateCcw, Shield, Hash } from 'lucide-react';
 
 interface TruckProfile {
   height: number;
@@ -15,6 +15,10 @@ interface TruckProfile {
   model: string;
   year: number;
   make: string;
+  truckNumber?: string;
+  trailerNumber?: string;
+  truckPlate?: string;
+  trailerPlate?: string;
 }
 
 interface TruckProfileModalProps {
@@ -37,7 +41,6 @@ const RECOMMENDED: Record<string, number> = {
 };
 
 const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, profile, onSave }) => {
-  // Use strings for numeric fields to prevent "0" showing on clear
   const [formData, setFormData] = useState<Record<string, any>>({});
 
   useEffect(() => {
@@ -46,39 +49,57 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
         make: profile.make || '',
         model: profile.model || '',
         year: profile.year ? String(profile.year) : '',
-        height: profile.height ? String(profile.height) : '',
-        weight: profile.weight ? String(profile.weight) : '',
-        length: profile.length ? String(profile.length) : '',
-        width: profile.width ? String(profile.width) : '',
-        axleCount: profile.axleCount ? String(profile.axleCount) : '',
-        axleWeight: profile.axleWeight ? String(profile.axleWeight) : '',
+        height: profile.height != null && profile.height !== 0 ? String(profile.height) : '',
+        weight: profile.weight != null && profile.weight !== 0 ? String(profile.weight) : '',
+        length: profile.length != null && profile.length !== 0 ? String(profile.length) : '',
+        width: profile.width != null && profile.width !== 0 ? String(profile.width) : '',
+        axleCount: profile.axleCount != null && profile.axleCount !== 0 ? String(profile.axleCount) : '',
+        axleWeight: profile.axleWeight != null && profile.axleWeight !== 0 ? String(profile.axleWeight) : '',
         trailerCount: profile.trailerCount != null ? String(profile.trailerCount) : '',
         hazmat: profile.hazmat || false,
         hazmatClasses: profile.hazmatClasses || [],
         tunnelCategory: profile.tunnelCategory || 'NONE',
+        truckNumber: profile.truckNumber || '',
+        trailerNumber: profile.trailerNumber || '',
+        truckPlate: profile.truckPlate || '',
+        trailerPlate: profile.trailerPlate || '',
       });
     }
   }, [profile, isOpen]);
 
   if (!isOpen) return null;
 
+  const parseNum = (val: string, fallback: number): number => {
+    if (val === '' || val == null) return fallback;
+    const n = parseFloat(val);
+    return isNaN(n) ? fallback : n;
+  };
+  const parseInt2 = (val: string, fallback: number): number => {
+    if (val === '' || val == null) return fallback;
+    const n = parseInt(val, 10);
+    return isNaN(n) ? fallback : n;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Convert string fields back to numbers, falling back to recommended defaults
     onSave({
       make: formData.make || '',
       model: formData.model || '',
-      year: parseInt(formData.year) || RECOMMENDED.year,
-      height: parseFloat(formData.height) || RECOMMENDED.height,
-      weight: parseInt(formData.weight) || RECOMMENDED.weight,
-      length: parseFloat(formData.length) || RECOMMENDED.length,
-      width: parseFloat(formData.width) || RECOMMENDED.width,
-      axleCount: parseInt(formData.axleCount) || RECOMMENDED.axleCount,
-      axleWeight: parseInt(formData.axleWeight) || RECOMMENDED.axleWeight,
-      trailerCount: parseInt(formData.trailerCount) ?? RECOMMENDED.trailerCount,
+      year: parseInt2(formData.year, RECOMMENDED.year),
+      height: parseNum(formData.height, RECOMMENDED.height),
+      weight: parseInt2(formData.weight, RECOMMENDED.weight),
+      length: parseNum(formData.length, RECOMMENDED.length),
+      width: parseNum(formData.width, RECOMMENDED.width),
+      axleCount: parseInt2(formData.axleCount, RECOMMENDED.axleCount),
+      axleWeight: parseInt2(formData.axleWeight, RECOMMENDED.axleWeight),
+      trailerCount: parseInt2(formData.trailerCount, RECOMMENDED.trailerCount),
       hazmat: formData.hazmat,
       hazmatClasses: formData.hazmatClasses,
       tunnelCategory: formData.tunnelCategory,
+      truckNumber: formData.truckNumber || '',
+      trailerNumber: formData.trailerNumber || '',
+      truckPlate: formData.truckPlate || '',
+      trailerPlate: formData.trailerPlate || '',
     });
     onClose();
   };
@@ -129,7 +150,27 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
             </div>
             <div>
               <label className={labelClass}><Truck className="w-3 h-3" />Year</label>
-              <input data-testid="truck-year" type="number" value={formData.year || ''} onChange={(e) => setField('year', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.year)} />
+              <input data-testid="truck-year" type="text" inputMode="numeric" value={formData.year || ''} onChange={(e) => setField('year', e.target.value.replace(/\D/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.year)} />
+            </div>
+          </div>
+
+          {/* Truck & Trailer Numbers + License Plates */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass}><Hash className="w-3 h-3" />Truck #</label>
+              <input data-testid="truck-number" type="text" value={formData.truckNumber || ''} onChange={(e) => setField('truckNumber', e.target.value.toUpperCase())} className={inputClass} placeholder="T-1042" />
+            </div>
+            <div>
+              <label className={labelClass}><Hash className="w-3 h-3" />Trailer #</label>
+              <input data-testid="trailer-number" type="text" value={formData.trailerNumber || ''} onChange={(e) => setField('trailerNumber', e.target.value.toUpperCase())} className={inputClass} placeholder="TR-5501" />
+            </div>
+            <div>
+              <label className={labelClass}><Hash className="w-3 h-3" />Truck Plate</label>
+              <input data-testid="truck-plate" type="text" value={formData.truckPlate || ''} onChange={(e) => setField('truckPlate', e.target.value.toUpperCase())} className={inputClass} placeholder="ABC 1234" />
+            </div>
+            <div>
+              <label className={labelClass}><Hash className="w-3 h-3" />Trailer Plate</label>
+              <input data-testid="trailer-plate" type="text" value={formData.trailerPlate || ''} onChange={(e) => setField('trailerPlate', e.target.value.toUpperCase())} className={inputClass} placeholder="XYZ 5678" />
             </div>
           </div>
           
@@ -137,19 +178,19 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={labelClass}><ArrowUpCircle className="w-3 h-3" />Height (ft)</label>
-              <input data-testid="truck-height" type="number" step="0.1" value={formData.height || ''} onChange={(e) => setField('height', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.height)} />
+              <input data-testid="truck-height" type="text" inputMode="decimal" value={formData.height || ''} onChange={(e) => setField('height', e.target.value.replace(/[^0-9.]/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.height)} />
             </div>
             <div>
               <label className={labelClass}><Scale className="w-3 h-3" />Weight (lbs)</label>
-              <input data-testid="truck-weight" type="number" value={formData.weight || ''} onChange={(e) => setField('weight', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.weight)} />
+              <input data-testid="truck-weight" type="text" inputMode="numeric" value={formData.weight || ''} onChange={(e) => setField('weight', e.target.value.replace(/\D/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.weight)} />
             </div>
             <div>
               <label className={labelClass}><RotateCcw className="w-3 h-3" />Length (ft)</label>
-              <input data-testid="truck-length" type="number" step="0.1" value={formData.length || ''} onChange={(e) => setField('length', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.length)} />
+              <input data-testid="truck-length" type="text" inputMode="decimal" value={formData.length || ''} onChange={(e) => setField('length', e.target.value.replace(/[^0-9.]/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.length)} />
             </div>
             <div>
               <label className={labelClass}><ArrowUpCircle className="w-3 h-3" />Width (ft)</label>
-              <input data-testid="truck-width" type="number" step="0.1" value={formData.width || ''} onChange={(e) => setField('width', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.width)} />
+              <input data-testid="truck-width" type="text" inputMode="decimal" value={formData.width || ''} onChange={(e) => setField('width', e.target.value.replace(/[^0-9.]/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.width)} />
             </div>
           </div>
           
@@ -157,15 +198,15 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className={labelClass}><RotateCcw className="w-3 h-3" />Axles</label>
-              <input data-testid="truck-axles" type="number" value={formData.axleCount || ''} onChange={(e) => setField('axleCount', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.axleCount)} />
+              <input data-testid="truck-axles" type="text" inputMode="numeric" value={formData.axleCount || ''} onChange={(e) => setField('axleCount', e.target.value.replace(/\D/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.axleCount)} />
             </div>
             <div>
               <label className={labelClass}><Scale className="w-3 h-3" />Axle Wt</label>
-              <input data-testid="truck-axle-weight" type="number" value={formData.axleWeight || ''} onChange={(e) => setField('axleWeight', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.axleWeight)} />
+              <input data-testid="truck-axle-weight" type="text" inputMode="numeric" value={formData.axleWeight || ''} onChange={(e) => setField('axleWeight', e.target.value.replace(/\D/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.axleWeight)} />
             </div>
             <div>
               <label className={labelClass}><Truck className="w-3 h-3" />Trailers</label>
-              <input data-testid="truck-trailers" type="number" value={formData.trailerCount ?? ''} onChange={(e) => setField('trailerCount', e.target.value)} className={inputClass} placeholder={String(RECOMMENDED.trailerCount)} />
+              <input data-testid="truck-trailers" type="text" inputMode="numeric" value={formData.trailerCount ?? ''} onChange={(e) => setField('trailerCount', e.target.value.replace(/\D/g, ''))} className={inputClass} placeholder={String(RECOMMENDED.trailerCount)} />
             </div>
           </div>
           

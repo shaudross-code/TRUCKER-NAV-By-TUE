@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Phone, Mail, CreditCard, Calendar } from 'lucide-react';
+import { X, User, Phone, Mail, CreditCard, Calendar, Hash } from 'lucide-react';
 
 interface DriverProfileData {
   firstName: string;
@@ -8,6 +8,7 @@ interface DriverProfileData {
   email: string;
   licenseNumber: string;
   licenseExpiry: string;
+  licensePlate?: string;
 }
 
 interface DriverProfileModalProps {
@@ -142,6 +143,21 @@ const DriverProfileModal: React.FC<DriverProfileModalProps> = ({ isOpen, onClose
               onChange={(e) => setFormData({...formData, licenseExpiry: e.target.value})}
               className={inputClass}
               required
+            />
+          </div>
+
+          <div>
+            <label className={labelClass}>
+              <Hash className="w-3 h-3" />
+              Driver License Plate
+            </label>
+            <input 
+              data-testid="driver-license-plate"
+              type="text" 
+              value={formData.licensePlate || ''}
+              onChange={(e) => setFormData({...formData, licensePlate: e.target.value.toUpperCase()})}
+              className={inputClass}
+              placeholder="ABC 1234"
             />
           </div>
           

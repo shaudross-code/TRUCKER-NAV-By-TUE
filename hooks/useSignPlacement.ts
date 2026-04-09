@@ -156,8 +156,8 @@ export function useSignPlacement(
         const params = new URLSearchParams({ label, countryCode: 'USA', routeLevel: String(routeLevel), width: '64' });
         if (stateCode && stateCode.length === 2) params.append('stateCode', stateCode.toUpperCase());
         const shieldUrl = `/api/road-shield?${params.toString()}`;
-        const dirBadge = directionBadge(direction || '');
-        const dirLabelHtml = directionLabel(direction || '');
+        const dirBadge = ''; // Direction badges removed — user reported screen clutter
+        const dirLabelHtml = ''; // Direction labels removed — user reported screen clutter
         let fallbackHtml = '';
         if (type === 'interstate') fallbackHtml = interstateShield(label, 44);
         else if (type === 'us') fallbackHtml = usRouteShield(label, 40);
