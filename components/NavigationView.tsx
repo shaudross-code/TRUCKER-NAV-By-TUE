@@ -478,6 +478,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [isMapReady, setIsMapReady] = useState(false);
 
   const [isNorthUp, setIsNorthUp] = useState(false); // Always start in heading-up mode
+  const [isTilted, setIsTilted] = useState(false); // Map tilt toggle (0° flat vs 55° cinematic)
   const manualRotationRef = useRef(0);
   const [manualRotation, setManualRotation] = useState(0);
   const [isCompassMode, setIsCompassMode] = useState(false);
@@ -1352,9 +1353,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // If marker already exists, don't recreate — position is managed by interpolation
     if (userMarkerRef.current) return;
     
-    const el = document.createElement('div');
-    el.className = 'user-marker-wrapper';
-    el.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
+    // Build the marker element directly (NOT via outerHTML string copy)
+    // This ensures userMarkerElRef points to the LIVE DOM element on the map
+    const wrapper = document.createElement('div');
+    wrapper.style.position = 'relative';
+    wrapper.style.width = '40px';
+    wrapper.style.height = '40px';
+    wrapper.style.marginLeft = '-20px';
+    wrapper.style.marginTop = '-20px';
+    wrapper.style.pointerEvents = 'none';
+    wrapper.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
       <div class="relative vehicle-pointer" style="filter: drop-shadow(0 2px 6px rgba(26,115,232,0.5))">
         <svg viewBox="0 0 40 40" width="36" height="36" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -1367,16 +1375,37 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </svg>
       </div>
     </div>`;
+
+    // Create DomIcon from the LIVE element (not a string copy)
+    const icon = new H.map.DomIcon(wrapper);
+    const marker = new H.map.DomMarker(
+      { lat: userLocation[0], lng: userLocation[1] },
+      { icon, zIndex: 100 }
+    );
     
-    // Restore current heading immediately so the arrow doesn't flash at 0°
-    const pointerEl = el.querySelector('.vehicle-pointer') as HTMLElement;
+    userMarkerRef.current = marker;
+    mapInstanceRef.current.addObject(marker);
+
+    // Get the pointer ref from the SAME element used by DomIcon — this is the LIVE element
+    const pointerEl = wrapper.querySelector('.vehicle-pointer') as HTMLElement;
     if (pointerEl && smoothedHeadingRef.current) {
       pointerEl.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
     }
-
-    userMarkerRef.current = createDomMarker(userLocation[0], userLocation[1], el.outerHTML, [40, 40], [20, 20], 100);
-    mapInstanceRef.current.addObject(userMarkerRef.current);
     userMarkerElRef.current = pointerEl;
+
+    // Safety net: HERE DomIcon may clone the element — find the live DOM copy after render
+    requestAnimationFrame(() => {
+      const mapContainer = mapRef.current;
+      if (mapContainer) {
+        const livePointer = mapContainer.querySelector('.vehicle-pointer') as HTMLElement;
+        if (livePointer && livePointer !== pointerEl) {
+          userMarkerElRef.current = livePointer;
+          if (smoothedHeadingRef.current) {
+            livePointer.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
+          }
+        }
+      }
+    });
   }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   // Numbered waypoint markers on the map
@@ -1705,6 +1734,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
     map.getViewPort().resize();
   }, [isNorthUp]);
+
+  // Toggle map tilt (0° flat / 55° cinematic)
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    try {
+      map.getViewModel().setLookAtData({ tilt: isTilted ? 55 : 0 }, true);
+    } catch (_) {}
+  }, [isTilted]);
+
 
   const poiFiltersString = useMemo(() => Array.from(poiFilters).join(','), [poiFilters]);
 
@@ -4984,50 +5023,56 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const dLat = cLat - pLat;
         const dLon = (cLon - pLon) * Math.cos(pLat * Math.PI / 180);
         const dist = Math.sqrt(dLat * dLat + dLon * dLon);
-        if (dist > 0.00001) { // ~1m movement threshold
+        if (dist > 0.00003) { // ~3m movement threshold (raised from 1m to reduce noise)
           const posHeading = (Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360;
           positionHeadingRef.current = posHeading;
         }
       }
       prevLocationRef.current = currentLoc ? [currentLoc[0], currentLoc[1]] : null;
 
-      // If no GPS heading, use position-based heading or route-based heading
-      if (!rawHeading || rawHeading === 0) {
-        // Try route-based heading first (most reliable when actively navigating)
-        if (isDriving && routeCoordsRef.current.length > 1) {
-          const currentIdx = lastSimIdxRef.current;
-          if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
-            const p1 = routeCoordsRef.current[currentIdx];
-            const p2 = routeCoordsRef.current[currentIdx + 1];
-            const dy = p2[0] - p1[0];
-            const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
-            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-            rawHeading = (90 - angle + 360) % 360;
-          } else if (routeCoordsRef.current.length > 1) {
-            // lastSimIdx not set yet — use first route segment as initial heading
-            const p1 = routeCoordsRef.current[0];
-            const p2 = routeCoordsRef.current[1];
-            const dy = p2[0] - p1[0];
-            const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
-            const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-            rawHeading = (90 - angle + 360) % 360;
-          }
+      // PRIORITY: Route heading > GPS heading > Position heading
+      // Route heading is the most stable and reliable when actively navigating
+      if (isDriving && routeCoordsRef.current.length > 1) {
+        const currentIdx = lastSimIdxRef.current;
+        if (currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1) {
+          const p1 = routeCoordsRef.current[currentIdx];
+          const p2 = routeCoordsRef.current[Math.min(currentIdx + 3, routeCoordsRef.current.length - 1)];
+          const dy = p2[0] - p1[0];
+          const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          rawHeading = (90 - angle + 360) % 360;
+        } else if (routeCoordsRef.current.length > 1) {
+          const p1 = routeCoordsRef.current[0];
+          const p2 = routeCoordsRef.current[1];
+          const dy = p2[0] - p1[0];
+          const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
+          const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+          rawHeading = (90 - angle + 360) % 360;
         }
-        // Fall back to position-based heading if route heading unavailable
-        if ((!rawHeading || rawHeading === 0) && positionHeadingRef.current > 0) {
+      } else if (!rawHeading || rawHeading === 0) {
+        // Not driving on route — fall back to position-based heading
+        if (positionHeadingRef.current > 0 && speed > 1) {
           rawHeading = positionHeadingRef.current;
         }
       }
 
-      // Smooth the heading — faster convergence when driving on route for precise alignment
+      // Smooth the heading — professional-grade: lock to route direction when navigating,
+      // heavy damping to prevent erratic spinning (CMV-grade stability)
       if (speed > 0.3 || rawHeading !== 0) {
         const diff = rawHeading - smoothedHeadingRef.current;
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
-        // Use higher convergence when actively navigating with route heading (0.6), 
-        // normal convergence otherwise (0.45)
-        const factor = (isDriving && routeCoordsRef.current.length > 1) ? 0.6 : 0.45;
-        smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * factor + 360) % 360;
+        
+        // Ignore micro-heading changes (< 3°) to prevent jitter when stationary/crawling
+        if (Math.abs(normalizedDiff) < 3 && speed < 2) {
+          // Skip update — heading is stable enough
+        } else {
+          // Lower factor = smoother, more stable rotation
+          // Route-driving: 0.15 (very stable, locks to route heading)
+          // Free-driving: 0.08 (heavy damping for GPS noise suppression)
+          const factor = (isDriving && routeCoordsRef.current.length > 1) ? 0.15 : 0.08;
+          smoothedHeadingRef.current = (smoothedHeadingRef.current + normalizedDiff * factor + 360) % 360;
+        }
       }
 
       const currentHeading = smoothedHeadingRef.current;
@@ -6677,6 +6722,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setShowTrafficFlow={setShowTrafficFlow}
         showRouteReasoning={showRouteReasoning}
         setShowRouteReasoning={setShowRouteReasoning}
+        isTilted={isTilted}
+        setIsTilted={setIsTilted}
         className={hudPositions.mapControls && (hudPositions.mapControls.x !== DEFAULT_POSITIONS.mapControls.x || hudPositions.mapControls.y !== DEFAULT_POSITIONS.mapControls.y) ? '' : `-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
         hudScale={hudScales.mapControls || 1}
       /></div>}

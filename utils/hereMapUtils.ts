@@ -42,10 +42,8 @@ export function createHereMap(
     pixelRatio: window.devicePixelRatio || 1,
   });
 
-  // Set default tilt for cinematic trucking GPS perspective (45-80°)
-  try {
-    map.getViewModel().setLookAtData({ tilt: 55 }, true);
-  } catch (_) {}
+  // Default to flat (0° tilt) — user can toggle tilt via map controls
+  // Do NOT set tilt here; it's managed by the tilt toggle button
 
   // Resize listener
   const onResize = () => map.getViewPort().resize();
