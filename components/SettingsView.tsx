@@ -19,7 +19,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { AppContext } from '../types';
-import { offlineMapsData } from '../src/constants/offlineMaps';
+import { offlineMapsData } from '../constants/offlineMaps';
 
 const MapFolder: React.FC<{ title: string, children: React.ReactNode }> = ({ title, children }) => {
   const [isOpen, setIsOpen] = useState(false);

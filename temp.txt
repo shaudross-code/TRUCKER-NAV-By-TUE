@@ -1,0 +1,48 @@
+348:  const mapLayersRef = useRef<Record<string, L.Polyline>>({});
+779:  const facilityMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+894:            // console.log("NavigationView: calling L.map");
+895:            map = L.map(mapRef.current!, {
+903:            console.error("NavigationView: L.map() failed", e);
+949:          routeGroupRef.current = L.layerGroup().addTo(map);
+950:          shieldLayerGroupRef.current = L.layerGroup().addTo(map);
+978:                return L.divIcon({
+981:                  iconSize: L.point(dim, dim),
+988:            markerClusterGroupRef.current = L.layerGroup();
+1326:          const icon = L.divIcon({
+1338:          L.marker([dp[0], dp[1]], { icon, interactive: false, pane: 'signPane' })
+1350:    map.on('contextmenu', (e: L.LeafletMouseEvent) => {
+1353:      L.popup()
+1513:      const marker = L.marker([wp.lat, wp.lon], {
+1514:        icon: L.divIcon({
+1631:          const marker = L.marker([iLat, iLon], {
+1632:            icon: L.divIcon({
+1757:      if (layer instanceof L.TileLayer || (layer as any).options?.style) {
+1770:      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+1777:      L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/512/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`, {
+1790:          L.tileLayer(`https://api.maptiler.com/maps/${MAPTILER_STYLE_ID}/256/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`, {
+1796:        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+1801:      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+1823:      L.tileLayer(overlayUrl, overlayOpts).addTo(map);
+1825:      const overlay2 = L.tileLayer(overlayUrl, { ...overlayOpts, opacity: 0.6 }).addTo(map);
+1848:    const group = L.layerGroup().addTo(mapInstanceRef.current);
+1879:      const marker = L.marker([facility.lat, facility.lon], {
+1880:        icon: L.divIcon({ html: iconEl, className: '', iconSize: [32, 36], iconAnchor: [16, 36] }),
+2368:            const traveledLine = L.polyline(traveledCoords, {
+2388:          const glowLine = L.polyline(segmentCoords, {
+4605:        const bounds = L.latLngBounds(coords.map(c => [c[0], c[1]]));
+4909:      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
+4910:        icon: L.divIcon({ 
+4921:      const popup = L.popup({ offset: [0, -25] }).setContent(`
+4967:      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
+4968:        icon: L.divIcon({ 
+4979:      const popup = L.popup({ offset: [0, -25] }).setContent(`
+5029:      const marker = L.marker([alert.lat, alert.lon], { icon: L.divIcon({ html: weatherIconsCacheRef.current[cacheKey], className: 'alert-marker', iconAnchor: [12, 24] }) });
+5034:      const popup = L.popup({ offset: [0, -25] }).setContent(`
+5058:      const bounds = routeCoordsRef.current.length > 0 ? L.latLngBounds(routeCoordsRef.current.map(c => [c[0], c[1]])) : null;
+5418:            const marker = L.marker([poi.lat, poi.lon], { icon: L.divIcon({ html: `<div class="custom-poi-icon"><div class="counter-rotate">${iconHtml}</div></div>`, className: 'poi-marker', iconAnchor: [12, 24] }) });
+5429:            const popup = L.popup({ offset: [0, -25] }).setContent(`
+5495:              const entranceMarker = L.marker([poi.entrance.lat, poi.entrance.lon], { icon: L.divIcon({ html: `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, className: 'entrance-marker', iconAnchor: [12, 12] }) });
+5510:              const exitMarker = L.marker([poi.exit.lat, poi.exit.lon], { icon: L.divIcon({ html: `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, className: 'exit-marker', iconAnchor: [12, 12] }) });
+5571:    const trafficMarkersRef: L.Marker[] = [];
+5633:        const marker = L.marker([item.position[0], item.position[1]], {
+5634:          icon: L.divIcon({

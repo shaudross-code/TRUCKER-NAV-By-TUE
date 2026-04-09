@@ -64,8 +64,13 @@ function writeRatingsStore(data: Record<string, FacilityEntry>) {
 // ────────────────────────────────────────────────────────────────────────────
 
 // Initialize Firebase Admin with service account (env var or file fallback)
+const configPath = path.join(__dirname, 'firebase-applet-config.json');
+const firebaseAppletConfig = existsSync(configPath) ? JSON.parse(readFileSync(configPath, 'utf8')) : {};
+const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || firebaseAppletConfig.projectId || '';
+
 try {
   let serviceAccount;
+
   if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     console.log('Firebase Admin: using FIREBASE_SERVICE_ACCOUNT env var');
@@ -87,7 +92,6 @@ try {
 
 // Programmatically add authorized domains for Firebase Auth
 async function addAuthorizedDomains() {
-  const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
   const domainsToAdd = [
     'hud-customizer-5.preview.emergentagent.com',
     'poi-fuel-tracker.preview.emergentagent.com',
@@ -167,7 +171,6 @@ async function enableAuthProviders(client: any, projectId: string) {
 }
 
 async function updateFirestoreRules() {
-  const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || '';
   try {
     const keyPath = path.join(__dirname, 'serviceAccountKey.json');
     const authClient = new GoogleAuth({
@@ -1389,7 +1392,7 @@ async function seedFacilitiesFromGoogle(lat: number, lon: number, gk: string): P
     app.use(vite.middlewares);
   }
 
-  const PORT = parseInt(process.env.PORT || '8001', 10);
+  const PORT = parseInt(process.env.PORT || '3000', 10);
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is listening on port ${PORT}...`);
   });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Target, Compass, Check, Navigation as NavIcon, Building2, Menu, Star, Activity, Route } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2 } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
@@ -44,6 +44,29 @@ export const MapControls: React.FC<any> = React.memo(({
   React.useEffect(() => {
     if (isDrivingMode) setIsCollapsed(true);
   }, [isDrivingMode]);
+
+  // Combined heading-up + follow-me + zoom handler
+  const handleFollowHeadingUp = () => {
+    if (isValidLatLng(userLocation)) {
+      if (is3DMode && mapboxMapRef?.current) {
+        mapboxMapRef.current.flyTo({ 
+          center: [userLocation[1], userLocation[0]], 
+          zoom: 17.5, 
+          pitch: 55,
+          duration: 1000 
+        });
+      } else if (mapInstanceRef.current) {
+        mapInstanceRef.current.getViewModel().setLookAtData({ 
+          position: { lat: userLocation[0], lng: userLocation[1] }, 
+          zoom: 17 
+        }, true); 
+      }
+      setIsFollowMode(true); 
+      setIsOverviewMode(false);
+      // Enable heading-up mode
+      if (isNorthUp) setIsNorthUp();
+    }
+  };
 
   return (
     <div id="nav-map-controls" className={`absolute right-2 md:right-4 z-[2010] flex flex-col items-end gap-1 md:gap-2 transition-all duration-700 origin-right ${className}`} style={{ transform: `scale(${hudScale})` }}>
@@ -95,10 +118,10 @@ export const MapControls: React.FC<any> = React.memo(({
                   <div className="flex gap-2 mb-2">
                     <button
                       onClick={() => {
-                        const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'cummins', 'peterbilt', 'volvo', 'freightliner', 'truck_wash'];
+                        const brandIds = ['loves', 'pilot', 'flying_j', 'petro', 'ta', 'road_ranger', 'bucees', 'sapp_bros', 'ambest', 'speedco', 'southern_tire', 'rush', 'ryder', 'penske', 'peterbilt', 'volvo', 'freightliner', 'cummins', 'truck_wash'];
                         const allIds = [
                           ...brandIds, 'parking', 'rest_area', 
-                          'weigh_station', 'cat_scale', 'food', 'service', 'low_clearance', 'other'
+                          'cat_scale', 'food', 'service', 'low_clearance', 'other'
                         ];
                         setPoiFilters(new Set(allIds));
                       }}
@@ -136,7 +159,6 @@ export const MapControls: React.FC<any> = React.memo(({
                       { id: 'truck_wash',    label: 'Truck Wash' },
                       { id: 'parking',       label: 'Parking',       divider: true },
                       { id: 'rest_area',     label: 'Rest Areas' },
-                      { id: 'weigh_station', label: 'DOT Weigh Stations' },
                       { id: 'cat_scale',    label: 'Certified Scales' },
                       { id: 'low_clearance', label: 'Low Clearance' },
                       { id: 'food',          label: 'Food' },
@@ -275,32 +297,7 @@ export const MapControls: React.FC<any> = React.memo(({
             <Minus className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
           </button>
 
-          {/* Overview — collapsible */}
-          {!isCollapsed && (
-            <button 
-              onClick={() => { 
-                const newOverviewMode = !isOverviewMode;
-                setIsOverviewMode(newOverviewMode);
-                if (newOverviewMode) {
-                  setIsFollowMode(false);
-                  if (is3DMode && mapboxMapRef?.current) {
-                    mapboxMapRef.current.easeTo({ pitch: 0, zoom: 12, duration: 800 });
-                  }
-                } else {
-                  if (is3DMode && mapboxMapRef?.current && isValidLatLng(userLocation)) {
-                    mapboxMapRef.current.flyTo({ center: [userLocation[1], userLocation[0]], zoom: 17.5, pitch: 70, duration: 800 });
-                  }
-                }
-              }} 
-              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${isOverviewMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
-              title="Toggle Route Overview"
-              data-testid="overview-btn"
-            >
-              <MapIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-            </button>
-          )}
-          
-          {/* 2D/3D toggle — collapsible */}
+          {/* HERE/SAT toggle — collapsible */}
           {!isCollapsed && (
             <button 
               onClick={() => { 
@@ -309,107 +306,30 @@ export const MapControls: React.FC<any> = React.memo(({
                 localStorage.setItem(getUserStorageKey(getCurrentUserId(), 'nav_3d_mode'), String(newMode));
               }} 
               className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${is3DMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
-              title={is3DMode ? '3D View Active' : 'Switch to 3D'}
+              title={is3DMode ? 'Satellite View Active' : 'Switch to Satellite View'}
             >
-              <span className="font-black text-[10px] md:text-xs">{is3DMode ? '3D' : '2D'}</span>
+              <span className="font-black text-[10px] md:text-xs">{is3DMode ? 'SAT' : 'HERE'}</span>
             </button>
           )}
 
-          {/* Follow User — collapsible */}
-          {!isCollapsed && (
-            <button 
-              onClick={() => { 
-                if (isValidLatLng(userLocation)) {
-                  if (is3DMode && mapboxMapRef?.current) {
-                    mapboxMapRef.current.flyTo({ 
-                      center: [userLocation[1], userLocation[0]], 
-                      zoom: 17.5, 
-                      pitch: 70,
-                      duration: 1000 
-                    });
-                  } else if (mapInstanceRef.current) {
-                    mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17); 
-                  }
-                  setIsFollowMode(true); 
-                  setIsOverviewMode(false);
-                }
-              }} 
-              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${!isFollowMode || isOverviewMode ? 'bg-red-600/20 text-red-500 border border-red-500/50 animate-pulse' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-              title="Follow User"
-              data-testid="follow-user-btn"
-            >
-              <Target className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
-            </button>
-          )}
-
-          {/* Heading Up / North Up — always visible */}
+          {/* Heading Up + Follow Me — single combined button (always visible) */}
           <button 
-            onClick={() => setIsNorthUp()} 
-            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${!isNorthUp ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'}`}
-            title={isNorthUp ? "Switch to Heading Up" : "Switch to North Up"}
-            data-testid="orientation-btn"
+            onClick={handleFollowHeadingUp}
+            className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
+              isFollowMode && !isOverviewMode && !isNorthUp 
+                ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' 
+                : !isFollowMode || isOverviewMode 
+                  ? 'bg-red-600/20 text-red-500 border border-red-500/50 animate-pulse' 
+                  : 'bg-white/5 text-[#D4AF37] hover:bg-white/10'
+            }`}
+            title="Heading Up + Follow Me"
+            data-testid="follow-heading-btn"
           >
-            <div style={{ transform: !isNorthUp ? `rotate(var(--map-rotation, 0deg))` : 'none', transition: 'transform 0.5s ease-out' }}>
-              <NavIcon className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${!isNorthUp ? 'animate-pulse' : ''}`} strokeWidth={4} />
+            <div style={{ transform: isFollowMode && !isNorthUp ? `rotate(var(--map-rotation, 0deg))` : 'none', transition: 'transform 0.5s ease-out' }}>
+              <NavIcon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={4} />
             </div>
           </button>
 
-          {/* Device Compass toggle — collapsible */}
-          {!isCollapsed && (
-            <button
-              onClick={() => setIsCompassMode?.(!isCompassMode)}
-              data-testid="compass-mode-btn"
-              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
-                isCompassMode
-                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
-                  : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-[#D4AF37]'
-              }`}
-              title={isCompassMode ? 'Compass Mode Active — tap to disable' : 'Enable Device Compass Mode'}
-            >
-              <Compass className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${isCompassMode ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
-              {isCompassMode && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
-              )}
-            </button>
-          )}
-
-          {/* Traffic Flow overlay toggle — collapsible */}
-          {!isCollapsed && (
-            <button
-              onClick={() => setShowTrafficFlow?.(!showTrafficFlow)}
-              data-testid="traffic-flow-btn"
-              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
-                showTrafficFlow
-                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
-                  : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-[#D4AF37]'
-              }`}
-              title={showTrafficFlow ? 'Traffic Flow ON — tap to hide' : 'Show Real-Time Traffic Flow'}
-            >
-              <Activity className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${showTrafficFlow ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
-              {showTrafficFlow && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
-              )}
-            </button>
-          )}
-
-          {/* Route Reasoning overlay toggle — collapsible */}
-          {!isCollapsed && (
-            <button
-              onClick={() => setShowRouteReasoning?.(!showRouteReasoning)}
-              data-testid="route-reasoning-btn"
-              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all relative ${
-                showRouteReasoning
-                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/50 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
-                  : 'bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-[#D4AF37]'
-              }`}
-              title={showRouteReasoning ? 'Route Reasoning ON — tap to hide' : 'Show Route Reasoning (tolls, restrictions, highway preference)'}
-            >
-              <Route className={`w-3.5 h-3.5 md:w-4.5 md:h-4.5 ${showRouteReasoning ? 'animate-pulse' : ''}`} strokeWidth={2.5} />
-              {showRouteReasoning && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-[#D4AF37] rounded-full animate-ping" />
-              )}
-            </button>
-          )}
         </div>
     </div>
   );

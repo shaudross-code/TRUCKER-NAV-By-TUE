@@ -58,8 +58,12 @@ export function formatDate(date: Date): string {
 export function calcTotals(entries: LogEntry[]) {
   let totalDrive = 0, totalOnDuty = 0, totalSleeper = 0, totalOff = 0;
   entries.forEach(e => {
-    if (!e.endTime) return;
-    const dur = (new Date(e.endTime).getTime() - new Date(e.startTime).getTime()) / 3600000;
+    if (!e.endTime || !e.startTime) return;
+    const start = new Date(e.startTime).getTime();
+    const end = new Date(e.endTime).getTime();
+    if (isNaN(start) || isNaN(end)) return;
+    
+    const dur = (end - start) / 3600000;
     if (e.status === 'DRIVE') totalDrive += dur;
     else if (e.status === 'ON') totalOnDuty += dur;
     else if (e.status === 'SB') totalSleeper += dur;
@@ -75,8 +79,12 @@ export function detectViolations(entries: LogEntry[]): string[] {
   let driveSinceBreak = 0;
 
   entries.forEach(e => {
-    if (!e.endTime) return;
-    const dur = (new Date(e.endTime).getTime() - new Date(e.startTime).getTime()) / 3600000;
+    if (!e.endTime || !e.startTime) return;
+    const start = new Date(e.startTime).getTime();
+    const end = new Date(e.endTime).getTime();
+    if (isNaN(start) || isNaN(end)) return;
+
+    const dur = (end - start) / 3600000;
     if (e.status === 'DRIVE') {
       totalDrive += dur;
       driveSinceBreak += dur;

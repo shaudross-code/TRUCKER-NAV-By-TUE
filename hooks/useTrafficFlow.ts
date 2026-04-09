@@ -1,5 +1,5 @@
 import { useRef, useCallback } from 'react';
-import L from 'leaflet';
+import { createGroup, createPolyline } from '../utils/hereMapUtils';
 
 /**
  * Real-time Traffic Flow Overlay — HERE Traffic API v7
@@ -48,14 +48,14 @@ function jamWeight(jam: number): number {
 export function useTrafficFlow(
   mapInstanceRef: { current: any },
 ) {
-  const flowLayerRef = useRef<L.LayerGroup | null>(null);
+  const flowLayerRef = useRef<any>(null);
   const fetchingRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const enabledRef = useRef(false);
 
   const clearFlow = useCallback(() => {
     if (flowLayerRef.current) {
-      flowLayerRef.current.clearLayers();
+      flowLayerRef.current.removeAll();
     }
   }, []);
 
@@ -96,9 +96,10 @@ export function useTrafficFlow(
       const results: FlowResult[] = data.results || [];
 
       if (!flowLayerRef.current) {
-        flowLayerRef.current = L.layerGroup().addTo(map);
+        flowLayerRef.current = createGroup();
+        map.addObject(flowLayerRef.current);
       }
-      flowLayerRef.current.clearLayers();
+      flowLayerRef.current.removeAll();
 
       for (const result of results) {
         const links = result.location?.shape?.links || [];
@@ -111,17 +112,13 @@ export function useTrafficFlow(
           if (!flow) continue;
 
           const jam = flow.jamFactor ?? 0;
-          const latlngs: L.LatLngExpression[] = link.points.map(p => [p.lat, p.lng]);
+          const latlngs: [number, number][] = link.points.map(p => [p.lat, p.lng]);
 
-          const polyline = L.polyline(latlngs, {
-            color: jamColor(jam),
-            weight: jamWeight(jam),
+          const polyline = createPolyline(latlngs, jamColor(jam), jamWeight(jam), {
             opacity: 0.8,
-            smoothFactor: 2,
-            interactive: false,
           });
 
-          flowLayerRef.current!.addLayer(polyline);
+          flowLayerRef.current!.addObject(polyline);
         }
       }
     } catch (err) {

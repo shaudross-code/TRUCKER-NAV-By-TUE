@@ -1,0 +1,135 @@
+{
+  "summary": "Frontend testing of TRUCKERS NAV BY TUE app iteration 80. Verified all requested changes: (1) MapControls simplified to 7 buttons only (hamburger, filter, zoom+, level, zoom-, HERE/SAT, follow/heading-up), (2) No duplicate buttons for heading-up, north-up, compass, traffic flow, route reasoning, overview, (3) Weigh stations excluded from POI filter list and getPoiCategory returns 'excluded', (4) POI panel has collapsible header with count and scrollable list. All 15 features tested and working.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "Gemini TTS API", "issue": "API key reported as leaked (403 error) - TTS falls back to native browser speech synthesis (non-blocking)"}
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_80.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: Guest login (Continue as Guest + skip tutorial) - works correctly",
+    "VERIFIED: Navigation view renders with satellite tiles (HERE logistics.satellite.day) and 55° map tilt",
+    "VERIFIED: Map controls simplified - Only 7 buttons visible: hamburger (≡), filter, zoom+, zoom level, zoom-, HERE/SAT, follow/heading-up",
+    "VERIFIED: No duplicate buttons - heading-up, north-up, compass, traffic flow, route reasoning, overview buttons correctly removed",
+    "VERIFIED: Follow/Heading-Up button (navigation arrow icon) works - click centers on user and enables follow mode",
+    "VERIFIED: Filter button opens POI filter panel with categories (NO weigh station in the list - confirmed in code)",
+    "VERIFIED: HERE/SAT toggle switches between HERE map and Mapbox SAT view",
+    "VERIFIED: Route calculation works - typed 'Dallas TX', clicked ROUTE, gold polyline rendered with 3 route alternatives",
+    "VERIFIED: Route comparison panel shows PRIMARY (9h 54m, 661.4 mi, $358.17), ALT 1 (10h 34m, 674.3 mi, $365.15), ALT 2 (10h 32m, 694.3 mi, $376.00)",
+    "VERIFIED: Turn-by-turn navigation header shows maneuver instruction ('Continue on S 8th St on W Broadway. Go')",
+    "VERIFIED: Truck Restrictions panel shows warnings ('ROUTE GOES THROUGH TOLL BOOTH THAT REQUIRES TRANSPONDER')",
+    "VERIFIED: Weather widget visible with temperature (42° CLOUDY, 9 MPH NNE wind, 14.5 MI visibility)",
+    "VERIFIED: MUTCD speed limit sign visible (35 mph shown on route)",
+    "VERIFIED: Sidebar tabs all work (Dashboard, Navigation, Load Board, Truck Stops, Pay Summary, Maintenance, History, Fuel Network, Community, ELD Logs, Offline Maps, Display, Settings, Announcements)",
+    "VERIFIED: Display tab HUD toggles work - shows 22/22 visible elements, SHOW ALL/HIDE ALL, Trip Panel Position, Speed Warning Tolerance",
+    "VERIFIED: IOWA state badge visible at bottom center",
+    "VERIFIED: Compass rose visible at bottom right corner",
+    "CODE VERIFIED: getPoiCategory() returns 'excluded' for weigh stations (line 471-473 in PoiIcon.tsx)",
+    "CODE VERIFIED: MapControls filter list does NOT include weigh_station (lines 140-167 in MapControls.tsx)"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only test)",
+    "frontend": "100% - All 15 requested features working correctly"
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button on login screen",
+    "email": "test@trucker.com / Test123456"
+  },
+
+  "seed_data_creation": "",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App successfully uses HERE Maps JS API v3.1 with logistics.satellite.day tiles. Map tilt is 55° by default. MapControls simplified to 7 buttons only (hamburger, filter, zoom+, level, zoom-, HERE/SAT, follow/heading-up). Duplicate buttons removed (heading-up, north-up, compass, traffic flow, route reasoning, overview). Weigh stations excluded from POI filter and getPoiCategory returns 'excluded'. POI panel has collapsible header with count badge and scrollable max-h-[35vh] container. Marker interpolation dampened: lerp=0.06, dead-zone=0.5m, throttled to 20fps. Gemini TTS API key is leaked - app falls back to native TTS. Geolocation fails in headless browser - defaults to Council Bluffs, Iowa. Preview URL: https://hud-customizer-5.preview.emergentagent.com",
+
+  "features_tested": {
+    "guest_login": {
+      "status": "PASS",
+      "details": "Guest login button works, navigates to COMMAND CENTER dashboard, tutorial skip works"
+    },
+    "navigation_view_satellite_tilt": {
+      "status": "PASS",
+      "details": "HERE logistics.satellite.day tiles load with 55° tilt perspective visible"
+    },
+    "map_controls_simplified": {
+      "status": "PASS",
+      "details": "Only 7 buttons visible: hamburger (≡), filter, zoom+, zoom level indicator, zoom-, HERE/SAT toggle, follow/heading-up"
+    },
+    "no_duplicate_buttons": {
+      "status": "PASS",
+      "details": "Confirmed NO separate buttons for: heading-up, north-up, device compass, traffic flow, route reasoning, overview"
+    },
+    "follow_heading_up_button": {
+      "status": "PASS",
+      "details": "Navigation arrow icon button works - click centers on user location and enables follow mode"
+    },
+    "filter_panel_no_weigh_station": {
+      "status": "PASS",
+      "details": "Filter panel opens with POI categories. Weigh station NOT in list (confirmed in code: MapControls.tsx lines 140-167)"
+    },
+    "here_sat_toggle": {
+      "status": "PASS",
+      "details": "HERE/SAT toggle button switches between HERE map (logistics.satellite.day) and Mapbox SAT view"
+    },
+    "route_calculation": {
+      "status": "PASS",
+      "details": "Route calculated from Council Bluffs, Iowa to Dallas, TX - gold route polyline rendered with 3 alternatives"
+    },
+    "turn_by_turn_navigation": {
+      "status": "PASS",
+      "details": "Navigation header shows 'Continue on S 8th St on W Broadway. Go'"
+    },
+    "truck_restrictions_panel": {
+      "status": "PASS",
+      "details": "TRUCK RESTRICTIONS (1) panel shows 'ROUTE GOES THROUGH TOLL BOOTH THAT REQUIRES TRANSPONDER'"
+    },
+    "weather_widget": {
+      "status": "PASS",
+      "details": "Shows 42° CLOUDY, 9 MPH NNE wind, 14.5 MI visibility, 3-day forecast"
+    },
+    "mutcd_speed_limit_sign": {
+      "status": "PASS",
+      "details": "SPEED LIMIT 35 sign visible near user marker after routing"
+    },
+    "poi_panel_collapsible": {
+      "status": "PASS (code verified)",
+      "details": "POI panel has collapsible header with count badge, scrollable max-h-[35vh] container, clicking POI centers map (verified in NavigationView.tsx)"
+    },
+    "sidebar_tabs": {
+      "status": "PASS",
+      "details": "All 14 sidebar tabs clickable and functional"
+    },
+    "display_hud_toggles": {
+      "status": "PASS",
+      "details": "Display Layout tab shows 22/22 visible elements, SHOW ALL/HIDE ALL, Trip Panel Position, Speed Warning Tolerance"
+    }
+  },
+
+  "known_issues": {
+    "gemini_api_key": "Gemini API key reported as leaked (403 error) - TTS falls back to native browser speech synthesis. Non-blocking.",
+    "geolocation": "Geolocation fails in headless browser - defaults to Council Bluffs, Iowa via IP geolocation fallback. Expected behavior."
+  },
+
+  "mocked_apis": {
+    "none": "No mocked APIs - all integrations are live (HERE Maps, Mapbox, etc.)"
+  }
+}

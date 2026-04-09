@@ -30,7 +30,7 @@ export const RouteSettingsModal: React.FC<RouteSettingsModalProps> = ({
 
   return (
     <div className="absolute inset-0 z-[3000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-zinc-900 border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div className="bg-black border border-[#D4AF37]/30 rounded-2xl p-6 w-full max-w-md shadow-2xl">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-3">
             <Settings className="w-5 h-5 text-[#D4AF37]" />

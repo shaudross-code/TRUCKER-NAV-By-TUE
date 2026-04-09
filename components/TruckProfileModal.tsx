@@ -28,10 +28,23 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
   const [formData, setFormData] = useState<TruckProfile>(profile);
 
   useEffect(() => {
-    setFormData(profile);
+    if (isOpen) {
+      setFormData(profile);
+    }
   }, [profile, isOpen]);
 
   if (!isOpen) return null;
+
+  const handleNumberChange = (field: keyof TruckProfile, value: string, isFloat: boolean = false) => {
+    if (value === '') {
+      setFormData(prev => ({ ...prev, [field]: 0 }));
+      return;
+    }
+    const parsed = isFloat ? parseFloat(value) : parseInt(value, 10);
+    if (!isNaN(parsed)) {
+      setFormData(prev => ({ ...prev, [field]: parsed }));
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +67,7 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="space-y-4">
             <div>
               <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2">
@@ -92,7 +105,7 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               <input 
                 type="number" 
                 value={formData.year || ''}
-                onChange={(e) => setFormData({...formData, year: parseInt(e.target.value) || 0})}
+                onChange={(e) => handleNumberChange('year', e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -106,8 +119,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               <input 
                 type="number" 
                 step="0.1"
-                value={formData.height}
-                onChange={(e) => setFormData({...formData, height: parseFloat(e.target.value) || 0})}
+                value={formData.height || ''}
+                onChange={(e) => handleNumberChange('height', e.target.value, true)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -120,8 +133,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               </label>
               <input 
                 type="number" 
-                value={formData.weight}
-                onChange={(e) => setFormData({...formData, weight: parseInt(e.target.value) || 0})}
+                value={formData.weight || ''}
+                onChange={(e) => handleNumberChange('weight', e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -135,8 +148,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               <input 
                 type="number" 
                 step="0.1"
-                value={formData.length}
-                onChange={(e) => setFormData({...formData, length: parseFloat(e.target.value) || 0})}
+                value={formData.length || ''}
+                onChange={(e) => handleNumberChange('length', e.target.value, true)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -150,8 +163,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               <input 
                 type="number" 
                 step="0.1"
-                value={formData.width}
-                onChange={(e) => setFormData({...formData, width: parseFloat(e.target.value) || 0})}
+                value={formData.width || ''}
+                onChange={(e) => handleNumberChange('width', e.target.value, true)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -164,8 +177,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               </label>
               <input 
                 type="number" 
-                value={formData.axleCount}
-                onChange={(e) => setFormData({...formData, axleCount: parseInt(e.target.value) || 0})}
+                value={formData.axleCount || ''}
+                onChange={(e) => handleNumberChange('axleCount', e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -178,8 +191,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               </label>
               <input 
                 type="number" 
-                value={formData.axleWeight}
-                onChange={(e) => setFormData({...formData, axleWeight: parseInt(e.target.value) || 0})}
+                value={formData.axleWeight || ''}
+                onChange={(e) => handleNumberChange('axleWeight', e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -192,8 +205,8 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
               </label>
               <input 
                 type="number" 
-                value={formData.trailerCount}
-                onChange={(e) => setFormData({...formData, trailerCount: parseInt(e.target.value) || 0})}
+                value={formData.trailerCount || ''}
+                onChange={(e) => handleNumberChange('trailerCount', e.target.value)}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
                 required
               />
@@ -209,6 +222,7 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
                 onChange={(e) => setFormData({...formData, tunnelCategory: e.target.value})}
                 className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-white font-mono focus:outline-none focus:border-[#D4AF37]/50 transition-colors"
               >
+                <option value="NONE">NONE</option>
                 <option value="A">A</option>
                 <option value="B">B</option>
                 <option value="C">C</option>

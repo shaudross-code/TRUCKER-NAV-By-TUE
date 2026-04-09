@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   User, 
   onAuthStateChanged, 
@@ -77,15 +78,25 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // For anonymous users, skip Firestore entirely — use local profile
     if (user.isAnonymous) {
+      const savedProfile = localStorage.getItem(`trucker_profile_${user.uid}`);
+      if (savedProfile) {
+        try {
+          setProfile(JSON.parse(savedProfile));
+          return;
+        } catch (e) {
+          console.warn('Failed to parse local profile:', e);
+        }
+      }
+
       const localProfile: UserProfile = {
         uid: user.uid,
         email: '',
         displayName: 'Guest Driver',
         truckProfile: {
-          height: 0, weight: 0, length: 0, width: 0,
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 0, axleWeight: 0, trailerCount: 0,
-          make: '', model: '', year: 0
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
+          make: 'Volvo', model: 'VNL 660', year: 2026
         }
       };
       setProfile(localProfile);
@@ -102,19 +113,19 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           email: user.email || '',
           displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
           truckProfile: {
-            height: 0,
-            weight: 0,
-            length: 0,
-            width: 0,
+            height: 13.5,
+            weight: 78500,
+            length: 53,
+            width: 8.5,
             hazmat: false,
             hazmatClasses: [],
             tunnelCategory: 'NONE',
-            axleCount: 0,
-            axleWeight: 0,
-            trailerCount: 0,
-            make: '',
-            model: '',
-            year: 0
+            axleCount: 5,
+            axleWeight: 12000,
+            trailerCount: 1,
+            make: 'Volvo',
+            model: 'VNL 660',
+            year: 2026
           }
         };
         setDoc(userDocRef, initialProfile).catch(() => {
@@ -130,10 +141,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         email: user.email || '',
         displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
         truckProfile: {
-          height: 0, weight: 0, length: 0, width: 0,
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 0, axleWeight: 0, trailerCount: 0,
-          make: '', model: '', year: 0
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
+          make: 'Volvo', model: 'VNL 660', year: 2026
         }
       };
       setProfile(localProfile);
@@ -264,7 +275,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!user) return;
     // Skip Firestore writes for anonymous users — data is saved locally via localStorage
     if (user.isAnonymous) {
-      setProfile(prev => prev ? { ...prev, ...data } : null);
+      setProfile(prev => {
+        const next = prev ? { ...prev, ...data } : null;
+        if (next) {
+          localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(next));
+        }
+        return next;
+      });
       return;
     }
     try {

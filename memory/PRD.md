@@ -1,96 +1,52 @@
-# TRUCKERS NAV By TUE - Product Requirements Document
+# TRUCKERS NAV By TUE — Product Requirements Document
 
 ## Original Problem Statement
-Build a professional trucking GPS navigation application with:
-- Real POIs using HERE Maps API
-- Turn-by-turn navigation with voice guidance
-- Real-time traffic/infrastructure alerts
-- 3D/2D satellite maps with dynamic switching
-- MUTCD-compliant official US road signs
-- Customizable UI/HUD layouts
-- Custom fuel network POI tracking
-- CMV warning systems
-- Multi-user support with Google Sign-In
-- Timed guest sessions (2 hours)
-- Gold/black themed navigation interface
-- Professional highway overlays with comprehensive exit signs
-- Permanent hardcoded highway/road overlay on the map
-- Inline road name labels along route polyline
+Build a professional trucking GPS navigation app. Features: HERE Maps satellite hybrid, turn-by-turn navigation, real-time hazard alerts, MUTCD road signs, customizable HUD layouts, POI clustering, multi-user support, guest sessions.
 
-## Architecture
-- **Frontend**: React + Vite + TypeScript + Leaflet
-- **Backend**: Node.js + Express (port 8001)
-- **Frontend Proxy**: Nginx (port 3000)
-- **Auth**: Firebase Auth (Google via custom token flow, Email/Password, Anonymous/Guest)
-- **Database**: Firebase Firestore + localStorage (user-scoped)
-- **Maps**: HERE Maps API (routing v8), Mapbox (tiles + road overlay), Google Maps (Places API)
-
-## Preview URL
-https://hud-customizer-5.preview.emergentagent.com
+## Core Architecture
+- **Frontend**: React (Vite) + TypeScript, HERE Maps JS API v3.1, Mapbox GL JS (SAT 2D view)
+- **Backend**: Node.js/Express (`server.ts`) on port 8001 with Vite dev server middleware
+- **Database**: Firebase Firestore (user profiles), LocalStorage (HUD layout, guest settings)
+- **Maps**: HERE logistics.satellite.day tiles (55° tilt, native colors) + Mapbox satellite-streets-v12 (SAT 2D)
+- **HERE Project**: `hrn:here:authorization::org675124033:project/trucking-nav`
 
 ## Completed Features
-- [x] Core navigation with HERE API truck routing (v8.140.0)
-- [x] MUTCD-compliant vector road signs (Interstate shields, US Routes, Speed Limits, Warnings)
-- [x] Real-time traffic incident overlays with auto-reroute countdown
-- [x] Collapsible map controls with hamburger button
-- [x] Waypoint numbered markers on route
-- [x] Customizable HUD Layout editor (Display tab in sidebar)
-- [x] Voice announcements and lane guidance
-- [x] POI marker clustering (leaflet.markercluster)
-- [x] Coming Soon overlays (Load Board, Truck Stops)
-- [x] Multi-user localStorage scoping (userStorage.ts)
-- [x] Tutorial overlay for new users
-- [x] Weigh Stations / Certified Scales POIs
-- [x] 2-hour Guest Session Timer with countdown warnings
-- [x] Google Sign-In (full-page redirect + Firebase custom token)
-- [x] Clean slate truck profile for new users
-- [x] Clean slate pay summary (no fake statements)
-- [x] Coming Soon overlay on Maintenance, Offline Maps tabs
-- [x] Announcements section (iOS/Android development notice)
-- [x] Denser highway shield placement along routes
-- [x] Enhanced exit sign extraction from all action types
-- [x] Larger, more professional exit guide sign visuals
-- [x] Permanent highway/road network overlay (Mapbox navigation-night-v1, mix-blend-mode:screen) - Apr 2026
-- [x] Pure satellite base tiles (satellite-v9) for cleaner overlay effect - Apr 2026
-- [x] Inline road name labels along route polyline with mini highway emblems - Apr 2026
-- [x] Labels oriented to road bearing, rotate with user heading - Apr 2026
-
-## Google Sign-In Implementation Details
-- Uses full-page redirect flow (no popups - avoids Safari COOP issues)
-- Server exchanges Google auth code for tokens, then creates Firebase custom token via Admin SDK
-- Frontend uses signInWithCustomToken to complete sign-in
-
-## Road Overlay Architecture
-- **Base tiles**: Mapbox `satellite-v9` (pure satellite, no built-in streets)
-- **Road overlay**: 2x Mapbox `navigation-night-v1` layers on `roadOverlayPane` (z-index 350)
-- **Blend mode**: `mix-blend-mode: screen` makes dark background invisible, keeps bright roads
-- **Road labels**: `placeRoadLabels()` in `useSignPlacement.ts` places labels every ~80 polyline points
-- **Label orientation**: Each label rotated to match road bearing at that point
-- **No counter-rotate**: Labels rotate WITH map heading during navigation
-
-## Upcoming Tasks (Priority Order)
-1. **P1**: Refactor NavigationView.tsx (~7000 lines) into smaller hooks/components
-2. **P2**: Apple Sign-In integration (requires Apple Developer credentials)
-3. **P2**: Speed limit warning system
-
-## Future/Backlog
-- PC*MILER Data integration (requires enterprise API)
-- Route Safety Score badge
-- Viewport-based sign culling (performance)
-- Driver reputation/review system
-- iOS and Android Store Submission
-
-## Key Files
-- `/app/components/NavigationView.tsx` - Core map UI (~7000+ lines, needs refactoring)
-- `/app/components/FirebaseProvider.tsx` - Auth context + Google OAuth
-- `/app/components/HudLayoutView.tsx` - HUD customization
-- `/app/components/GuestSessionTimer.tsx` - 2hr guest timer
-- `/app/hooks/useSignPlacement.ts` - Sign placement, road labels, and rendering
-- `/app/utils/mutcdSigns.ts` - MUTCD road sign SVG generation
-- `/app/server.ts` - Express backend (HERE API, Google OAuth)
-- `/app/utils/userStorage.ts` - User-scoped localStorage
+- [x] HERE Maps JS API v3.1 (replaced Leaflet)
+- [x] HERE logistics.satellite.day hybrid tiles with native colors
+- [x] 55° map tilt for cinematic GPS perspective
+- [x] Mapbox 2D SAT view with pitch:55
+- [x] H.clustering.Provider POI clustering with gold/black SVG theme
+- [x] Fixed user location icon jitter (lerp=0.06, dead-zone 0.5m, 20fps cap)
+- [x] Simplified MapControls: 7 buttons only
+- [x] Merged heading-up + follow-me into single default button
+- [x] POI panel: collapsible header with count, scrollable max-h-[35vh]
+- [x] Turn-by-turn navigation with voice + route comparison (3 alternatives)
+- [x] MUTCD road signs (Interstate shields, Speed Limits, Truck Warnings)
+- [x] Real-time truck restrictions and toll warnings
+- [x] Weather widget with 3-day forecast
+- [x] Customizable HUD Layout (Display tab) — 22 toggleable elements
+- [x] Traffic incident overlays + auto-reroute countdown
+- [x] Guest login + Google Sign-In + 2-hour session timer
+- [x] HERE Routing API v8.140.0 truck routing
+- [x] Removed CSS dark-gold map tint — native HERE satellite colors — Apr 6, 2026
+- [x] Signature gold/black theme on NavigationHUD Lane Guidance — Apr 6, 2026
+- [x] Signature gold/black theme on Route Comparison Panel — Apr 6, 2026
+- [x] Fixed truck profile defaults (13.5'/78500lbs/53'/8.5'/5axles/12000/1trailer) — Apr 6, 2026
+- [x] Fixed heading-up mode spinning when stationary (5m dead-zone, 2mph speed gate) — Apr 6, 2026
+- [x] Enhanced Route Comparison Panel: FASTEST/CHEAPEST/SHORTEST/SAFEST badges, time/cost savings, fuel gallon breakdown, toll breakdown, restriction count, total est. cost — Apr 6, 2026
+- [x] Upgraded HERE Routing API: fuel[type]=diesel with consumption tables, consumption spans for per-segment diesel data — Apr 6, 2026
 
 ## Known Issues
-- NavigationView.tsx is dangerously large (~7000+ lines) - needs refactoring
-- Apple Sign-In disabled (requires Apple Developer credentials)
-- Some state road shield API requests fail intermittently (non-blocking, SVG fallback used)
+- Gemini TTS key degraded (403) — falls back to native speech
+- Overpass API 504 timeouts (intermittent corridor POI fetch)
+- Intermittent trucker-nav service drops
+
+## Upcoming Tasks (P1)
+- [ ] Refactor NavigationView.tsx (~6700 lines) into smaller hooks/components
+- [ ] Speed limit warning system (red flash + audio when exceeding)
+- [ ] Viewport-based sign culling for DOM performance
+
+## Future Tasks (P2)
+- [ ] Apple Sign-In, PC*MILER Data, Route Safety Score
+- [ ] Map filtering for Reputation Scores, Driver review system
+- [ ] iOS/Android Store Submission

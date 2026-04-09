@@ -32,19 +32,19 @@ export const WarningBanners: React.FC<WarningBannersProps> = ({
 
       {isOffRoute && (
         <div className={`absolute left-1/2 -translate-x-1/2 z-[3000] w-full max-w-[600px] px-4 md:px-6 transition-all duration-700 ${topOffset}`}>
-          <div className="bg-rose-600 border-2 border-white/20 rounded-3xl p-3 md:p-4 flex items-center gap-3 md:gap-4 shadow-[0_20px_60px_rgba(225,29,72,0.4)]">
-            <div className="bg-white p-1.5 md:p-2 rounded-xl text-rose-600">
+          <div className="bg-black/90 border-2 border-[#D4AF37] rounded-3xl p-3 md:p-4 flex items-center gap-3 md:gap-4 shadow-[0_20px_60px_rgba(0,0,0,0.8),0_0_30px_rgba(212,175,55,0.2)]">
+            <div className="bg-[#D4AF37] p-1.5 md:p-2 rounded-xl text-black">
               <RotateCcw className={`w-5 h-5 md:w-6 md:h-6 ${isCalculating ? 'animate-spin' : ''}`} strokeWidth={3} />
             </div>
             <div className="flex-1">
-              <h3 className="text-white font-black uppercase italic tracking-tighter text-base md:text-lg leading-none">Off Route Detected</h3>
+              <h3 className="text-[#D4AF37] font-black uppercase italic tracking-tighter text-base md:text-lg leading-none">Off Route Detected</h3>
               <p className="text-white/80 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mt-0.5 md:mt-1">
                 {autoReroute ? 'Recalculating route...' : 'Manual recalculation required'}
               </p>
             </div>
             {!autoReroute && (
               <button onClick={handleReroute} disabled={isCalculating}
-                className="px-4 py-2 bg-white text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 transition-all shadow-lg disabled:opacity-50">
+                className="px-4 py-2 bg-[#D4AF37] text-black rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-lg disabled:opacity-50">
                 {isCalculating ? 'Recalculating...' : 'Recalculate'}
               </button>
             )}
@@ -54,12 +54,12 @@ export const WarningBanners: React.FC<WarningBannersProps> = ({
 
       {hasViolation && (
         <div className={`absolute left-1/2 -translate-x-1/2 z-[3000] w-full max-w-[600px] px-4 md:px-6 transition-all duration-700 ${topOffset}`}>
-          <div className="bg-rose-600 border-2 border-white/20 rounded-3xl p-3 md:p-4 flex items-center gap-3 md:gap-4 shadow-[0_20px_60px_rgba(225,29,72,0.4)]">
-            <div className="bg-white p-1.5 md:p-2 rounded-xl text-rose-600 animate-pulse">
+          <div className="bg-black/90 border-2 border-rose-600 rounded-3xl p-3 md:p-4 flex items-center gap-3 md:gap-4 shadow-[0_20px_60px_rgba(225,29,72,0.4)]">
+            <div className="bg-rose-600 p-1.5 md:p-2 rounded-xl text-white animate-pulse">
               <AlertTriangle className="w-5 h-5 md:w-6 md:h-6" strokeWidth={3} />
             </div>
             <div className="flex-1">
-              <h3 className="text-white font-black uppercase italic tracking-tighter text-base md:text-lg leading-none">HOS Violation Alert</h3>
+              <h3 className="text-rose-500 font-black uppercase italic tracking-tighter text-base md:text-lg leading-none">HOS Violation Alert</h3>
               <p className="text-white/80 text-[9px] md:text-[10px] font-bold uppercase tracking-widest mt-0.5 md:mt-1">Immediate Stop Required - Safety Protocol Active</p>
             </div>
           </div>

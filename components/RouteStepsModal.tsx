@@ -20,8 +20,8 @@ export const RouteStepsModal: React.FC<RouteStepsModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-zinc-900 border border-[#D4AF37]/30 rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] animate-in zoom-in duration-300">
-        <div className="p-6 border-b border-white/10 flex items-center justify-between bg-zinc-900/50">
+      <div className="bg-black border border-[#D4AF37]/30 rounded-3xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden shadow-[0_0_50px_rgba(212,175,55,0.15)] animate-in zoom-in duration-300">
+        <div className="p-6 border-b border-white/10 flex items-center justify-between bg-black/50">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#D4AF37]/20 rounded-xl">
               <List className="w-6 h-6 text-[#D4AF37]" />
@@ -93,7 +93,7 @@ export const RouteStepsModal: React.FC<RouteStepsModalProps> = ({
           })}
         </div>
         
-        <div className="p-4 bg-zinc-900/80 border-t border-white/10 flex justify-center">
+        <div className="p-4 bg-black/80 border-t border-white/10 flex justify-center">
           <button 
             onClick={onClose}
             className="px-8 py-3 bg-[#D4AF37] text-black font-black uppercase italic tracking-widest rounded-xl hover:scale-105 transition-transform shadow-lg shadow-[#D4AF37]/20"

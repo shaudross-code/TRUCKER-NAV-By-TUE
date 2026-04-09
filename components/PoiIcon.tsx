@@ -469,7 +469,7 @@ export const getPoiCategory = (type: any = '', name: any = ''): string => {
   }
 
   if (normalizedType.includes('weigh station') || normalizedType.includes('weigh')) {
-    return 'weigh_station';
+    return 'excluded'; // Weigh stations removed per user request
   }
 
   if (normalizedType.includes('rest area') || normalizedType.includes('restarea')) {

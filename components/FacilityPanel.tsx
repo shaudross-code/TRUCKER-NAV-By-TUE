@@ -125,14 +125,14 @@ const AddFacilityForm: React.FC<AddFormProps> = ({ userLocation, onAdd, onClose 
           placeholder="Facility name (e.g. XYZ Distribution Center)"
           value={name}
           onChange={e => setName(e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#D4AF37]"
+          className="w-full bg-black border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#D4AF37]"
         />
         <input
           type="text"
           placeholder="Address (optional)"
           value={address}
           onChange={e => setAddress(e.target.value)}
-          className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#D4AF37]"
+          className="w-full bg-black border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#D4AF37]"
         />
         <div className="space-y-1.5">
           <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Facility Type</span>
@@ -280,7 +280,7 @@ export const FacilityPanel: React.FC<FacilityPanelProps> = ({ facility, userLoca
         </div>
 
         {/* ── Facility Reputation Score ── */}
-        <div data-testid="facility-reputation-section" className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div data-testid="facility-reputation-section" className="bg-black/60 border border-zinc-800 rounded-2xl overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-zinc-800">
             <svg className="w-3.5 h-3.5 text-[#D4AF37]" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
@@ -293,7 +293,7 @@ export const FacilityPanel: React.FC<FacilityPanelProps> = ({ facility, userLoca
         </div>
 
         {/* ── Google Hours ── */}
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="bg-black/60 border border-zinc-800 rounded-2xl overflow-hidden">
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
             <div className="flex items-center gap-2">
               <Clock className="w-3.5 h-3.5 text-zinc-400" />
@@ -314,7 +314,7 @@ export const FacilityPanel: React.FC<FacilityPanelProps> = ({ facility, userLoca
 
         {/* ── Driver Consensus ── */}
         {crowd.total_reports > 0 && (
-          <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+          <div className="bg-black/60 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-zinc-800">
               <div className="flex items-center gap-2">
                 <Truck className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -351,7 +351,7 @@ export const FacilityPanel: React.FC<FacilityPanelProps> = ({ facility, userLoca
         )}
 
         {/* ── Report Form ── */}
-        <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl overflow-hidden">
+        <div className="bg-black/60 border border-zinc-800 rounded-2xl overflow-hidden">
           <div className="px-4 py-2.5 border-b border-zinc-800">
             <span className="text-[10px] font-black text-white uppercase tracking-widest">Submit Your Report</span>
           </div>

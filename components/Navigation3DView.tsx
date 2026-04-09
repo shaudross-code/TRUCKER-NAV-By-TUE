@@ -195,7 +195,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     spokenAlertsRef.current.clear();
   }, [route]);
 
-  // Initialize 3D map with SATELLITE style
+  // Initialize 2D map with SATELLITE style + tilt
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -203,7 +203,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       ? [userLocation[1], userLocation[0]] as [number, number]
       : [-83.0458, 42.3314] as [number, number];
 
-    // Use Mapbox satellite-streets for 3D view
+    // Use Mapbox satellite-streets for 2D tilted view
     const style = MAPBOX_TOKEN
       ? 'mapbox://styles/mapbox/satellite-streets-v12'
       : MAPTILER_KEY
@@ -215,13 +215,15 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       style,
       center: lngLat,
       zoom: 17.5,
-      pitch: 70,
+      pitch: 55,
       bearing: heading,
       antialias: true,
       fadeDuration: 0,
       dragRotate: true,
       touchZoomRotate: true,
       touchPitch: true,
+      maxPitch: 80,
+      minPitch: 0,
     });
 
     map.current.on('error', (e: any) => {
@@ -237,48 +239,6 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     map.current.on('load', () => {
       setMapLoaded(true);
       onMapRef?.(map.current);
-      try {
-        const layers = map.current!.getStyle().layers;
-        const labelLayerId = layers?.find(
-          (l) => l.type === 'symbol' && l.layout && (l.layout as any)['text-field']
-        )?.id;
-        map.current!.addLayer({
-          id: '3d-buildings',
-          source: 'composite',
-          'source-layer': 'building',
-          filter: ['==', 'extrude', 'true'],
-          type: 'fill-extrusion',
-          minzoom: 14,
-          paint: {
-            'fill-extrusion-color': '#2a2a2a',
-            'fill-extrusion-height': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'height']],
-            'fill-extrusion-base': ['interpolate', ['linear'], ['zoom'], 14, 0, 14.5, ['get', 'min_height']],
-            'fill-extrusion-opacity': 0.6,
-          },
-        }, labelLayerId);
-      } catch {}
-      try {
-        map.current!.setFog({
-          color: '#1a1a2e',
-          'high-color': '#1a1a3e',
-          'horizon-blend': 0.06,
-          'space-color': '#0a0a1a',
-          'star-intensity': 0.15,
-        } as any);
-      } catch {}
-
-      // Add terrain for 3D satellite
-      try {
-        if (!map.current!.getSource('mapbox-dem')) {
-          map.current!.addSource('mapbox-dem', {
-            type: 'raster-dem',
-            url: 'mapbox://mapbox.mapbox-terrain-dem-v1',
-            tileSize: 512,
-            maxzoom: 14,
-          });
-          map.current!.setTerrain({ source: 'mapbox-dem', exaggeration: 1.3 });
-        }
-      } catch {}
     });
 
     const truckEl = document.createElement('div');
@@ -325,7 +285,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
     map.current.easeTo({
       center: [userLocation[1], userLocation[0]],
       bearing: h,
-      pitch: 70,
+      pitch: 55,
       zoom,
       duration: 800,
     });
@@ -338,7 +298,7 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
       const h = telemetry.headingRef.current || 0;
       const spd = telemetry.speedRef.current || 0;
       const zoom = spd > 55 ? 16.2 : spd > 25 ? 17 : 17.5;
-      map.current.easeTo({ bearing: h, zoom, pitch: 70, duration: 400 });
+      map.current.easeTo({ bearing: h, zoom, pitch: 55, duration: 400 });
     });
     return unsub;
   }, [telemetry, isFollowMode, isOverviewMode]);
@@ -665,10 +625,10 @@ export const Navigation3DView: React.FC<Navigation3DViewProps> = ({
         </div>
       </div>
 
-      {/* ─── 3D SAT Label ─── */}
+      {/* ─── 2D SAT Label ─── */}
       <div className="absolute bottom-2 right-2 z-10 pointer-events-auto">
         <div className="bg-black/60 backdrop-blur-sm text-[#D4AF37] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-[#D4AF37]/20">
-          3D SAT
+          2D SAT
         </div>
       </div>
     </div>

@@ -22,6 +22,7 @@ function formatTime(isoStr: string): string {
 }
 
 function formatHM(hours: number): string {
+  if (isNaN(hours)) return '0h 0m';
   const h = Math.floor(hours);
   const m = Math.round((hours - h) * 60);
   return `${h}h ${m}m`;

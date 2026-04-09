@@ -1,7 +1,9 @@
 import { fileURLToPath, URL } from 'url';
+import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
+import tailwindcss from '@tailwindcss/postcss';
+import cascadeLayers from '@csstools/postcss-cascade-layers';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
@@ -19,8 +21,12 @@ export default defineConfig(({ mode }) => {
         host: '0.0.0.0',
         allowedHosts: true,
       },
+      css: {
+        postcss: {
+          plugins: [tailwindcss(), cascadeLayers()],
+        },
+      },
       plugins: [
-        tailwindcss(),
         react(),
         // VitePWA({
         //   registerType: 'autoUpdate',
@@ -84,6 +90,7 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': fileURLToPath(new URL('.', import.meta.url)),
+          'react-dom/server': fileURLToPath(new URL('./node_modules/react-dom/server.browser.js', import.meta.url)),
         }
       }
     };

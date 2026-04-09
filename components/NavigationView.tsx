@@ -1,4 +1,4 @@
-import { getRoute } from '../src/services/hereRoutingService';
+import { getRoute } from '../services/hereRoutingService';
 import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
@@ -62,6 +62,7 @@ import {
 } from 'lucide-react';
 import { fetchTrafficInfrastructure, playTrafficAlert, TrafficInfrastructure } from '../services/trafficInfrastructure';
 import { TrafficIcon } from './TrafficIcon';
+import { HereNavigationView } from './HereNavigationView';
 import { Navigation3DView } from './Navigation3DView';
 import { PoiDetailModal } from './PoiDetailModal';
 import { RouteStepsModal } from './RouteStepsModal';
@@ -96,6 +97,17 @@ import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getPoiFilterIcon, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { getFuelNetworkSelections } from './FuelNetwork';
 import { decode } from '@here/flexpolyline';
+import { 
+  createDomMarker, 
+  createSvgMarker, 
+  createPolyline, 
+  updatePolylineCoords, 
+  createGroup, 
+  fitBounds, 
+  showInfoBubble,
+  createClusterProvider, 
+  buildClusterDataPoints 
+} from '../utils/hereMapUtils';
 import { RouteComparisonPanel } from './RouteComparisonPanel';
 import { FuelCostCalculator } from './FuelCostCalculator';
 import { DriverFatigueAlert } from './DriverFatigueAlert';
@@ -172,51 +184,52 @@ const synthesizeLanes = (actionType: string, direction: string | undefined, seve
   const act = actionType.toLowerCase();
   
   // Helper to build a lane object
-  const lane = (dirs: string, active: boolean) => ({
+  const lane = (dirs: string, active: boolean, truckLane: boolean = false) => ({
     direction: dirs,
-    matches: active ? ['selected'] : []
+    matches: active ? ['selected'] : [],
+    truckLane
   });
 
   // Highway entrance: 3-4 lanes, ramp lane highlighted
   if (act === 'enterhighway') {
     if (dir === 'left') {
-      return [lane('slight left', true), lane('straight', false), lane('straight', false)];
+      return [lane('slight left', true), lane('straight', false), lane('straight', false, true)];
     } else if (dir === 'right') {
-      return [lane('straight', false), lane('straight', false), lane('slight right', true)];
+      return [lane('straight', false), lane('straight', false, true), lane('slight right', true, true)];
     } else {
       // middle
-      return [lane('straight', false), lane('straight', true), lane('straight', false)];
+      return [lane('straight', false), lane('straight', true), lane('straight', false, true)];
     }
   }
   
   // Highway exit: 3-4 lanes, exit lane highlighted
   if (act === 'exit') {
     if (dir === 'right') {
-      return [lane('straight', false), lane('straight', false), lane('straight', false), lane('right', true)];
+      return [lane('straight', false), lane('straight', false), lane('straight', false, true), lane('right', true, true)];
     } else {
-      return [lane('left', true), lane('straight', false), lane('straight', false), lane('straight', false)];
+      return [lane('left', true, true), lane('straight', false, true), lane('straight', false), lane('straight', false)];
     }
   }
   
   // Keep: highway fork/split, stay in indicated lanes
   if (act === 'keep') {
     if (dir === 'right') {
-      return [lane('slight left', false), lane('straight;slight right', true), lane('slight right', true)];
+      return [lane('slight left', false), lane('straight;slight right', true, true), lane('slight right', true, true)];
     } else if (dir === 'left') {
-      return [lane('slight left', true), lane('straight;slight left', true), lane('slight right', false)];
+      return [lane('slight left', true, true), lane('straight;slight left', true, true), lane('slight right', false)];
     } else {
-      return [lane('slight left', false), lane('straight', true), lane('slight right', false)];
+      return [lane('slight left', false), lane('straight', true, true), lane('slight right', false, true)];
     }
   }
   
   // Continue highway: stay in flow lanes
   if (act === 'continuehighway') {
     if (dir === 'left') {
-      return [lane('straight', true), lane('straight', true), lane('straight', false)];
+      return [lane('straight', true), lane('straight', true, true), lane('straight', false, true)];
     } else if (dir === 'right') {
-      return [lane('straight', false), lane('straight', true), lane('straight', true)];
+      return [lane('straight', false), lane('straight', true, true), lane('straight', true, true)];
     } else {
-      return [lane('straight', true), lane('straight', true), lane('straight', true)];
+      return [lane('straight', true), lane('straight', true, true), lane('straight', true, true)];
     }
   }
   
@@ -322,21 +335,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   );
   const mapInstanceRef = useRef<any>(null);
   const mapboxMapRef = useRef<any>(null); // 3D Mapbox GL map instance
-  const routeGroupRef = useRef<L.LayerGroup | null>(null);
-  const shieldLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  const roadOverlayRef = useRef<L.TileLayer | null>(null);
+  const routeGroupRef = useRef<any>(null);
+  const shieldLayerGroupRef = useRef<any>(null);
+  const roadOverlayRef = useRef<any>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const mapRef = useRef<HTMLDivElement>(null);
-  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userMarkerRef = useRef<any>(null);
   const userMarkerElRef = useRef<HTMLElement | null>(null);
   // Smooth marker interpolation
   const markerTargetRef = useRef<[number, number] | null>(null);
   const markerCurrentRef = useRef<[number, number] | null>(null);
   const markerAnimFrameRef = useRef<number>(0);
-  const mapLayersRef = useRef<Record<string, L.Polyline>>({});
-  const poiMarkersRef = useRef<L.Marker[]>([]);
-  const waypointMarkersRef = useRef<L.Marker[]>([]);
-  const trafficIncidentMarkersRef = useRef<L.Marker[]>([]);
+  const mapLayersRef = useRef<Record<string, any>>({});
+  const poiMarkersRef = useRef<any[]>([]);
+  const waypointMarkersRef = useRef<any[]>([]);
+  const trafficIncidentMarkersRef = useRef<any[]>([]);
   const trafficIncidentIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const [autoRerouteCountdown, setAutoRerouteCountdown] = useState<number | null>(null);
   const autoRerouteTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -611,9 +624,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       compassHeadingRef.current = bearing;
 
+      const speed = telemetryContext?.speedRef.current || 0;
+      // If moving at decent speed (> 5mph), trust GPS heading more than compass for the icon
+      if (speed > 5) return;
+
+      // Threshold check: only update if change is > 2.5 degrees to prevent "ticking"
+      const diff = Math.abs(((bearing - lastAppliedRotationRef.current + 540) % 360) - 180);
+      
       // Rotate vehicle icon to match compass bearing
-      if (userMarkerElRef.current) {
+      if (userMarkerElRef.current && diff > 2.5) {
         userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${bearing}deg`);
+        lastAppliedRotationRef.current = bearing;
       }
 
       // Rotate map container
@@ -704,8 +725,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Destroy old disconnected Leaflet instance
       if (mapInstanceRef.current) {
         try {
-          mapInstanceRef.current.off();
-          mapInstanceRef.current.remove();
+          if (typeof (mapInstanceRef.current as any).dispose === 'function') {
+            (mapInstanceRef.current as any).dispose();
+          } else {
+            (mapInstanceRef.current as any).off?.();
+            (mapInstanceRef.current as any).remove?.();
+          }
         } catch (e) { /* already disconnected from DOM */ }
         mapInstanceRef.current = null;
       }
@@ -745,6 +770,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const isFetchingPoisRef = useRef(false);
   const lastPoiFetchRef = useRef<{ time: number, lat: number, lon: number } | null>(null);
   const smoothedHeadingRef = useRef(0);
+  const lastAppliedRotationRef = useRef(0);
   const prevLocationRef = useRef<[number, number] | null>(null);
   const positionHeadingRef = useRef(0); // heading calculated from position changes
   const [showPois] = useState(() => uGet('nav_show_pois') !== 'false');
@@ -754,8 +780,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [facilities, setFacilities] = useState<Facility[]>([]);
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
   const [showAddFacility, setShowAddFacility] = useState(false);
-  const facilityLayerGroupRef = useRef<L.LayerGroup | null>(null);
-  const facilityMarkersRef = useRef<Map<string, L.Marker>>(new Map());
+  const facilityLayerGroupRef = useRef<any>(null);
+  const facilityMarkersRef = useRef<Map<string, any>>(new Map());
 
   const [poiFilters, setPoiFilters] = useState<Set<string>>(() => {
     const saved = uGet('poi_filters');
@@ -817,7 +843,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (!mapInstanceRef.current) {
         initializeMap();
       } else {
-        mapInstanceRef.current.invalidateSize();
+        if (typeof (mapInstanceRef.current as any).getViewPort === 'function') {
+          (mapInstanceRef.current as any).getViewPort().resize();
+        } else if (typeof (mapInstanceRef.current as any).invalidateSize === 'function') {
+          (mapInstanceRef.current as any).invalidateSize();
+        }
       }
     }
   }, [activeView]);
@@ -826,165 +856,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // console.log("NavigationView: mapRef.current changed to", mapRef.current ? "exists" : "null");
   }, [mapRef.current]);
 
-  const initializeMap = () => {
-    // console.log("NavigationView: initializeMap called");
-    try {
-      if (!mapRef.current) {
-        // console.log("NavigationView: mapRef.current is null");
-        return;
-      }
-      if (mapInstanceRef.current) {
-        // console.log("NavigationView: mapInstanceRef.current already exists");
-        return;
-      }
-
-      // Ensure container has dimensions
-      const width = mapRef.current.clientWidth;
-      const height = mapRef.current.clientHeight;
-      // console.log("NavigationView: map container dimensions", { width, height });
-
-      if (width > 0 && height > 0) {
-        // console.log("NavigationView: container has dimensions", { width, height });
-        let timeoutId: any;
-        try {
-          // console.log("NavigationView: starting map initialization");
-          // Add a timeout to trigger error if map takes too long to load
-          timeoutId = setTimeout(() => {
-            if (!isMapReady) {
-              console.error("Map initialization timed out after 30 seconds");
-              setMapInitError("Map initialization timed out. Please check your connection or API key.");
-            }
-          }, 30000); // 30 seconds timeout
-
-          const L_obj = (window as any).L || L;
-          
-          if (!mapRef.current) {
-            // console.log("NavigationView: mapRef.current is null before map initialization");
-            return;
-          }
-          if ((mapRef.current as any)._leaflet_id) {
-            // console.log("NavigationView: deleting _leaflet_id");
-            delete (mapRef.current as any)._leaflet_id;
-          }
-
-          // console.log("NavigationView: initializing map with center", isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION);
-          let map;
-          try {
-            // console.log("NavigationView: calling L.map");
-            map = L.map(mapRef.current!, {
-              center: isValidLatLng(userLocation) ? userLocation : FALLBACK_LOCATION,
-              zoom: 13,
-              maxZoom: 20,
-              zoomControl: false,
-            });
-            // console.log("NavigationView: map initialized successfully");
-          } catch (e) {
-            console.error("NavigationView: L.map() failed", e);
-            throw e;
-          }
-          // console.log("NavigationView: map initialized, setting up event listeners");
-          
-          map.on('dragstart', () => {
-            setIsFollowMode(false);
-          });
-          map.on('moveend', () => {
-            const center = map.getCenter();
-            setMapCenter([center.lat, center.lng]);
-            // Viewport-based sign culling: only render signs in current view
-            syncVisibleSignsRef.current();
-          });
-          map.on('zoomend', () => {
-            const z = map.getZoom();
-            setCurrentZoom(z);
-            // If user manually zoomed (not auto-zoom), save as preferred level
-            if (!isManeuverZoomActiveRef.current) {
-              userPreferredZoomRef.current = z;
-            }
-            // Viewport-based sign culling: sync on zoom changes too
-            syncVisibleSignsRef.current();
-          });
-          // console.log("Map created successfully");
-
-          mapInstanceRef.current = map;
-          
-          // Create custom Leaflet panes for proper z-ordering:
-          // Road overlay pane — ABOVE route so road info is visible on top of the polyline
-          const roadOverlayPane = map.createPane('roadOverlayPane');
-          roadOverlayPane.style.zIndex = '500';
-          roadOverlayPane.style.pointerEvents = 'none';
-          roadOverlayPane.style.mixBlendMode = 'screen';
-
-          // Route line renders BELOW signs and markers
-          const routePane = map.createPane('routePane');
-          routePane.style.zIndex = '420';  // Above tiles (200), below markers (600)
-          routePane.style.pointerEvents = 'none';
-          
-          // Sign pane renders ABOVE the route line
-          const signPane = map.createPane('signPane');
-          signPane.style.zIndex = '630';  // Above default marker pane (600)
-          signPane.style.pointerEvents = 'none';
-
-          // Initialize layer groups on custom panes
-          routeGroupRef.current = L.layerGroup().addTo(map);
-          shieldLayerGroupRef.current = L.layerGroup().addTo(map);
-
-          // Add rotation class to the main pane
-          map.getPane('mapPane')?.classList.add('leaflet-rotate-pane');
-
-          // Log layers
-          map.eachLayer((_layer) => {
-            // console.log("Layer:", layer);
-          });
-
-          const L_any = L_obj as any;
-          // Initialize POI layer group with marker clustering for performance
-          try {
-            markerClusterGroupRef.current = (L_any as any).markerClusterGroup({
-              maxClusterRadius: 60,
-              spiderfyOnMaxZoom: true,
-              showCoverageOnHover: false,
-              zoomToBoundsOnClick: true,
-              disableClusteringAtZoom: 16,
-              chunkedLoading: true,
-              chunkInterval: 100,
-              chunkDelay: 20,
-              iconCreateFunction: (cluster: any) => {
-                const count = cluster.getChildCount();
-                let size = 'small';
-                let dim = 36;
-                if (count > 50) { size = 'large'; dim = 48; }
-                else if (count > 10) { size = 'medium'; dim = 42; }
-                return L.divIcon({
-                  html: `<div class="poi-cluster poi-cluster-${size}"><span>${count}</span></div>`,
-                  className: 'poi-cluster-icon',
-                  iconSize: L.point(dim, dim),
-                });
-              },
-            });
-            map.addLayer(markerClusterGroupRef.current);
-          } catch (e) {
-            console.error("NavigationView: MarkerClusterGroup initialization failed, falling back to LayerGroup", e);
-            markerClusterGroupRef.current = L.layerGroup();
-            map.addLayer(markerClusterGroupRef.current);
-          }
-
-          clearTimeout(timeoutId);
-          setIsMapReady(true);
-          setTimeout(() => {
-            map.invalidateSize();
-          }, 100);
-        } catch (error) {
-          console.error("Map initialization caught error:", error);
-          setMapInitError(`Map initialization failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      } else {
-        console.log("NavigationView: container dimensions are 0, retrying...");
-        setTimeout(initializeMap, 500);
-      }
-    } catch (e) {
-      console.error("NavigationView: initializeMap failed unexpectedly", e);
-    }
-  };
+  const initializeMap = () => {};
 
 
   useEffect(() => {
@@ -1033,9 +905,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [trafficAlerts, setTrafficAlerts] = useState<any[]>([]);
   const cmvWarningsRef = useRef<{ type: string; severity: string; message: string; grade?: number; coord: [number, number]; progress: number }[]>([]);
   const routeSignsRef = useRef<{ speedLimitSigns: any[]; exitSigns: any[]; restrictions: any[] }>({ speedLimitSigns: [], exitSigns: [], restrictions: [] });
-  const restrictionAlertMarkersRef = useRef<L.Marker[]>([]);
-  const trafficAlertMarkersRef = useRef<L.Marker[]>([]);
-  const weatherAlertMarkersRef = useRef<L.Marker[]>([]);
+  const restrictionAlertMarkersRef = useRef<any[]>([]);
+  const trafficAlertMarkersRef = useRef<any[]>([]);
+  const weatherAlertMarkersRef = useRef<any[]>([]);
   const [weighStationAlert, setWeighStationAlert] = useState<{ distance: number, status: 'OPEN' | 'CLOSED' | 'BYPASS' } | null>(null);
   
   // Collapsible alert panels state
@@ -1226,69 +1098,48 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return html;
   };
 
-  const updateMapLine = (map: L.Map | null, id: string, coords: [number, number][], color: string, width: number) => {
+  const updateMapLine = (map: any, id: string, coords: [number, number][], color: string, width: number) => {
     if (!map) return;
     
     if (id === 'route' && routeGroupRef.current) {
       // Clear any existing route lines
-      routeGroupRef.current.clearLayers();
+      routeGroupRef.current.removeAll();
       
       // 1. Outer glow effect (soft shadow)
-      L.polyline(coords, { 
-        color: '#D4AF37', 
-        weight: 24, 
-        opacity: 0.15, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        pane: 'routePane'
-      }).addTo(routeGroupRef.current);
+      const glow = createPolyline(coords, '#D4AF37', 24, { opacity: 0.15, zIndex: 1 });
+      routeGroupRef.current.addObject(glow);
       
       // 2. Outer black border line (creates the outline effect)
-      L.polyline(coords, { 
-        color: '#111111', 
-        weight: 16, 
-        opacity: 0.9, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        pane: 'routePane'
-      }).addTo(routeGroupRef.current);
+      const border = createPolyline(coords, '#111111', 16, { opacity: 0.9, zIndex: 2 });
+      routeGroupRef.current.addObject(border);
 
       // 3. Inner route line (the main navigation path)
-      L.polyline(coords, { 
-        color: color, 
-        weight: 10, 
-        opacity: 1, 
-        lineCap: 'round', 
-        lineJoin: 'round',
-        pane: 'routePane'
-      }).addTo(routeGroupRef.current);
+      const main = createPolyline(coords, color, 10, { zIndex: 3 });
+      routeGroupRef.current.addObject(main);
       return;
     }
 
     const layer = mapLayersRef.current[id];
     if (layer) {
-      layer.setLatLngs(coords);
+      updatePolylineCoords(layer, coords);
       return;
     }
     
-    const polyline = L.polyline(coords, {
-      color: color,
-      weight: width,
-      pane: 'routePane'
-    });
-    polyline.addTo(map);
+    const polyline = createPolyline(coords, color, width);
+    map.addObject(polyline);
     mapLayersRef.current[id] = polyline;
   };
 
   // Draw alternative routes with distinct colors (dimmed, dashed)
-  const altRouteLayersRef = useRef<L.LayerGroup | null>(null);
+  const altRouteLayersRef = useRef<any>(null);
   const ALT_ROUTE_COLORS = ['#4A9EFF', '#8B5CF6', '#FF6B4A'];
 
-  const drawAlternativeRoutes = (map: L.Map, routes: any[], selectedIdx: number) => {
+  const drawAlternativeRoutes = (map: any, routes: any[], selectedIdx: number) => {
     if (!altRouteLayersRef.current) {
-      altRouteLayersRef.current = L.layerGroup().addTo(map);
+      altRouteLayersRef.current = createGroup();
+      map.addObject(altRouteLayersRef.current);
     } else {
-      altRouteLayersRef.current.clearLayers();
+      altRouteLayersRef.current.removeAll();
     }
 
     routes.forEach((route, idx) => {
@@ -1296,16 +1147,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const altColor = ALT_ROUTE_COLORS[(idx > selectedIdx ? idx - 1 : idx) % ALT_ROUTE_COLORS.length];
       
       // Dashed outline for alt routes
-      L.polyline(route.coords, {
-        color: altColor,
-        weight: 6,
+      const altPoly = createPolyline(route.coords, altColor, 6, {
         opacity: 0.35,
-        dashArray: '12, 8',
-        lineCap: 'round',
-        lineJoin: 'round',
-        pane: 'routePane',
-        interactive: false,
-      }).addTo(altRouteLayersRef.current!);
+        dash: [12, 8],
+      });
+      altRouteLayersRef.current.addObject(altPoly);
     });
 
     // Mark diverge/converge points where routes split/rejoin
@@ -1349,25 +1195,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   // Place highway shield markers along the route using HERE Map Image API
   useEffect(() => {
+    if (isMapReady && mapInstanceRef.current && !markerClusterGroupRef.current) {
+      const group = createGroup();
+      mapInstanceRef.current.addObject(group);
+      markerClusterGroupRef.current = group;
+    }
+  }, [isMapReady]);
+
+  useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
 
-    map.on('contextmenu', (e: L.LeafletMouseEvent) => {
+    map.on('contextmenu', (e: any) => {
       console.log('contextmenu at:', e.latlng);
       const { lat, lng } = e.latlng;
-      L.popup()
-        .setLatLng(e.latlng)
-        .setContent(`
-          <div class="flex flex-col gap-2 p-1">
-            <button class="set-location-btn bg-[#D4AF37] text-black px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider" data-lat="${lat}" data-lng="${lng}">
-              Set as Current Location
-            </button>
-            <button class="add-waypoint-btn bg-zinc-800 text-white px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider border border-zinc-700" data-lat="${lat}" data-lng="${lng}">
-              Add as Stop
-            </button>
-          </div>
-        `)
-        .openOn(map);
+      showInfoBubble(map, lat, lng, `
+        <div class="flex flex-col gap-2 p-1">
+          <button class="set-location-btn bg-[#D4AF37] text-black px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider" data-lat="${lat}" data-lng="${lng}">
+            Set as Current Location
+          </button>
+          <button class="add-waypoint-btn bg-zinc-800 text-white px-3 py-1.5 rounded font-bold text-xs uppercase tracking-wider border border-zinc-700" data-lat="${lat}" data-lng="${lng}">
+            Add as Stop
+          </button>
+        </div>
+      `);
     });
 
     let moveEndTimeout: any = null;
@@ -1476,10 +1327,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const pointerEl = el.querySelector('.vehicle-pointer') as HTMLElement;
     if (pointerEl && smoothedHeadingRef.current) {
       pointerEl.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
+      lastAppliedRotationRef.current = smoothedHeadingRef.current;
     }
 
-    userMarkerRef.current = L.marker([userLocation[0], userLocation[1]], { icon: L.divIcon({ html: el, className: 'user-marker-container', iconSize: [40, 40], iconAnchor: [20, 20] }) }).addTo(mapInstanceRef.current);
-    userMarkerElRef.current = pointerEl;
+    const { marker, element } = createDomMarker(
+      userLocation[0], 
+      userLocation[1], 
+      el, 
+      [40, 40], 
+      [20, 20], 
+      1000
+    );
+    userMarkerRef.current = marker;
+    mapInstanceRef.current.addObject(userMarkerRef.current);
+    userMarkerElRef.current = pointerEl; // Now this points to an element that is part of the marker's DOM
   }, [isMapReady, userLocation ? userLocation[0] : null, userLocation ? userLocation[1] : null]);
 
   // Numbered waypoint markers on the map
@@ -1505,17 +1366,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         font-weight:900;font-size:13px;color:#000;
         font-family:system-ui,sans-serif;
       ">${num}</div>`;
-      const marker = L.marker([wp.lat, wp.lon], {
-        icon: L.divIcon({
-          html: el,
-          className: 'waypoint-number-marker',
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        }),
-        interactive: false,
-        zIndexOffset: 600,
-        pane: 'signPane'
-      }).addTo(mapInstanceRef.current!);
+      const { marker } = createDomMarker(wp.lat, wp.lon, el, [28, 28], [14, 14], 600);
+      map.addObject(marker);
       waypointMarkersRef.current.push(marker);
     });
   }, [isMapReady, waypoints, milesRemaining, hudLayout.showWaypointMarkers]);
@@ -1623,19 +1475,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             cursor:pointer;
           " title="${desc.replace(/"/g, '&quot;')}">${iconSvg}</div>`;
 
-          const marker = L.marker([iLat, iLon], {
-            icon: L.divIcon({
-              html: el,
-              className: 'traffic-incident-icon',
-              iconSize: [26, 26],
-              iconAnchor: [13, 13],
-            }),
-            interactive: true,
-            zIndexOffset: 580,
-            pane: 'signPane'
-          }).addTo(mapInstanceRef.current!);
-
-          marker.bindPopup(`<div style="font-family:system-ui;font-size:12px;max-width:200px;"><strong style="color:${bgColor}">${incType.charAt(0).toUpperCase() + incType.slice(1)}</strong><br/>${desc}</div>`, { className: 'traffic-incident-popup' });
+          const { marker } = createDomMarker(iLat, iLon, el, [26, 26], [13, 13], 580);
+          marker.addEventListener('tap', () => {
+            showInfoBubble(map, iLat, iLon, `<div style="font-family:system-ui;font-size:12px;max-width:200px;"><strong style="color:${bgColor}">${incType.charAt(0).toUpperCase() + incType.slice(1)}</strong><br/>${desc}</div>`);
+          });
+          map.addObject(marker);
           trafficIncidentMarkersRef.current.push(marker);
         }
 
@@ -1760,6 +1604,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
     // Use Mapbox raster tiles for the 2D view (satellite-streets-v12 style)
     // In Data Saver mode, use lighter OSM tiles instead of satellite imagery
+    /* 
     if (dataSaver) {
       console.log("NavigationView: Data Saver ON — using lightweight OSM tiles");
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1797,6 +1642,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 20
       }).addTo(map);
     }
+    */
 
     // ── Permanent Highway/Road Network Overlay ─────────────────────────
     // Adds a roads-focused tile layer using Mapbox navigation-night style
@@ -1805,6 +1651,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // Uses tileSize:256 (no zoomOffset) so tiles load at +1 zoom, making
     // road lines appear wider/thicker on the map.
     // Two stacked layers make highways appear bolder and more professional.
+    /*
     if (MAPBOX_TOKEN && !dataSaver) {
       const overlayUrl = `https://api.mapbox.com/styles/v1/mapbox/navigation-night-v1/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX_TOKEN}`;
       const overlayOpts: any = {
@@ -1821,6 +1668,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       roadOverlayRef.current = overlay2;
       console.log('[Map] Highway/road overlay added (2x navigation-night-v1, blend:screen, wide)');
     }
+    */
 
     map.invalidateSize();
   }, [isMapReady, showTruckRestrictions, dataSaver]);
@@ -1840,7 +1688,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // ─── Facility layer group setup ──────────────────────────────────────────
   useEffect(() => {
     if (!isMapReady || !mapInstanceRef.current) return;
-    const group = L.layerGroup().addTo(mapInstanceRef.current);
+/*     const group = L.layerGroup().addTo(mapInstanceRef.current); */
     facilityLayerGroupRef.current = group;
     return () => { group.remove(); facilityLayerGroupRef.current = null; };
   }, [isMapReady]);
@@ -1861,7 +1709,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // ─── Render facility markers on map ─────────────────────────────────────
   useEffect(() => {
     if (!facilityLayerGroupRef.current) return;
-    facilityLayerGroupRef.current.clearLayers();
+    facilityLayerGroupRef.current.removeAll();
     facilityMarkersRef.current.clear();
     if (!showFacilities) return;
 
@@ -1871,13 +1719,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       iconEl.style.cssText = 'cursor:pointer;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.6))';
       iconEl.innerHTML = facilityIconSVG(type, 32);
 
-      const marker = L.marker([facility.lat, facility.lon], {
-        icon: L.divIcon({ html: iconEl, className: '', iconSize: [32, 36], iconAnchor: [16, 36] }),
-        zIndexOffset: 200,
-      });
+      const { marker } = createDomMarker(facility.lat, facility.lon, iconEl, [32, 36], [16, 36], 200);
 
-      marker.on('click', () => setSelectedFacility(facility));
-      marker.addTo(facilityLayerGroupRef.current!);
+      marker.addEventListener('tap', () => setSelectedFacility(facility));
+      facilityLayerGroupRef.current!.addObject(marker);
       facilityMarkersRef.current.set(facility.id, marker);
     });
   }, [facilities, showFacilities]);
@@ -2026,7 +1871,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return {
       rotation,
       active: (lane?.matches || []).includes('selected'),
-      isStraight
+      isStraight,
+      truckLane: (lane?.laneType || '').toLowerCase().includes('truck')
     };
   };
 
@@ -2039,6 +1885,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
     const totalLanes = lanes.length;
     const recommendedCount = recommendedLanes.length;
+    const hasTruckLanes = lanes.some(l => l.truckLane);
     
     // Find recommended lane indices (1-based for speech)
     const activeIndices: number[] = [];
@@ -2064,30 +1911,35 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // Build professional callout
     const ordinals = ['', 'first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth'];
     
+    let phrase = '';
+    const truckPrefix = hasTruckLanes ? 'Truck lane upcoming. ' : '';
+
     if (recommendedCount === 1) {
       // Single lane recommendation
       const position = isLeftmost ? 'left' : isRightmost ? 'right' : isCenter ? 'center' : '';
       const laneNum = ordinals[firstIdx] || `lane ${firstIdx}`;
       
       if (totalLanes === 2) {
-        return `Use the ${position} lane.`;
+        phrase = `Use the ${position} lane.`;
       } else if (totalLanes <= 4) {
-        return `Move to the ${laneNum} lane from left.`;
+        phrase = `Move to the ${laneNum} lane from left.`;
       } else {
-        return `Use lane ${firstIdx} of ${totalLanes}, the ${position} side.`;
+        phrase = `Use lane ${firstIdx} of ${totalLanes}, the ${position} side.`;
       }
     } else {
       // Multiple lane recommendation
       const side = isLeftmost ? 'left' : isRightmost ? 'right' : 'center';
       
       if (hasExit) {
-        return `Stay in the ${side} ${recommendedCount} lanes for the exit.`;
+        phrase = `Stay in the ${side} ${recommendedCount} lanes for the exit.`;
       } else if (hasMerge) {
-        return `Use the ${side} ${recommendedCount} lanes to merge.`;
+        phrase = `Use the ${side} ${recommendedCount} lanes to merge.`;
       } else {
-        return `Use the ${side} ${recommendedCount} lanes.`;
+        phrase = `Use the ${side} ${recommendedCount} lanes.`;
       }
     }
+
+    return truckPrefix + phrase;
   };
 
   const lastSpokenRef = useRef('');
@@ -2362,7 +2214,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               pane: 'routePane',
               interactive: false,
             });
-            traveledLine.addTo(mapInstanceRef.current!);
+            /* .addTo(mapInstanceRef.current); */
             mapLayersRef.current['traveled'] = traveledLine;
           }
         }
@@ -2381,7 +2233,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             pane: 'routePane',
             interactive: false,
           });
-          glowLine.addTo(mapInstanceRef.current!);
+          /* .addTo(mapInstanceRef.current); */
           mapLayersRef.current['segment_glow'] = glowLine;
           
           updateMapLine(mapInstanceRef.current, 'segment', segmentCoords, '#ffffff', 12);
@@ -2707,19 +2559,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (distMi <= zoomThreshold && !isManeuverZoomActiveRef.current) {
                 // Zoom in for the upcoming maneuver
                 isManeuverZoomActiveRef.current = true;
-                mapInstanceRef.current.flyTo(
-                  mapInstanceRef.current.getCenter(),
-                  maneuverZoomLevel,
-                  { duration: 1.2, easeLinearity: 0.25 }
-                );
+                mapInstanceRef.current.getViewModel().setLookAtData({
+                  center: mapInstanceRef.current.getCenter(),
+                  zoom: maneuverZoomLevel
+                }, true);
               } else if (distMi > 0.6 && isManeuverZoomActiveRef.current) {
                 // Maneuver passed — zoom back to user's preferred level
                 isManeuverZoomActiveRef.current = false;
-                mapInstanceRef.current.flyTo(
-                  mapInstanceRef.current.getCenter(),
-                  userPreferredZoomRef.current,
-                  { duration: 1.5, easeLinearity: 0.25 }
-                );
+                mapInstanceRef.current.getViewModel().setLookAtData({
+                  center: mapInstanceRef.current.getCenter(),
+                  zoom: userPreferredZoomRef.current
+                }, true);
               }
             }
 
@@ -4590,20 +4440,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         }
         
         // Fit map to route
-        const bounds = L.latLngBounds(coords.map(c => [c[0], c[1]]));
-        mapInstanceRef.current.fitBounds(bounds, { 
-          padding: [100, 100], 
-          animate: true, 
-          duration: 1.5 
-        });
+        const bounds = boundsFromCoords(coords.map(c => [c[0], c[1]]));
+        if (mapInstanceRef.current && bounds) {
+          mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
+        }
 
         // After a short delay, zoom into the starting position
         setTimeout(() => {
           try {
             if (isValidLatLng(userLocation) && mapInstanceRef.current) {
-              mapInstanceRef.current.flyTo([userLocation[0], userLocation[1]], 17, {
-                duration: 1.5
-              }); 
+              mapInstanceRef.current.getViewModel().setLookAtData({
+                center: { lat: userLocation[0], lng: userLocation[1] },
+                zoom: 17
+              }, true);
             }
           } catch (error) {
             console.error(`[handleNavigate] FlyTo error:`, error);
@@ -4894,19 +4743,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       );
       
-      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
-        icon: L.divIcon({ 
-          html: iconHtml, 
-          className: 'restriction-marker', 
-          iconAnchor: [12, 24] 
-        }) 
-      });
-
-      if (mapInstanceRef.current) {
-        marker.addTo(mapInstanceRef.current);
-      }
+      const { marker } = createDomMarker(alert.coords[0], alert.coords[1], iconHtml, [24, 24], [12, 24]);
       
-      const popup = L.popup({ offset: [0, -25] }).setContent(`
+      marker.addEventListener('tap', () => {
+        showInfoBubble(mapInstanceRef.current, alert.coords[0], alert.coords[1], `
           <div class="p-3 min-w-[150px]">
             <div class="flex items-center gap-2 mb-2">
               <div class="p-1.5 rounded-lg ${alert.type === 'BRIDGE' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'}">
@@ -4920,7 +4760,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           </div>
         `);
-      marker.bindPopup(popup);
+      });
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.addObject(marker);
+      }
+      
       restrictionAlertMarkersRef.current.push(marker);
     });
   }, [restrictionAlerts, isMapReady]);
@@ -4952,19 +4797,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       );
       
-      const marker = L.marker([alert.coords[0], alert.coords[1]], { 
-        icon: L.divIcon({ 
-          html: iconHtml, 
-          className: 'traffic-marker', 
-          iconAnchor: [12, 24] 
-        }) 
-      });
+      const { marker } = createDomMarker(alert.coords[0], alert.coords[1], iconHtml, [24, 24], [12, 24]);
 
-      if (mapInstanceRef.current) {
-        marker.addTo(mapInstanceRef.current);
-      }
-      
-      const popup = L.popup({ offset: [0, -25] }).setContent(`
+      marker.addEventListener('tap', () => {
+        showInfoBubble(mapInstanceRef.current, alert.coords[0], alert.coords[1], `
           <div class="p-3 min-w-[150px]">
             <div class="flex items-center gap-2 mb-2">
               <div class="p-1.5 rounded-lg ${alert.type === 'STOP_SIGN' ? 'bg-red-100 text-red-600' : 'bg-[#D4AF37]/20 text-[#9A7B2C]'}">
@@ -4978,7 +4814,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           </div>
         `);
-      marker.bindPopup(popup);
+      });
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.addObject(marker);
+      }
+      
       trafficAlertMarkersRef.current.push(marker);
     });
   }, [trafficAlerts, isMapReady]);
@@ -5014,12 +4855,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         );
       }
       
-      const marker = L.marker([alert.lat, alert.lon], { icon: L.divIcon({ html: weatherIconsCacheRef.current[cacheKey], className: 'alert-marker', iconAnchor: [12, 24] }) });
-      if (mapInstanceRef.current) {
-        marker.addTo(mapInstanceRef.current);
-      }
+      const { marker } = createDomMarker(alert.lat, alert.lon, weatherIconsCacheRef.current[cacheKey], [24, 24], [12, 24]);
       
-      const popup = L.popup({ offset: [0, -25] }).setContent(`
+      marker.addEventListener('tap', () => {
+        showInfoBubble(mapInstanceRef.current, alert.lat, alert.lon, `
           <div class="p-3 min-w-[150px]">
             <div class="flex items-center gap-2 mb-2">
               <div class="p-1.5 rounded-lg ${alert.severity === 'SEVERE' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}">
@@ -5034,7 +4873,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             </div>
           </div>
         `);
-      marker.bindPopup(popup);
+      });
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.addObject(marker);
+      }
+      
       weatherAlertMarkersRef.current.push(marker);
     });
   }, [weatherAlerts, isMapReady]);
@@ -5043,13 +4887,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   useEffect(() => {
     if (isOverviewMode && mapInstanceRef.current) {
-      const bounds = routeCoordsRef.current.length > 0 ? L.latLngBounds(routeCoordsRef.current.map(c => [c[0], c[1]])) : null;
+      const bounds = routeCoordsRef.current.length > 0 ? boundsFromCoords(routeCoordsRef.current.map(c => [c[0], c[1]])) : null;
       if (bounds) {
-        mapInstanceRef.current.fitBounds(bounds, {
-          padding: [50, 50],
-          animate: true,
-          duration: 1.5
-        });
+        mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
       }
     }
   }, [isOverviewMode]);
@@ -5082,11 +4922,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           const nLat = lerp(cLat, tLat, t);
           const nLon = lerp(cLon, tLon, t);
           markerCurrentRef.current = [nLat, nLon];
-          userMarkerRef.current.setLatLng([nLat, nLon]);
+          userMarkerRef.current.setGeometry({ lat: nLat, lng: nLon });
         } else {
           // Large jump (new route, teleport) — snap immediately
           markerCurrentRef.current = [...markerTargetRef.current];
-          userMarkerRef.current.setLatLng(markerTargetRef.current);
+          userMarkerRef.current.setGeometry({ lat: markerTargetRef.current[0], lng: markerTargetRef.current[1] });
         }
       }
       markerAnimFrameRef.current = requestAnimationFrame(animate);
@@ -5222,20 +5062,28 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (isCompassMode) {
         if (isFollowMode && mapInstanceRef.current) {
           const now = Date.now();
-          if (now - lastPanRef.current > 500) {
+          if (now - lastPanRef.current > 300) {
             lastPanRef.current = now;
             try {
               const compassH = compassHeadingRef.current;
               const zoom = mapInstanceRef.current.getZoom();
               const offsetPixels = window.innerHeight * 0.2;
-              const point = mapInstanceRef.current.project(currentLoc, zoom);
+              
               const compassRad = compassH * Math.PI / 180;
-              const offsetPoint = point.add(L.point(
-                offsetPixels * Math.sin(compassRad),
-                -offsetPixels * Math.cos(compassRad)
-              ));
-              const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
-              mapInstanceRef.current.panTo([unprojected.lat, unprojected.lng], { animate: true, duration: 0.8, easeLinearity: 0.25 });
+              const center = mapInstanceRef.current.getCenter();
+              
+              // Use HERE Map projection to calculate offset
+              const screenPoint = mapInstanceRef.current.geoToScreen(center);
+              if (screenPoint) {
+                const offsetScreenPoint = {
+                  x: screenPoint.x + offsetPixels * Math.sin(compassRad),
+                  y: screenPoint.y - offsetPixels * Math.cos(compassRad)
+                };
+                const newCenter = mapInstanceRef.current.screenToGeo(offsetScreenPoint.x, offsetScreenPoint.y);
+                if (newCenter) {
+                  mapInstanceRef.current.setCenter(newCenter, true);
+                }
+              }
             } catch (e) { /* ignore */ }
           }
         }
@@ -5288,7 +5136,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       }
 
       // Smooth the heading — faster convergence when driving on route for precise alignment
-      if (speed > 0.3 || rawHeading !== 0) {
+      // Only update heading if speed > 2.5mph to prevent jittering when stationary
+      if (speed > 2.5 || (rawHeading !== 0 && speed > 1.0)) {
         const diff = rawHeading - smoothedHeadingRef.current;
         // Handle wraparound (e.g., 350 -> 10 should be +20, not -340)
         const normalizedDiff = ((diff + 540) % 360) - 180;
@@ -5300,8 +5149,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       const currentHeading = smoothedHeadingRef.current;
 
-      if (userMarkerElRef.current) {
+      // Threshold check for icon rotation to prevent jitter/ticking
+      const rotationDiff = Math.abs(((currentHeading - lastAppliedRotationRef.current + 540) % 360) - 180);
+      
+      // Only update if change is > 1.5 degrees OR if we are moving at a decent speed
+      if (userMarkerElRef.current && (rotationDiff > 1.5 || speed > 10)) {
         userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${currentHeading}deg`);
+        lastAppliedRotationRef.current = currentHeading;
       }
 
       // Update map rotation based on mode — apply to container div, not mapPane
@@ -5320,7 +5174,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       if (isFollowMode && mapInstanceRef.current) { 
         const now = Date.now();
-        if (now - lastPanRef.current > 1200) { // Throttle panning to avoid competing animations
+        if (now - lastPanRef.current > 600) { // Reduced throttle for better responsiveness
           lastPanRef.current = now;
           try {
             // In Heading Up mode, we offset the center slightly to see more ahead
@@ -5329,18 +5183,22 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             if (!isNorthUp) {
               const zoom = mapInstanceRef.current.getZoom();
               const offsetPixels = window.innerHeight * 0.2; // Offset by 20% of screen height
-              const point = mapInstanceRef.current.project(center, zoom);
               
               const headingRad = currentHeading * Math.PI / 180;
-              const offsetPoint = point.add(L.point(
-                offsetPixels * Math.sin(headingRad),
-                -offsetPixels * Math.cos(headingRad)
-              ));
-              const unprojected = mapInstanceRef.current.unproject(offsetPoint, zoom);
-              center = [unprojected.lat, unprojected.lng];
+              const screenPoint = mapInstanceRef.current.geoToScreen(new H.geo.Point(center[0], center[1]));
+              if (screenPoint) {
+                const offsetScreenPoint = {
+                  x: screenPoint.x + offsetPixels * Math.sin(headingRad),
+                  y: screenPoint.y - offsetPixels * Math.cos(headingRad)
+                };
+                const newCenter = mapInstanceRef.current.screenToGeo(offsetScreenPoint.x, offsetScreenPoint.y);
+                if (newCenter) {
+                  center = [newCenter.lat, newCenter.lng];
+                }
+              }
             }
             
-            mapInstanceRef.current.panTo(center, { animate: true, duration: 1.2, easeLinearity: 0.15 }); 
+            mapInstanceRef.current.setCenter({ lat: center[0], lng: center[1] }, true); 
           } catch (e) {
             console.error("PanTo error:", e instanceof Error ? e.message : String(e));
           }
@@ -5397,18 +5255,18 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           validPoisCount++;
           const iconHtml = getCachedPoiIcon(poi.type, poi.name);
           if (iconHtml) {
-            const marker = L.marker([poi.lat, poi.lon], { icon: L.divIcon({ html: `<div class="custom-poi-icon"><div class="counter-rotate">${iconHtml}</div></div>`, className: 'poi-marker', iconAnchor: [12, 24] }) });
+            const { marker } = createDomMarker(poi.lat, poi.lon, `<div class="custom-poi-icon"><div class="counter-rotate">${iconHtml}</div></div>`, [24, 24], [12, 24]);
             if (markerClusterGroupRef.current) {
-              marker.addTo(markerClusterGroupRef.current);
+              markerClusterGroupRef.current.addObject(marker);
             } else {
-              marker.addTo(mapInstanceRef.current!);
+              mapInstanceRef.current?.addObject(marker);
             }
             
-            marker.on('click', () => {
+            marker.addEventListener('tap', () => {
               setSelectedPoi(poi);
             });
 
-            const popup = L.popup({ offset: [0, -25] }).setContent(`
+            const popupContent = `
               <div class="p-3 min-w-[180px]">
                 <div class="font-black text-zinc-900 text-sm mb-1">${poi.name}</div>
                 <div class="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1">${poi.type}</div>
@@ -5465,8 +5323,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   </div>
                 </div>
               </div>
-            `);
-            marker.bindPopup(popup);
+            `;
+            
+            marker.addEventListener('tap', () => {
+              showInfoBubble(mapInstanceRef.current, poi.lat, poi.lon, popupContent);
+            });
+
             poiMarkersRef.current.push(marker);
 
             // Add Entrance Marker if available
@@ -5474,13 +5336,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (!poiIconsCacheRef.current['entrance']) {
                 poiIconsCacheRef.current['entrance'] = renderToStaticMarkup(getEntranceIcon());
               }
-              const entranceMarker = L.marker([poi.entrance.lat, poi.entrance.lon], { icon: L.divIcon({ html: `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, className: 'entrance-marker', iconAnchor: [12, 12] }) });
+              const { marker: entranceMarker } = createDomMarker(poi.entrance.lat, poi.entrance.lon, `<div class="custom-entrance-icon">${poiIconsCacheRef.current['entrance']}</div>`, [24, 24], [12, 12]);
               if (markerClusterGroupRef.current) {
-                entranceMarker.addTo(markerClusterGroupRef.current);
-              } else {
-                entranceMarker.addTo(mapInstanceRef.current!);
+                markerClusterGroupRef.current.addObject(entranceMarker);
               }
-              entranceMarker.bindPopup(`<div class="p-2 font-bold text-xs">${poi.name} Entrance</div>`);
+              entranceMarker.addEventListener('tap', () => {
+                showInfoBubble(mapInstanceRef.current, poi.entrance.lat, poi.entrance.lon, `<div class="p-2 font-bold text-xs">${poi.name} Entrance</div>`);
+              });
               poiMarkersRef.current.push(entranceMarker);
             }
 
@@ -5489,13 +5351,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               if (!poiIconsCacheRef.current['exit']) {
                 poiIconsCacheRef.current['exit'] = renderToStaticMarkup(getExitIcon());
               }
-              const exitMarker = L.marker([poi.exit.lat, poi.exit.lon], { icon: L.divIcon({ html: `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, className: 'exit-marker', iconAnchor: [12, 12] }) });
+              const { marker: exitMarker } = createDomMarker(poi.exit.lat, poi.exit.lon, `<div class="custom-exit-icon">${poiIconsCacheRef.current['exit']}</div>`, [24, 24], [12, 12]);
               if (markerClusterGroupRef.current) {
-                exitMarker.addTo(markerClusterGroupRef.current);
-              } else {
-                exitMarker.addTo(mapInstanceRef.current!);
+                markerClusterGroupRef.current.addObject(exitMarker);
               }
-              exitMarker.bindPopup(`<div class="p-2 font-bold text-xs">${poi.name} Exit</div>`);
+              exitMarker.addEventListener('tap', () => {
+                showInfoBubble(mapInstanceRef.current, poi.exit.lat, poi.exit.lon, `<div class="p-2 font-bold text-xs">${poi.name} Exit</div>`);
+              });
               poiMarkersRef.current.push(exitMarker);
             }
           }
@@ -5531,14 +5393,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               }
             }
             addWaypoint(poi, type, position);
-            mapInstanceRef.current?.closePopup();
+            /* mapInstanceRef.current?.closePopup() */;
           }
         } else if (target.classList.contains('view-poi-details-btn')) {
           const poiId = target.getAttribute('data-poi-id');
           const poi = pois.find(p => `${p.name}-${p.lat}-${p.lon}` === poiId);
           if (poi) {
             setSelectedPoi(poi);
-            mapInstanceRef.current?.closePopup();
+            /* mapInstanceRef.current?.closePopup() */;
           }
         }
       };
@@ -5612,18 +5474,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           />
         );
 
-        const marker = L.marker([item.position[0], item.position[1]], {
-          icon: L.divIcon({
-            html: `<div class="traffic-infrastructure-icon">${iconHtml}</div>`,
-            className: 'traffic-marker',
-            iconSize: [18, 18],
-            iconAnchor: [9, 9]
-          }),
-          zIndexOffset: 500
-        });
+        const { marker } = createDomMarker(item.position[0], item.position[1], `<div class="traffic-infrastructure-icon">${iconHtml}</div>`, [18, 18], [9, 9], 500);
 
-        marker.addTo(mapInstanceRef.current!);
-        marker.bindTooltip(`<span class="text-xs font-bold">${item.name}</span>`, { permanent: false, direction: 'top', offset: [0, -12] });
+        mapInstanceRef.current?.addObject(marker);
+        marker.addEventListener('tap', () => {
+          showInfoBubble(mapInstanceRef.current, item.position[0], item.position[1], `<span class="text-xs font-bold">${item.name}</span>`);
+        });
         trafficMarkersRef.push(marker);
       } catch (error) {
         console.error('Error rendering traffic marker:', error);
@@ -5631,7 +5487,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     });
 
     return () => {
-      trafficMarkersRef.forEach(marker => marker.remove());
+      trafficMarkersRef.forEach(marker => {
+        if (mapInstanceRef.current) mapInstanceRef.current.removeObject(marker);
+      });
     };
   }, [trafficInfrastructure, showTrafficSigns, isMapReady, milesRemaining, userLocation, routePoints]);
 
@@ -5748,13 +5606,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setIsNorthUp(false); // Default to Heading Up mode
       if (mapInstanceRef.current && userMarkerRef.current) {
         // The marker is at the start of the route, which is the user's location
-        const startPosition = userMarkerRef.current.getLatLng(); 
+        const startPosition = (userMarkerRef.current as any).getPosition(); 
         if (startPosition && !isNaN(startPosition.lat) && !isNaN(startPosition.lng)) {
           try {
-            mapInstanceRef.current.flyTo([startPosition.lat, startPosition.lng], 17, {
-              animate: true,
-              duration: 1.5 
-            });
+            mapInstanceRef.current.getViewModel().setLookAtData({
+              center: startPosition,
+              zoom: 17
+            }, true);
           } catch (e) {
             console.error("FlyTo error in toggleDriving:", e instanceof Error ? e.message : String(e));
           }
@@ -5792,51 +5650,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       `}</style>
       {/* Main Map Container */}
       <div className="absolute inset-0 z-0 h-full w-full bg-zinc-950">
-        {is3DMode ? (
-          /* 3D Mapbox Navigation */
-          <>
-            <Navigation3DView
-              userLocation={userLocation}
-              route={routeCoordinates ? { coordinates: routeCoordinates } : undefined}
-              heading={telemetryContext?.headingRef.current || 0}
-              nextTurnDistance={milesRemaining > 0 ? (parseFloat(nextInstruction.distance) || undefined) : undefined}
-              nextTurnDirection={milesRemaining > 0 ? nextInstruction.text : undefined}
-              speedLimit={currentSpeedLimit ?? undefined}
-              currentSpeed={speed}
-              trafficSigns={trafficInfrastructure.slice(0, 1)}
-              eta={eta}
-              milesRemaining={milesRemaining}
-              timeRemaining={remainingDuration}
-              streetName={currentRoad || undefined}
-              unitSystem={context?.unitSystem || 'imperial'}
-              currentRegion={currentRegion}
-              restrictionAlerts={restrictionAlerts}
-              truckProfile={truckProfile}
-              onMapRef={(m) => { mapboxMapRef.current = m; }}
-              isFollowMode={isFollowMode}
-              isOverviewMode={isOverviewMode}
-            />
-            {/* 3D Mode Route Controls */}
-            {isDriving && (
-              <div className="absolute bottom-20 right-4 z-[2020] flex flex-col gap-2 pointer-events-auto">
-                <button onClick={handleCancelRoute} className="p-3 rounded-xl bg-black/80 backdrop-blur-sm border border-zinc-700 text-zinc-400 hover:text-red-400 hover:border-red-400/40 transition-all" title="Cancel Route">
-                  <X className="w-5 h-5" strokeWidth={3} />
-                </button>
-                <button onClick={handleReroute} className="p-3 rounded-xl bg-black/80 backdrop-blur-sm border border-zinc-700 text-zinc-400 hover:text-[#D4AF37] hover:border-[#D4AF37]/40 transition-all" title="Reroute">
-                  <RotateCcw className="w-5 h-5" strokeWidth={3} />
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          /* 2D Leaflet Map */
-          <div className="w-full h-full overflow-hidden relative">
-            <div id="nav-map-container" ref={mapRef} className={`absolute transition-opacity duration-500`}
-              style={{ width: '150%', height: '150%', top: '-25%', left: '-25%' }}>
-              {/* The contents of this div are dynamically generated by Leaflet at runtime */}
-            </div>
-          </div>
-        )}
+        <HereNavigationView 
+          userLocation={userLocation} 
+          mapInstanceRef={mapInstanceRef} 
+          setIsMapReady={setIsMapReady} 
+          mapRef={mapRef} 
+        />
       </div>
       {mapInitError && (
         <div className="absolute inset-0 z-40 w-full h-full">
