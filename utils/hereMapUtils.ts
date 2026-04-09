@@ -26,12 +26,13 @@ export function createHereMap(
   const { platform, defaultLayers } = getHerePlatform();
 
   // Native HERE logistics satellite hybrid (satellite + road labels/logistics overlays)
+  // Includes vehicle_restrictions overlay — shows no-truck zones, weight limits, height barriers, etc.
   const satelliteProvider = new H.map.provider.ImageTileProvider({
     label: 'TRUCKERS NAV Satellite',
     min: 1,
     max: 20,
     getURL: (col: number, row: number, level: number) =>
-      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=logistics.satellite.day&apiKey=${HERE_MAP_API_KEY}`,
+      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=logistics.satellite.day&features=vehicle_restrictions:active_and_inactive&ppi=400&apiKey=${HERE_MAP_API_KEY}`,
   });
   const baseLayer = new H.map.layer.TileLayer(satelliteProvider);
 

@@ -1,0 +1,103 @@
+{
+  "summary": "Frontend testing of TRUCKERS NAV BY TUE app iteration 81. Verified vehicle restriction icons feature: tile URL now includes 'features=vehicle_restrictions:active_and_inactive&ppi=400' parameter. Yellow diamond weight limit signs (6T) and truck prohibition icons are visible on HERE Maps satellite tiles at zoom 10+. All 8 requested features tested and working.",
+
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "Gemini TTS API", "issue": "API key reported as leaked (403 error) - TTS falls back to native browser speech synthesis (non-blocking)"}
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_81.json"
+  ],
+
+  "action_items": [],
+
+  "critical_code_review_comments": [
+    "VERIFIED: Tile URL includes features=vehicle_restrictions:active_and_inactive parameter (hereMapUtils.ts line 35)",
+    "VERIFIED: Tile URL includes ppi=400 for high resolution tiles (hereMapUtils.ts line 35)",
+    "VERIFIED: Yellow diamond weight limit signs (6T) visible on map tiles at zoom 13",
+    "VERIFIED: Map renders logistics.satellite.day tiles with 55-degree tilt perspective (hereMapUtils.ts line 50)",
+    "VERIFIED: Guest login works (Continue as Guest button)",
+    "VERIFIED: Navigation view shows satellite map with restriction icons",
+    "VERIFIED: Map controls work (zoom in/out, HERE/SAT toggle, follow button)",
+    "VERIFIED: Route calculation works (searched Dallas TX, clicked ROUTE, 3 alternatives shown)",
+    "VERIFIED: Route comparison panel shows PRIMARY (9h 33m, 661.0 mi, $357.97), ALT 1 (10h 24m, 674.3 mi), ALT 2 (10h 31m, 694.3 mi)",
+    "VERIFIED: Turn-by-turn navigation header shows maneuver instruction",
+    "VERIFIED: TRUCK RESTRICTIONS panel shows toll booth warning",
+    "VERIFIED: Highway shields (I-29, Exit 10) visible on route",
+    "VERIFIED: Speed limit sign (35 mph) visible",
+    "VERIFIED: Weather widget (56° CLOUDY) visible",
+    "VERIFIED: IOWA state badge visible"
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend only test)",
+    "frontend": "100% - All 8 requested features working correctly"
+  },
+
+  "test_credentials": {
+    "guest": "Click 'Continue as Guest' button on login screen",
+    "email": "test@trucker.com / Test123456"
+  },
+
+  "seed_data_creation": "",
+
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "Vehicle restriction icons feature successfully implemented. Tile URL in hereMapUtils.ts line 35 now includes 'features=vehicle_restrictions:active_and_inactive&ppi=400'. Yellow diamond weight limit signs (6T) and truck prohibition circles are rendered natively by HERE Maps in the tile images at zoom 10+. Most visible at zoom 13-16+. The icons are part of the raster tile image, not separate DOM elements. Geolocation fails in headless browser - defaults to Council Bluffs, Iowa. Preview URL: https://hud-customizer-5.preview.emergentagent.com",
+
+  "features_tested": {
+    "vehicle_restriction_icons_visible": {
+      "status": "PASS",
+      "details": "Yellow diamond weight limit signs (6T) clearly visible on map tiles at zoom 13. These are rendered natively by HERE Maps via the features=vehicle_restrictions:active_and_inactive parameter."
+    },
+    "tile_url_parameter": {
+      "status": "PASS",
+      "details": "Verified in code: hereMapUtils.ts line 35 includes 'features=vehicle_restrictions:active_and_inactive&ppi=400'"
+    },
+    "logistics_satellite_day_tiles": {
+      "status": "PASS",
+      "details": "Map renders logistics.satellite.day style tiles with satellite imagery and logistics overlays"
+    },
+    "55_degree_tilt": {
+      "status": "PASS",
+      "details": "Map tilt set to 55 degrees in hereMapUtils.ts line 50"
+    },
+    "guest_login": {
+      "status": "PASS",
+      "details": "Continue as Guest button works, navigates to COMMAND CENTER dashboard"
+    },
+    "navigation_view": {
+      "status": "PASS",
+      "details": "Navigation view renders with HERE Maps satellite tiles and vehicle restriction icons"
+    },
+    "map_controls": {
+      "status": "PASS",
+      "details": "Zoom in/out, HERE/SAT toggle, follow button all working"
+    },
+    "route_calculation": {
+      "status": "PASS",
+      "details": "Route calculated from Council Bluffs, Iowa to Dallas, TX - 3 alternatives shown with fuel cost estimates"
+    }
+  },
+
+  "known_issues": {
+    "gemini_api_key": "Gemini API key reported as leaked (403 error) - TTS falls back to native browser speech synthesis. Non-blocking.",
+    "geolocation": "Geolocation fails in headless browser - defaults to Council Bluffs, Iowa via IP geolocation fallback. Expected behavior."
+  },
+
+  "mocked_apis": {
+    "none": "No mocked APIs - all integrations are live (HERE Maps, Mapbox, etc.)"
+  }
+}
