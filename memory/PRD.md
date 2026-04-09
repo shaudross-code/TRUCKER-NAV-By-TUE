@@ -6,7 +6,7 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 ## Core Architecture
 - **Frontend**: React (Vite) + TypeScript, HERE Maps JS API v3.1, Mapbox GL JS (SAT 2D view)
 - **Backend**: Node.js/Express (`server.ts`) on port 8001 with Vite dev server middleware
-- **Database**: Firebase Firestore (user profiles), LocalStorage (anonymous user profiles, HUD layout, driver profile)
+- **Database**: Firebase Firestore (user profiles), LocalStorage (anonymous profiles, HUD layout, driver profile)
 - **Maps**: HERE logistics.satellite.day tiles (vehicle_restrictions, ppi=400, flat default + tilt toggle) + Mapbox satellite-streets-v12 (SAT 2D)
 
 ## Completed Features
@@ -27,8 +27,10 @@ Build a professional trucking GPS navigation app. Features: HERE Maps satellite 
 - [x] Route Comparison Smart Tags (Fastest/Cheapest/Slowest/Most Expensive/Shortest/No Tolls)
 - [x] POI Panel shows nearest highway exit for each POI
 - [x] Removed road labels & direction badges from map overlay
-- [x] **Truck Profile Save Bug Fixed** — anonymous user profiles now persist to localStorage via FirebaseProvider — Apr 9
-- [x] **User Icon Stationary Spin Fixed** — heading FREEZES when speed < 1 mph + dynamic dead zone (10°/5°/2°) — Apr 9
+- [x] Truck Profile Save Bug Fixed (anonymous profiles persist to localStorage via FirebaseProvider)
+- [x] User Icon Stationary Spin Fixed (heading FREEZES when speed < 1 mph + dynamic dead zone)
+- [x] **POI Panel Independent from Weather Swipe** — extracted to own positioned container with touch propagation stopped — Apr 9
+- [x] **Compass Rose Hidden by Default** — showCompassRose: false in hudLayout.ts — Apr 9
 
 ## Known Issues
 - Gemini TTS key degraded (403) — falls back to native speech synthesis
