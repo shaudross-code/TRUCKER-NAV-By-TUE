@@ -88,7 +88,7 @@ import { MapControls } from './MapControls';
 import { CompassRose } from './CompassRose';
 import { FacilityPanel, AddFacilityForm } from './FacilityPanel';
 import { fetchFacilities, facilityIconSVG, Facility } from '../services/facilityService';
-import { TruckStopReputation } from './ReputationScore';
+// ReputationScore functions used elsewhere
 import { RouteSettingsModal } from './RouteSettingsModal';
 import { getPoiIcon, getPoiCategory, getPoiFilterIcon, getEntranceIcon, getExitIcon } from './PoiIcon';
 import { getFuelNetworkSelections } from './FuelNetwork';
@@ -5034,12 +5034,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     if (!telemetryContext || !userMarkerElRef.current || !isValidLatLng(userLocationRef.current)) return;
 
-    const lastRotationTickRef = useRef(0);
+    let lastRotationTick = 0;
     const updateRotationAndPan = () => {
       // Throttle rotation updates to 1.5s tick rate
       const now = Date.now();
-      if (now - lastRotationTickRef.current < 1500) return;
-      lastRotationTickRef.current = now;
+      if (now - lastRotationTick < 1500) return;
+      lastRotationTick = now;
 
       const currentLoc = userLocationRef.current;
       if (!currentLoc) return;
@@ -6308,7 +6308,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       </div>
                     );
                   }
-                  const { icon: Icon, color: iconColor, brandIcon, hasBrandIcon } = getPoiIcon(poi.type, poi.name);
+                  const poiIconElement = getPoiIcon(poi.type, poi.name);
                   return (
                     <div key={idx} data-testid={`route-poi-item-${idx}`} className="flex items-center justify-between p-1 md:p-1.5 bg-white/5 rounded-lg border border-white/5 cursor-pointer hover:bg-white/10 transition-colors active:bg-[#D4AF37]/10" onClick={() => {
                       setSelectedPoi(poi);
@@ -6317,11 +6317,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                       }
                     }}>
                       <div className="flex items-center gap-1.5 md:gap-2 overflow-hidden">
-                        {hasBrandIcon ? (
-                          <span className="shrink-0 flex items-center justify-center w-4 h-4 md:w-5 md:h-5">{brandIcon}</span>
-                        ) : (
-                          <Icon className={`w-3 h-3 md:w-4 md:h-4 ${iconColor} shrink-0`} />
-                        )}
+                        <span className="shrink-0 flex items-center justify-center w-4 h-4 md:w-5 md:h-5">{poiIconElement}</span>
                         <div className="flex flex-col overflow-hidden">
                           <span className="text-[8px] md:text-[10px] font-bold text-white truncate w-full">{poi.name}</span>
                           <div className="flex items-center gap-1.5">
