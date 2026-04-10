@@ -1226,14 +1226,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Clear any existing route lines
       routeGroupRef.current.removeAll();
       
-      // 1. Outer glow effect (vibrant pink halo)
-      routeGroupRef.current.addObject(createPolyline(coords, '#E259AD', 28, { opacity: 0.18, zIndex: 1 }));
+      // 1. Outer glow effect (soft gold shadow)
+      routeGroupRef.current.addObject(createPolyline(coords, '#D4AF37', 28, { opacity: 0.18, zIndex: 1 }));
       
       // 2. Outer dark border (creates depth and road edge)
       routeGroupRef.current.addObject(createPolyline(coords, '#1a1a2e', 16, { opacity: 0.9, zIndex: 2 }));
 
-      // 3. Inner route line — vibrant pink primary navigation path
-      routeGroupRef.current.addObject(createPolyline(coords, '#E259AD', 10, { opacity: 1, zIndex: 3 }));
+      // 3. Inner route line — gold primary navigation path
+      routeGroupRef.current.addObject(createPolyline(coords, '#D4AF37', 10, { opacity: 1, zIndex: 3 }));
       return;
     }
 
@@ -4399,7 +4399,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         
         // Draw route polyline using updateMapLine for consistency
         updateMapLine(mapInstanceRef.current, 'route', coords, '#D4AF37', 12);
-        routeLineRef.current = { id: 'route', color: '#E259AD' };
+        routeLineRef.current = { id: 'route', color: '#D4AF37' };
 
         // Draw alternative routes with distinct colors if available
         if (routes.length > 1) {
@@ -5669,7 +5669,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 clearRouteMarkers();
                 currentSegmentLineRef.current = null;
                 updateMapLine(mapInstanceRef.current, 'route', route.coords, '#D4AF37', 8);
-                routeLineRef.current = { id: 'route', color: '#E259AD' };
+                routeLineRef.current = { id: 'route', color: '#D4AF37' };
                 // Redraw alt routes with new selection
                 drawAlternativeRoutes(mapInstanceRef.current, alternativeRoutes, idx);
                 // Update lane visualization for selected route
@@ -6894,7 +6894,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 <div id="nav-stat-dist" data-testid="nav-stat-dist" className="flex flex-col items-center shrink-0 min-w-[52px] md:min-w-[72px]">
                   <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Distance</span>
                   <div className="flex items-baseline gap-0.5">
-                    <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#E259AD] tracking-tighter leading-none tabular-nums">
+                    <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#D4AF37] tracking-tighter leading-none tabular-nums">
                       {context?.unitSystem === 'metric' 
                         ? (milesRemaining > 0 ? (milesRemaining * 1.60934).toFixed(1) : '---')
                         : (milesRemaining > 0 ? milesRemaining.toFixed(1) : '---')
@@ -6921,7 +6921,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                   <>
                     <div id="nav-stat-stops" data-testid="nav-stat-stops" className="flex flex-col items-center shrink-0">
                       <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">Stops</span>
-                      <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#E259AD] tracking-tighter leading-none tabular-nums">{waypoints.length}</span>
+                      <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-[#D4AF37] tracking-tighter leading-none tabular-nums">{waypoints.length}</span>
                     </div>
                     <div className="h-8 md:h-10 landscape:h-8 w-px bg-zinc-800/60 shrink-0" />
                   </>
@@ -6931,10 +6931,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
                 <div id="nav-stat-eta" data-testid="nav-stat-eta" className="flex flex-col items-center shrink-0 min-w-[60px] md:min-w-[80px]">
                   <span className="text-[7px] md:text-[9px] landscape:text-[7px] font-bold text-zinc-600 uppercase tracking-[0.2em]">ETA</span>
                   <div className="flex items-center gap-1.5">
-                    <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${userLocation ? 'bg-[#E259AD] animate-pulse shadow-[0_0_8px_#E259AD]' : 'bg-zinc-800'}`} />
+                    <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${userLocation ? 'bg-[#D4AF37] animate-pulse shadow-[0_0_8px_#D4AF37]' : 'bg-zinc-800'}`} />
                     <span className="text-xl md:text-3xl landscape:text-xl font-[900] text-white tracking-tighter leading-none">{eta}</span>
                   </div>
-                  <span className="text-[6px] md:text-[8px] landscape:text-[6px] font-bold text-[#E259AD]/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
+                  <span className="text-[6px] md:text-[8px] landscape:text-[6px] font-bold text-[#D4AF37]/70 uppercase tracking-[0.2em] mt-0.5">LIVE</span>
                 </div>
               </div>
             </div>
