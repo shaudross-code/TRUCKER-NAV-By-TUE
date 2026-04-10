@@ -20,7 +20,7 @@ interface NavigationHUDProps {
 }
 
 const getDirectionIcon = (type: string, modifier: string) => {
-  const cls = "w-12 h-12 text-white";
+  const cls = "w-12 h-12 text-[#D4AF37]";
   if (type.includes('roundabout')) return <RotateCcw className={cls} strokeWidth={2.5} />;
   if (type.includes('fork')) return <GitFork className={cls} strokeWidth={2.5} style={{ transform: modifier === 'left' ? 'scaleX(-1)' : '' }} />;
   if (type.includes('merge')) return <Merge className={cls} strokeWidth={2.5} />;
@@ -91,9 +91,9 @@ const LaneRibbon: React.FC<{ parseLane: (step: any) => any; nextInstruction: any
   const hasRecommendation = activeCount > 0 && activeCount < lanes.length;
 
   return (
-    <div data-testid="lane-ribbon" className="border-t border-white/5 px-3 py-2 bg-black/30">
+    <div data-testid="lane-ribbon" className="border-t border-[#D4AF37]/10 px-3 py-2 bg-black/40">
       {hasRecommendation && (
-        <div className="text-[8px] uppercase tracking-[0.2em] text-white/25 text-center mb-1 font-black">
+        <div className="text-[8px] uppercase tracking-[0.2em] text-[#D4AF37]/30 text-center mb-1 font-black">
           Lane Guidance
         </div>
       )}
@@ -164,24 +164,24 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
         width: 'min(340px, calc(100% - 1.5rem))',
       }}
     >
-      <div className={`bg-[#1a1a2e]/92 backdrop-blur-2xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] border overflow-hidden transition-all duration-300 ${
-        detailLevel === 'immediate' ? 'border-[#D4AF37]/50 shadow-[0_0_24px_rgba(212,175,55,0.25)]' : 'border-white/8'
+      <div className={`bg-black/95 backdrop-blur-2xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.8)] border overflow-hidden transition-all duration-300 ${
+        detailLevel === 'immediate' ? 'border-[#D4AF37]/60 shadow-[0_0_24px_rgba(212,175,55,0.3)]' : 'border-[#D4AF37]/20'
       }`}>
         {/* Main maneuver row */}
         <div className="flex items-stretch">
           {/* Direction arrow panel */}
           <div className={`flex flex-col items-center justify-center px-5 py-4 min-w-[88px] ${
-            detailLevel === 'immediate' ? 'bg-[#D4AF37]/15' : 'bg-white/[0.04]'
+            detailLevel === 'immediate' ? 'bg-[#D4AF37]/15' : 'bg-[#D4AF37]/[0.05]'
           }`}>
             {getDirectionIcon(maneuverType, maneuverModifier)}
             {dist && (
               <div className="flex items-baseline gap-0.5 mt-1">
                 <span className={`text-2xl font-[900] tracking-tight leading-none tabular-nums ${
-                  detailLevel === 'immediate' ? 'text-[#D4AF37]' : 'text-white'
+                  detailLevel === 'immediate' ? 'text-[#D4AF37]' : 'text-[#D4AF37]'
                 }`}>
                   {dist.value}
                 </span>
-                <span className="text-[10px] font-bold text-white/50 uppercase">{dist.unit}</span>
+                <span className="text-[10px] font-bold text-[#D4AF37]/50 uppercase">{dist.unit}</span>
               </div>
             )}
           </div>
@@ -189,12 +189,12 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
           {/* Road info */}
           <div className="flex-1 py-3.5 px-4 min-w-0 flex flex-col justify-center">
             {displayExitNum && (detailLevel === 'close' || detailLevel === 'immediate') && (
-              <div className="inline-flex items-center self-start gap-1 bg-emerald-500 text-white text-[9px] font-black px-2 py-0.5 rounded-md mb-1.5 uppercase tracking-wider">
+              <div className="inline-flex items-center self-start gap-1 bg-[#D4AF37] text-black text-[9px] font-black px-2 py-0.5 rounded-md mb-1.5 uppercase tracking-wider">
                 Exit {displayExitNum}
               </div>
             )}
 
-            <div className="text-white font-bold text-[15px] leading-snug line-clamp-2">
+            <div className="text-[#D4AF37] font-bold text-[15px] leading-snug line-clamp-2">
               {detailLevel === 'far' && displayRoadName ? (
                 <>Continue on <span className="text-white/90">{displayRoadName}</span></>
               ) : (
@@ -203,7 +203,7 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
             </div>
 
             {detailLevel === 'approaching' && displayRoadName && (
-              <div className="text-white/40 text-xs mt-1 truncate font-medium">
+              <div className="text-[#D4AF37]/40 text-xs mt-1 truncate font-medium">
                 toward {displayRoadName}
               </div>
             )}

@@ -635,8 +635,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   }, [isNorthUp]);
 
   // Device compass mode — uses DeviceOrientationEvent for physical compass heading
+  // Includes tilt compensation for non-level device mounting (truck dashboards)
   useEffect(() => {
     if (!isCompassMode) return;
+
+    let smoothedCompass = compassHeadingRef.current || 0;
+    let animFrameId = 0;
+    let latestBearing = 0;
+    let deviceGamma = 0; // left-right tilt
+    let deviceBeta = 0;  // front-back tilt
 
     const handleOrientation = (event: DeviceOrientationEvent) => {
       let bearing = 0;
@@ -650,20 +657,45 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         return; // No usable data
       }
 
-      compassHeadingRef.current = bearing;
+      // Capture device tilt for level correction
+      deviceBeta = event.beta || 0;
+      deviceGamma = event.gamma || 0;
 
-      // Compass mode exclusively controls vehicle icon rotation (no competing writers)
-      smoothedHeadingRef.current = bearing; // Sync smoothed heading so telemetry loop won't fight
-      if (userMarkerElRef.current) {
-        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${bearing}deg`);
+      // Compensate compass heading for device tilt (non-level mounting)
+      // When gamma != 0, the compass heading drifts — apply correction factor
+      if (Math.abs(deviceBeta) > 10 && Math.abs(deviceBeta) < 170) {
+        const tiltRad = (deviceGamma || 0) * Math.PI / 180;
+        const betaRad = (deviceBeta || 0) * Math.PI / 180;
+        // Small correction for tilted devices
+        bearing = bearing - Math.atan2(Math.sin(tiltRad), Math.cos(tiltRad) * Math.cos(betaRad)) * 180 / Math.PI;
+        bearing = ((bearing % 360) + 360) % 360;
       }
 
-      // Rotate map container
+      latestBearing = bearing;
+    };
+
+    // Smooth animation loop — prevents jerky rotation on mobile
+    const animate = () => {
+      const diff = latestBearing - smoothedCompass;
+      const normalizedDiff = ((diff + 540) % 360) - 180;
+      // Heavy smoothing factor (0.08) for silky-smooth professional rotation
+      smoothedCompass = (smoothedCompass + normalizedDiff * 0.08 + 360) % 360;
+
+      compassHeadingRef.current = smoothedCompass;
+      smoothedHeadingRef.current = smoothedCompass;
+
+      if (userMarkerElRef.current) {
+        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${smoothedCompass}deg`);
+      }
+
+      // Rotate map container with tilt-corrected heading
       const el = mapRef.current;
       if (el) {
         const rotation = manualRotationRef.current;
-        el.style.setProperty('--map-rotation', `${-bearing + rotation}deg`);
+        el.style.setProperty('--map-rotation', `${-smoothedCompass + rotation}deg`);
       }
+
+      animFrameId = requestAnimationFrame(animate);
     };
 
     const setup = async () => {
@@ -677,6 +709,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       // Prefer absolute orientation (Android), fall back to relative
       window.addEventListener('deviceorientationabsolute', handleOrientation as any, true);
       window.addEventListener('deviceorientation', handleOrientation as any);
+      animFrameId = requestAnimationFrame(animate);
     };
 
     setup();
@@ -684,6 +717,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     return () => {
       window.removeEventListener('deviceorientationabsolute', handleOrientation as any);
       window.removeEventListener('deviceorientation', handleOrientation as any);
+      cancelAnimationFrame(animFrameId);
     };
   }, [isCompassMode]);
   const [showTruckRestrictions] = useState(() => {
@@ -1401,10 +1435,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     wrapper.style.marginTop = '-20px';
     wrapper.style.pointerEvents = 'none';
     wrapper.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
-      <div class="absolute w-10 h-10 rounded-full" style="background:radial-gradient(circle, rgba(66,133,244,0.25) 0%, rgba(66,133,244,0) 70%); animation: navPulse 2.5s ease-out infinite;"></div>
-      <div class="relative vehicle-pointer" style="filter: drop-shadow(0 0 8px rgba(255,255,255,0.5))">
-        <svg viewBox="0 0 40 40" width="32" height="32" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="20,5 33,31 20,24 7,31" fill="white" stroke="rgba(0,0,0,0.15)" stroke-width="1" stroke-linejoin="round"/>
+      <div class="absolute w-12 h-12 rounded-full" style="background:radial-gradient(circle, rgba(34,197,94,0.35) 0%, rgba(34,197,94,0) 70%); animation: navPulse 2s ease-out infinite;"></div>
+      <div class="absolute w-8 h-8 rounded-full" style="background:radial-gradient(circle, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0) 70%); animation: navPulse 2s ease-out 0.6s infinite;"></div>
+      <div class="relative vehicle-pointer" style="filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7))">
+        <svg viewBox="0 0 40 40" width="34" height="34" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="20,4 34,32 20,24 6,32" fill="#D4AF37" stroke="#000000" stroke-width="2" stroke-linejoin="round"/>
+          <polygon points="20,8 30,29 20,23 10,29" fill="#D4AF37" stroke="none"/>
         </svg>
       </div>
     </div>`;
@@ -4059,6 +4095,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       };
       if (primaryRoute.spans) {
         routeSpansRef.current = primaryRoute.spans;
+        // Set initial speed limit from the first route span that has one
+        for (const span of primaryRoute.spans) {
+          if (span.speedLimit !== undefined && span.speedLimit > 0) {
+            setCurrentSpeedLimit(Math.round(span.speedLimit * 2.23694)); // m/s → mph
+            break;
+          }
+        }
+        // Fallback: if no span has speed limit, infer from route steps
+        if (!currentSpeedLimit && routeStepsRef.current.length > 0) {
+          const firstStep = routeStepsRef.current[0];
+          if (firstStep?.maneuver?.instruction) {
+            const roadName = firstStep.maneuver.instruction.match(/on (.+?)(?:\s+for|\.|$)/)?.[1] || '';
+            if (roadName.match(/^I\s*[- ]/i)) setCurrentSpeedLimit(70);
+            else if (roadName.match(/^US\s*[- ]/i)) setCurrentSpeedLimit(65);
+            else setCurrentSpeedLimit(45);
+          }
+        }
       }
 
       // Render route reasoning overlay if enabled
