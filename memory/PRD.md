@@ -8,7 +8,7 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - Backend: Node.js + Express (server.ts on port 8001)
 - Auth: Firebase (Anonymous + Email)
 - Storage: Firestore + LocalStorage fallback
-- APIs: HERE Maps (Routing v8, Discover, Traffic), Mapbox, Google Gemini (TTS)
+- APIs: HERE Maps (Routing v8, Discover, Traffic, Raster Tile v3), Mapbox, Google Gemini (TTS)
 
 ## Completed Features
 - Core navigation with HERE truck routing v8
@@ -24,19 +24,20 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - Collapsible map controls
 - Lane guidance visualization with gold theme
 - Compass rose
-- Voice announcements (TTS with Gemini fallback to native)
+- Voice announcements (TTS) with imperial units
 - Guest login with localStorage persistence
 
 ## Recently Completed (Feb 2026)
-- P0 BUG FIX: App crash on START NAV — two root causes fixed:
-  1. `useRef(0)` inside `useEffect` → changed to closure variable
-  2. `getPoiIcon()` JSX destructuring mismatch → use JSX directly
-- Map Performance: Changed HERE tile ppi from 400→72 (fixes oversized restriction icons/text)
+- P0 BUG FIX: App crash on START NAV — two root causes fixed
+- Satellite Map: Changed tile style to `explore.satellite.day` with `ppi=100` for proper satellite imagery + vehicle restrictions
+- Map Performance: ppi reduced from 400→100 (restriction icons/text properly sized)
 - User Location Icon: Gold (#D4AF37) arrow with black outline + pulsing green animation
 - NavigationHUD Theme: Pure black background, gold direction arrows, gold instruction text, gold borders
-- Speed Limit Sign: Now shows immediately on route calculation (initial span extraction)
+- Speed Limit Sign: Shows immediately on route calculation (initial span extraction)
 - Map Rotation: Smooth compass tilt compensation via device orientation (gamma/beta correction)
-- Lane Guidance: Updated to gold-accented theme
+- Traffic Light Throttling: Alerts spaced at ~0.3 miles minimum apart (prevents repetition)
+- Imperial Units: All distances converted from meters to miles/feet/quarter/half mile in voice + HUD
+- Voice Announcements: Natural language ("In half a mile", "Continue for 5 miles", "In 1312 feet")
 
 ## Upcoming Tasks
 - P1: Refactor NavigationView.tsx (~7000 lines) into smaller hooks/components
@@ -53,4 +54,3 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - Gemini TTS API key flagged (403) — falls back to native TTS
 - Nominatim reverse geocoding CORS errors in preview
 - Intermittent service drops (trucker-nav/frontend) requiring supervisor restart
-- Tangram tile renderer intermittent errors (non-blocking, map still renders)
