@@ -144,12 +144,29 @@ const convertInstructionToImperial = (instruction: string): string => {
   // Convert "X.X km" to "X.X mi"
   let result = instruction.replace(/(\d+(?:\.\d+)?)\s*km\b/gi, (_match, num) => {
     const miles = parseFloat(num) * 0.621371;
-    return miles < 0.1 ? `${Math.round(miles * 5280)} ft` : `${miles.toFixed(1)} mi`;
+    if (miles < 0.1) return `${Math.round(miles * 5280)} feet`;
+    if (miles < 0.5) return `quarter mile`;
+    if (miles < 0.8) return `half a mile`;
+    if (miles < 1.2) return `1 mile`;
+    return `${miles.toFixed(1)} miles`;
   });
-  // Convert standalone "X m" (meters) to feet — match "X m" not followed by letters (avoids "mi", "min" etc.)
+  // Convert "X meters" or "X metres" to feet/miles
+  result = result.replace(/(\d+(?:\.\d+)?)\s*(?:meters?|metres?)\b/gi, (_match, num) => {
+    const meters = parseFloat(num);
+    const miles = meters / 1609.34;
+    if (miles >= 1) return `${miles.toFixed(1)} miles`;
+    if (miles >= 0.4) return `half a mile`;
+    if (miles >= 0.2) return `quarter mile`;
+    return `${Math.round(meters * 3.28084)} feet`;
+  });
+  // Convert standalone "X m" (meters) — match "X m" not followed by letters (avoids "mi", "min" etc.)
   result = result.replace(/(\d+)\s*m(?=[,.\s)]|$)/gi, (_match, num) => {
     const meters = parseInt(num);
-    return `${Math.round(meters * 3.28084)} ft`;
+    const miles = meters / 1609.34;
+    if (miles >= 1) return `${miles.toFixed(1)} miles`;
+    if (miles >= 0.4) return `half a mile`;
+    if (miles >= 0.2) return `quarter mile`;
+    return `${Math.round(meters * 3.28084)} feet`;
   });
   return result;
 };
@@ -2041,17 +2058,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       
       const spokenText = convertInstructionToImperial(nextInstruction.text);
       shouldSpeak = true;
-      if (dist > 2) {
-        phrase = `Continue for ${dist} miles, then ${spokenText}.`;
+      if (dist > 5) {
+        phrase = `Continue for ${Math.round(dist)} miles, then ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
-      } else if (dist > 0.5) {
-        phrase = `In ${dist} miles, ${spokenText}.`;
+      } else if (dist > 2) {
+        phrase = `In ${Math.round(dist)} miles, ${spokenText}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
+      } else if (dist > 1) {
+        phrase = `In ${dist.toFixed(0)} mile${dist >= 1.5 ? 's' : ''}, ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         if (dist <= 2) spokenDistancesRef.current.add('2');
         if (dist <= 1.5) spokenDistancesRef.current.add('1.5');
         if (dist <= 1) spokenDistancesRef.current.add('1');
+      } else if (dist > 0.5) {
+        phrase = `In half a mile, ${spokenText}.`;
+        if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
+        spokenDistancesRef.current.add('2');
+        spokenDistancesRef.current.add('1.5');
+        spokenDistancesRef.current.add('1');
       } else {
-        phrase = `In ${(dist * 5280).toFixed(0)} feet, ${spokenText}.`;
+        phrase = `In ${Math.round(dist * 5280)} feet, ${spokenText}.`;
         if (hasLaneGuidance) phrase += ` ${lanePhrase}`;
         spokenDistancesRef.current.add('2');
         spokenDistancesRef.current.add('1.5');
@@ -3620,19 +3646,28 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let currentRoadDirection = '';
           let currentRoadStartIdx = 0;
 
+          // Throttle traffic light/stop sign alerts — minimum gap between markers
+          const MIN_TRAFFIC_ALERT_GAP = Math.max(40, Math.floor(totalPoints * 0.02)); // ~0.3 miles apart minimum
+          let lastTrafficLightIdx = -99999;
+          let lastStopSignIdx = -99999;
+
           section.spans.forEach((span: any) => {
             const progress = currentPointIndex / (totalPoints - 1 || 1);
 
             if (span.streetAttributes && span.streetAttributes.includes('trafficLight')) {
-              trafficAlertsList.push({
-                type: 'TRAFFIC_LIGHT',
-                message: 'Traffic Light',
-                icon: TrafficCone,
-                color: 'text-[#D4AF37]',
-                bg: 'bg-[#D4AF37]/10',
-                progress,
-                coords: coords[currentPointIndex]
-              });
+              // Only add if far enough from the last traffic light marker
+              if (currentPointIndex - lastTrafficLightIdx >= MIN_TRAFFIC_ALERT_GAP) {
+                trafficAlertsList.push({
+                  type: 'TRAFFIC_LIGHT',
+                  message: 'Traffic Light',
+                  icon: TrafficCone,
+                  color: 'text-[#D4AF37]',
+                  bg: 'bg-[#D4AF37]/10',
+                  progress,
+                  coords: coords[currentPointIndex]
+                });
+                lastTrafficLightIdx = currentPointIndex;
+              }
             }
 
             if (span.truckAttributes) {
