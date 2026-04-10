@@ -42,6 +42,12 @@
   will-change: transform;
 }
 
+@keyframes navPulse {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(0.8); opacity: 0; }
+}
+
 .counter-rotate {
   rotate: calc(var(--map-rotation, 0deg) * -1);
   transition: rotate 0.6s cubic-bezier(0.4, 0, 0.2, 1);
