@@ -1446,18 +1446,21 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     // This ensures userMarkerElRef points to the LIVE DOM element on the map
     const wrapper = document.createElement('div');
     wrapper.style.position = 'relative';
-    wrapper.style.width = '40px';
-    wrapper.style.height = '40px';
-    wrapper.style.marginLeft = '-20px';
-    wrapper.style.marginTop = '-20px';
+    wrapper.style.width = '64px';
+    wrapper.style.height = '64px';
+    wrapper.style.marginLeft = '-32px';
+    wrapper.style.marginTop = '-32px';
     wrapper.style.pointerEvents = 'none';
     wrapper.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
-      <div class="absolute w-12 h-12 rounded-full" style="background:radial-gradient(circle, rgba(34,197,94,0.35) 0%, rgba(34,197,94,0) 70%); animation: navPulse 2s ease-out infinite;"></div>
-      <div class="absolute w-8 h-8 rounded-full" style="background:radial-gradient(circle, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0) 70%); animation: navPulse 2s ease-out 0.6s infinite;"></div>
-      <div class="relative vehicle-pointer" style="filter: drop-shadow(0 2px 6px rgba(0,0,0,0.7))">
-        <svg viewBox="0 0 40 40" width="34" height="34" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="20,4 34,32 20,24 6,32" fill="#D4AF37" stroke="#000000" stroke-width="2" stroke-linejoin="round"/>
-          <polygon points="20,8 30,29 20,23 10,29" fill="#D4AF37" stroke="none"/>
+      <!-- Outer warm golden glow (large radiating halo) -->
+      <div class="absolute" style="width:80px;height:80px;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle, rgba(212,175,55,0.35) 0%, rgba(212,175,55,0.15) 35%, rgba(212,175,55,0) 70%);animation:navPulse 2.5s ease-out infinite;"></div>
+      <div class="absolute" style="width:60px;height:60px;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle, rgba(212,175,55,0.25) 0%, rgba(212,175,55,0) 65%);animation:navPulse 2.5s ease-out 0.8s infinite;"></div>
+      <!-- Black circle with gold fill and black border ring -->
+      <div class="absolute" style="width:38px;height:38px;top:50%;left:50%;transform:translate(-50%,-50%);border-radius:50%;background:#D4AF37;border:3.5px solid #000000;box-shadow:0 0 12px rgba(212,175,55,0.5),0 2px 8px rgba(0,0,0,0.6);"></div>
+      <!-- Arrow pointing up inside the circle -->
+      <div class="relative vehicle-pointer" style="filter:drop-shadow(0 1px 2px rgba(0,0,0,0.3));">
+        <svg viewBox="0 0 40 40" width="22" height="22" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="20,6 32,30 20,22 8,30" fill="#111111" stroke="none"/>
         </svg>
       </div>
     </div>`;
