@@ -32,7 +32,7 @@ export function createHereMap(
     min: 1,
     max: 20,
     getURL: (col: number, row: number, level: number) =>
-      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=explore.satellite.day&features=vehicle_restrictions:active_and_inactive&ppi=100&apiKey=${HERE_MAP_API_KEY}`,
+      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=explore.satellite.day&features=vehicle_restrictions:active_and_inactive&ppi=200&apiKey=${HERE_MAP_API_KEY}`,
   });
   const baseLayer = new H.map.layer.TileLayer(satelliteProvider);
 
