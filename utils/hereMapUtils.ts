@@ -25,22 +25,46 @@ export function createHereMap(
 ): { map: any; platform: any; defaultLayers: any; behavior: any; ui: any } {
   const { platform, defaultLayers } = getHerePlatform();
 
-  // Native HERE logistics satellite hybrid (satellite + road labels/logistics overlays)
-  // Includes vehicle_restrictions overlay — shows no-truck zones, weight limits, height barriers, etc.
+  // Layer 1 (BASE): Clean satellite imagery from HERE Raster Tile API v3
+  // No vehicle_restrictions baked in — we'll overlay those separately on top
   const satelliteProvider = new H.map.provider.ImageTileProvider({
     label: 'TRUCKERS NAV Satellite',
     min: 1,
     max: 20,
     getURL: (col: number, row: number, level: number) =>
-      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=explore.satellite.day&features=vehicle_restrictions:active_and_inactive&ppi=200&apiKey=${HERE_MAP_API_KEY}`,
+      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=explore.satellite.day&ppi=200&apiKey=${HERE_MAP_API_KEY}`,
   });
   const baseLayer = new H.map.layer.TileLayer(satelliteProvider);
+
+  // Layer 2 (OVERLAY): Vehicle restrictions as a separate raster overlay ON TOP
+  // Uses logistics.day style which renders truck restrictions, weight limits,
+  // bridge heights, highway shields — always visible above the satellite base
+  // Reduced opacity to let satellite imagery show through while keeping restrictions visible
+  const restrictionsProvider = new H.map.provider.ImageTileProvider({
+    label: 'TRUCKERS NAV Restrictions',
+    min: 1,
+    max: 20,
+    opacity: 0.55,
+    getURL: (col: number, row: number, level: number) =>
+      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=logistics.day&features=vehicle_restrictions:active_and_inactive&ppi=200&apiKey=${HERE_MAP_API_KEY}`,
+  });
+  const restrictionsLayer = new H.map.layer.TileLayer(restrictionsProvider);
 
   const map = new H.Map(element, baseLayer, {
     center,
     zoom,
     pixelRatio: window.devicePixelRatio || 1,
   });
+
+  // Add the restrictions overlay ON TOP of the satellite base
+  map.addLayer(restrictionsLayer);
+
+  // Also add the built-in vector truck layer for additional real-time truck data
+  try {
+    if (defaultLayers?.vector?.normal?.truck) {
+      map.addLayer(defaultLayers.vector.normal.truck);
+    }
+  } catch (_) { /* Vector truck layer optional */ }
 
   // Default to flat (0° tilt) — user can toggle tilt via map controls
   // Do NOT set tilt here; it's managed by the tilt toggle button
