@@ -3574,10 +3574,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
         }
 
-        // Throttle traffic light/stop sign alerts — minimum gap between markers
-        const MIN_TRAFFIC_ALERT_GAP = Math.max(40, Math.floor(totalPoints * 0.02)); // ~0.3 miles apart minimum
-        let lastTrafficLightIdx = -99999;
+        // Throttle stop sign alerts — minimum gap based on coord count
         let lastStopSignIdx = -99999;
+        const STOP_SIGN_MIN_GAP = Math.max(40, Math.floor(coords.length * 0.02));
 
         if (section.actions) {
           section.actions.forEach((action: any) => {
@@ -3588,8 +3587,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const actionCoord = coords[coordIdx] || coords[Math.floor(actionOffset * (coords.length - 1) / (summary.length || 1))];
             
             if (instruction.includes('stop sign') || action.action === 'stop') {
-              // Throttle stop signs like traffic lights
-              if (coordIdx - lastStopSignIdx >= MIN_TRAFFIC_ALERT_GAP) {
+              // Throttle stop signs — minimum gap between alerts
+              if (coordIdx - lastStopSignIdx >= STOP_SIGN_MIN_GAP) {
                 const progress = coordIdx / (coords.length - 1 || 1);
                 trafficAlertsList.push({
                   type: 'STOP_SIGN',
@@ -3651,6 +3650,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let currentRoadShieldLabel = '';
           let currentRoadDirection = '';
           let currentRoadStartIdx = 0;
+
+          // Throttle traffic light alerts
+          const MIN_TRAFFIC_ALERT_GAP = Math.max(40, Math.floor(totalPoints * 0.02));
+          let lastTrafficLightIdx = -99999;
 
           section.spans.forEach((span: any) => {
             const progress = currentPointIndex / (totalPoints - 1 || 1);

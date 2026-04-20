@@ -73,4 +73,3 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - Gemini TTS API key flagged (403) — falls back to native TTS
 - Nominatim reverse geocoding CORS errors in preview
 - Intermittent service drops (trucker-nav/frontend) requiring supervisor restart
-- HERE routing API 'fuelConsumption' parameter error in older cached requests (resolved in current code)
