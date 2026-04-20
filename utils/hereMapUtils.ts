@@ -488,12 +488,20 @@ export function createClusterProvider(): { provider: any; layer: any } {
           el.innerHTML = `<div class="custom-poi-icon">${html}</div>`;
           el.style.width = '24px';
           el.style.height = '24px';
-          el.style.pointerEvents = 'none';
         } else {
           el = document.createElement('div');
           el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="5" fill="#D4AF37" stroke="#050505" stroke-width="1.5"/></svg>`;
           el.style.width = '12px';
           el.style.height = '12px';
+        }
+        // Make POI markers clickable
+        el.style.pointerEvents = 'auto';
+        el.style.cursor = 'pointer';
+        el.classList.add('poi-cluster-marker');
+        if (data.name) el.setAttribute('data-poi-name', data.name);
+        if (data.poi) {
+          el.setAttribute('data-poi-lat', String(data.poi.lat));
+          el.setAttribute('data-poi-lon', String(data.poi.lon));
         }
         const marker = new WrappedMarker(pt._lat, pt._lng, el, 1);
         marker.setData(data);

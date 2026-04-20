@@ -5356,7 +5356,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     console.log("POI Filters:", Array.from(poiFilters).join(', '));
     console.log("Cluster Provider:", clusterProviderRef.current ? "exists" : "null");
 
-      // Add event delegation for the "Add as Stop" button in popups
+      // Add event delegation for the "Add as Stop" button in popups AND POI marker clicks
       const handlePopupClick = (e: MouseEvent) => {
         const target = e.target as HTMLElement;
         if (target.classList.contains('add-poi-stop-btn')) {
@@ -5378,15 +5378,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
               }
             }
             addWaypoint(poi, type, position);
-            // Close any open info bubbles
-            try { hereUiRef.current?.getBubbles()?.forEach((b: any) => hereUiRef.current?.removeBubble(b)); } catch(_) {}
           }
         } else if (target.classList.contains('view-poi-details-btn')) {
           const poiId = target.getAttribute('data-poi-id');
           const poi = pois.find(p => `${p.name}-${p.lat}-${p.lon}` === poiId);
           if (poi) {
             setSelectedPoi(poi);
-            try { hereUiRef.current?.getBubbles()?.forEach((b: any) => hereUiRef.current?.removeBubble(b)); } catch(_) {}
+          }
+        } else {
+          // Check if the click was on a POI cluster marker (or a child of one)
+          const markerEl = target.closest('.poi-cluster-marker') as HTMLElement;
+          if (markerEl) {
+            const name = markerEl.getAttribute('data-poi-name');
+            const lat = parseFloat(markerEl.getAttribute('data-poi-lat') || '');
+            const lon = parseFloat(markerEl.getAttribute('data-poi-lon') || '');
+            if (name && !isNaN(lat) && !isNaN(lon)) {
+              const poi = pois.find(p => p.name === name && Math.abs(p.lat - lat) < 0.001 && Math.abs(p.lon - lon) < 0.001);
+              if (poi) {
+                setSelectedPoi(poi);
+              }
+            }
           }
         }
       };

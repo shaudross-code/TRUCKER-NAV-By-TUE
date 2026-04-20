@@ -41,6 +41,10 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
   - Added addEventListener/removeEventListener, geoToScreen, setZIndex to wrapper
   - H.geo.Rect replaced with boundsFromCoords
   - All 12 test features verified passing (iteration_95.json)
+- **POI Marker Clickability Fix**: Made POI markers interactive on the Mapbox map
+  - Cluster provider markers now have pointerEvents: auto and cursor: pointer
+  - Added .poi-cluster-marker class with data-poi-name/lat/lon attributes
+  - Click handler in NavigationView.tsx detects clicks and opens POI detail modal via setSelectedPoi
 - P0 BUG FIX: App crash on START NAV (useRef in useEffect + getPoiIcon mismatch)
 - Truck Profile save bug fixed
 
