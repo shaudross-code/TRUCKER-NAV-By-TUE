@@ -1,140 +1,413 @@
 /**
- * HERE Maps Utility Module — TRUCKERS NAV BY TUE Signature Edition
+ * Map Utility Module — TRUCKERS NAV BY TUE (Mapbox GL JS Edition)
  * Satellite hybrid base with dark-gold branding + clustering support.
+ * Drop-in replacement for HERE Maps utils — same exported API surface.
  */
 
-const HERE_MAP_API_KEY = 'hDGCtu7ZoFAYNU1ajczKchoOm5o06iUjOAjZmLi-hLI';
+import mapboxgl from 'mapbox-gl';
 
-let _platform: any = null;
-let _defaultLayers: any = null;
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || import.meta.env.REACT_APP_MAPBOX_TOKEN || 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
-/** Initialize (or reuse) the HERE platform + default layers */
-export function getHerePlatform() {
-  if (!_platform) {
-    _platform = new H.service.Platform({ apikey: HERE_MAP_API_KEY });
-    _defaultLayers = _platform.createDefaultLayers();
+// ─── Compatibility wrapper for HERE-like map API ──────────────────────
+// NavigationView.tsx calls map.addObject(), map.removeObject(), map.getViewModel(), etc.
+// This wrapper makes Mapbox GL JS respond to those calls.
+
+class MapGroup {
+  _objects: any[] = [];
+  _map: WrappedMap | null = null;
+  _zIndex: number = 0;
+
+  addObject(obj: any) {
+    this._objects.push(obj);
+    if (this._map) obj._addToMap?.(this._map);
   }
-  return { platform: _platform, defaultLayers: _defaultLayers };
+
+  removeObject(obj: any) {
+    const idx = this._objects.indexOf(obj);
+    if (idx >= 0) this._objects.splice(idx, 1);
+    obj._removeFromMap?.();
+  }
+
+  removeAll() {
+    for (const obj of [...this._objects]) {
+      obj._removeFromMap?.();
+    }
+    this._objects = [];
+  }
+
+  getObjects() { return [...this._objects]; }
+
+  setZIndex(z: number) {
+    this._zIndex = z;
+  }
+  
+  _addToMap(map: WrappedMap) {
+    this._map = map;
+    for (const obj of this._objects) obj._addToMap?.(map);
+  }
+
+  _removeFromMap() {
+    for (const obj of this._objects) obj._removeFromMap?.();
+    this._map = null;
+  }
+
+  dispose() { this.removeAll(); }
 }
 
-/** Create a HERE Map on a DOM element — TRUCKERS NAV dark-gold signature theme */
+class WrappedMarker {
+  _marker: mapboxgl.Marker;
+  _map: WrappedMap | null = null;
+  _data: any = null;
+  _zIndex: number;
+
+  constructor(lat: number, lng: number, el: HTMLElement, zIndex: number = 0) {
+    this._marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([lng, lat]);
+    this._zIndex = zIndex;
+    el.style.zIndex = String(zIndex);
+  }
+
+  setGeometry(coords: { lat: number; lng: number } | any) {
+    if (coords.lat !== undefined && coords.lng !== undefined) {
+      this._marker.setLngLat([coords.lng, coords.lat]);
+    } else if (coords.lat !== undefined && coords.lon !== undefined) {
+      this._marker.setLngLat([coords.lon, coords.lat]);
+    }
+  }
+
+  getGeometry() {
+    const ll = this._marker.getLngLat();
+    return { lat: ll.lat, lng: ll.lng };
+  }
+
+  setData(d: any) { this._data = d; }
+  getData() { return this._data; }
+
+  _addToMap(map: WrappedMap) {
+    this._map = map;
+    if (map._mbMap) this._marker.addTo(map._mbMap);
+  }
+
+  _removeFromMap() {
+    this._marker.remove();
+    this._map = null;
+  }
+
+  dispose() { this._marker.remove(); }
+  getElement() { return this._marker.getElement(); }
+}
+
+class WrappedPolyline {
+  _id: string;
+  _coords: [number, number][];
+  _color: string;
+  _width: number;
+  _opacity: number;
+  _dash: number[];
+  _zIndex: number;
+  _map: WrappedMap | null = null;
+
+  constructor(coords: [number, number][], color: string, width: number, opts?: any) {
+    this._id = 'polyline-' + Math.random().toString(36).substring(2, 10);
+    this._coords = coords;
+    this._color = color;
+    this._width = width;
+    this._opacity = opts?.opacity ?? 1;
+    this._dash = opts?.dash || [];
+    this._zIndex = opts?.zIndex ?? 0;
+  }
+
+  setGeometry(coords: [number, number][]) {
+    this._coords = coords;
+    if (this._map?._mbMap?.getSource(this._id)) {
+      (this._map._mbMap.getSource(this._id) as mapboxgl.GeoJSONSource).setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'LineString', coordinates: coords.map(c => [c[1], c[0]]) }
+      });
+    }
+  }
+
+  _addToMap(map: WrappedMap) {
+    this._map = map;
+    const mb = map._mbMap;
+    if (!mb) return;
+    try {
+      if (mb.getSource(this._id)) return;
+      mb.addSource(this._id, {
+        type: 'geojson',
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: this._coords.map(c => [c[1], c[0]])
+          }
+        }
+      });
+      const paintProps: any = {
+        'line-color': this._color,
+        'line-width': this._width,
+        'line-opacity': this._opacity,
+      };
+      if (this._dash.length > 0) {
+        paintProps['line-dasharray'] = this._dash;
+      }
+      mb.addLayer({
+        id: this._id,
+        type: 'line',
+        source: this._id,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: paintProps,
+      });
+    } catch (e) { console.warn('addPolyline:', e); }
+  }
+
+  _removeFromMap() {
+    if (this._map?._mbMap) {
+      try {
+        if (this._map._mbMap.getLayer(this._id)) this._map._mbMap.removeLayer(this._id);
+        if (this._map._mbMap.getSource(this._id)) this._map._mbMap.removeSource(this._id);
+      } catch {}
+    }
+    this._map = null;
+  }
+
+  dispose() { this._removeFromMap(); }
+}
+
+class ViewModel {
+  _map: WrappedMap;
+  constructor(map: WrappedMap) { this._map = map; }
+
+  setLookAtData(data: any, _animate?: boolean) {
+    const mb = this._map._mbMap;
+    if (!mb) return;
+
+    if (data.bounds) {
+      const b = data.bounds;
+      mb.fitBounds([[b._minLng, b._minLat], [b._maxLng, b._maxLat]], {
+        padding: 60, duration: _animate ? 800 : 0
+      });
+      return;
+    }
+
+    const opts: any = {};
+    if (data.position) {
+      opts.center = [data.position.lng, data.position.lat];
+    }
+    if (data.zoom !== undefined) opts.zoom = data.zoom;
+    if (data.heading !== undefined) opts.bearing = -data.heading;
+    if (data.tilt !== undefined) opts.pitch = data.tilt;
+
+    if (_animate) {
+      mb.easeTo({ ...opts, duration: 500 });
+    } else {
+      mb.jumpTo(opts);
+    }
+  }
+
+  getLookAtData() {
+    const mb = this._map._mbMap;
+    if (!mb) return { position: { lat: 0, lng: 0 }, zoom: 10, heading: 0, tilt: 0, bounds: null };
+    const c = mb.getCenter();
+    const bounds = mb.getBounds();
+    return {
+      position: { lat: c.lat, lng: c.lng },
+      zoom: mb.getZoom(),
+      heading: -mb.getBearing(),
+      tilt: mb.getPitch(),
+      bounds: bounds ? {
+        getTop: () => bounds.getNorth(),
+        getBottom: () => bounds.getSouth(),
+        getLeft: () => bounds.getWest(),
+        getRight: () => bounds.getEast(),
+      } : null,
+    };
+  }
+}
+
+class WrappedMap {
+  _mbMap: mapboxgl.Map;
+  _viewModel: ViewModel;
+  _objects: any[] = [];
+  __resizeHandler: (() => void) | null = null;
+  _eventMap: Map<string, Map<Function, Function>> = new Map();
+
+  constructor(mbMap: mapboxgl.Map) {
+    this._mbMap = mbMap;
+    this._viewModel = new ViewModel(this);
+  }
+
+  // Map HERE event names to Mapbox equivalents
+  private _mbEventName(hereName: string): string {
+    const mapping: Record<string, string> = {
+      'mapviewchangeend': 'moveend',
+      'dragstart': 'dragstart',
+      'contextmenu': 'contextmenu',
+      'tap': 'click',
+      'pointerup': 'mouseup',
+      'pointerdown': 'mousedown',
+    };
+    return mapping[hereName] || hereName;
+  }
+
+  addEventListener(hereName: string, fn: Function) {
+    const mbName = this._mbEventName(hereName);
+    // Wrap the callback to adapt Mapbox event shape to HERE-like shape
+    const wrapper = (e: any) => {
+      const adapted: any = { ...e, originalEvent: e.originalEvent };
+      if (e.point) {
+        adapted.viewportX = e.point.x;
+        adapted.viewportY = e.point.y;
+      }
+      if (e.lngLat) {
+        adapted.lat = e.lngLat.lat;
+        adapted.lng = e.lngLat.lng;
+      }
+      fn(adapted);
+    };
+    if (!this._eventMap.has(hereName)) this._eventMap.set(hereName, new Map());
+    this._eventMap.get(hereName)!.set(fn, wrapper);
+    this._mbMap.on(mbName as any, wrapper as any);
+  }
+
+  removeEventListener(hereName: string, fn: Function) {
+    const mbName = this._mbEventName(hereName);
+    const wrapper = this._eventMap.get(hereName)?.get(fn);
+    if (wrapper) {
+      this._mbMap.off(mbName as any, wrapper as any);
+      this._eventMap.get(hereName)!.delete(fn);
+    }
+  }
+
+  addObject(obj: any) {
+    this._objects.push(obj);
+    obj._addToMap?.(this);
+  }
+
+  removeObject(obj: any) {
+    const idx = this._objects.indexOf(obj);
+    if (idx >= 0) this._objects.splice(idx, 1);
+    obj._removeFromMap?.();
+  }
+
+  addLayer(layer: any) {
+    // Compatibility for HERE's addLayer — delegate to _addToMap if available
+    if (layer && typeof layer._addToMap === 'function') {
+      layer._addToMap(this);
+    }
+  }
+
+  removeLayer(layer: any) {
+    if (layer && typeof layer._removeFromMap === 'function') {
+      layer._removeFromMap();
+    }
+  }
+
+  getViewModel() { return this._viewModel; }
+  getZoom() { return this._mbMap.getZoom(); }
+  setZoom(z: number) { this._mbMap.setZoom(z); }
+  getCenter() {
+    const c = this._mbMap.getCenter();
+    return { lat: c.lat, lng: c.lng };
+  }
+
+  getViewPort() {
+    return { resize: () => this._mbMap.resize() };
+  }
+
+  screenToGeo(x: number, y: number) {
+    const ll = this._mbMap.unproject([x, y]);
+    return { lat: ll.lat, lng: ll.lng };
+  }
+
+  geoToScreen(coords: { lat: number; lng: number }) {
+    const pt = this._mbMap.project([coords.lng, coords.lat]);
+    return { x: pt.x, y: pt.y };
+  }
+
+  dispose() {
+    for (const obj of [...this._objects]) obj._removeFromMap?.();
+    this._objects = [];
+    this._eventMap.clear();
+    try { this._mbMap.remove(); } catch {}
+  }
+}
+
+// ─── Exported API (same signatures as before) ────────────────────────
+
+export function getHerePlatform() {
+  return { platform: null, defaultLayers: null };
+}
+
 export function createHereMap(
   element: HTMLElement,
   center: { lat: number; lng: number },
   zoom: number
 ): { map: any; platform: any; defaultLayers: any; behavior: any; ui: any } {
-  const { platform, defaultLayers } = getHerePlatform();
-
-  // Layer 1 (BASE): Clean satellite imagery from HERE Raster Tile API v3
-  // No vehicle_restrictions baked in — we'll overlay those separately on top
-  const satelliteProvider = new H.map.provider.ImageTileProvider({
-    label: 'TRUCKERS NAV Satellite',
-    min: 1,
-    max: 20,
-    getURL: (col: number, row: number, level: number) =>
-      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=explore.satellite.day&ppi=200&apiKey=${HERE_MAP_API_KEY}`,
-  });
-  const baseLayer = new H.map.layer.TileLayer(satelliteProvider);
-
-  // Layer 2 (OVERLAY): Vehicle restrictions as a separate raster overlay ON TOP
-  // Uses logistics.day style which renders truck restrictions, weight limits,
-  // bridge heights, highway shields — always visible above the satellite base
-  // Reduced opacity to let satellite imagery show through while keeping restrictions visible
-  const restrictionsProvider = new H.map.provider.ImageTileProvider({
-    label: 'TRUCKERS NAV Restrictions',
-    min: 1,
-    max: 20,
-    opacity: 0.55,
-    getURL: (col: number, row: number, level: number) =>
-      `https://maps.hereapi.com/v3/base/mc/${level}/${col}/${row}/png?style=logistics.day&features=vehicle_restrictions:active_and_inactive&ppi=200&apiKey=${HERE_MAP_API_KEY}`,
-  });
-  const restrictionsLayer = new H.map.layer.TileLayer(restrictionsProvider);
-
-  const map = new H.Map(element, baseLayer, {
-    center,
+  const mbMap = new mapboxgl.Map({
+    container: element,
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [center.lng, center.lat],
     zoom,
-    pixelRatio: window.devicePixelRatio || 1,
+    pitch: 0,
+    bearing: 0,
+    attributionControl: false,
+    maxZoom: 20,
+    minZoom: 2,
+    fadeDuration: 0,
   });
 
-  // Add the restrictions overlay ON TOP of the satellite base
-  map.addLayer(restrictionsLayer);
+  // Add compact attribution
+  mbMap.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
 
-  // Also add the built-in vector truck layer for additional real-time truck data
-  try {
-    if (defaultLayers?.vector?.normal?.truck) {
-      map.addLayer(defaultLayers.vector.normal.truck);
-    }
-  } catch (_) { /* Vector truck layer optional */ }
+  // Navigation control (zoom buttons)
+  mbMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
 
-  // Default to flat (0° tilt) — user can toggle tilt via map controls
-  // Do NOT set tilt here; it's managed by the tilt toggle button
+  const wrapped = new WrappedMap(mbMap);
 
   // Resize listener
-  const onResize = () => map.getViewPort().resize();
+  const onResize = () => mbMap.resize();
   window.addEventListener('resize', onResize);
-  (map as any).__resizeHandler = onResize;
+  wrapped.__resizeHandler = onResize;
 
-  // Interactivity — enable tilt via ctrl+drag/pinch
-  const behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
-
-  // Default UI (zoom, scale bar)
-  const ui = H.ui.UI.createDefault(map, defaultLayers);
-
-  return { map, platform, defaultLayers, behavior, ui };
+  return {
+    map: wrapped,
+    platform: null,
+    defaultLayers: { vector: { normal: { truck: null }, traffic: { map: null } } },
+    behavior: null,
+    ui: null,
+  };
 }
 
-/** Dispose a HERE Map cleanly */
 export function disposeHereMap(map: any) {
   if (!map) return;
   try {
-    const handler = (map as any).__resizeHandler;
+    const handler = map.__resizeHandler;
     if (handler) window.removeEventListener('resize', handler);
     map.dispose();
-  } catch (_) {}
+  } catch {}
 }
 
-/** Create H.map.Group (equivalent of L.layerGroup) */
 export function createGroup(): any {
-  return new H.map.Group();
+  return new MapGroup();
 }
 
-/** Create a polyline from [lat,lng][] coords */
 export function createPolyline(
   coords: [number, number][],
   color: string,
   width: number,
   opts?: { opacity?: number; dash?: number[]; cap?: string; join?: string; zIndex?: number }
 ): any {
-  const ls = new H.geo.LineString();
-  for (const c of coords) {
-    ls.pushLatLngAlt(c[0], c[1], 0);
-  }
-  const rgba = hexToRgba(color, opts?.opacity ?? 1);
-  const style: any = {
-    strokeColor: rgba,
-    lineWidth: width,
-    lineCap: opts?.cap || 'round',
-    lineJoin: opts?.join || 'round',
-  };
-  if (opts?.dash && opts.dash.length > 0) {
-    style.lineDash = opts.dash;
-  }
-  return new H.map.Polyline(ls, {
-    style,
-    zIndex: opts?.zIndex,
-  });
+  return new WrappedPolyline(coords, color, width, opts);
 }
 
-/** Update an existing polyline's geometry */
 export function updatePolylineCoords(polyline: any, coords: [number, number][]) {
-  const ls = new H.geo.LineString();
-  for (const c of coords) {
-    ls.pushLatLngAlt(c[0], c[1], 0);
-  }
-  polyline.setGeometry(ls);
+  polyline.setGeometry(coords);
 }
 
-/** Create an HTML-based DomMarker (equivalent of L.marker with L.divIcon) */
 export function createDomMarker(
   lat: number,
   lng: number,
@@ -148,15 +421,11 @@ export function createDomMarker(
   el.style.position = 'relative';
   el.style.width = iconSize[0] + 'px';
   el.style.height = iconSize[1] + 'px';
-  el.style.marginLeft = -iconAnchor[0] + 'px';
-  el.style.marginTop = -iconAnchor[1] + 'px';
   el.style.pointerEvents = 'none';
 
-  const icon = new H.map.DomIcon(el);
-  return new H.map.DomMarker({ lat, lng }, { icon, zIndex: zIndex || 0 });
+  return new WrappedMarker(lat, lng, el, zIndex || 0);
 }
 
-/** Create an SVG-based Marker (for simple icons) */
 export function createSvgMarker(
   lat: number,
   lng: number,
@@ -165,14 +434,15 @@ export function createSvgMarker(
   anchor: [number, number],
   zIndex?: number
 ): any {
-  const icon = new H.map.Icon(svgHtml, {
-    size: { w: size[0], h: size[1] },
-    anchor: { x: anchor[0], y: anchor[1] },
-  });
-  return new H.map.Marker({ lat, lng }, { icon, zIndex: zIndex || 0 });
+  const el = document.createElement('div');
+  el.innerHTML = svgHtml;
+  el.style.width = size[0] + 'px';
+  el.style.height = size[1] + 'px';
+  el.style.pointerEvents = 'none';
+
+  return new WrappedMarker(lat, lng, el, zIndex || 0);
 }
 
-/** Compute a bounding rect from [lat,lng][] coords */
 export function boundsFromCoords(coords: [number, number][]): any {
   if (!coords || coords.length === 0) return null;
   let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
@@ -182,133 +452,91 @@ export function boundsFromCoords(coords: [number, number][]): any {
     if (lng < minLng) minLng = lng;
     if (lng > maxLng) maxLng = lng;
   }
-  return new H.geo.Rect(maxLat, minLng, minLat, maxLng);
+  return { _minLat: minLat, _maxLat: maxLat, _minLng: minLng, _maxLng: maxLng };
 }
 
-/** FitBounds helper */
 export function fitBounds(map: any, coords: [number, number][], padding?: number) {
   const rect = boundsFromCoords(coords);
   if (!rect || !map) return;
   map.getViewModel().setLookAtData({ bounds: rect }, true);
 }
 
-// ─── POI Clustering ───────────────────────────────────────────────────
+// ─── Clustering (Mapbox native clustering) ────────────────────────────
 
-/** TRUCKERS NAV gold/black cluster theme */
-const CLUSTER_THEME = {
-  getClusterPresentation(cluster: any) {
-    const weight = cluster.getWeight();
-    const pos = cluster.getPosition();
-    const size = weight < 10 ? 36 : weight < 50 ? 44 : weight < 100 ? 52 : 60;
-    const fontSize = weight < 10 ? 12 : weight < 50 ? 13 : weight < 100 ? 14 : 15;
-    const label = weight > 999 ? Math.round(weight / 1000) + 'k' : String(weight);
+let _clusterCounter = 0;
 
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <defs>
-        <radialGradient id="cg" cx="40%" cy="35%">
-          <stop offset="0%" stop-color="#F5D76E"/>
-          <stop offset="60%" stop-color="#D4AF37"/>
-          <stop offset="100%" stop-color="#8A6914"/>
-        </radialGradient>
-        <filter id="gs"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      </defs>
-      <circle cx="${size/2}" cy="${size/2}" r="${size/2 - 2}" fill="url(#cg)" stroke="#D4AF37" stroke-width="2" filter="url(#gs)"/>
-      <text x="${size/2}" y="${size/2 + fontSize * 0.36}" text-anchor="middle" font-family="Space Grotesk,Inter,sans-serif" font-size="${fontSize}" font-weight="900" fill="#050505">${label}</text>
-    </svg>`;
-
-    const icon = new H.map.Icon(svg, {
-      size: { w: size, h: size },
-      anchor: { x: size / 2, y: size / 2 },
-    });
-    const marker = new H.map.Marker(pos, { icon, min: cluster.getMinZoom(), max: cluster.getMaxZoom() });
-    marker.setData(cluster);
-    return marker;
-  },
-
-  getNoisePresentation(noisePoint: any) {
-    const pos = noisePoint.getPosition();
-    const data = noisePoint.getData();
-
-    // Use custom POI icon if provided in the data, otherwise default gold dot
-    const html = data?.iconHtml || '';
-    if (html) {
-      const el = document.createElement('div');
-      el.innerHTML = `<div class="custom-poi-icon">${html}</div>`;
-      el.style.position = 'relative';
-      el.style.width = '24px';
-      el.style.height = '24px';
-      el.style.marginLeft = '-12px';
-      el.style.marginTop = '-24px';
-      el.style.pointerEvents = 'none';
-      const domIcon = new H.map.DomIcon(el);
-      const marker = new H.map.DomMarker(pos, { icon: domIcon, min: noisePoint.getMinZoom() });
-      marker.setData(noisePoint.getData());
-      return marker;
-    }
-
-    // Fallback: small gold dot
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="5" fill="#D4AF37" stroke="#050505" stroke-width="1.5"/></svg>`;
-    const icon = new H.map.Icon(svg, { size: { w: 12, h: 12 }, anchor: { x: 6, y: 6 } });
-    const marker = new H.map.Marker(pos, { icon, min: noisePoint.getMinZoom() });
-    marker.setData(noisePoint.getData());
-    return marker;
-  }
-};
-
-/**
- * Create a clustered POI layer.
- * Returns { provider, layer } — add layer to map, use provider to setDataPoints().
- */
 export function createClusterProvider(): { provider: any; layer: any } {
-  const provider = new H.clustering.Provider([], {
-    clusteringOptions: {
-      eps: 48,
-      minWeight: 2,
+  const id = 'cluster-' + (++_clusterCounter);
+  // Return a mock provider that stores data points and renders them when added to map
+  const provider = {
+    _id: id,
+    _dataPoints: [] as any[],
+    _markers: [] as any[],
+    _map: null as WrappedMap | null,
+    setDataPoints(points: any[]) {
+      // Remove old markers
+      for (const m of this._markers) m._removeFromMap?.();
+      this._markers = [];
+      this._dataPoints = points;
+      // Create simple markers for each point (no WebGL clustering, just DOM markers)
+      for (const pt of points) {
+        const data = pt._data || {};
+        const html = data.iconHtml || '';
+        let el: HTMLElement;
+        if (html) {
+          el = document.createElement('div');
+          el.innerHTML = `<div class="custom-poi-icon">${html}</div>`;
+          el.style.width = '24px';
+          el.style.height = '24px';
+          el.style.pointerEvents = 'none';
+        } else {
+          el = document.createElement('div');
+          el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="5" fill="#D4AF37" stroke="#050505" stroke-width="1.5"/></svg>`;
+          el.style.width = '12px';
+          el.style.height = '12px';
+        }
+        const marker = new WrappedMarker(pt._lat, pt._lng, el, 1);
+        marker.setData(data);
+        this._markers.push(marker);
+        if (this._map) marker._addToMap(this._map);
+      }
     },
-    theme: CLUSTER_THEME,
-  });
-  const layer = new H.map.layer.ObjectLayer(provider);
+    addEventListener() {},
+    removeEventListener() {},
+  };
+
+  const layer = {
+    _provider: provider,
+    _addToMap(map: WrappedMap) {
+      provider._map = map;
+      for (const m of provider._markers) m._addToMap(map);
+    },
+    _removeFromMap() {
+      for (const m of provider._markers) m._removeFromMap?.();
+      provider._map = null;
+    },
+    dispose() { this._removeFromMap(); },
+  };
+
   return { provider, layer };
 }
 
-/**
- * Build an array of H.clustering.DataPoint from POI data.
- * Each DataPoint carries the iconHtml for use in the noise theme.
- */
 export function buildClusterDataPoints(
   pois: { lat: number; lon: number; iconHtml?: string; name?: string; type?: string; [key: string]: any }[]
 ): any[] {
-  return pois.map(poi =>
-    new H.clustering.DataPoint(poi.lat, poi.lon, 1, { iconHtml: poi.iconHtml, name: poi.name, type: poi.type, poi })
-  );
+  return pois.map(poi => ({
+    _lat: poi.lat,
+    _lng: poi.lon,
+    _data: { iconHtml: poi.iconHtml, name: poi.name, type: poi.type, poi },
+  }));
 }
 
-/** Convert hex color to rgba string */
-function hexToRgba(hex: string, opacity: number): string {
-  if (hex.startsWith('rgba') || hex.startsWith('rgb')) {
-    if (opacity < 1 && hex.startsWith('rgb(')) {
-      return hex.replace('rgb(', 'rgba(').replace(')', `,${opacity})`);
-    }
-    return hex;
-  }
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16) || 0;
-  const g = parseInt(h.substring(2, 4), 16) || 0;
-  const b = parseInt(h.substring(4, 6), 16) || 0;
-  return `rgba(${r},${g},${b},${opacity})`;
-}
-
-/** Check if a point is within the map's current viewport (rough) */
 export function isInViewport(map: any, lat: number, lng: number): boolean {
-  if (!map) return false;
+  if (!map?._mbMap) return true;
   try {
-    const bounds = map.getViewModel().getLookAtData().bounds;
-    if (!bounds) return true;
-    const top = bounds.getTop();
-    const bottom = bounds.getBottom();
-    const left = bounds.getLeft();
-    const right = bounds.getRight();
-    return lat >= bottom && lat <= top && lng >= left && lng <= right;
+    const bounds = map._mbMap.getBounds();
+    return lat >= bounds.getSouth() && lat <= bounds.getNorth() &&
+           lng >= bounds.getWest() && lng <= bounds.getEast();
   } catch {
     return true;
   }

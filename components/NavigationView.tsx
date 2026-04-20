@@ -3,7 +3,7 @@ import { safeStringify, isValidLatLng, calcDistMi } from '../utils';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-// HERE Maps JS API loaded via script tags in index.html (global H namespace)
+// Map utility imports (Mapbox GL JS wrapper)
 import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds, createClusterProvider, buildClusterDataPoints } from '../utils/hereMapUtils';
 import { 
   Plus, 
@@ -340,8 +340,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const hereDefaultLayersRef = useRef<any>(null);
   const hereBehaviorRef = useRef<any>(null);
   const hereUiRef = useRef<any>(null);
-  const routeGroupRef = useRef<any>(null); // H.map.Group
-  const shieldLayerGroupRef = useRef<any>(null); // H.map.Group
+  const routeGroupRef = useRef<any>(null); // Map layer group
+  const shieldLayerGroupRef = useRef<any>(null); // Map layer group
   const roadOverlayRef = useRef<any>(null);
   const markerClusterGroupRef = useRef<any>(null);
   const clusterProviderRef = useRef<any>(null);
@@ -993,7 +993,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
           mapInstanceRef.current = map;
           
-          // Initialize layer groups (H.map.Group replaces L.layerGroup)
+          // Initialize layer groups
           // Route polylines sit below signs/shields
           routeGroupRef.current = createGroup();
           routeGroupRef.current.setZIndex(100);
@@ -1003,7 +1003,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           shieldLayerGroupRef.current.setZIndex(900);
           map.addObject(shieldLayerGroupRef.current);
 
-          // POI clustering layer (H.clustering.Provider for proper cluster/zoom behavior)
+          // POI clustering layer for proper cluster/zoom behavior
           const { provider: clusterProv, layer: clusterLay } = createClusterProvider();
           clusterProviderRef.current = clusterProv;
           clusterLayerRef.current = clusterLay;
@@ -1465,28 +1465,30 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>
     </div>`;
 
-    // Create DomIcon from the LIVE element (not a string copy)
-    const icon = new H.map.DomIcon(wrapper);
-    const marker = new H.map.DomMarker(
-      { lat: userLocation[0], lng: userLocation[1] },
-      { icon, zIndex: 100 }
+    // Create marker using the wrapper's createDomMarker approach (Mapbox-compatible)
+    const marker = createDomMarker(
+      userLocation[0], userLocation[1],
+      wrapper.outerHTML,
+      [64, 64], [32, 32], 100
     );
     
     userMarkerRef.current = marker;
     mapInstanceRef.current.addObject(marker);
 
-    // Get the pointer ref from the SAME element used by DomIcon — this is the LIVE element
-    const pointerEl = wrapper.querySelector('.vehicle-pointer') as HTMLElement;
+    // Get the pointer element from the marker's actual DOM
+    const markerEl = marker.getElement?.();
+    const pointerEl = markerEl?.querySelector('.vehicle-pointer') as HTMLElement || 
+                      wrapper.querySelector('.vehicle-pointer') as HTMLElement;
     if (pointerEl && smoothedHeadingRef.current) {
       pointerEl.style.setProperty('--vehicle-rotation', `${smoothedHeadingRef.current}deg`);
     }
     userMarkerElRef.current = pointerEl;
 
-    // Safety net: HERE DomIcon may clone the element — find the live DOM copy after render
+    // Mapbox markers use the live element directly — no cloning
     requestAnimationFrame(() => {
-      const mapContainer = mapRef.current;
-      if (mapContainer) {
-        const livePointer = mapContainer.querySelector('.vehicle-pointer') as HTMLElement;
+      const mEl = marker.getElement?.();
+      if (mEl) {
+        const livePointer = mEl.querySelector('.vehicle-pointer') as HTMLElement;
         if (livePointer && livePointer !== pointerEl) {
           userMarkerElRef.current = livePointer;
           if (smoothedHeadingRef.current) {
@@ -5347,7 +5349,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (clusterProviderRef.current) {
       const dataPoints = buildClusterDataPoints(clusterPoints);
       clusterProviderRef.current.setDataPoints(dataPoints);
-      console.log(`Clustered ${clusterPoints.length} POIs via H.clustering.Provider`);
+      console.log(`Clustered ${clusterPoints.length} POIs via clustering provider`);
     }
 
     console.log("Show POIs:", showPois);
@@ -7086,13 +7088,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         hasActiveRoute={routePoints.length > 1}
         onRouteOverview={() => {
           if (mapInstanceRef.current && routePoints.length > 1) {
-            const bounds = new H.geo.Rect(
-              Math.max(...routePoints.map(p => p[0])),
-              Math.min(...routePoints.map(p => p[1])),
-              Math.min(...routePoints.map(p => p[0])),
-              Math.max(...routePoints.map(p => p[1]))
-            );
-            mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
+            const bounds = boundsFromCoords(routePoints);
+            if (bounds) {
+              mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
+            }
             setIsFollowMode(false);
             setIsOverviewMode(true);
           }

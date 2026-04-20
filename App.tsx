@@ -276,23 +276,23 @@ const AppContent: React.FC = React.memo(() => {
       model: '', year: 2024, make: '',
       truckNumber: '', trailerNumber: '', truckPlate: '', trailerPlate: ''
     };
-    // Fix "0" bug: ensure numeric fields that shouldn't be 0 use defaults
+    // Use nullish coalescing (??) instead of || to preserve valid 0 values
     return {
       ...stored,
-      height: stored.height || 13.5,
-      weight: stored.weight || 78500,
-      length: stored.length || 53,
-      width: stored.width || 8.5,
-      axleCount: stored.axleCount || 5,
-      axleWeight: stored.axleWeight || 12000,
+      height: stored.height ?? 13.5,
+      weight: stored.weight ?? 78500,
+      length: stored.length ?? 53,
+      width: stored.width ?? 8.5,
+      axleCount: stored.axleCount ?? 5,
+      axleWeight: stored.axleWeight ?? 12000,
       trailerCount: stored.trailerCount != null && stored.trailerCount > 0 ? stored.trailerCount : 1,
-      model: stored.model || '',
-      year: stored.year || 2024,
-      make: stored.make || '',
-      truckNumber: stored.truckNumber || '',
-      trailerNumber: stored.trailerNumber || '',
-      truckPlate: stored.truckPlate || '',
-      trailerPlate: stored.trailerPlate || '',
+      model: stored.model ?? '',
+      year: stored.year ?? 2024,
+      make: stored.make ?? '',
+      truckNumber: stored.truckNumber ?? '',
+      trailerNumber: stored.trailerNumber ?? '',
+      truckPlate: stored.truckPlate ?? '',
+      trailerPlate: stored.trailerPlate ?? '',
     };
   }, [profile]);
 

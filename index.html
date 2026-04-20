@@ -4,13 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>TRUCKERS NAV By TUE</title>
-    <!-- HERE Maps JS API v3.1 -->
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-core.js" type="text/javascript" charset="utf-8"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-service.js" type="text/javascript" charset="utf-8"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js" type="text/javascript" charset="utf-8"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-ui.js" type="text/javascript" charset="utf-8"></script>
-    <script src="https://js.api.here.com/v3/3.1/mapsjs-clustering.js" type="text/javascript" charset="utf-8"></script>
-    <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
+    <!-- Mapbox GL JS CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css" rel="stylesheet" />
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
         body {
@@ -30,16 +25,17 @@
             background: #262626;
             border-radius: 3px;
         }
-        /* TRUCKERS NAV BY TUE signature dark-gold satellite theme
-           Darkens satellite imagery with warm gold tint for signature branded look */
-        .here-map-satellite-dark canvas {
-            filter: brightness(0.65) contrast(1.25) saturate(0.65) sepia(0.3) hue-rotate(-5deg);
+        /* TRUCKERS NAV BY TUE signature dark-gold satellite theme */
+        .mapboxgl-map canvas {
+            filter: brightness(0.7) contrast(1.2) saturate(0.7) sepia(0.25) hue-rotate(-5deg);
         }
-        /* Ensure DomMarkers (POI icons, signs) render normally above the filtered canvas */
-        .here-map-satellite-dark .H_ui,
-        .here-map-satellite-dark [class^="H_"] > div:not(canvas) {
+        /* Ensure markers render above the filtered canvas */
+        .mapboxgl-marker, .mapboxgl-popup {
             filter: none !important;
         }
+        /* Hide Mapbox default UI elements we don't need */
+        .mapboxgl-ctrl-logo { display: none !important; }
+        .mapboxgl-ctrl-attrib { font-size: 9px !important; opacity: 0.4; }
         /* Gold glow on cluster badges */
         .trucker-cluster-badge {
             background: radial-gradient(ellipse at center, #D4AF37 0%, #AA8B2F 70%, #050505 100%);
