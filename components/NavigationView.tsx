@@ -549,11 +549,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     const el = mapRef.current;
     if (!el) return;
 
-    if (isNorthUp) {
-      // North-up mode: apply manual rotation (user can still rotate with touch)
-      el.style.setProperty('--map-rotation', `${manualRotation}deg`);
+    // CSS rotation is always 0 now — Mapbox native bearing handles rotation
+    el.style.setProperty('--map-rotation', '0deg');
+    if (isNorthUp && mapInstanceRef.current) {
+      // North-up mode: bearing = 0 or manual rotation
+      mapInstanceRef.current.setBearing(-manualRotation);
     }
-    // Heading-up mode rotation is handled by the telemetry subscription (updateRotationAndPan)
   }, [manualRotation, isNorthUp, isCompassMode]);
 
   // When switching modes, reset rotation properly
@@ -564,19 +565,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     
     const el = mapRef.current;
     if (newVal) {
-      // Switching TO North Up — reset rotation to face north
+      // Switching TO North Up — reset bearing to 0
       setManualRotation(0);
       manualRotationRef.current = 0;
-      if (el) {
-        el.style.setProperty('--map-rotation', '0deg');
-      }
+      if (el) el.style.setProperty('--map-rotation', '0deg');
+      if (mapInstanceRef.current) mapInstanceRef.current.setBearing(0);
     } else {
-      // Switching TO Heading Up — reset manual rotation and apply current heading
+      // Switching TO Heading Up — use native bearing for heading direction
       setManualRotation(0);
       manualRotationRef.current = 0;
-      // Use best available heading: GPS → route-based → position-based → smoothed
       let heading = telemetryContext?.headingRef?.current || 0;
-      // Route-based heading: use current segment or first segment
       if (!heading && routeCoordsRef.current.length > 1) {
         const currentIdx = lastSimIdxRef.current;
         const idx = currentIdx >= 0 && currentIdx < routeCoordsRef.current.length - 1 ? currentIdx : 0;
@@ -586,20 +584,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         const dx = Math.cos(Math.PI / 180 * p1[0]) * (p2[1] - p1[1]);
         heading = (90 - Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360;
       }
-      if (!heading && positionHeadingRef.current > 0) {
-        heading = positionHeadingRef.current;
-      }
-      if (!heading && smoothedHeadingRef.current > 0) {
-        heading = smoothedHeadingRef.current;
-      }
-      // Initialize smoothed heading so it doesn't snap back to 0
-      if (heading > 0) {
-        smoothedHeadingRef.current = heading;
-      }
-      const totalRotation = -heading;
-      if (el) {
-        el.style.setProperty('--map-rotation', `${totalRotation}deg`);
-      }
+      if (!heading && positionHeadingRef.current > 0) heading = positionHeadingRef.current;
+      if (!heading && smoothedHeadingRef.current > 0) heading = smoothedHeadingRef.current;
+      if (heading > 0) smoothedHeadingRef.current = heading;
+      if (el) el.style.setProperty('--map-rotation', '0deg');
+      if (mapInstanceRef.current) mapInstanceRef.current.setBearing(heading);
     }
   }, [isNorthUp, telemetryContext]);
 
@@ -702,14 +691,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       smoothedHeadingRef.current = smoothedCompass;
 
       if (userMarkerElRef.current) {
-        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${smoothedCompass}deg`);
+        // Compass mode: arrow points UP since map rotates via native bearing
+        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `0deg`);
       }
 
-      // Rotate map container with tilt-corrected heading
+      // Rotate map using Mapbox native bearing (fixes drag direction)
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.setBearing(smoothedCompass);
+      }
       const el = mapRef.current;
       if (el) {
-        const rotation = manualRotationRef.current;
-        el.style.setProperty('--map-rotation', `${-smoothedCompass + rotation}deg`);
+        el.style.setProperty('--map-rotation', '0deg');
       }
 
       animFrameId = requestAnimationFrame(animate);
@@ -1814,14 +1806,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     });
   }, [facilities, showFacilities]);
 
-  // When isNorthUp changes, reset map rotation accordingly
+  // When isNorthUp changes, reset map bearing accordingly
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
     if (isNorthUp && mapRef.current) {
-      // North-up: reset rotation to 0
+      // North-up: reset bearing to 0
       mapRef.current.style.setProperty('--map-rotation', '0deg');
+      map.setBearing(0);
     }
     map.getViewPort().resize();
   }, [isNorthUp]);
@@ -3581,6 +3574,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           });
         }
 
+        // Throttle traffic light/stop sign alerts — minimum gap between markers
+        const MIN_TRAFFIC_ALERT_GAP = Math.max(40, Math.floor(totalPoints * 0.02)); // ~0.3 miles apart minimum
+        let lastTrafficLightIdx = -99999;
+        let lastStopSignIdx = -99999;
+
         if (section.actions) {
           section.actions.forEach((action: any) => {
             const instruction = (action.instruction || '').toLowerCase();
@@ -3590,17 +3588,20 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             const actionCoord = coords[coordIdx] || coords[Math.floor(actionOffset * (coords.length - 1) / (summary.length || 1))];
             
             if (instruction.includes('stop sign') || action.action === 'stop') {
-              // Progress = polyline point index / total polyline points (NOT distance)
-              const progress = coordIdx / (coords.length - 1 || 1);
-              trafficAlertsList.push({
-                type: 'STOP_SIGN',
-                message: 'Stop Sign',
-                icon: Octagon,
-                color: 'text-red-600',
-                bg: 'bg-red-600/10',
-                progress,
-                coords: actionCoord
-              });
+              // Throttle stop signs like traffic lights
+              if (coordIdx - lastStopSignIdx >= MIN_TRAFFIC_ALERT_GAP) {
+                const progress = coordIdx / (coords.length - 1 || 1);
+                trafficAlertsList.push({
+                  type: 'STOP_SIGN',
+                  message: 'Stop Sign',
+                  icon: Octagon,
+                  color: 'text-red-600',
+                  bg: 'bg-red-600/10',
+                  progress,
+                  coords: actionCoord
+                });
+                lastStopSignIdx = coordIdx;
+              }
             }
             
             // Extract highway exit signs - capture from ALL action types that reference exit numbers
@@ -3650,11 +3651,6 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           let currentRoadShieldLabel = '';
           let currentRoadDirection = '';
           let currentRoadStartIdx = 0;
-
-          // Throttle traffic light/stop sign alerts — minimum gap between markers
-          const MIN_TRAFFIC_ALERT_GAP = Math.max(40, Math.floor(totalPoints * 0.02)); // ~0.3 miles apart minimum
-          let lastTrafficLightIdx = -99999;
-          let lastStopSignIdx = -99999;
 
           section.spans.forEach((span: any) => {
             const progress = currentPointIndex / (totalPoints - 1 || 1);
@@ -5234,22 +5230,34 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       const currentHeading = smoothedHeadingRef.current;
 
+      // Update vehicle marker rotation
       if (userMarkerElRef.current) {
-        userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${currentHeading}deg`);
+        if (!isNorthUp) {
+          // Heading-up: map is rotated so heading is at top, arrow points UP (0)
+          userMarkerElRef.current.style.setProperty('--vehicle-rotation', `0deg`);
+        } else {
+          // North-up: arrow must point in heading direction
+          userMarkerElRef.current.style.setProperty('--vehicle-rotation', `${currentHeading}deg`);
+        }
       }
 
-      // Update map rotation based on mode — apply to container div, not mapPane
+      // Update map bearing using Mapbox native bearing (fixes drag/pan direction)
+      if (mapInstanceRef.current) {
+        if (!isNorthUp) {
+          // Heading-up mode: set Mapbox bearing so heading direction is at top
+          mapInstanceRef.current.setBearing(currentHeading);
+        } else if (!isCompassMode) {
+          // North-up mode: bearing = 0 (or manual rotation offset)
+          const rotation = manualRotationRef.current;
+          if (Math.abs(rotation) > 0.5) {
+            mapInstanceRef.current.setBearing(-rotation);
+          }
+        }
+      }
+      // Keep CSS rotation at 0 — Mapbox native bearing handles it now
       const el = mapRef.current;
       if (el) {
-        if (!isNorthUp) {
-          // Heading-up mode: rotate map purely opposite to heading (no manual rotation offset)
-          const totalRotation = -currentHeading;
-          el.style.setProperty('--map-rotation', `${totalRotation}deg`);
-        } else if (!isCompassMode) {
-          // North-up mode: apply only manual rotation
-          const rotation = manualRotationRef.current;
-          el.style.setProperty('--map-rotation', `${rotation}deg`);
-        }
+        el.style.setProperty('--map-rotation', '0deg');
       }
 
       if (isFollowMode && mapInstanceRef.current) { 
@@ -5257,18 +5265,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         if (now - lastPanRef.current > 1200) { // Throttle panning to avoid competing animations
           lastPanRef.current = now;
           try {
-            // In Heading Up mode, we offset the center slightly to see more ahead
+            // In Heading Up mode, offset center to show more road ahead
             let center: [number, number] = [currentLoc[0], currentLoc[1]];
             
             if (!isNorthUp) {
-              const offsetPixels = window.innerHeight * 0.2; // Offset by 20% of screen height
+              // With Mapbox native bearing, "up" on screen IS the heading direction
+              // So just offset by negative Y pixels
+              const offsetPixels = window.innerHeight * 0.2;
               const point = mapInstanceRef.current.geoToScreen({ lat: center[0], lng: center[1] });
               
               if (point) {
-                const headingRad = currentHeading * Math.PI / 180;
                 const unprojected = mapInstanceRef.current.screenToGeo(
-                  point.x + offsetPixels * Math.sin(headingRad),
-                  point.y - offsetPixels * Math.cos(headingRad)
+                  point.x,
+                  point.y - offsetPixels
                 );
                 if (unprojected) center = [unprojected.lat, unprojected.lng];
               }
@@ -5407,7 +5416,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return () => document.removeEventListener('click', handlePopupClick);
   }, [pois, showPois, poiFilters, mapCenter, isMapReady]);
 
-  // Render traffic infrastructure markers — only on-route, only next 15 ahead, smaller icons
+  // Render traffic infrastructure markers — deduplicated, only on-route, strict caps
   useEffect(() => {
     const trafficMarkersRef: any[] = [];
 
@@ -5435,7 +5444,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       if (d < closestDist) { closestDist = d; closestIdx = i; }
     }
 
-    // Step 2: Collect route points within next ~10 miles (≈16km) ahead
+    // Step 2: Collect route points within next ~10 miles ahead
     const LOOK_AHEAD_M = 16000;
     let accumulated = 0;
     let lookAheadEnd = closestIdx;
@@ -5446,21 +5455,50 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     }
     const aheadPts = routePts.slice(closestIdx, lookAheadEnd + 1);
 
-    // Step 3: Keep only signs within 80m of any ahead route point
+    // Step 3: Keep only signs within 80m of route points ahead
     const ON_ROUTE_M = 80;
     const onRoute = trafficInfrastructure.filter((item: TrafficInfrastructure) => {
       const pos: [number, number] = [item.position[0], item.position[1]];
       return aheadPts.some(rp => distM(pos, rp) <= ON_ROUTE_M);
     });
 
-    // Step 4: Sort by distance from user, cap at 15 markers
-    const sorted = onRoute
-      .map(item => ({ item, d: distM(userPos, [item.position[0], item.position[1]]) }))
-      .sort((a, b) => a.d - b.d)
-      .slice(0, 15)
-      .map(x => x.item);
+    // Step 4: Deduplicate by intersection — only ONE of each type per ~100m cluster
+    const INTERSECTION_CLUSTER_M = 100;
+    const deduped: TrafficInfrastructure[] = [];
+    for (const item of onRoute) {
+      const pos: [number, number] = [item.position[0], item.position[1]];
+      const tooClose = deduped.some(existing => {
+        if (existing.type !== item.type) return false; // Different types can coexist
+        return distM(pos, [existing.position[0], existing.position[1]]) < INTERSECTION_CLUSTER_M;
+      });
+      if (!tooClose) deduped.push(item);
+    }
 
-    sorted.forEach((item: TrafficInfrastructure) => {
+    // Step 5: Sort by distance from user
+    const sorted = deduped
+      .map(item => ({ item, d: distM(userPos, [item.position[0], item.position[1]]) }))
+      .sort((a, b) => a.d - b.d);
+
+    // Step 6: Strict cap — max 2 traffic lights and 2 stop signs total
+    let lightCount = 0;
+    let stopCount = 0;
+    const MAX_LIGHTS = 2;
+    const MAX_STOPS = 2;
+    const capped: TrafficInfrastructure[] = [];
+
+    for (const { item } of sorted) {
+      if (item.type === 'traffic_signals' || item.type === 'traffic_light') {
+        if (lightCount >= MAX_LIGHTS) continue;
+        lightCount++;
+      } else if (item.type === 'stop' || item.type === 'stop_sign') {
+        if (stopCount >= MAX_STOPS) continue;
+        stopCount++;
+      }
+      capped.push(item);
+      if (capped.length >= 6) break; // Hard cap on total markers
+    }
+
+    capped.forEach((item: TrafficInfrastructure) => {
       try {
         const iconHtml = renderToStaticMarkup(
           <TrafficIcon

@@ -45,6 +45,16 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
   - Cluster provider markers now have pointerEvents: auto and cursor: pointer
   - Added .poi-cluster-marker class with data-poi-name/lat/lon attributes
   - Click handler in NavigationView.tsx detects clicks and opens POI detail modal via setSelectedPoi
+- **Heading Up + Follow Me Fix**: Fixed map panning in wrong direction
+  - Replaced CSS container rotation with Mapbox native setBearing()
+  - User drag/pan now works correctly in all orientation modes (heading-up, north-up, compass)
+  - Vehicle arrow now correctly shows 0deg in heading-up (points up) and heading-deg in north-up
+  - Panning offset simplified: uses screen-space Y-offset since Mapbox handles bearing internally
+- **Traffic Signs Deduplication**: Reduced clutter from repeated traffic lights and stop signs
+  - Intersection clustering: only ONE of each type per 100m radius
+  - Strict caps: max 2 traffic lights + 2 stop signs displayed on map at once
+  - Stop sign throttling during route parsing (was missing, only traffic lights were throttled)
+  - Hard cap of 6 total infrastructure markers
 - P0 BUG FIX: App crash on START NAV (useRef in useEffect + getPoiIcon mismatch)
 - Truck Profile save bug fixed
 

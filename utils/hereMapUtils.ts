@@ -318,6 +318,14 @@ class WrappedMap {
     return { resize: () => this._mbMap.resize() };
   }
 
+  setBearing(bearing: number) {
+    this._mbMap.setBearing(bearing);
+  }
+
+  getBearing() {
+    return this._mbMap.getBearing();
+  }
+
   screenToGeo(x: number, y: number) {
     const ll = this._mbMap.unproject([x, y]);
     return { lat: ll.lat, lng: ll.lng };
