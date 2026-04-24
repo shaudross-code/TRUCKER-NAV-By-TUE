@@ -428,15 +428,16 @@ async function createServer() {
     }
 
     try {
-      console.log('Backend: Received truckProfile', safeStringify(truckProfile));
+      const tp = truckProfile || {};
+      console.log('Backend: Received truckProfile', safeStringify(tp));
 
-      const height = Number(truckProfile.height) || 13.5;
-      const weight = Number(truckProfile.weight) || 80000;
-      const length = Number(truckProfile.length) || 53;
-      const width = Number(truckProfile.width) || 8.5;
-      const axleWeight = Number(truckProfile.axleWeight) || 12000;
-      const axleCount = Number(truckProfile.axleCount) || 5;
-      const trailerCount = Number(truckProfile.trailerCount) || 1;
+      const height = Number(tp.height) || 13.5;
+      const weight = Number(tp.weight) || 80000;
+      const length = Number(tp.length) || 53;
+      const width = Number(tp.width) || 8.5;
+      const axleWeight = Number(tp.axleWeight) || 12000;
+      const axleCount = Number(tp.axleCount) || 5;
+      const trailerCount = Number(tp.trailerCount) || 1;
 
       const heightCm = Math.round(height * 30.48);
       const weightKg = Math.round(weight * 0.453592);
@@ -521,24 +522,56 @@ async function createServer() {
     if (!query) {
       return res.status(400).json({ error: 'Query is required' });
     }
-    if (!process.env.HERE_API_KEY) {
-      console.error('HERE_API_KEY is missing in environment variables');
-      return res.status(500).json({ error: 'HERE API key is not configured on the server' });
+    
+    const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+    
+    // Try HERE first
+    if (process.env.HERE_API_KEY) {
+      try {
+        const hereUrl = new URL('https://autosuggest.search.hereapi.com/v1/autosuggest');
+        hereUrl.searchParams.append('q', query);
+        if (lat && lon) hereUrl.searchParams.append('at', `${lat},${lon}`);
+        hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
+        hereUrl.searchParams.append('limit', '5');
+        
+        const response = await fetch(hereUrl.toString());
+        if (response.ok) {
+          const data = await response.json();
+          if (data.items && data.items.length > 0) {
+            return res.json(data);
+          }
+        }
+        console.warn('HERE autosuggest failed or returned 0 results, trying Mapbox fallback');
+      } catch (error) {
+        console.warn('HERE autosuggest error, trying Mapbox fallback:', error);
+      }
     }
+
+    // Mapbox Geocoding fallback
     try {
-      const hereUrl = new URL('https://autosuggest.search.hereapi.com/v1/autosuggest');
-      hereUrl.searchParams.append('q', query);
-      if (lat && lon) hereUrl.searchParams.append('at', `${lat},${lon}`);
-      hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
-      hereUrl.searchParams.append('limit', '5');
-      
-      const response = await fetch(hereUrl.toString());
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error('Error fetching search:', error);
-      res.status(500).json({ error: 'Failed to fetch search' });
+      const proximity = (lat && lon) ? `&proximity=${lon},${lat}` : '';
+      const mbUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&limit=5&types=place,address,poi,locality${proximity}`;
+      const mbRes = await fetch(mbUrl);
+      if (mbRes.ok) {
+        const mbData = await mbRes.json();
+        // Normalize Mapbox format to HERE autosuggest schema
+        const items = (mbData.features || []).map((f: any) => ({
+          title: f.place_name || f.text,
+          id: f.id,
+          resultType: f.place_type?.[0] === 'poi' ? 'place' : 'locality',
+          address: { label: f.place_name },
+          position: { lat: f.center[1], lng: f.center[0] },
+          highlights: {},
+          distance: f.properties?.distance,
+        }));
+        console.log(`Mapbox geocoding fallback returned ${items.length} results for "${query}"`);
+        return res.json({ items });
+      }
+    } catch (mbError) {
+      console.error('Mapbox geocoding fallback failed:', mbError);
     }
+
+    res.json({ items: [] });
   });
 
   app.post('/api/browse', async (req, res) => {
@@ -565,18 +598,46 @@ async function createServer() {
 
   app.post('/api/geocode', async (req, res) => {
     const { q } = req.body;
-    try {
-      const hereUrl = new URL('https://geocode.search.hereapi.com/v1/geocode');
-      hereUrl.searchParams.append('q', q);
-      hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
-      
-      const response = await fetch(hereUrl.toString());
-      const data = await response.json();
-      res.json(data);
-    } catch (error) {
-      console.error('Error fetching geocode:', error);
-      res.status(500).json({ error: 'Failed to fetch geocode' });
+    const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+    
+    // Try HERE first
+    if (process.env.HERE_API_KEY) {
+      try {
+        const hereUrl = new URL('https://geocode.search.hereapi.com/v1/geocode');
+        hereUrl.searchParams.append('q', q);
+        hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
+        
+        const response = await fetch(hereUrl.toString());
+        if (response.ok) {
+          const data = await response.json();
+          if (data.items && data.items.length > 0) {
+            return res.json(data);
+          }
+        }
+      } catch (error) {
+        console.warn('HERE geocode error, trying Mapbox fallback');
+      }
     }
+
+    // Mapbox fallback
+    try {
+      const mbUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(q)}.json?access_token=${MAPBOX_TOKEN}&limit=5`;
+      const mbRes = await fetch(mbUrl);
+      if (mbRes.ok) {
+        const mbData = await mbRes.json();
+        const items = (mbData.features || []).map((f: any) => ({
+          title: f.place_name || f.text,
+          id: f.id,
+          address: { label: f.place_name },
+          position: { lat: f.center[1], lng: f.center[0] },
+        }));
+        return res.json({ items });
+      }
+    } catch (mbError) {
+      console.error('Mapbox geocode fallback failed:', mbError);
+    }
+
+    res.json({ items: [] });
   });
 
   app.post('/api/discover', async (req, res) => {

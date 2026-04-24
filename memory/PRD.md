@@ -7,66 +7,60 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - Frontend: React + TypeScript (Vite), Mapbox GL JS v3.20.0, Tailwind CSS
 - Backend: Node.js + Express (server.ts on port 8001)
 - Auth: Firebase (Anonymous + Email)
-- Storage: Firestore + LocalStorage fallback
-- APIs: Mapbox (Satellite map rendering), HERE Maps (Routing v8, Discover, Traffic — backend only), Google Gemini (TTS)
+- Storage: Firestore + LocalStorage fallback (localStorage is primary store)
+- APIs: Mapbox (Map rendering + Directions + Geocoding), HERE Maps (Routing v8 + Traffic — backend, currently 403), Google Gemini (TTS)
 
 ## Completed Features
 - Core navigation with HERE truck routing v8 (backend proxy)
-- **Mapbox GL JS map rendering** (satellite-streets-v12 with gold/dark CSS filter) — MIGRATED FROM HERE Maps
+- Mapbox GL JS map rendering (satellite-streets-v12 with gold/dark CSS filter)
+- **Mapbox Directions API fallback** when HERE routing fails
+- **Mapbox Geocoding fallback** when HERE search/autosuggest fails
 - MUTCD-compliant SVG road signs (Interstate shields, US Routes, Speed Limits, Truck Warnings)
-- Professional NavigationHUD + bottom trip bar (Apple Maps style) — gold/black theme
+- Professional NavigationHUD with distance-urgency color coding (far→approaching→close→immediate→NOW)
+- **Next Maneuver Preview panel** — shows upcoming 3 turns with road names and distances
+- **Speed Warning Overlay** — red border flash + "REDUCE SPEED" banner when exceeding limit
+- **Grade Warning Banner** — alerts for steep grades with gear-down recommendations
+- **Arrival Countdown** — final mile approach with distance countdown
+- **Route Progress Bar** on bottom trip bar
 - Real-time traffic incident overlays + auto-reroute
-- Route Comparison Panel with smart tags (Fastest, Cheapest, 3 alternatives)
+- Route Comparison Panel with smart tags
 - Waypoint system (DEADHEAD/PAID stops)
-- POI system with 40+ branded truck stop icons
+- POI system with 40+ branded truck stop icons (clickable with pointerEvents: auto)
 - Weather overlay with 3-day forecast
-- Driver/Truck profiles with license plates, trailers
+- Driver/Truck profiles with license plates, trailers (save to localStorage + Firestore)
 - HUD Layout customization (Display tab)
-- Collapsible map controls
 - Lane guidance visualization with gold theme
-- Compass rose + smooth tilt compensation
-- Voice announcements (TTS) with imperial units (natural language)
+- Compass rose + Mapbox native bearing (heading-up mode uses setBearing, not CSS rotation)
+- Voice announcements (TTS) with imperial units
 - Guest login with localStorage persistence
-- User Location Icon: Gold-filled circle with black directional arrow, thick black ring border, warm gold radiating glow pulse
-- Traffic Light Throttling: ~0.3 miles minimum gap between markers
-- Imperial Units: meters/km → miles/feet/quarter mile/half a mile throughout voice + HUD
-- NavigationHUD: Pure black bg, gold arrows, gold text, gold borders
-- Speed Limit Sign: Visible immediately on route start
-- Map Rotation: Smooth compass tilt compensation (gamma/beta correction)
+- Traffic sign deduplication: max 2 lights + 2 stop signs, 100m intersection clustering
+- 3D Mapbox Navigation mode with separate HUD
 
-## Recently Completed (Feb 2026)
-- **Mapbox GL JS Migration**: Complete migration from HERE Maps to Mapbox GL JS for map rendering
-  - hereMapUtils.ts rewritten as Mapbox compatibility wrapper
-  - NavigationView.tsx cleared of all H. namespace calls
-  - Added addEventListener/removeEventListener, geoToScreen, setZIndex to wrapper
-  - H.geo.Rect replaced with boundsFromCoords
-  - All 12 test features verified passing (iteration_95.json)
-- **POI Marker Clickability Fix**: Made POI markers interactive on the Mapbox map
-  - Cluster provider markers now have pointerEvents: auto and cursor: pointer
-  - Added .poi-cluster-marker class with data-poi-name/lat/lon attributes
-  - Click handler in NavigationView.tsx detects clicks and opens POI detail modal via setSelectedPoi
-- **Heading Up + Follow Me Fix**: Fixed map panning in wrong direction
-  - Replaced CSS container rotation with Mapbox native setBearing()
-  - User drag/pan now works correctly in all orientation modes (heading-up, north-up, compass)
-  - Vehicle arrow now correctly shows 0deg in heading-up (points up) and heading-deg in north-up
-  - Panning offset simplified: uses screen-space Y-offset since Mapbox handles bearing internally
-- **Traffic Signs Deduplication**: Reduced clutter from repeated traffic lights and stop signs
-  - Intersection clustering: only ONE of each type per 100m radius
-  - Strict caps: max 2 traffic lights + 2 stop signs displayed on map at once
-  - Stop sign throttling during route parsing (was missing, only traffic lights were throttled)
-  - Hard cap of 6 total infrastructure markers
-- **Profile Save Fix**: Fixed truck profile, driver profile, and edit truck profile not saving
-  - Root cause: For non-anonymous users, updateProfile only wrote to Firestore (which fails on permission deny), silently dropping saves
-  - Fix: Always update React state + localStorage immediately as primary store, Firestore as secondary sync
-  - Profile load also now checks localStorage before falling back to defaults (was initializing with zeros)
-  - Default truck dimensions changed from 0 to FHWA recommended (13.5ft, 78500 lbs, etc.)
-  - Verified: Data persists across view navigation (Settings → Dashboard → Settings)
+## Recently Completed (Apr 2026)
+- **Professional-Grade CMV Navigation System Upgrade**:
+  - NextManeuverPreview: Shows upcoming 3 turns with road names, distances, and direction icons
+  - SpeedWarningOverlay: Red border flash with "REDUCE SPEED — X mph over limit" banner
+  - GradeWarningBanner: Amber/red alerts for steep grades
+  - ArrivalCountdown: Final mile approach with ft countdown and progress bar
+  - Enhanced NavigationHUD: 5-level urgency color coding (far/approaching/close/immediate/now) with pulsing indicator
+  - Route Progress Bar on bottom trip bar
+  - Mapbox Directions API fallback routing (replaces offline straight-line when HERE fails)
+  - Mapbox Geocoding fallback search (replaces empty results when HERE autosuggest fails)
+  - Fixed route crash when alerts/restrictions are null (offline/fallback routes)
+  - Fixed truckProfile crash when undefined in /api/route
+- **Heading Up + Follow Me Fix**: Replaced CSS rotation with Mapbox native setBearing()
+- **Traffic Signs Deduplication**: Max 2 each per type, 100m intersection clustering
+- **Profile Save Fix**: localStorage as primary store for all user types
+- **POI Clickability Fix**: pointerEvents: auto on cluster markers
 
 ## Upcoming Tasks
-- P1: Refactor NavigationView.tsx (~7100 lines) into smaller hooks/components
-- P1: Speed limit warning system (red flash + audio alert)
+- P1: Refactor NavigationView.tsx (~7200 lines) into smaller hooks/sub-components
+- P1: Bridge/Overpass Height Warnings (visual + audio when approaching low clearances)
+- P1: Weight Limit Alerts (warn on weight-restricted bridges/roads)
 
 ## Future/Backlog
+- P2: Truck Restriction Overlays (no-truck zones, mandatory weigh stations)
+- P2: Night Mode Auto-Dimming (time-based HUD brightness)
 - P2: Viewport-based sign culling
 - P2: Driver reputation/review system
 - P2: Apple Sign-In Integration
@@ -74,6 +68,7 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - P2: Route Safety Score badge
 
 ## Known Issues
+- HERE Routing/Search API returning 403 (credentials issue) — app falls back to Mapbox
 - Gemini TTS API key flagged (403) — falls back to native TTS
-- Nominatim reverse geocoding CORS errors in preview
 - Intermittent service drops (trucker-nav/frontend) requiring supervisor restart
+- nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
