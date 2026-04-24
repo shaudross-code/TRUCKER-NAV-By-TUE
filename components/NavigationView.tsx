@@ -2578,23 +2578,53 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         });
       }
 
-      // Truck restriction voice announcements
+      // Truck restriction voice announcements — tiered: 2mi, 1mi, 0.5mi
       if (routeSignsRef.current.restrictions.length > 0) {
         routeSignsRef.current.restrictions.forEach((r: any, idx: number) => {
           if (!r.coords) return;
           const distToWarning = calcDistMi(currentLocation[0], currentLocation[1], r.coords[0], r.coords[1]);
-          if (distToWarning > 0 && distToWarning <= 0.5) {
-            const key = `warning_${r.type}_${idx}`;
-            if (!spokenDistancesRef.current.has(key)) {
-              const typeLabel = r.type === 'BRIDGE' ? 'Low clearance ahead' : r.type === 'WEIGHT' ? 'Weight limit ahead' : r.type === 'TUNNEL' ? 'Tunnel ahead' : r.type === 'HAZMAT' ? 'Hazmat restriction ahead' : r.type === 'TRUCK_PROHIBITED' ? 'Truck restriction ahead' : 'Route notice';
-              speak(`${typeLabel}. ${r.message}.`);
-              spokenDistancesRef.current.add(key);
+          const isBridgeOrWeight = r.type === 'BRIDGE' || r.type === 'WEIGHT';
+          const typeLabel = r.type === 'BRIDGE' ? 'Low clearance' : r.type === 'WEIGHT' ? 'Weight limit' : r.type === 'TUNNEL' ? 'Tunnel' : r.type === 'HAZMAT' ? 'Hazmat restriction' : r.type === 'TRUCK_PROHIBITED' ? 'Truck restriction' : 'Route notice';
+
+          if (isBridgeOrWeight) {
+            // First alert at 2 miles — gives driver time to plan alternate route
+            if (distToWarning > 0 && distToWarning <= 2 && distToWarning > 1.5) {
+              const key2 = `warning_${r.type}_${idx}_2mi`;
+              if (!spokenDistancesRef.current.has(key2)) {
+                speak(`Caution. ${typeLabel} in 2 miles. ${r.message}. Plan alternate route if needed.`);
+                spokenDistancesRef.current.add(key2);
+              }
+            }
+            // Second alert at 1 mile — urgent reminder
+            if (distToWarning > 0 && distToWarning <= 1 && distToWarning > 0.8) {
+              const key1 = `warning_${r.type}_${idx}_1mi`;
+              if (!spokenDistancesRef.current.has(key1)) {
+                speak(`Warning. ${typeLabel} in 1 mile. ${r.message}.`);
+                spokenDistancesRef.current.add(key1);
+              }
+            }
+            // Final alert at 0.5 miles — immediate action needed
+            if (distToWarning > 0 && distToWarning <= 0.5 && distToWarning > 0.3) {
+              const keyH = `warning_${r.type}_${idx}_half`;
+              if (!spokenDistancesRef.current.has(keyH)) {
+                speak(`${typeLabel} ahead! ${r.message}. Half a mile.`);
+                spokenDistancesRef.current.add(keyH);
+              }
+            }
+          } else {
+            // Other restrictions: single alert at 0.5 miles
+            if (distToWarning > 0 && distToWarning <= 0.5) {
+              const key = `warning_${r.type}_${idx}`;
+              if (!spokenDistancesRef.current.has(key)) {
+                speak(`${typeLabel} ahead. ${r.message}.`);
+                spokenDistancesRef.current.add(key);
+              }
             }
           }
         });
       }
 
-      // Bridge height & weight limit proximity warnings (visual overlay)
+      // Bridge height & weight limit proximity warnings (visual overlay — 2 mile range)
       const truckHtFt = truckProfile?.height || 13.5;
       const truckWtLbs = truckProfile?.weight || 80000;
 
@@ -2602,7 +2632,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       for (const b of routeBridgesRef.current) {
         const distMi = calcDistMi(currentLocation[0], currentLocation[1], b.lat, b.lon);
         const distFt = distMi * 5280;
-        if (distFt > 0 && distFt <= 2640 && b.maxheightFt < truckHtFt + 1) { // Within 0.5 mi
+        if (distFt > 0 && distFt <= 10560 && b.maxheightFt < truckHtFt + 1) { // Within 2 mi
           if (!closestBridge || distFt < closestBridge.distFt) {
             closestBridge = { distFt, clearanceFt: b.maxheightFt, name: b.road || b.name };
           }
@@ -2614,7 +2644,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       for (const w of routeWeightLimitsRef.current) {
         const distMi = calcDistMi(currentLocation[0], currentLocation[1], w.lat, w.lon);
         const distFt = distMi * 5280;
-        if (distFt > 0 && distFt <= 2640 && w.maxweightLbs < truckWtLbs + 2000) { // Within 0.5 mi
+        if (distFt > 0 && distFt <= 10560 && w.maxweightLbs < truckWtLbs + 2000) { // Within 2 mi
           if (!closestWeight || distFt < closestWeight.distFt) {
             closestWeight = { distFt, limitLbs: w.maxweightLbs, road: w.road || w.name };
           }
