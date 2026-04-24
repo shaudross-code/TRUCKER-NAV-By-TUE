@@ -353,8 +353,12 @@ export const MapControls: React.FC<any> = React.memo(({
             <button
               data-testid="route-overview-btn"
               onClick={() => onRouteOverview?.()}
-              className="p-1.5 md:p-3 rounded-lg md:rounded-xl bg-white/5 text-[#D4AF37] hover:bg-[#D4AF37]/20 transition-all"
-              title="Route Overview — Fit entire route in view"
+              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${
+                isOverviewMode 
+                  ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' 
+                  : 'bg-white/5 text-[#D4AF37] hover:bg-[#D4AF37]/20'
+              }`}
+              title={isOverviewMode ? "Exit Route Overview" : "Route Overview — Fit entire route in view"}
             >
               <Maximize2 className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
             </button>

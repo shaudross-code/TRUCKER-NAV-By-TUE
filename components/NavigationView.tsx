@@ -6160,7 +6160,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       />
 
       {/* Speed Limit Overlay — positioned outside z-0 map container for proper stacking */}
-      {hudLayout.showSpeedOverlay && !is3DMode && (
+      {hudLayout.showSpeedOverlay && !is3DMode && !isOverviewMode && (
         <div style={{
           ...(hudPositions.speedOverlay && (hudPositions.speedOverlay.x !== DEFAULT_POSITIONS.speedOverlay.x || hudPositions.speedOverlay.y !== DEFAULT_POSITIONS.speedOverlay.y)
             ? { position: 'absolute' as const, left: `${hudPositions.speedOverlay.x}%`, top: `${hudPositions.speedOverlay.y}%`, transform: `translate(-50%, -50%) scale(${autoScale('speedOverlay')})`, zIndex: 2010 }
@@ -6172,7 +6172,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Modern Navigation HUD */}
-      {hudLayout.showNavigationHUD && !isExploreMode && milesRemaining > 0 && !is3DMode && (
+      {hudLayout.showNavigationHUD && !isExploreMode && !isOverviewMode && milesRemaining > 0 && !is3DMode && (
         <NavigationHUD 
           nextInstruction={nextInstruction} 
           parseLane={parseLane} 
@@ -6184,7 +6184,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Next Maneuver Preview — upcoming 3 turns (works in both 2D and 3D) */}
-      {hudLayout.showNavigationHUD && !isExploreMode && milesRemaining > 0 && routeSteps.length > 1 && (
+      {hudLayout.showNavigationHUD && !isExploreMode && !isOverviewMode && milesRemaining > 0 && routeSteps.length > 1 && (
         <div className="absolute z-[3050] pointer-events-none" style={{
           top: is3DMode ? 'calc(4.5rem + env(safe-area-inset-top, 0px))' : 'calc(8rem + env(safe-area-inset-top, 0px))',
           left: '0.75rem',
@@ -6201,7 +6201,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
-      {hudLayout.showManeuverPreview && !isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
+      {hudLayout.showManeuverPreview && !isExploreMode && !isOverviewMode && isDriving && maneuverPreviewData && !is3DMode && (
         <div className="absolute z-[2000] w-72 pointer-events-auto" style={{
           ...(hudPositions.maneuverPreview && (hudPositions.maneuverPreview.x !== DEFAULT_POSITIONS.maneuverPreview.x || hudPositions.maneuverPreview.y !== DEFAULT_POSITIONS.maneuverPreview.y)
             ? { left: `${hudPositions.maneuverPreview.x}%`, top: `${hudPositions.maneuverPreview.y}%`, transform: `translate(-50%, -50%) scale(${autoScale('maneuverPreview')})` }
@@ -6212,27 +6212,32 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* ── Professional CMV Warning Systems ────────────────────────────── */}
+      {/* ── Professional CMV Warning Systems (hidden during route overview) ── */}
       
       {/* Speed Warning Overlay — Red border flash when exceeding speed limit */}
+      {!isOverviewMode && (
       <SpeedWarningOverlay 
         isActive={isSpeedWarning && isDriving} 
         currentSpeed={speed} 
         speedLimit={currentSpeedLimit || 0}
         unitSystem={context?.unitSystem}
       />
+      )}
 
       {/* Truck Intelligence: Steep Grade Alert */}
-      <GradeWarningBanner message={activeGradeAlert && isDriving ? activeGradeAlert : null} />
+      {!isOverviewMode && <GradeWarningBanner message={activeGradeAlert && isDriving ? activeGradeAlert : null} />}
 
       {/* Arrival Countdown — Final mile approach */}
+      {!isOverviewMode && (
       <ArrivalCountdown 
         milesRemaining={milesRemaining} 
         destinationName={currentDestination || 'Destination'}
         visible={isDriving && milesRemaining > 0 && milesRemaining <= 1}
       />
+      )}
 
-      {/* Bridge Height Warning — Prominent overlay when approaching low clearance */}
+      {/* Bridge Height Warning */}
+      {!isOverviewMode && (
       <BridgeHeightWarning
         distanceFt={activeBridgeWarning?.distFt || 0}
         clearanceFt={activeBridgeWarning?.clearanceFt || 0}
@@ -6240,9 +6245,10 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         bridgeName={activeBridgeWarning?.name || ''}
         visible={isDriving && !!activeBridgeWarning}
       />
+      )}
 
-      {/* Weight Limit Warning — Prominent overlay when approaching weight-restricted road */}
-      {!activeBridgeWarning && (
+      {/* Weight Limit Warning */}
+      {!isOverviewMode && !activeBridgeWarning && (
         <WeightLimitWarning
           distanceFt={activeWeightWarning?.distFt || 0}
           limitLbs={activeWeightWarning?.limitLbs || 0}
@@ -6252,8 +6258,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         />
       )}
 
-      {/* No-Truck Zone Warning — Red alert for truck-restricted roads */}
-      {!activeBridgeWarning && !activeWeightWarning && (
+      {/* No-Truck Zone Warning */}
+      {!isOverviewMode && !activeBridgeWarning && !activeWeightWarning && (
         <NoTruckZoneWarning
           distanceFt={activeNoTruckWarning?.distFt || 0}
           restriction={activeNoTruckWarning?.restriction || ''}
@@ -6293,7 +6299,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Weather & Restriction Overlay — swipeable */}
-      {!selectedPoi && !isExploreMode && !weatherDismissed && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
+      {!selectedPoi && !isExploreMode && !isOverviewMode && !weatherDismissed && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
         <div id="nav-weather-overlay" className={`absolute z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 scale-90 md:scale-100`} style={{
           ...(hudPositions.weatherPanel && (hudPositions.weatherPanel.x !== DEFAULT_POSITIONS.weatherPanel.x || hudPositions.weatherPanel.y !== DEFAULT_POSITIONS.weatherPanel.y)
             ? { left: `${hudPositions.weatherPanel.x}%`, top: `${hudPositions.weatherPanel.y}%`, transform: `translate(-50%, -50%) scale(${autoScale('weatherPanel')})` }
@@ -6631,7 +6637,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* ─── Route POIs — Independent Panel (not tied to weather swipe) ─── */}
-      {!selectedPoi && !isExploreMode && hudLayout.showAlongRoute && upcomingPois.length > 0 && (
+      {!selectedPoi && !isExploreMode && !isOverviewMode && hudLayout.showAlongRoute && upcomingPois.length > 0 && (
         <div data-testid="route-poi-panel" className="absolute z-[1900] transition-all duration-300"
           style={{
             left: '0.5rem',
@@ -6761,7 +6767,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* ─── Route Warning Signs — Right Side Stacked Badges (MUTCD Gold/Black) ─── */}
-      {isDriving && !isExploreMode && !is3DMode && milesRemaining > 0 && (
+      {isDriving && !isExploreMode && !is3DMode && !isOverviewMode && milesRemaining > 0 && (
         (() => {
           // Compute upcoming warnings sorted by distance to user
           const warnings: { type: string; label: string; distance: number; icon: string; coord: [number, number] }[] = [];
@@ -6848,7 +6854,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Fuel Cost & HOS Panel — Right side, above arrival HUD */}
-      {isDriving && !isExploreMode && milesRemaining > 0 && !is3DMode && (
+      {isDriving && !isExploreMode && !isOverviewMode && milesRemaining > 0 && !is3DMode && (
         <div data-testid="trip-info-panel" className={`absolute z-[2000] flex flex-col gap-2 transition-all duration-700 scale-90 md:scale-100 w-40 md:w-52`} style={
           hudPositions.tripPanel && (hudPositions.tripPanel.x !== DEFAULT_POSITIONS.tripPanel.x || hudPositions.tripPanel.y !== DEFAULT_POSITIONS.tripPanel.y)
             ? { left: `${hudPositions.tripPanel.x}%`, top: `${hudPositions.tripPanel.y}%`, transform: 'translate(-50%, -50%)' }
@@ -7148,7 +7154,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       </div>
       )}
 
-      {hudLayout.showNextStop && isDriving && !isExploreMode && !is3DMode && waypoints.length > 0 && (
+      {hudLayout.showNextStop && isDriving && !isExploreMode && !isOverviewMode && !is3DMode && waypoints.length > 0 && (
         <div
           data-testid="waypoint-action-panel"
           className="absolute z-[2012] w-full max-w-[650px] px-3 md:px-5 pointer-events-none"
@@ -7206,7 +7212,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Speed Warning Banner */}
-      {isSpeedWarning && hudLayout.showSpeedWarning && isDriving && (
+      {isSpeedWarning && hudLayout.showSpeedWarning && isDriving && !isOverviewMode && (
         <div data-testid="speed-warning-banner" className="absolute z-[2015] left-1/2 -translate-x-1/2 animate-pulse pointer-events-none" style={{ bottom: 'calc(6.5rem + env(safe-area-inset-bottom))' }}>
           <div className="flex items-center gap-2 px-4 py-2 bg-red-600/95 border-2 border-red-400 rounded-full shadow-[0_0_30px_rgba(239,68,68,0.5)]">
             <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -7406,18 +7412,25 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         hasActiveRoute={routePoints.length > 1}
         onRouteOverview={() => {
           if (mapInstanceRef.current && routePoints.length > 1) {
-            // Reset to north-up for clear overview
-            setIsNorthUp(true);
-            mapInstanceRef.current.setBearing(0);
-            const el = mapRef.current;
-            if (el) el.style.setProperty('--map-rotation', '0deg');
-            
-            const bounds = boundsFromCoords(routePoints);
-            if (bounds) {
-              mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
+            if (isOverviewMode) {
+              // Toggle OFF — return to follow mode
+              setIsOverviewMode(false);
+              setIsFollowMode(true);
+              setIsNorthUp(false);
+            } else {
+              // Toggle ON — show full route
+              setIsNorthUp(true);
+              mapInstanceRef.current.setBearing(0);
+              const el = mapRef.current;
+              if (el) el.style.setProperty('--map-rotation', '0deg');
+              
+              const bounds = boundsFromCoords(routePoints);
+              if (bounds) {
+                mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
+              }
+              setIsFollowMode(false);
+              setIsOverviewMode(true);
             }
-            setIsFollowMode(false);
-            setIsOverviewMode(true);
           }
         }}
         className={hudPositions.mapControls && (hudPositions.mapControls.x !== DEFAULT_POSITIONS.mapControls.x || hudPositions.mapControls.y !== DEFAULT_POSITIONS.mapControls.y) ? '' : `-translate-y-1/2 ${milesRemaining > 0 ? 'top-[55%]' : 'top-1/2'}`}
