@@ -64,7 +64,8 @@ import { PoiDetailModal } from './PoiDetailModal';
 import { RouteStepsModal } from './RouteStepsModal';
 import { NavigationHUD } from './NavigationHUD';
 import { WarningBanners } from './WarningBanners';
-import { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner } from './ProNavComponents';
+import { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner, BridgeHeightWarning, WeightLimitWarning } from './ProNavComponents';
+import { fetchRouteRestrictions, BridgeClearance, WeightLimit } from '../services/routeRestrictions';
 import { loadHudLayout, loadHudPositions, loadHudScales, DEFAULT_POSITIONS, DEFAULT_SCALES, type HudPositions, type HudScales } from '../utils/hudLayout';
 import type { HudLayoutConfig } from '../types';
 import { useHudConfig } from '../hooks/useHudConfig';
@@ -1073,6 +1074,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const trafficAlertMarkersRef = useRef<any[]>([]);
   const weatherAlertMarkersRef = useRef<any[]>([]);
   const [weighStationAlert, setWeighStationAlert] = useState<{ distance: number, status: 'OPEN' | 'CLOSED' | 'BYPASS' } | null>(null);
+  
+  // Bridge height & weight limit proximity warnings (Overpass-sourced)
+  const routeBridgesRef = useRef<BridgeClearance[]>([]);
+  const routeWeightLimitsRef = useRef<WeightLimit[]>([]);
+  const [activeBridgeWarning, setActiveBridgeWarning] = useState<{ distFt: number; clearanceFt: number; name: string } | null>(null);
+  const [activeWeightWarning, setActiveWeightWarning] = useState<{ distFt: number; limitLbs: number; road: string } | null>(null);
   
   // Collapsible alert panels state
   const [restrictionsCollapsed, setRestrictionsCollapsed] = useState(false);
@@ -2586,6 +2593,34 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         });
       }
+
+      // Bridge height & weight limit proximity warnings (visual overlay)
+      const truckHtFt = truckProfile?.height || 13.5;
+      const truckWtLbs = truckProfile?.weight || 80000;
+
+      let closestBridge: { distFt: number; clearanceFt: number; name: string } | null = null;
+      for (const b of routeBridgesRef.current) {
+        const distMi = calcDistMi(currentLocation[0], currentLocation[1], b.lat, b.lon);
+        const distFt = distMi * 5280;
+        if (distFt > 0 && distFt <= 2640 && b.maxheightFt < truckHtFt + 1) { // Within 0.5 mi
+          if (!closestBridge || distFt < closestBridge.distFt) {
+            closestBridge = { distFt, clearanceFt: b.maxheightFt, name: b.road || b.name };
+          }
+        }
+      }
+      setActiveBridgeWarning(closestBridge);
+
+      let closestWeight: { distFt: number; limitLbs: number; road: string } | null = null;
+      for (const w of routeWeightLimitsRef.current) {
+        const distMi = calcDistMi(currentLocation[0], currentLocation[1], w.lat, w.lon);
+        const distFt = distMi * 5280;
+        if (distFt > 0 && distFt <= 2640 && w.maxweightLbs < truckWtLbs + 2000) { // Within 0.5 mi
+          if (!closestWeight || distFt < closestWeight.distFt) {
+            closestWeight = { distFt, limitLbs: w.maxweightLbs, road: w.road || w.name };
+          }
+        }
+      }
+      setActiveWeightWarning(closestWeight);
 
       for (let i = 0; i < routeStepsRef.current.length; i++) {
         traveledForStep += routeStepsRef.current[i].distance;
@@ -4353,6 +4388,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       followingStep: null
     });
     
+    // Clear bridge/weight restrictions
+    routeBridgesRef.current = [];
+    routeWeightLimitsRef.current = [];
+    setActiveBridgeWarning(null);
+    setActiveWeightWarning(null);
+    
     // Clear map layers
     if (mapLayersRef.current) {
       Object.values(mapLayersRef.current).forEach(layer => {
@@ -4508,6 +4549,54 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setInitialMiles(distMi);
       totalRouteDistanceRef.current = distMi * 1609.34;
       routeDurationRef.current = durationSec;
+      
+      // Fetch bridge heights & weight limits along route corridor (async, non-blocking)
+      fetchRouteRestrictions(coords).then(restrictions => {
+        routeBridgesRef.current = restrictions.bridges;
+        routeWeightLimitsRef.current = restrictions.weightLimits;
+        
+        // Merge Overpass restrictions into restrictionAlerts for the side panel
+        const newAlerts: RestrictionAlert[] = [];
+        const truckHtCm = (truckProfile.height || 13.5) * 30.48;
+        const truckWtKg = (truckProfile.weight || 80000) * 0.453592;
+        
+        for (const b of restrictions.bridges) {
+          if (b.maxheight * 100 < truckHtCm + 15) {
+            newAlerts.push({
+              type: 'BRIDGE',
+              message: `Low Bridge: ${b.maxheightFt}ft${b.road ? ` on ${b.road}` : ''}`,
+              icon: Truck,
+              color: 'text-red-500',
+              bg: 'bg-red-500/20',
+              progress: 0,
+              coords: [b.lat, b.lon],
+            });
+          }
+        }
+        for (const w of restrictions.weightLimits) {
+          if (w.maxweight < truckWtKg / 1000 + 0.9) {
+            newAlerts.push({
+              type: 'WEIGHT',
+              message: `Weight Limit: ${w.maxweightLbs.toLocaleString()} lbs${w.road ? ` on ${w.road}` : ''}`,
+              icon: Scale,
+              color: 'text-orange-500',
+              bg: 'bg-orange-500/20',
+              progress: 0,
+              coords: [w.lat, w.lon],
+            });
+          }
+        }
+        
+        if (newAlerts.length > 0) {
+          setRestrictionAlerts(prev => [...prev, ...newAlerts]);
+          // Also add to routeSignsRef for voice announcements
+          routeSignsRef.current.restrictions = [
+            ...routeSignsRef.current.restrictions,
+            ...newAlerts.map(a => ({ ...a, coord: a.coords })),
+          ];
+          console.log(`[RouteRestrictions] Added ${newAlerts.length} alerts (${restrictions.bridges.length} bridges, ${restrictions.weightLimits.length} weight limits)`);
+        }
+      }).catch(err => console.warn('[RouteRestrictions] fetch failed:', err));
       
       const arrival = new Date();
       arrival.setSeconds(arrival.getSeconds() + durationSec);
@@ -6064,6 +6153,26 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         destinationName={currentDestination || 'Destination'}
         visible={isDriving && milesRemaining > 0 && milesRemaining <= 1}
       />
+
+      {/* Bridge Height Warning — Prominent overlay when approaching low clearance */}
+      <BridgeHeightWarning
+        distanceFt={activeBridgeWarning?.distFt || 0}
+        clearanceFt={activeBridgeWarning?.clearanceFt || 0}
+        truckHeightFt={truckProfile?.height || 13.5}
+        bridgeName={activeBridgeWarning?.name || ''}
+        visible={isDriving && !!activeBridgeWarning}
+      />
+
+      {/* Weight Limit Warning — Prominent overlay when approaching weight-restricted road */}
+      {!activeBridgeWarning && (
+        <WeightLimitWarning
+          distanceFt={activeWeightWarning?.distFt || 0}
+          limitLbs={activeWeightWarning?.limitLbs || 0}
+          truckWeightLbs={truckProfile?.weight || 80000}
+          roadName={activeWeightWarning?.road || ''}
+          visible={isDriving && !!activeWeightWarning}
+        />
+      )}
 
       {/* Trip Progress HUD removed in favor of nav-arrival-hud */}
 

@@ -37,6 +37,15 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - 3D Mapbox Navigation mode with separate HUD
 
 ## Recently Completed (Apr 2026)
+- **Bridge/Overpass Height Warnings + Weight Limit Alerts** (P1):
+  - Overpass API fetches low-clearance bridges and weight-restricted roads along route corridor
+  - 250m corridor filter ensures only relevant restrictions are shown
+  - Restriction panel shows alerts (7 bridges, 21 weight limits on test route)
+  - Proximity warnings: BridgeHeightWarning overlay (red for clearance violation, amber for tight fit)
+  - Proximity warnings: WeightLimitWarning overlay (red for overweight, orange for near-limit)
+  - Voice announcements within 0.5 miles of restrictions
+  - New service: /app/services/routeRestrictions.ts (Overpass API, OSM tag parsing)
+  - Alerts cleared on route cancellation
 - **Professional-Grade CMV Navigation System Upgrade**:
   - NextManeuverPreview: Shows upcoming 3 turns with road names, distances, and direction icons
   - SpeedWarningOverlay: Red border flash with "REDUCE SPEED — X mph over limit" banner
@@ -54,9 +63,8 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - **POI Clickability Fix**: pointerEvents: auto on cluster markers
 
 ## Upcoming Tasks
-- P1: Refactor NavigationView.tsx (~7200 lines) into smaller hooks/sub-components
-- P1: Bridge/Overpass Height Warnings (visual + audio when approaching low clearances)
-- P1: Weight Limit Alerts (warn on weight-restricted bridges/roads)
+- P1: Refactor NavigationView.tsx (~7300 lines) into smaller hooks/sub-components
+- P1: Truck Restriction Overlays (no-truck zones, mandatory weigh stations)
 
 ## Future/Backlog
 - P2: Truck Restriction Overlays (no-truck zones, mandatory weigh stations)

@@ -1,0 +1,202 @@
+/**
+ * Bridge Height & Weight Limit Service
+ * Fetches low-clearance bridges and weight-restricted roads along a route corridor
+ * using OpenStreetMap Overpass API.
+ */
+
+export interface BridgeClearance {
+  lat: number;
+  lon: number;
+  maxheight: number; // meters
+  maxheightFt: number; // feet
+  name: string;
+  road: string;
+  type: 'bridge' | 'tunnel';
+}
+
+export interface WeightLimit {
+  lat: number;
+  lon: number;
+  maxweight: number; // metric tons
+  maxweightLbs: number; // pounds
+  name: string;
+  road: string;
+}
+
+export interface RouteRestrictions {
+  bridges: BridgeClearance[];
+  weightLimits: WeightLimit[];
+}
+
+// Sample route points to Overpass poly format
+function routeToPolyFilter(routeCoords: [number, number][], bufferKm: number = 0.5): string {
+  // Sample every Nth point to keep the query manageable
+  const step = Math.max(1, Math.floor(routeCoords.length / 30));
+  const sampled: [number, number][] = [];
+  for (let i = 0; i < routeCoords.length; i += step) {
+    sampled.push(routeCoords[i]);
+  }
+  if (sampled[sampled.length - 1] !== routeCoords[routeCoords.length - 1]) {
+    sampled.push(routeCoords[routeCoords.length - 1]);
+  }
+
+  // Build a bounding box from sampled points + buffer
+  let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+  for (const [lat, lon] of sampled) {
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+  }
+  const latBuf = bufferKm / 111;
+  const lonBuf = bufferKm / (111 * Math.cos(((minLat + maxLat) / 2) * Math.PI / 180));
+
+  return `${(minLat - latBuf).toFixed(5)},${(minLon - lonBuf).toFixed(5)},${(maxLat + latBuf).toFixed(5)},${(maxLon + lonBuf).toFixed(5)}`;
+}
+
+// Distance in meters between two [lat, lon] points
+function distM(a: [number, number], b: [number, number]): number {
+  const R = 6371000;
+  const dLat = (b[0] - a[0]) * Math.PI / 180;
+  const dLon = (b[1] - a[1]) * Math.PI / 180;
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
+}
+
+// Filter to only keep restrictions within corridor of the route
+function filterNearRoute(items: { lat: number; lon: number }[], routeCoords: [number, number][], corridorM: number = 150): typeof items {
+  // Sample route points for faster distance checks
+  const step = Math.max(1, Math.floor(routeCoords.length / 100));
+  const sampled: [number, number][] = [];
+  for (let i = 0; i < routeCoords.length; i += step) {
+    sampled.push(routeCoords[i]);
+  }
+
+  return items.filter(item => {
+    const pos: [number, number] = [item.lat, item.lon];
+    return sampled.some(rp => distM(pos, rp) <= corridorM);
+  });
+}
+
+export async function fetchRouteRestrictions(routeCoords: [number, number][]): Promise<RouteRestrictions> {
+  const result: RouteRestrictions = { bridges: [], weightLimits: [] };
+  if (routeCoords.length < 2) return result;
+
+  const bbox = routeToPolyFilter(routeCoords, 0.8);
+
+  const query = `
+    [out:json][timeout:20][bbox:${bbox}];
+    (
+      way["maxheight"](${bbox});
+      node["maxheight"](${bbox});
+      way["maxweight"](${bbox});
+      node["maxweight"](${bbox});
+      way["bridge"="yes"]["maxheight"](${bbox});
+      way["tunnel"="yes"]["maxheight"](${bbox});
+    );
+    out center;
+  `;
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(query)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.warn('Overpass API returned', response.status);
+      return result;
+    }
+
+    const data = await response.json();
+    const elements = data.elements || [];
+
+    for (const el of elements) {
+      const lat = el.lat || el.center?.lat;
+      const lon = el.lon || el.center?.lon;
+      if (!lat || !lon) continue;
+      const tags = el.tags || {};
+
+      // Parse maxheight
+      if (tags.maxheight) {
+        const mh = parseHeight(tags.maxheight);
+        if (mh > 0) {
+          result.bridges.push({
+            lat, lon,
+            maxheight: mh,
+            maxheightFt: +(mh * 3.28084).toFixed(1),
+            name: tags.name || '',
+            road: tags['addr:street'] || tags.ref || tags.name || '',
+            type: tags.tunnel === 'yes' ? 'tunnel' : 'bridge',
+          });
+        }
+      }
+
+      // Parse maxweight
+      if (tags.maxweight) {
+        const mw = parseWeight(tags.maxweight);
+        if (mw > 0) {
+          result.weightLimits.push({
+            lat, lon,
+            maxweight: mw,
+            maxweightLbs: Math.round(mw * 2204.62),
+            name: tags.name || '',
+            road: tags['addr:street'] || tags.ref || tags.name || '',
+          });
+        }
+      }
+    }
+
+    // Filter to only restrictions near the route corridor (250m buffer for OSM data precision)
+    result.bridges = filterNearRoute(result.bridges, routeCoords, 250) as BridgeClearance[];
+    result.weightLimits = filterNearRoute(result.weightLimits, routeCoords, 250) as WeightLimit[];
+
+    console.log(`[RouteRestrictions] Found ${result.bridges.length} bridges, ${result.weightLimits.length} weight limits near route`);
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.warn('[RouteRestrictions] Overpass query timed out');
+    } else {
+      console.error('[RouteRestrictions] Overpass fetch error:', err.message);
+    }
+  }
+
+  return result;
+}
+
+// Parse OSM maxheight tag (e.g., "4.2", "14'6\"", "14'6\"", "14 ft 6 in")
+function parseHeight(val: string): number {
+  if (!val) return 0;
+  // Feet + inches: 14'6" or 14' 6"
+  const ftIn = val.match(/(\d+)'\s*(\d+)?/);
+  if (ftIn) {
+    return (parseInt(ftIn[1]) * 12 + parseInt(ftIn[2] || '0')) * 0.0254;
+  }
+  // "X ft Y in"
+  const ftInAlt = val.match(/(\d+)\s*ft\s*(\d+)?\s*in/i);
+  if (ftInAlt) {
+    return (parseInt(ftInAlt[1]) * 12 + parseInt(ftInAlt[2] || '0')) * 0.0254;
+  }
+  // Metric (meters)
+  const m = parseFloat(val);
+  if (!isNaN(m)) return m;
+  return 0;
+}
+
+// Parse OSM maxweight tag (e.g., "10", "10 t", "20000 lbs")
+function parseWeight(val: string): number {
+  if (!val) return 0;
+  const lbs = val.match(/([\d,.]+)\s*(?:lbs?|pounds?)/i);
+  if (lbs) return parseFloat(lbs[1].replace(',', '')) * 0.000453592;
+  const tons = val.match(/([\d.]+)\s*(?:st|tons?)/i);
+  if (tons) return parseFloat(tons[1]) * 0.907185; // short tons to metric
+  const t = parseFloat(val);
+  if (!isNaN(t)) return t;
+  return 0;
+}
