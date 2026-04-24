@@ -6212,32 +6212,27 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
-      {/* ── Professional CMV Warning Systems (hidden during route overview) ── */}
+      {/* ── Professional CMV Warning Systems ────────────────────────── */}
       
       {/* Speed Warning Overlay — Red border flash when exceeding speed limit */}
-      {!isOverviewMode && (
       <SpeedWarningOverlay 
         isActive={isSpeedWarning && isDriving} 
         currentSpeed={speed} 
         speedLimit={currentSpeedLimit || 0}
         unitSystem={context?.unitSystem}
       />
-      )}
 
       {/* Truck Intelligence: Steep Grade Alert */}
-      {!isOverviewMode && <GradeWarningBanner message={activeGradeAlert && isDriving ? activeGradeAlert : null} />}
+      <GradeWarningBanner message={activeGradeAlert && isDriving ? activeGradeAlert : null} />
 
       {/* Arrival Countdown — Final mile approach */}
-      {!isOverviewMode && (
       <ArrivalCountdown 
         milesRemaining={milesRemaining} 
         destinationName={currentDestination || 'Destination'}
         visible={isDriving && milesRemaining > 0 && milesRemaining <= 1}
       />
-      )}
 
       {/* Bridge Height Warning */}
-      {!isOverviewMode && (
       <BridgeHeightWarning
         distanceFt={activeBridgeWarning?.distFt || 0}
         clearanceFt={activeBridgeWarning?.clearanceFt || 0}
@@ -6245,10 +6240,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         bridgeName={activeBridgeWarning?.name || ''}
         visible={isDriving && !!activeBridgeWarning}
       />
-      )}
 
       {/* Weight Limit Warning */}
-      {!isOverviewMode && !activeBridgeWarning && (
+      {!activeBridgeWarning && (
         <WeightLimitWarning
           distanceFt={activeWeightWarning?.distFt || 0}
           limitLbs={activeWeightWarning?.limitLbs || 0}
@@ -6259,7 +6253,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* No-Truck Zone Warning */}
-      {!isOverviewMode && !activeBridgeWarning && !activeWeightWarning && (
+      {!activeBridgeWarning && !activeWeightWarning && (
         <NoTruckZoneWarning
           distanceFt={activeNoTruckWarning?.distFt || 0}
           restriction={activeNoTruckWarning?.restriction || ''}
@@ -6299,7 +6293,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       )}
 
       {/* Weather & Restriction Overlay — swipeable */}
-      {!selectedPoi && !isExploreMode && !isOverviewMode && !weatherDismissed && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
+      {!selectedPoi && !isExploreMode && !weatherDismissed && (hudLayout.showWeatherOverlay || hudLayout.showTruckRestrictions) && (
         <div id="nav-weather-overlay" className={`absolute z-[2000] flex flex-col gap-1 md:gap-2 transition-all duration-700 scale-90 md:scale-100`} style={{
           ...(hudPositions.weatherPanel && (hudPositions.weatherPanel.x !== DEFAULT_POSITIONS.weatherPanel.x || hudPositions.weatherPanel.y !== DEFAULT_POSITIONS.weatherPanel.y)
             ? { left: `${hudPositions.weatherPanel.x}%`, top: `${hudPositions.weatherPanel.y}%`, transform: `translate(-50%, -50%) scale(${autoScale('weatherPanel')})` }

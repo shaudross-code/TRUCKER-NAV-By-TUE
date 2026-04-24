@@ -187,9 +187,17 @@ class ViewModel {
 
     if (data.bounds) {
       const b = data.bounds;
-      // Reset bearing to north-up for overview
+      const container = mb.getContainer();
+      const cw = container?.clientWidth || 1920;
+      const ch = container?.clientHeight || 800;
+      // Account for sidebar (~200px left) and bottom bar (~140px bottom)
+      const padLeft = Math.min(220, cw * 0.14);
+      const padRight = Math.min(60, cw * 0.04);
+      const padTop = Math.min(60, ch * 0.08);
+      const padBottom = Math.min(160, ch * 0.22);
+      
       mb.fitBounds([[b._minLng, b._minLat], [b._maxLng, b._maxLat]], {
-        padding: { top: 80, bottom: 120, left: 240, right: 80 },
+        padding: { top: padTop, bottom: padBottom, left: padLeft, right: padRight },
         duration: _animate ? 1000 : 0,
         bearing: 0,
         pitch: 0,
