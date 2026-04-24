@@ -23,9 +23,29 @@ export interface WeightLimit {
   road: string;
 }
 
+export interface NoTruckZone {
+  lat: number;
+  lon: number;
+  name: string;
+  road: string;
+  restriction: string; // e.g. "No HGV", "No trucks", "Weight restricted"
+  tags: Record<string, string>;
+}
+
+export interface WeighStation {
+  lat: number;
+  lon: number;
+  name: string;
+  operator: string;
+  direction: string; // e.g. "northbound", "both"
+  isOpen: boolean; // default true, we can't query real-time status
+}
+
 export interface RouteRestrictions {
   bridges: BridgeClearance[];
   weightLimits: WeightLimit[];
+  noTruckZones: NoTruckZone[];
+  weighStations: WeighStation[];
 }
 
 // Sample route points to Overpass poly format
@@ -80,13 +100,13 @@ function filterNearRoute(items: { lat: number; lon: number }[], routeCoords: [nu
 }
 
 export async function fetchRouteRestrictions(routeCoords: [number, number][]): Promise<RouteRestrictions> {
-  const result: RouteRestrictions = { bridges: [], weightLimits: [] };
+  const result: RouteRestrictions = { bridges: [], weightLimits: [], noTruckZones: [], weighStations: [] };
   if (routeCoords.length < 2) return result;
 
   const bbox = routeToPolyFilter(routeCoords, 0.8);
 
   const query = `
-    [out:json][timeout:20][bbox:${bbox}];
+    [out:json][timeout:25][bbox:${bbox}];
     (
       way["maxheight"](${bbox});
       node["maxheight"](${bbox});
@@ -94,6 +114,13 @@ export async function fetchRouteRestrictions(routeCoords: [number, number][]): P
       node["maxweight"](${bbox});
       way["bridge"="yes"]["maxheight"](${bbox});
       way["tunnel"="yes"]["maxheight"](${bbox});
+      way["hgv"="no"](${bbox});
+      way["hgv"="delivery"](${bbox});
+      way["hgv:conditional"](${bbox});
+      way["motor_vehicle"="no"]["highway"](${bbox});
+      node["highway"="weigh_station"](${bbox});
+      way["highway"="weigh_station"](${bbox});
+      node["amenity"="weighbridge"](${bbox});
     );
     out center;
   `;
@@ -152,13 +179,43 @@ export async function fetchRouteRestrictions(routeCoords: [number, number][]): P
           });
         }
       }
+
+      // Parse no-truck zones (hgv=no, motor_vehicle=no, hgv=delivery)
+      if (tags.hgv === 'no' || tags.hgv === 'delivery' || tags['hgv:conditional'] || 
+          (tags.motor_vehicle === 'no' && tags.highway)) {
+        let restriction = 'No trucks';
+        if (tags.hgv === 'delivery') restriction = 'Delivery trucks only';
+        if (tags['hgv:conditional']) restriction = `Conditional: ${tags['hgv:conditional']}`;
+        if (tags.motor_vehicle === 'no') restriction = 'No motor vehicles';
+        
+        result.noTruckZones.push({
+          lat, lon,
+          name: tags.name || '',
+          road: tags.ref || tags['addr:street'] || tags.name || '',
+          restriction,
+          tags,
+        });
+      }
+
+      // Parse weigh stations
+      if (tags.highway === 'weigh_station' || tags.amenity === 'weighbridge') {
+        result.weighStations.push({
+          lat, lon,
+          name: tags.name || 'Weigh Station',
+          operator: tags.operator || '',
+          direction: tags.direction || tags['traffic_sign:direction'] || 'both',
+          isOpen: true, // Default — real-time status not available from OSM
+        });
+      }
     }
 
     // Filter to only restrictions near the route corridor (250m buffer for OSM data precision)
     result.bridges = filterNearRoute(result.bridges, routeCoords, 250) as BridgeClearance[];
     result.weightLimits = filterNearRoute(result.weightLimits, routeCoords, 250) as WeightLimit[];
+    result.noTruckZones = filterNearRoute(result.noTruckZones, routeCoords, 200) as NoTruckZone[];
+    result.weighStations = filterNearRoute(result.weighStations, routeCoords, 500) as WeighStation[]; // Wider for weigh stations (off-ramp)
 
-    console.log(`[RouteRestrictions] Found ${result.bridges.length} bridges, ${result.weightLimits.length} weight limits near route`);
+    console.log(`[RouteRestrictions] Found ${result.bridges.length} bridges, ${result.weightLimits.length} weight limits, ${result.noTruckZones.length} no-truck zones, ${result.weighStations.length} weigh stations near route`);
   } catch (err: any) {
     if (err.name === 'AbortError') {
       console.warn('[RouteRestrictions] Overpass query timed out');

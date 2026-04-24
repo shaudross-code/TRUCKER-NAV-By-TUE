@@ -64,8 +64,8 @@ import { PoiDetailModal } from './PoiDetailModal';
 import { RouteStepsModal } from './RouteStepsModal';
 import { NavigationHUD } from './NavigationHUD';
 import { WarningBanners } from './WarningBanners';
-import { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner, BridgeHeightWarning, WeightLimitWarning } from './ProNavComponents';
-import { fetchRouteRestrictions, BridgeClearance, WeightLimit } from '../services/routeRestrictions';
+import { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner, BridgeHeightWarning, WeightLimitWarning, NoTruckZoneWarning } from './ProNavComponents';
+import { fetchRouteRestrictions, BridgeClearance, WeightLimit, NoTruckZone, WeighStation } from '../services/routeRestrictions';
 import { loadHudLayout, loadHudPositions, loadHudScales, DEFAULT_POSITIONS, DEFAULT_SCALES, type HudPositions, type HudScales } from '../utils/hudLayout';
 import type { HudLayoutConfig } from '../types';
 import { useHudConfig } from '../hooks/useHudConfig';
@@ -1078,8 +1078,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   // Bridge height & weight limit proximity warnings (Overpass-sourced)
   const routeBridgesRef = useRef<BridgeClearance[]>([]);
   const routeWeightLimitsRef = useRef<WeightLimit[]>([]);
+  const routeNoTruckZonesRef = useRef<NoTruckZone[]>([]);
+  const routeWeighStationsRef = useRef<WeighStation[]>([]);
   const [activeBridgeWarning, setActiveBridgeWarning] = useState<{ distFt: number; clearanceFt: number; name: string } | null>(null);
   const [activeWeightWarning, setActiveWeightWarning] = useState<{ distFt: number; limitLbs: number; road: string } | null>(null);
+  const [activeNoTruckWarning, setActiveNoTruckWarning] = useState<{ distFt: number; restriction: string; road: string } | null>(null);
   
   // Collapsible alert panels state
   const [restrictionsCollapsed, setRestrictionsCollapsed] = useState(false);
@@ -2651,6 +2654,19 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         }
       }
       setActiveWeightWarning(closestWeight);
+
+      // No-truck zone proximity check (2 mile range)
+      let closestNoTruck: { distFt: number; restriction: string; road: string } | null = null;
+      for (const z of routeNoTruckZonesRef.current) {
+        const distMi = calcDistMi(currentLocation[0], currentLocation[1], z.lat, z.lon);
+        const distFt = distMi * 5280;
+        if (distFt > 0 && distFt <= 10560) { // Within 2 mi
+          if (!closestNoTruck || distFt < closestNoTruck.distFt) {
+            closestNoTruck = { distFt, restriction: z.restriction, road: z.road || z.name };
+          }
+        }
+      }
+      setActiveNoTruckWarning(closestNoTruck);
 
       for (let i = 0; i < routeStepsRef.current.length; i++) {
         traveledForStep += routeStepsRef.current[i].distance;
@@ -4418,11 +4434,14 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       followingStep: null
     });
     
-    // Clear bridge/weight restrictions
+    // Clear bridge/weight/no-truck restrictions
     routeBridgesRef.current = [];
     routeWeightLimitsRef.current = [];
+    routeNoTruckZonesRef.current = [];
+    routeWeighStationsRef.current = [];
     setActiveBridgeWarning(null);
     setActiveWeightWarning(null);
+    setActiveNoTruckWarning(null);
     
     // Clear map layers
     if (mapLayersRef.current) {
@@ -4584,6 +4603,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       fetchRouteRestrictions(coords).then(restrictions => {
         routeBridgesRef.current = restrictions.bridges;
         routeWeightLimitsRef.current = restrictions.weightLimits;
+        routeNoTruckZonesRef.current = restrictions.noTruckZones;
+        routeWeighStationsRef.current = restrictions.weighStations;
         
         // Merge Overpass restrictions into restrictionAlerts for the side panel
         const newAlerts: RestrictionAlert[] = [];
@@ -4617,14 +4638,39 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           }
         }
         
+        // No-truck zones — always critical
+        for (const z of restrictions.noTruckZones) {
+          newAlerts.push({
+            type: 'TRUCK_PROHIBITED',
+            message: `${z.restriction}${z.road ? ` — ${z.road}` : ''}`,
+            icon: Truck,
+            color: 'text-red-500',
+            bg: 'bg-red-500/20',
+            progress: 0,
+            coords: [z.lat, z.lon],
+          });
+        }
+        
+        // Weigh stations — informational
+        for (const ws of restrictions.weighStations) {
+          newAlerts.push({
+            type: 'RESTRICTION',
+            message: `Weigh Station: ${ws.name}${ws.operator ? ` (${ws.operator})` : ''}`,
+            icon: Scale,
+            color: 'text-[#D4AF37]',
+            bg: 'bg-[#D4AF37]/20',
+            progress: 0,
+            coords: [ws.lat, ws.lon],
+          });
+        }
+        
         if (newAlerts.length > 0) {
           setRestrictionAlerts(prev => [...prev, ...newAlerts]);
-          // Also add to routeSignsRef for voice announcements
           routeSignsRef.current.restrictions = [
             ...routeSignsRef.current.restrictions,
             ...newAlerts.map(a => ({ ...a, coord: a.coords })),
           ];
-          console.log(`[RouteRestrictions] Added ${newAlerts.length} alerts (${restrictions.bridges.length} bridges, ${restrictions.weightLimits.length} weight limits)`);
+          console.log(`[RouteRestrictions] Added ${newAlerts.length} alerts (${restrictions.bridges.length} bridges, ${restrictions.weightLimits.length} weight, ${restrictions.noTruckZones.length} no-truck, ${restrictions.weighStations.length} weigh stations)`);
         }
       }).catch(err => console.warn('[RouteRestrictions] fetch failed:', err));
       
@@ -6201,6 +6247,16 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           truckWeightLbs={truckProfile?.weight || 80000}
           roadName={activeWeightWarning?.road || ''}
           visible={isDriving && !!activeWeightWarning}
+        />
+      )}
+
+      {/* No-Truck Zone Warning — Red alert for truck-restricted roads */}
+      {!activeBridgeWarning && !activeWeightWarning && (
+        <NoTruckZoneWarning
+          distanceFt={activeNoTruckWarning?.distFt || 0}
+          restriction={activeNoTruckWarning?.restriction || ''}
+          roadName={activeNoTruckWarning?.road || ''}
+          visible={isDriving && !!activeNoTruckWarning}
         />
       )}
 

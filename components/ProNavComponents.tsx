@@ -271,5 +271,48 @@ const WeightLimitWarning: React.FC<WeightLimitWarningProps> = ({ distanceFt, lim
   );
 };
 
-export { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner, BridgeHeightWarning, WeightLimitWarning };
+// ── No-Truck Zone Warning ────────────────────────────────────────────
+interface NoTruckZoneWarningProps {
+  distanceFt: number;
+  restriction: string;
+  roadName: string;
+  visible: boolean;
+}
+
+const NoTruckZoneWarning: React.FC<NoTruckZoneWarningProps> = ({ distanceFt, restriction, roadName, visible }) => {
+  if (!visible) return null;
+  
+  const distMi = distanceFt / 5280;
+  const distStr = distMi >= 0.1 ? `${distMi.toFixed(1)} mi` : `${Math.round(distanceFt)} ft`;
+
+  return (
+    <div data-testid="no-truck-zone-warning" className="absolute top-16 left-1/2 -translate-x-1/2 z-[4100] pointer-events-none animate-in slide-in-from-top duration-300">
+      <div className="flex items-center gap-3 px-5 py-3 rounded-2xl border-2 shadow-2xl backdrop-blur-xl bg-red-900/95 border-red-500 shadow-red-500/40">
+        <div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center shrink-0 border border-red-500/30">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" className="text-red-400">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+            <line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            <rect x="7" y="9" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" fill="none" />
+          </svg>
+        </div>
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-red-400 animate-pulse" strokeWidth={2.5} />
+            <span className="text-sm md:text-base font-black uppercase tracking-wider text-red-300">
+              TRUCK RESTRICTED ZONE
+            </span>
+          </div>
+          <span className="text-xs text-white/80 font-bold mt-0.5">
+            {restriction}
+          </span>
+          <span className="text-[10px] text-zinc-400 font-medium mt-0.5">
+            {distStr} ahead{roadName ? ` — ${roadName}` : ''}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner, BridgeHeightWarning, WeightLimitWarning, NoTruckZoneWarning };
 export type { Step };

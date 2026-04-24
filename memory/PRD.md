@@ -39,13 +39,14 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 ## Recently Completed (Apr 2026)
 - **Bridge/Overpass Height Warnings + Weight Limit Alerts** (P1):
   - Overpass API fetches low-clearance bridges and weight-restricted roads along route corridor
-  - 250m corridor filter ensures only relevant restrictions are shown
-  - Restriction panel shows alerts (7 bridges, 21 weight limits on test route)
-  - Proximity warnings: BridgeHeightWarning overlay (red for clearance violation, amber for tight fit)
-  - Proximity warnings: WeightLimitWarning overlay (red for overweight, orange for near-limit)
-  - Voice announcements within 0.5 miles of restrictions
-  - New service: /app/services/routeRestrictions.ts (Overpass API, OSM tag parsing)
-  - Alerts cleared on route cancellation
+  - Tiered voice alerts at 2mi, 1mi, 0.5mi for bridge/weight restrictions
+  - Visual overlay range extended to 2 miles
+- **Truck Restriction Overlays** (P1):
+  - No-truck zones (hgv=no, delivery-only, conditional) fetched from Overpass API
+  - Mandatory weigh stations detected and displayed in restriction panel
+  - Test route (Council Bluffs → Lincoln): 7 bridges, 21 weight limits, 53 no-truck zones, 4 weigh stations
+  - NoTruckZoneWarning: Red overlay with truck-prohibited icon, distance, road name
+  - All restriction types color-coded: Red (bridge/no-truck), Orange (weight), Gold (weigh station)
 - **Professional-Grade CMV Navigation System Upgrade**:
   - NextManeuverPreview: Shows upcoming 3 turns with road names, distances, and direction icons
   - SpeedWarningOverlay: Red border flash with "REDUCE SPEED — X mph over limit" banner
@@ -63,8 +64,7 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - **POI Clickability Fix**: pointerEvents: auto on cluster markers
 
 ## Upcoming Tasks
-- P1: Refactor NavigationView.tsx (~7300 lines) into smaller hooks/sub-components
-- P1: Truck Restriction Overlays (no-truck zones, mandatory weigh stations)
+- P1: Refactor NavigationView.tsx (~7400 lines) into smaller hooks/sub-components
 
 ## Future/Backlog
 - P2: Truck Restriction Overlays (no-truck zones, mandatory weigh stations)
