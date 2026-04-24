@@ -5151,6 +5151,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   useEffect(() => {
     if (isOverviewMode && mapInstanceRef.current) {
+      // Reset bearing/pitch for clean overview
+      mapInstanceRef.current.setBearing(0);
       const bounds = routeCoordsRef.current.length > 0 ? boundsFromCoords(routeCoordsRef.current) : null;
       if (bounds) {
         mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);
@@ -7404,6 +7406,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         hasActiveRoute={routePoints.length > 1}
         onRouteOverview={() => {
           if (mapInstanceRef.current && routePoints.length > 1) {
+            // Reset to north-up for clear overview
+            setIsNorthUp(true);
+            mapInstanceRef.current.setBearing(0);
+            const el = mapRef.current;
+            if (el) el.style.setProperty('--map-rotation', '0deg');
+            
             const bounds = boundsFromCoords(routePoints);
             if (bounds) {
               mapInstanceRef.current.getViewModel().setLookAtData({ bounds }, true);

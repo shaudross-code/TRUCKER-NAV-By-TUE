@@ -187,8 +187,12 @@ class ViewModel {
 
     if (data.bounds) {
       const b = data.bounds;
+      // Reset bearing to north-up for overview
       mb.fitBounds([[b._minLng, b._minLat], [b._maxLng, b._maxLat]], {
-        padding: 60, duration: _animate ? 800 : 0
+        padding: { top: 80, bottom: 120, left: 240, right: 80 },
+        duration: _animate ? 1000 : 0,
+        bearing: 0,
+        pitch: 0,
       });
       return;
     }
