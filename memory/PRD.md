@@ -55,8 +55,12 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
   - Strict caps: max 2 traffic lights + 2 stop signs displayed on map at once
   - Stop sign throttling during route parsing (was missing, only traffic lights were throttled)
   - Hard cap of 6 total infrastructure markers
-- P0 BUG FIX: App crash on START NAV (useRef in useEffect + getPoiIcon mismatch)
-- Truck Profile save bug fixed
+- **Profile Save Fix**: Fixed truck profile, driver profile, and edit truck profile not saving
+  - Root cause: For non-anonymous users, updateProfile only wrote to Firestore (which fails on permission deny), silently dropping saves
+  - Fix: Always update React state + localStorage immediately as primary store, Firestore as secondary sync
+  - Profile load also now checks localStorage before falling back to defaults (was initializing with zeros)
+  - Default truck dimensions changed from 0 to FHWA recommended (13.5ft, 78500 lbs, etc.)
+  - Verified: Data persists across view navigation (Settings → Dashboard → Settings)
 
 ## Upcoming Tasks
 - P1: Refactor NavigationView.tsx (~7100 lines) into smaller hooks/components

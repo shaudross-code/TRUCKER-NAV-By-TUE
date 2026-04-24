@@ -101,45 +101,60 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const userDocRef = doc(db, 'users', user.uid);
     const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
-        setProfile(docSnap.data() as UserProfile);
+        const firestoreProfile = docSnap.data() as UserProfile;
+        setProfile(firestoreProfile);
+        // Sync Firestore data to localStorage as backup
+        try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(firestoreProfile)); } catch {}
       } else {
-        const initialProfile: UserProfile = {
+        // No Firestore doc — check localStorage first, then create defaults
+        let localStored: UserProfile | null = null;
+        try {
+          const raw = localStorage.getItem(`trucker_profile_${user.uid}`);
+          if (raw) localStored = JSON.parse(raw);
+        } catch {}
+        
+        const initialProfile: UserProfile = localStored || {
           uid: user.uid,
           email: user.email || '',
-          displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
+          displayName: user.displayName || '',
           truckProfile: {
-            height: 0,
-            weight: 0,
-            length: 0,
-            width: 0,
+            height: 13.5,
+            weight: 78500,
+            length: 53,
+            width: 8.5,
             hazmat: false,
             hazmatClasses: [],
             tunnelCategory: 'NONE',
-            axleCount: 0,
-            axleWeight: 0,
-            trailerCount: 0,
+            axleCount: 5,
+            axleWeight: 12000,
+            trailerCount: 1,
             make: '',
             model: '',
-            year: 0
+            year: 2024
           }
         };
-        setDoc(userDocRef, initialProfile).catch(() => {
-          // Permission denied for anonymous/email users - use local profile
-          setProfile(initialProfile);
-        });
+        setProfile(initialProfile);
+        try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(initialProfile)); } catch {}
+        setDoc(userDocRef, initialProfile).catch(() => {});
       }
     }, (error) => {
-      // Firestore permission error - create local profile
+      // Firestore permission error — load from localStorage
       console.warn('Firestore read denied, using local profile');
-      const localProfile: UserProfile = {
+      let localStored: UserProfile | null = null;
+      try {
+        const raw = localStorage.getItem(`trucker_profile_${user.uid}`);
+        if (raw) localStored = JSON.parse(raw);
+      } catch {}
+      
+      const localProfile: UserProfile = localStored || {
         uid: user.uid,
         email: user.email || '',
         displayName: user.displayName || (user.isAnonymous ? 'Guest Driver' : ''),
         truckProfile: {
-          height: 0, weight: 0, length: 0, width: 0,
+          height: 13.5, weight: 78500, length: 53, width: 8.5,
           hazmat: false, hazmatClasses: [], tunnelCategory: 'NONE',
-          axleCount: 0, axleWeight: 0, trailerCount: 0,
-          make: '', model: '', year: 0
+          axleCount: 5, axleWeight: 12000, trailerCount: 1,
+          make: '', model: '', year: 2024
         }
       };
       setProfile(localProfile);
@@ -268,24 +283,26 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return;
     }
     if (!user) return;
-    // Skip Firestore writes for anonymous users — persist locally via localStorage
-    if (user.isAnonymous) {
-      setProfile(prev => {
-        const updated = prev ? { ...prev, ...data } : null;
-        if (updated) {
-          try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(updated)); } catch {}
+    
+    // ALWAYS update React state + localStorage immediately (primary store)
+    setProfile(prev => {
+      const updated = prev ? { ...prev, ...data } : null;
+      if (updated) {
+        try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(updated)); } catch {}
+      }
+      return updated;
+    });
+
+    // For non-anonymous users, also try Firestore sync (secondary store)
+    if (!user.isAnonymous) {
+      try {
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, data);
+      } catch (err: any) {
+        // Firestore write failed — data is already saved locally above
+        if (!err?.message?.includes('permission')) {
+          console.error('Profile Firestore sync error:', err?.message);
         }
-        return updated;
-      });
-      return;
-    }
-    try {
-      const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, data);
-    } catch (err: any) {
-      // Silently handle permission errors - data is saved locally
-      if (!err?.message?.includes('permission')) {
-        console.error('Profile update error:', err?.message);
       }
     }
   };
