@@ -126,15 +126,14 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
   maneuverType = '',
   maneuverModifier = '',
 }) => {
-  // ALL hooks MUST be called before any conditional returns (Rules of Hooks)
   const detailLevel = useMemo(() => {
     if (!distanceToManeuverMi || distanceToManeuverMi > 5) return 'far';
     if (distanceToManeuverMi > 2) return 'approaching';
     if (distanceToManeuverMi > 0.5) return 'close';
-    return 'immediate';
+    if (distanceToManeuverMi > 0.1) return 'immediate';
+    return 'now';
   }, [distanceToManeuverMi]);
 
-  // Conditional return AFTER hooks
   if (!nextInstruction) return null;
 
   const instrText = typeof nextInstruction === 'string' ? nextInstruction : (nextInstruction?.text || '');
@@ -154,6 +153,19 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
 
   const dist = distanceToManeuverMi !== undefined ? formatDistance(distanceToManeuverMi) : null;
 
+  // Distance urgency colors
+  const distColor = detailLevel === 'now' ? 'text-red-400' 
+    : detailLevel === 'immediate' ? 'text-amber-400' 
+    : 'text-[#D4AF37]';
+
+  const borderStyle = detailLevel === 'now' ? 'border-red-500/70 shadow-[0_0_30px_rgba(239,68,68,0.4)]'
+    : detailLevel === 'immediate' ? 'border-[#D4AF37]/60 shadow-[0_0_24px_rgba(212,175,55,0.3)]'
+    : 'border-[#D4AF37]/20';
+
+  const arrowBg = detailLevel === 'now' ? 'bg-red-500/20'
+    : detailLevel === 'immediate' ? 'bg-[#D4AF37]/15'
+    : 'bg-[#D4AF37]/[0.05]';
+
   return (
     <div 
       data-testid="navigation-hud" 
@@ -164,39 +176,39 @@ export const NavigationHUD: React.FC<NavigationHUDProps> = ({
         width: 'min(340px, calc(100% - 1.5rem))',
       }}
     >
-      <div className={`bg-black/95 backdrop-blur-2xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.8)] border overflow-hidden transition-all duration-300 ${
-        detailLevel === 'immediate' ? 'border-[#D4AF37]/60 shadow-[0_0_24px_rgba(212,175,55,0.3)]' : 'border-[#D4AF37]/20'
-      }`}>
+      <div className={`bg-black/95 backdrop-blur-2xl rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.8)] border overflow-hidden transition-all duration-300 ${borderStyle}`}>
         {/* Main maneuver row */}
         <div className="flex items-stretch">
           {/* Direction arrow panel */}
-          <div className={`flex flex-col items-center justify-center px-5 py-4 min-w-[88px] ${
-            detailLevel === 'immediate' ? 'bg-[#D4AF37]/15' : 'bg-[#D4AF37]/[0.05]'
-          }`}>
+          <div className={`flex flex-col items-center justify-center px-5 py-4 min-w-[88px] ${arrowBg}`}>
             {getDirectionIcon(maneuverType, maneuverModifier)}
             {dist && (
               <div className="flex items-baseline gap-0.5 mt-1">
-                <span className={`text-2xl font-[900] tracking-tight leading-none tabular-nums ${
-                  detailLevel === 'immediate' ? 'text-[#D4AF37]' : 'text-[#D4AF37]'
-                }`}>
+                <span className={`text-2xl font-[900] tracking-tight leading-none tabular-nums ${distColor}`}>
                   {dist.value}
                 </span>
-                <span className="text-[10px] font-bold text-[#D4AF37]/50 uppercase">{dist.unit}</span>
+                <span className={`text-[10px] font-bold uppercase ${distColor} opacity-50`}>{dist.unit}</span>
               </div>
+            )}
+            {/* Urgency indicator dot */}
+            {(detailLevel === 'immediate' || detailLevel === 'now') && (
+              <div className={`w-2 h-2 rounded-full mt-1.5 ${detailLevel === 'now' ? 'bg-red-500 animate-ping' : 'bg-[#D4AF37] animate-pulse'}`} />
             )}
           </div>
 
           {/* Road info */}
           <div className="flex-1 py-3.5 px-4 min-w-0 flex flex-col justify-center">
-            {displayExitNum && (detailLevel === 'close' || detailLevel === 'immediate') && (
+            {displayExitNum && (detailLevel === 'close' || detailLevel === 'immediate' || detailLevel === 'now') && (
               <div className="inline-flex items-center self-start gap-1 bg-[#D4AF37] text-black text-[9px] font-black px-2 py-0.5 rounded-md mb-1.5 uppercase tracking-wider">
                 Exit {displayExitNum}
               </div>
             )}
 
-            <div className="text-[#D4AF37] font-bold text-[15px] leading-snug line-clamp-2">
+            <div className={`font-bold text-[15px] leading-snug line-clamp-2 ${detailLevel === 'now' ? 'text-red-400' : 'text-[#D4AF37]'}`}>
               {detailLevel === 'far' && displayRoadName ? (
                 <>Continue on <span className="text-white/90">{displayRoadName}</span></>
+              ) : detailLevel === 'now' ? (
+                <>{cleanInstruction} <span className="text-red-300 text-xs">NOW</span></>
               ) : (
                 cleanInstruction
               )}

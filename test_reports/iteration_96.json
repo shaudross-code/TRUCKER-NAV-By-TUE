@@ -1,0 +1,118 @@
+{
+  "summary": "Frontend testing of Pro-grade Navigation View features (SpeedWarningOverlay, NextManeuverPreview, GradeWarningBanner, ArrivalCountdown, enhanced NavigationHUD, route progress bar, Mapbox routing fallback). Guest login and Navigation view load successfully with Mapbox satellite map and gold/black TUE theme. HOWEVER a CRITICAL blocker prevents end-to-end route testing: the /api/search endpoint (HERE Autosuggest proxy) returns 403 Forbidden and has NO fallback, so no destination suggestions appear for any query (e.g., 'Lincoln Nebraska' -> 0 results). Because a destination cannot be selected, the ROUTE button never becomes visible and none of the new routing-dependent HUD features could be exercised.",
+
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "POST /api/search",
+        "issue": "HERE Autosuggest returns 403 ('credentials do not authorize access ... search-autosuggest-7'). Backend has no Mapbox/OSRM geocoding fallback, so frontend receives 0 suggestions and user cannot select a destination. This blocks ALL routing features.",
+        "priority": "CRITICAL"
+      },
+      {
+        "endpoint": "POST /api/route",
+        "issue": "Backend-only /api/route also 403s on HERE (same key scope problem). Route fallback to Mapbox Directions is implemented on the FRONTEND only (NavigationView.tsx line 4192), not in server.ts. Works only if the frontend path is reached, which requires search to succeed first.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": [
+      {
+        "endpoint": "GEMINI TTS (external)",
+        "issue": "API key 'was reported as leaked' - returns 403. Pre-existing; app falls back to native browser TTS which also fails in headless but works in real browser."
+      }
+    ]
+  },
+
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "nav-search-input suggestions dropdown",
+        "issue": "No empty-state or error message shown when /api/search returns 0 results. User sees a static search box with no feedback that the geocoding service is down. Silent failure.",
+        "selector": "[data-testid=\"nav-search-input\"]",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Destination search -> route calculation",
+        "issue": "fetchAddressSuggestions returns 0 items because HERE Autosuggest is 403. 'start-route-button' never becomes visible (no destination selected). All new pro-nav features (NextManeuverPreview, SpeedWarningOverlay, GradeWarningBanner, ArrivalCountdown, enhanced NavigationHUD with urgency color coding, route progress bar, route polyline) are UNREACHABLE via the UI as a result.",
+        "affected_selectors": [
+          "[data-testid=\"nav-search-input\"]",
+          "[data-testid=\"start-route-button\"]",
+          "[data-testid=\"nav-arrival-hud\"]",
+          "[data-testid=\"next-maneuver-preview\"]",
+          "[data-testid=\"trip-info-panel\"]",
+          "[data-testid=\"speed-limit-overlay\"]",
+          "[data-testid=\"speed-warning-overlay\"]",
+          "[data-testid=\"grade-warning-banner\"]",
+          "[data-testid=\"arrival-countdown\"]"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+
+  "test_report_links": [
+    "/app/test_reports/iteration_96.json"
+  ],
+
+  "action_items": [
+    "CRITICAL: Add a Mapbox Geocoding fallback (or alternative provider) for POST /api/search in /app/server.ts. Pattern should mirror the frontend route fallback: try HERE, on !response.ok or 403 call https://api.mapbox.com/geocoding/v5/mapbox.places/{q}.json?access_token=MAPBOX_ACCESS_TOKEN&proximity=lon,lat&limit=5 and normalize to HERE autosuggest schema ({items:[{title, address, position:{lat,lng}, resultType}]}). Verified that Mapbox geocoding returns correct 'Lincoln, Nebraska' (40.809193,-96.701189) for the same query.",
+    "HIGH: Either (a) move the Mapbox Directions fallback from NavigationView.tsx (line 4192) into /api/route server code so backend is self-healing, or (b) keep frontend fallback but add clear logging/telemetry. Currently fallback only fires if user reached handleNavigate in the UI.",
+    "MEDIUM: Show an inline error/toast in the search dropdown when /api/search returns 0 results or non-2xx so the user knows geocoding is down (currently silent).",
+    "LOW: Rotate GEMINI_API_KEY - Google flagged it as leaked (403 PERMISSION_DENIED). Currently falling back to native TTS.",
+    "RETEST: Once /api/search fallback is added, re-run the test to verify (1) suggestions appear for 'Lincoln Nebraska', (2) ROUTE button becomes visible, (3) Mapbox Directions fallback produces a route, (4) NavigationHUD + NextManeuverPreview + trip-info-panel render correctly, (5) speed-limit-overlay shows."
+  ],
+
+  "critical_code_review_comments": [
+    "server.ts /api/route (line 431) calls safeStringify(truckProfile) then truckProfile.height on a field that may be undefined when no body is passed; crashes with 500. Defensive: guard `if (!truckProfile) return 400 'truckProfile required'` or default-init before accessing.",
+    "NavigationView.tsx is 7264 lines and well above the 700-line guideline. Recommend splitting into hooks/subcomponents (routing service, POI loader, HUD renderer, telemetry listeners).",
+    "Mapbox fallback for routing is good, but search has no fallback. For an app that markets itself as a CMV navigation tool, destination discovery cannot be single-provider. Add at least one of: Mapbox Geocoding, Nominatim/OSM, or Google Places.",
+    "Silent failure: fetchAddressSuggestions swallows 'Received 0 suggestions from HERE' without distinguishing 'no match' from 'API error'. Surface HTTP status to the UI.",
+    "GEMINI_API_KEY committed to /app/.env is reported as leaked by Google - should be rotated and server-side proxied, not bundled into client.",
+    "ProNavComponents.tsx components are well-scoped with data-testid attributes (good for testing). No issues found in that file."
+  ],
+
+  "updated_files": [],
+
+  "success_rate": {
+    "backend": "N/A (frontend-only test requested; incidental backend curl showed /api/search and /api/route both 403/500)",
+    "frontend": "30% - 3/10 features verified (guest login, Navigation view loads, Mapbox satellite map renders). 7/10 blocked by search outage (search results, route calc, NavigationHUD, NextManeuverPreview, trip-bar distance/time/ETA with active route, speed-limit sign in route context, route polyline)."
+  },
+
+  "test_credentials": {
+    "guest": "Continue as Guest button (no creds required) - WORKS",
+    "email": "test@trucker.com / Test123456 (not tested this iteration)"
+  },
+
+  "seed_data_creation": "None",
+
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+
+  "context_for_next_testing_agent": "App loads at https://hud-customizer-5.preview.emergentagent.com. Flow: wait ~6s splash -> click data-testid='guest-signin-btn' -> tutorial modal appears, click text='Skip' -> sidebar button text='Navigation' to enter Nav view. Map uses Mapbox GL JS (.mapboxgl-canvas). Geolocation is denied in headless -> IP fallback to Council Bluffs, IA (41.2619,-95.8608). CRITICAL BLOCKER: POST /api/search returns HERE 403 for any query and has no geocoding fallback, so the autosuggest dropdown is always empty and the ROUTE button (data-testid='start-route-button') never appears. To verify the pro-nav HUD features once fixed, search 'Lincoln Nebraska', click first suggestion, then click ROUTE and wait ~15s for Mapbox Directions fallback inside NavigationView.tsx (line 4192). Verify: nav-arrival-hud, next-maneuver-preview, trip-info-panel, speed-limit-overlay, and route polyline visible on map. HERE key scope error: 'search-autosuggest-7 ... no resource policy associated'.",
+
+  "features_tested": {
+    "guest_login": {"status": "PASS", "details": "data-testid='guest-signin-btn' works, navigates to Dashboard -> Navigation."},
+    "navigation_view_loads": {"status": "PASS", "details": "Navigation sidebar button switches to Nav view. Mapbox satellite imagery renders with gold/black theme, weather widget (52 CLEAR, 10 MPH NNW, 15.6 MI), search bar with voice/+/ROUTE, right toolbar (menu/filter/zoom/HERE/layer/recenter)."},
+    "mapbox_satellite_renders": {"status": "PASS", "details": ".mapboxgl-canvas present, aerial imagery visible, Iowa region indicator shown."},
+    "search_destination": {"status": "FAIL", "details": "Typed 'Lincoln Nebraska' -> frontend console logs 'Received 0 suggestions from HERE' -> no dropdown shown. Backend /api/search returns HERE 403 'credentials do not authorize access to ... search-autosuggest-7'."},
+    "route_button_visible_after_selection": {"status": "BLOCKED", "details": "Cannot reach state - no search result to select."},
+    "route_calculation_mapbox_fallback": {"status": "BLOCKED", "details": "Cannot trigger ROUTE button. Mapbox Directions fallback code exists in NavigationView.tsx (line 4192) but is unreachable via UI due to search failure."},
+    "navigation_hud_turn_instruction": {"status": "BLOCKED", "details": "Needs active route."},
+    "next_maneuver_preview_3_turns": {"status": "BLOCKED", "details": "Needs route steps; data-testid='next-maneuver-preview' would render but has no data."},
+    "trip_bar_distance_time_eta": {"status": "BLOCKED", "details": "trip-info-panel hidden until route active."},
+    "speed_limit_45mph_sign": {"status": "BLOCKED", "details": "speed-limit-overlay requires route/telemetry data."},
+    "route_polyline_on_map": {"status": "BLOCKED", "details": "No route to render."},
+    "no_console_crashes": {"status": "PASS", "details": "No uncaught pageerror. Errors observed are expected (geolocation denied in headless, Gemini TTS 403 leaked key, HERE POI 0 results -> Overpass fallback logged)."}
+  },
+
+  "known_issues_preexisting": {
+    "gemini_tts_leaked_key": "GEMINI_API_KEY in /app/.env reported as leaked; 403 on every TTS call. Not related to current task.",
+    "geolocation_denied_headless": "Expected; IP fallback to Council Bluffs, IA works.",
+    "webgl_gpu_stall": "Warning from mapbox-gl ReadPixels; non-blocking."
+  },
+
+  "mocked_apis": {"none": "All APIs are live"},
+
+  "rca_of_the_issue": "Root cause: The HERE developer project 'trucking-nav' (App ID bbcVVUX5cmt7xjrSojCa) does NOT have a resource policy attached for the search-autosuggest-7 service, so every autosuggest call returns 403. In /app/server.ts, POST /api/search (line 519) proxies HERE autosuggest and returns whatever HERE responds with (res.json(data)); the 403 error body is sent verbatim with status 200-from-res.json, and the frontend treats a missing `.items` array as '0 results' (silent failure). Reproduction: curl -X POST https://hud-customizer-5.preview.emergentagent.com/api/search -H 'Content-Type: application/json' -d '{\"query\":\"Lincoln Nebraska\",\"lat\":\"41.26\",\"lon\":\"-95.86\"}' -> returns HERE's 403 JSON. Mitigation: add Mapbox Geocoding fallback in server.ts /api/search when response.ok is false OR when parsed data lacks .items - this mirrors the existing Mapbox Directions fallback already used for routing and unblocks the entire navigation workflow."
+}

@@ -64,6 +64,7 @@ import { PoiDetailModal } from './PoiDetailModal';
 import { RouteStepsModal } from './RouteStepsModal';
 import { NavigationHUD } from './NavigationHUD';
 import { WarningBanners } from './WarningBanners';
+import { NextManeuverPreview, SpeedWarningOverlay, ArrivalCountdown, GradeWarningBanner } from './ProNavComponents';
 import { loadHudLayout, loadHudPositions, loadHudScales, DEFAULT_POSITIONS, DEFAULT_SCALES, type HudPositions, type HudScales } from '../utils/hudLayout';
 import type { HudLayoutConfig } from '../types';
 import { useHudConfig } from '../hooks/useHudConfig';
@@ -4122,9 +4123,9 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
       // For now, return the first one as primary, but we'll store others in state
       const primaryRoute = processedRoutes[0];
-      setWeatherAlerts(primaryRoute.alerts.sort((a: any, b: any) => a.progress - b.progress));
-      setRestrictionAlerts(primaryRoute.restrictions.sort((a: any, b: any) => a.progress - b.progress));
-      setTrafficAlerts(primaryRoute.trafficAlerts.sort((a: any, b: any) => a.progress - b.progress));
+      setWeatherAlerts((primaryRoute.alerts || []).sort((a: any, b: any) => a.progress - b.progress));
+      setRestrictionAlerts((primaryRoute.restrictions || []).sort((a: any, b: any) => a.progress - b.progress));
+      setTrafficAlerts((primaryRoute.trafficAlerts || []).sort((a: any, b: any) => a.progress - b.progress));
       cmvWarningsRef.current = (primaryRoute.cmvWarnings || []).sort((a: any, b: any) => a.progress - b.progress);
       routeSignsRef.current = {
         speedLimitSigns: primaryRoute.speedLimitSigns || [],
@@ -4183,7 +4184,40 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   ): Promise<{ coords: [number, number][]; distMi: number; durationSec: number; steps: any[] } | null> => {
     if (!userLocation) return null;
     const waypointCoords = waypoints.map(wp => `${wp.lon},${wp.lat}`).join(';');
-    
+    const mapboxToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+
+    // Try Mapbox Directions API first (supports driving profile with steps)
+    try {
+      const coords_str = `${userLocation[1]},${userLocation[0]};${waypointCoords ? waypointCoords + ';' : ''}${destLon},${destLat}`;
+      const mbUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords_str}?alternatives=true&geometries=geojson&overview=full&steps=true&banner_instructions=true&annotations=speed,maxspeed&access_token=${mapboxToken}`;
+      const res = await fetch(mbUrl);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0];
+          const routeCoords: [number, number][] = route.geometry.coordinates.map((c: any) => [c[1], c[0]]);
+          const distMi = route.distance / 1609.34;
+          const durationSec = route.duration;
+          const steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => ({
+            maneuver: {
+              instruction: convertInstructionToImperial(step.maneuver.instruction || ''),
+              type: step.maneuver.type || 'straight',
+              modifier: step.maneuver.modifier || '',
+            },
+            distance: step.distance,
+            duration: step.duration,
+            name: step.name || '',
+            lanes: [],
+          }));
+          totalRouteDistanceRef.current = route.distance;
+          console.log(`[Fallback] Mapbox Directions: ${distMi.toFixed(1)} mi, ${steps.length} steps`);
+          return { coords: routeCoords, distMi, durationSec, steps };
+        }
+      }
+    } catch (e) {
+      console.error("[Fallback] Mapbox Directions failed:", e instanceof Error ? e.message : String(e));
+    }
+
     // Try OSRM
     try {
       const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${userLocation[1]},${userLocation[0]};${waypointCoords ? waypointCoords + ';' : ''}${destLon},${destLat}?overview=full&geometries=geojson&steps=true`;
@@ -4196,9 +4230,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
           const distMi = route.distance / 1609.34;
           const durationSec = route.duration;
           const steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => ({
-            maneuver: { instruction: convertInstructionToImperial(step.maneuver.instruction), type: step.maneuver.type },
+            maneuver: { instruction: convertInstructionToImperial(step.maneuver.instruction), type: step.maneuver.type, modifier: step.maneuver.modifier || '' },
             distance: step.distance,
-            duration: step.duration
+            duration: step.duration,
+            name: step.name || '',
+            lanes: [],
           }));
           totalRouteDistanceRef.current = route.distance;
           return { coords, distMi, durationSec, steps };
@@ -4222,9 +4258,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       const distMi = route.distance / 1609.34;
       const durationSec = route.duration;
       const steps = route.legs.flatMap((leg: any) => leg.steps).map((step: any) => ({
-        maneuver: { instruction: convertInstructionToImperial(step.maneuver.instruction), type: step.maneuver.type },
+        maneuver: { instruction: convertInstructionToImperial(step.maneuver.instruction), type: step.maneuver.type, modifier: step.maneuver.modifier || '' },
         distance: step.distance,
-        duration: step.duration
+        duration: step.duration,
+        name: step.name || '',
+        lanes: [],
       }));
       totalRouteDistanceRef.current = route.distance;
       return { coords, distMi, durationSec, steps };
@@ -4494,7 +4532,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         routeLineRef.current = { id: 'route', color: '#D4AF37' };
 
         // Draw alternative routes with distinct colors if available
-        if (routes.length > 1) {
+        if (routes && routes.length > 1) {
           drawAlternativeRoutes(mapInstanceRef.current, routes, 0);
         }
         
@@ -5978,6 +6016,23 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         />
       )}
 
+      {/* Next Maneuver Preview — upcoming 3 turns (works in both 2D and 3D) */}
+      {hudLayout.showNavigationHUD && !isExploreMode && milesRemaining > 0 && routeSteps.length > 1 && (
+        <div className="absolute z-[3050] pointer-events-none" style={{
+          top: is3DMode ? 'calc(4.5rem + env(safe-area-inset-top, 0px))' : 'calc(8rem + env(safe-area-inset-top, 0px))',
+          left: '0.75rem',
+          width: 'min(300px, calc(100% - 1.5rem))',
+        }}>
+          <div className="bg-black/85 backdrop-blur-xl rounded-xl border border-[#D4AF37]/10 overflow-hidden py-1.5 shadow-lg">
+            <NextManeuverPreview 
+              steps={routeSteps}
+              currentStepIndex={Math.max(0, currentManeuverIndex)}
+              visible={true}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Maneuver Preview — Shows zoomed preview of complex interchanges */}
       {hudLayout.showManeuverPreview && !isExploreMode && isDriving && maneuverPreviewData && !is3DMode && (
         <div className="absolute z-[2000] w-72 pointer-events-auto" style={{
@@ -5990,20 +6045,25 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         </div>
       )}
 
+      {/* ── Professional CMV Warning Systems ────────────────────────────── */}
+      
+      {/* Speed Warning Overlay — Red border flash when exceeding speed limit */}
+      <SpeedWarningOverlay 
+        isActive={isSpeedWarning && isDriving} 
+        currentSpeed={speed} 
+        speedLimit={currentSpeedLimit || 0}
+        unitSystem={context?.unitSystem}
+      />
+
       {/* Truck Intelligence: Steep Grade Alert */}
-      {activeGradeAlert && isDriving && (
-        <div data-testid="grade-alert" className="absolute top-[calc(1rem+env(safe-area-inset-top))] left-1/2 -translate-x-1/2 z-[2100] pointer-events-none animate-in slide-in-from-top-3 fade-in duration-300">
-          <div className="flex items-center gap-2.5 px-4 py-2.5 bg-amber-600/95 backdrop-blur-md rounded-xl shadow-[0_4px_20px_rgba(217,119,6,0.5)] pointer-events-auto border border-amber-500/40">
-            <div className="w-6 h-6 rounded-full bg-black/30 flex items-center justify-center flex-shrink-0">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
-            <span className="text-sm font-bold text-white">{activeGradeAlert}</span>
-          </div>
-        </div>
-      )}
+      <GradeWarningBanner message={activeGradeAlert && isDriving ? activeGradeAlert : null} />
+
+      {/* Arrival Countdown — Final mile approach */}
+      <ArrivalCountdown 
+        milesRemaining={milesRemaining} 
+        destinationName={currentDestination || 'Destination'}
+        visible={isDriving && milesRemaining > 0 && milesRemaining <= 1}
+      />
 
       {/* Trip Progress HUD removed in favor of nav-arrival-hud */}
 
@@ -6998,6 +7058,15 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
             )}
             {/* Main Stats Row */}
             <div className="flex items-center p-2 md:p-4 landscape:p-2 gap-1 md:gap-3">
+              {/* Route progress bar */}
+              {totalRouteDistanceRef.current > 0 && milesRemaining > 0 && (
+                <div className="absolute top-0 left-0 right-0 h-[2px] bg-zinc-800/50">
+                  <div 
+                    className="h-full bg-[#D4AF37] transition-all duration-1000 ease-out rounded-r-full" 
+                    style={{ width: `${Math.max(0, Math.min(100, ((totalRouteDistanceRef.current / 1609.34 - milesRemaining) / (totalRouteDistanceRef.current / 1609.34)) * 100))}%` }} 
+                  />
+                </div>
+              )}
               {/* Controls cluster */}
               <div className="flex items-center gap-1 md:gap-1.5 shrink-0">
                 <button id="nav-exit-button" data-testid="nav-exit-button" onClick={handleCancelRoute} className="p-2 md:p-3 landscape:p-2 rounded-xl bg-zinc-900/80 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 border border-zinc-800 hover:border-red-500/30 transition-all active:scale-90" title="Clear Route">
