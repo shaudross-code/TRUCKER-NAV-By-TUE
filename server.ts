@@ -523,7 +523,7 @@ async function createServer() {
       return res.status(400).json({ error: 'Query is required' });
     }
     
-    const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+    const MAPBOX_TOKEN = process.env.MAPBOX_ACCESS_TOKEN || process.env.REACT_APP_MAPBOX_TOKEN || '';
     
     // Try HERE first
     if (process.env.HERE_API_KEY) {
@@ -598,7 +598,7 @@ async function createServer() {
 
   app.post('/api/geocode', async (req, res) => {
     const { q } = req.body;
-    const MAPBOX_TOKEN = 'pk.eyJ1IjoicmFzaGF1ZHJvc3MxIiwiYSI6ImNtbjVwanI0YjBlZ2UycG14OTRiMnVyazMifQ.GD_qnfQBIT_iRxdU72LaPg';
+    const MAPBOX_TOKEN = process.env.MAPBOX_ACCESS_TOKEN || process.env.REACT_APP_MAPBOX_TOKEN || '';
     
     // Try HERE first
     if (process.env.HERE_API_KEY) {
