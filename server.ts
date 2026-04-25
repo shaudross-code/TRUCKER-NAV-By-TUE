@@ -1480,10 +1480,33 @@ async function seedFacilitiesFromGoogle(lat: number, lon: number, gk: string): P
 
   if (process.env.NODE_ENV === 'production') {
     const distPath = path.join(__dirname, 'dist');
-    app.use(express.static(distPath));
-    app.get('*all', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+    const distIndexPath = path.join(distPath, 'index.html');
+    
+    // If dist doesn't exist, build it
+    if (!existsSync(distIndexPath)) {
+      console.log('Production mode: dist/index.html not found, building...');
+      const { execSync } = await import('child_process');
+      try {
+        execSync('npx vite build', { cwd: __dirname, stdio: 'inherit', timeout: 120000 });
+        console.log('Vite build completed successfully');
+      } catch (buildErr) {
+        console.error('Vite build failed:', buildErr);
+      }
+    }
+    
+    if (existsSync(distIndexPath)) {
+      app.use(express.static(distPath));
+      app.get('*all', (req, res) => {
+        res.sendFile(distIndexPath);
+      });
+    } else {
+      console.warn('dist/index.html still not found after build attempt, falling back to Vite dev middleware');
+      const vite = await createViteServer({
+        server: { middlewareMode: true, hmr: false },
+        appType: 'spa'
+      });
+      app.use(vite.middlewares);
+    }
   } else {
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: { port: 24679 } },
