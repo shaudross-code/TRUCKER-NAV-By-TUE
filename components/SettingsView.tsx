@@ -21,7 +21,9 @@ import {
   Mail,
   CreditCard,
   Calendar,
-  Hash
+  Hash,
+  Moon,
+  Key
 } from 'lucide-react';
 import { AppContext } from '../types';
 import { offlineMapsData } from '../src/constants/offlineMaps';
@@ -423,6 +425,80 @@ const SettingsView: React.FC<{ onReplayTutorial?: () => void }> = ({ onReplayTut
               <p className="text-zinc-600 text-[10px] mt-3 pl-11 uppercase tracking-wider">
                 Linked to speed setting — changes distance across navigation, routes, and dashboard
               </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Night Mode & Integrations Section */}
+        <section>
+          <div className="flex items-center gap-3 mb-6">
+            <Moon className="w-4 h-4 text-[#D4AF37]" />
+            <h2 className="text-[11px] font-black text-[#D4AF37] uppercase tracking-[0.2em] italic">Display & Integrations</h2>
+          </div>
+          <div className="space-y-4">
+            {/* Night Mode Auto-Dimming */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-800 rounded-xl">
+                    <Moon className="w-4 h-4 text-[#D4AF37]" />
+                  </div>
+                  <div>
+                    <p className="text-white text-sm font-bold uppercase tracking-wider italic">Night Mode</p>
+                    <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Auto-dim map based on time of day</p>
+                  </div>
+                </div>
+                <button
+                  data-testid="night-mode-setting-toggle"
+                  onClick={() => {
+                    const key = `trucker_nav_night_mode`;
+                    const current = localStorage.getItem(key) !== 'false';
+                    localStorage.setItem(key, String(!current));
+                    window.location.reload();
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
+                    localStorage.getItem('trucker_nav_night_mode') !== 'false'
+                      ? 'bg-[#D4AF37] text-black' 
+                      : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                  }`}
+                >
+                  {localStorage.getItem('trucker_nav_night_mode') !== 'false' ? 'ON' : 'OFF'}
+                </button>
+              </div>
+            </div>
+
+            {/* PC*MILER Integration */}
+            <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 bg-zinc-800 rounded-xl">
+                  <Key className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <p className="text-white text-sm font-bold uppercase tracking-wider italic">PC*MILER</p>
+                  <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold">Trimble Maps truck mileage data</p>
+                </div>
+              </div>
+              <p className="text-zinc-500 text-[10px] pl-11 mb-2">
+                Add your Trimble Maps API key to enable PC*MILER practical miles, state mileage breakdown, and toll costs.
+                Get a key at <span className="text-[#D4AF37]">developer.trimblemaps.com</span>
+              </p>
+              <div className="pl-11">
+                <input
+                  data-testid="pcmiler-api-key-input"
+                  type="password"
+                  placeholder="Enter Trimble Maps API key..."
+                  defaultValue={localStorage.getItem('pcmiler_api_key') || ''}
+                  onBlur={(e) => {
+                    const val = e.target.value.trim();
+                    if (val) {
+                      localStorage.setItem('pcmiler_api_key', val);
+                    } else {
+                      localStorage.removeItem('pcmiler_api_key');
+                    }
+                  }}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-600 focus:border-[#D4AF37]/50 focus:outline-none"
+                />
+              </div>
             </div>
           </div>
         </section>

@@ -210,10 +210,30 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }, []);
 
-  // Apple Sign-In (Firebase handler is broken for this project)
+  // Apple Sign-In via Firebase OAuthProvider
   const signInWithApple = useCallback(async () => {
     if (USE_MOCK_DATA) return;
-    setAuthError('Apple Sign-In requires additional configuration. Please use Google Sign-In, Email, or Guest access.');
+    try {
+      setAuthError(null);
+      const { OAuthProvider, signInWithPopup } = await import('firebase/auth');
+      const provider = new OAuthProvider('apple.com');
+      provider.addScope('email');
+      provider.addScope('name');
+      const result = await signInWithPopup(auth, provider);
+      // Apple credential from the sign-in
+      const credential = OAuthProvider.credentialFromResult(result);
+      console.log('Apple Sign-In successful:', result.user.uid);
+    } catch (error: any) {
+      console.error('Apple Sign-In error:', error);
+      if (error.code === 'auth/popup-closed-by-user') {
+        return; // User cancelled — no error message
+      }
+      if (error.code === 'auth/operation-not-allowed') {
+        setAuthError('Apple Sign-In is not enabled. Enable it in Firebase Console > Authentication > Sign-in method.');
+      } else {
+        setAuthError(error.message || 'Apple Sign-In failed. Please try another method.');
+      }
+    }
   }, []);
 
   // Email/Password Sign-In

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2 } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2, Moon, Sun } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
@@ -39,6 +39,9 @@ export const MapControls: React.FC<any> = React.memo(({
   setIsTilted,
   onRouteOverview,
   hasActiveRoute,
+  nightModeEnabled,
+  setNightModeEnabled,
+  isNightMode,
   className = "",
   hudScale = 1
 }) => {
@@ -327,6 +330,22 @@ export const MapControls: React.FC<any> = React.memo(({
               title={isTilted ? 'Tilt: 55° (Click for flat)' : 'Tilt: Flat (Click for 55°)'}
             >
               <Mountain className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
+            </button>
+          )}
+
+          {/* Night Mode toggle — collapsible */}
+          {!isCollapsed && (
+            <button 
+              data-testid="night-mode-btn"
+              onClick={() => {
+                const newVal = !nightModeEnabled;
+                setNightModeEnabled?.(newVal);
+                localStorage.setItem(getUserStorageKey(getCurrentUserId(), 'nav_night_mode'), String(newVal));
+              }}
+              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${isNightMode ? 'bg-[#D4AF37] text-black' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
+              title={isNightMode ? 'Night Mode Active (Auto)' : 'Night Mode (Auto-dimming)'}
+            >
+              {isNightMode ? <Moon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} /> : <Sun className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />}
             </button>
           )}
 

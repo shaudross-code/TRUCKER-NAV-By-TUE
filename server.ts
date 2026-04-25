@@ -700,6 +700,58 @@ async function createServer() {
     }
   });
 
+  // ── PC*MILER API Proxy ──────────────────────────────────────────────────
+  app.post('/api/pcmiler/route', async (req, res) => {
+    const { stops, truckProfile } = req.body;
+    const pcmilerKey = process.env.PCMILER_API_KEY;
+    
+    if (!pcmilerKey) {
+      return res.status(501).json({ error: 'PC*MILER API key not configured. Add PCMILER_API_KEY to .env' });
+    }
+    
+    if (!stops || stops.length < 2) {
+      return res.status(400).json({ error: 'Need at least 2 stops' });
+    }
+
+    try {
+      const stopsStr = stops.map((s: [number, number]) => `${s[1]},${s[0]}`).join(';');
+      const params = new URLSearchParams({
+        authToken: pcmilerKey,
+        stops: stopsStr,
+        reports: 'Mileage,State',
+        dataVersion: 'Current',
+        vehicleType: '0',
+        routeType: 'Practical',
+        distUnits: 'Miles',
+      });
+
+      if (truckProfile) {
+        if (truckProfile.height) params.append('height', String(Math.round(truckProfile.height * 12)));
+        if (truckProfile.weight) params.append('weight', String(truckProfile.weight));
+        if (truckProfile.length) params.append('length', String(Math.round(truckProfile.length * 12)));
+        if (truckProfile.width) params.append('width', String(Math.round((truckProfile.width || 8.5) * 12)));
+        if (truckProfile.hazmat) params.append('hazMatType', '1');
+      }
+
+      const url = `https://pcmiler.alk.com/apis/rest/v1.0/Service.svc/route/routeReports?${params.toString()}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[PC*MILER] API error:', response.status, text.substring(0, 200));
+        return res.status(response.status).json({ error: `PC*MILER API error: ${response.status}` });
+      }
+
+      const data = await response.json();
+      res.json(data);
+    } catch (error) {
+      console.error('[PC*MILER] Proxy error:', error);
+      res.status(500).json({ error: 'PC*MILER proxy failed' });
+    }
+  });
+
+
+
 
   app.post('/api/lookup', async (req, res) => {
     const { id } = req.body;
