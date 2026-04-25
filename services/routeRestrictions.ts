@@ -129,10 +129,10 @@ export async function fetchRouteRestrictions(routeCoords: [number, number][]): P
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
+    const response = await fetch('/api/overpass', {
       method: 'POST',
-      body: `data=${encodeURIComponent(query)}`,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
       signal: controller.signal,
     });
     clearTimeout(timeout);

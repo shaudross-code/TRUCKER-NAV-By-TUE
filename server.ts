@@ -580,7 +580,6 @@ async function createServer() {
       const hereUrl = new URL('https://browse.search.hereapi.com/v1/browse');
       hereUrl.searchParams.append('at', `${lat},${lon}`);
       
-      // Use truck-specific categories if none provided
       const truckCategories = categories || '700-7600-0116,700-7600-0117,700-7600-0322,700-7900-0132,700-7000-0000';
       hereUrl.searchParams.append('categories', truckCategories);
       
@@ -588,11 +587,15 @@ async function createServer() {
       hereUrl.searchParams.append('limit', '100');
       
       const response = await fetch(hereUrl.toString());
+      if (!response.ok) {
+        console.warn('HERE Browse API returned', response.status);
+        return res.status(response.status).json({ items: [], error: 'HERE API error' });
+      }
       const data = await response.json();
       res.json(data);
     } catch (error) {
       console.error('Error fetching browse:', error);
-      res.status(500).json({ error: 'Failed to fetch browse' });
+      res.status(500).json({ items: [], error: 'Failed to fetch browse' });
     }
   });
 
@@ -645,20 +648,58 @@ async function createServer() {
     try {
       const hereUrl = new URL('https://discover.search.hereapi.com/v1/discover');
       if (q) hereUrl.searchParams.append('q', q);
-      // Use `in` for area restriction (replaces `at` for radius-based search)
       const r = radius || 80000;
       hereUrl.searchParams.append('in', `circle:${lat},${lon};r=${r}`);
       hereUrl.searchParams.append('apiKey', process.env.HERE_API_KEY!);
       hereUrl.searchParams.append('limit', '50');
       
       const response = await fetch(hereUrl.toString());
+      if (!response.ok) {
+        console.warn('HERE Discover API returned', response.status);
+        return res.status(response.status).json({ items: [], error: 'HERE API error' });
+      }
       const data = await response.json();
       res.json(data);
     } catch (error) {
       console.error('Error fetching discover:', error);
-      res.status(500).json({ error: 'Failed to fetch discover' });
+      res.status(500).json({ items: [], error: 'Failed to fetch discover' });
     }
   });
+
+  // ── Overpass API Proxy (CORS bypass for browser) ──────────────────────────
+  app.post('/api/overpass', async (req, res) => {
+    const { query } = req.body;
+    if (!query) {
+      return res.status(400).json({ error: 'Query is required' });
+    }
+    try {
+      const trimmedQuery = query.trim();
+      console.log('[Overpass Proxy] Query length:', trimmedQuery.length);
+      console.log('[Overpass Proxy] Query first 300:', trimmedQuery.substring(0, 300));
+      const response = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': '*/*',
+          'User-Agent': 'TruckersNav/1.0',
+        },
+        body: `data=${encodeURIComponent(trimmedQuery)}`,
+      });
+      console.log('[Overpass Proxy] Response status:', response.status);
+      if (!response.ok) {
+        const text = await response.text();
+        console.error('[Overpass Proxy] Error body:', text.substring(0, 200));
+        return res.status(response.status).json({ elements: [], error: `Overpass returned ${response.status}` });
+      }
+      const data = await response.json();
+      console.log('[Overpass Proxy] Elements:', data.elements?.length || 0);
+      res.json(data);
+    } catch (error) {
+      console.error('Overpass proxy error:', error);
+      res.status(500).json({ elements: [], error: 'Overpass proxy failed' });
+    }
+  });
+
 
   app.post('/api/lookup', async (req, res) => {
     const { id } = req.body;

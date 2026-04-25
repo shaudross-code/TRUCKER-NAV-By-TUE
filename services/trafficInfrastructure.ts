@@ -51,8 +51,11 @@ export async function fetchTrafficInfrastructure(
       out body qt;
     `;
 
-    const overpassUrl = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(overpassQuery)}`;
-    const response = await fetch(overpassUrl);
+    const response = await fetch('/api/overpass', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: overpassQuery })
+    });
     
     if (!response.ok) {
       console.warn('Overpass API request failed:', response.statusText);

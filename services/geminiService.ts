@@ -681,33 +681,15 @@ export async function fetchCorridorPOIs(
 // Fallback to OpenStreetMap Overpass API
 async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
   try {
-    const radius = 50000; // 50km radius
-    const query = `
-      [out:json][timeout:25];
-      (
-        node["amenity"="fuel"]["hgv"="yes"](around:${radius},${lat},${lon});
-        way["amenity"="fuel"]["hgv"="yes"](around:${radius},${lat},${lon});
-        node["highway"="weigh_station"](around:${radius},${lat},${lon});
-        way["highway"="weigh_station"](around:${radius},${lat},${lon});
-        node["highway"="rest_area"](around:${radius},${lat},${lon});
-        way["highway"="rest_area"](around:${radius},${lat},${lon});
-        node["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        way["brand"~"Love's|Pilot|Flying J|Petro|TravelCenters of America|TA Express|Walmart|Blue Beacon|Exxon|Shell|BP|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        node["name"~"Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        way["name"~"Walmart|Truck Wash|Blue Beacon|Low Clearance|Low Bridge|Exxon|Shell|Marathon|Circle K|7-Eleven",i](around:${radius},${lat},${lon});
-        node["brand"~"Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
-        way["brand"~"Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
-        node["name"~"Lowes|Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
-        way["name"~"Lowes|Lowe's|Home Depot",i]["hgv"!="no"]["access"!="no"]["access"!="private"](around:${radius},${lat},${lon});
-        node["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
-        way["shop"="tyres"]["hgv"="yes"](around:${radius},${lat},${lon});
-      );
-      out center;
-    `;
+    const radius = 40000; // 40km radius
+    // US truck stops rarely tag hgv=yes, so search by brand + name patterns
+    // Use node queries only (way queries are expensive and timeout on Overpass)
+    const query = `[out:json][timeout:15];(node["brand"~"Pilot|Flying J|Petro|TravelCenters|TA Express|Blue Beacon|Love",i](around:${radius},${lat},${lon});node["highway"="weigh_station"](around:${radius},${lat},${lon});node["highway"="rest_area"](around:${radius},${lat},${lon}););out;`;
     
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
+    const response = await fetch('/api/overpass', {
       method: 'POST',
-      body: query
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
     });
     
     if (!response.ok) {
@@ -715,6 +697,8 @@ async function fetchTruckPOIsFromOverpass(lat: number, lon: number) {
     }
     
     const data = await response.json();
+    
+    console.log(`[Overpass POIs] Received ${data.elements?.length || 0} elements`);
     
     return data.elements.map((el: any) => {
       const elLat = el.lat || el.center?.lat;

@@ -5520,10 +5520,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return;
     }
 
-    // Throttling: only re-render if map moved > 2 miles or if it's the first render
+    // Throttling: only re-render if map moved > 2 miles, POI count changed, or if it's the first render
     if (lastPoiRenderCenterRef.current) {
       const distMoved = calcDistMi(mapCenter[0], mapCenter[1], lastPoiRenderCenterRef.current[0], lastPoiRenderCenterRef.current[1]);
-      if (distMoved < 2.0) return;
+      const prevCount = poiMarkersRef.current.length;
+      if (distMoved < 2.0 && pois.length === prevCount && prevCount > 0) return;
     }
     lastPoiRenderCenterRef.current = mapCenter;
 
