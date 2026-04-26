@@ -104,7 +104,10 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const firestoreProfile = docSnap.data() as UserProfile;
         setProfile(firestoreProfile);
         // Sync Firestore data to localStorage as backup
-        try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(firestoreProfile)); } catch {}
+        try { 
+          localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(firestoreProfile));
+          localStorage.setItem('trucker_profile_current', JSON.stringify(firestoreProfile));
+        } catch {}
       } else {
         // No Firestore doc — check localStorage first, then create defaults
         let localStored: UserProfile | null = null;
@@ -112,6 +115,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const raw = localStorage.getItem(`trucker_profile_${user.uid}`);
           if (raw) localStored = JSON.parse(raw);
         } catch {}
+        // Fallback: check the fixed "current" key (survives UID changes)
+        if (!localStored) {
+          try {
+            const raw = localStorage.getItem('trucker_profile_current');
+            if (raw) localStored = JSON.parse(raw);
+          } catch {}
+        }
         
         const initialProfile: UserProfile = localStored || {
           uid: user.uid,
@@ -145,6 +155,13 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const raw = localStorage.getItem(`trucker_profile_${user.uid}`);
         if (raw) localStored = JSON.parse(raw);
       } catch {}
+      // Fallback: check fixed "current" key
+      if (!localStored) {
+        try {
+          const raw = localStorage.getItem('trucker_profile_current');
+          if (raw) localStored = JSON.parse(raw);
+        } catch {}
+      }
       
       const localProfile: UserProfile = localStored || {
         uid: user.uid,
@@ -308,7 +325,11 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setProfile(prev => {
       const updated = prev ? { ...prev, ...data } : null;
       if (updated) {
-        try { localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(updated)); } catch {}
+        try { 
+          localStorage.setItem(`trucker_profile_${user.uid}`, JSON.stringify(updated));
+          // Also save to a fixed key so data survives UID changes (guest re-auth)
+          localStorage.setItem('trucker_profile_current', JSON.stringify(updated));
+        } catch {}
       }
       return updated;
     });
