@@ -100,7 +100,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({ isExiting }) => {
             TRUCKERS NAV
           </h1>
           <p className="text-[#D4AF37] font-black tracking-[0.35em] uppercase text-xs mt-2 opacity-90">
-            By TUE
+            BY TUE
           </p>
         </div>
 

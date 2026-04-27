@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.tue.truckersnav',
-  appName: 'TRUCKERS NAV By TUE',
+  appName: 'TRUCKERS NAV BY TUE',
   webDir: 'dist',
   server: {
     androidScheme: 'https',

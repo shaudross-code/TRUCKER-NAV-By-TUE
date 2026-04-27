@@ -56,7 +56,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       <div className="max-w-md w-full space-y-6 text-center">
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tighter italic uppercase text-[#D4AF37] drop-shadow-[0_0_15px_rgba(212,175,55,0.8)]">
-            TRUCKERS NAV By TUE
+            TRUCKERS NAV BY TUE
           </h1>
           <p className="text-[#D4AF37] text-sm uppercase tracking-widest">
             THE HOME OF THE TRUCKERS NEXT-GEN LOGISTICS PLATFORM

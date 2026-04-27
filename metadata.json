@@ -1,5 +1,5 @@
 {
-  "name": "TRUCKERS NAV By TUE",
+  "name": "TRUCKERS NAV BY TUE",
   "description": "A professional-grade logistics platform for truck drivers featuring high-accuracy navigation, HOS logging, load board management, maintenance tracking, and real-time financial summaries.",
   "requestFramePermissions": [
     "microphone",
