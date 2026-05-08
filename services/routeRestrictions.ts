@@ -120,7 +120,6 @@ export async function fetchRouteRestrictions(routeCoords: [number, number][]): P
       way["motor_vehicle"="no"]["highway"](${bbox});
       node["highway"="weigh_station"](${bbox});
       way["highway"="weigh_station"](${bbox});
-      node["amenity"="weighbridge"](${bbox});
     );
     out center;
   `;
@@ -197,15 +196,22 @@ export async function fetchRouteRestrictions(routeCoords: [number, number][]): P
         });
       }
 
-      // Parse weigh stations
-      if (tags.highway === 'weigh_station' || tags.amenity === 'weighbridge') {
-        result.weighStations.push({
-          lat, lon,
-          name: tags.name || 'Weigh Station',
-          operator: tags.operator || '',
-          direction: tags.direction || tags['traffic_sign:direction'] || 'both',
-          isOpen: true, // Default — real-time status not available from OSM
-        });
+      // Parse weigh stations (DOT only — NOT Cat Scales / commercial weighbridges)
+      if (tags.highway === 'weigh_station') {
+        // Exclude Cat Scales and commercial weighbridges
+        const name = (tags.name || '').toLowerCase();
+        const isCatScale = name.includes('cat scale') || name.includes('catscale') || 
+                           tags.brand?.toLowerCase().includes('cat scale') ||
+                           tags.operator?.toLowerCase().includes('cat scale');
+        if (!isCatScale) {
+          result.weighStations.push({
+            lat, lon,
+            name: tags.name || 'Weigh Station',
+            operator: tags.operator || '',
+            direction: tags.direction || tags['traffic_sign:direction'] || 'both',
+            isOpen: true,
+          });
+        }
       }
     }
 
