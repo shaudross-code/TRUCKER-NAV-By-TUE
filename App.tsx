@@ -42,6 +42,7 @@ import { FirebaseProvider, useFirebase } from './components/FirebaseProvider';
 import { LoginScreen } from './components/LoginScreen';
 import VoiceCommand from './components/VoiceCommand';
 import { speak } from './services/speechService';
+import useScreenWakeLock from './hooks/useScreenWakeLock';
 
 const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(() => {
@@ -249,6 +250,8 @@ const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children })
 
 const AppContent: React.FC = React.memo(() => {
   const { user, profile, loading, signIn, signInWithApple, signInWithEmail, signUpWithEmail, signInAsGuest, signOut, updateProfile, authError } = useFirebase();
+  // Keep device screen awake while the app is open & visible.
+  useScreenWakeLock(true);
   const [activeView, setActiveView] = useState<ViewType>(ViewType.DASHBOARD);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
