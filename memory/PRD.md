@@ -83,6 +83,10 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - Gemini TTS API key flagged (403) — falls back to native TTS
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
+## Recent Changes
+- 2026-05-08: ✅ Verified Truck/Driver Profile typing bug fix (useRef-based init guard) — Make/Truck#/Height typing all PASS
+- 2026-05-08: Extracted pure helpers (`calcDist`, `calcEuclideanDist`, `convertInstructionToImperial`, `synthesizeLanes`) from `NavigationView.tsx` to `/app/utils/navigationHelpers.ts` (~150 lines, no functional change). NavigationView.tsx now ~7350 lines (was 7500).
+
 ## Remaining Tasks
 - P2: Driver reputation/review system
 - P2: Route Safety Score badge

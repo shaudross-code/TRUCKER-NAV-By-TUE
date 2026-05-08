@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, User, Phone, Mail, CreditCard, Calendar, Hash } from 'lucide-react';
 
 interface DriverProfileData {
@@ -20,10 +20,17 @@ interface DriverProfileModalProps {
 
 const DriverProfileModal: React.FC<DriverProfileModalProps> = ({ isOpen, onClose, profile, onSave }) => {
   const [formData, setFormData] = useState<DriverProfileData>(profile);
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    setFormData(profile);
-  }, [profile, isOpen]);
+    if (isOpen && !hasInitialized.current) {
+      hasInitialized.current = true;
+      setFormData(profile);
+    }
+    if (!isOpen) {
+      hasInitialized.current = false;
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

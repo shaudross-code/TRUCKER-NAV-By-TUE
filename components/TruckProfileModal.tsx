@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Truck, Scale, ArrowUpCircle, RotateCcw, Shield, Hash } from 'lucide-react';
 
 interface TruckProfile {
@@ -42,9 +42,11 @@ const RECOMMENDED: Record<string, number> = {
 
 const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, profile, onSave }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const hasInitialized = useRef(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !hasInitialized.current) {
+      hasInitialized.current = true;
       setFormData({
         make: profile.make || '',
         model: profile.model || '',
@@ -65,7 +67,10 @@ const TruckProfileModal: React.FC<TruckProfileModalProps> = ({ isOpen, onClose, 
         trailerPlate: profile.trailerPlate || '',
       });
     }
-  }, [profile, isOpen]);
+    if (!isOpen) {
+      hasInitialized.current = false;
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
