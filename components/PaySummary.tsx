@@ -128,7 +128,6 @@ const PaySummary: React.FC = () => {
   const setMaintenanceAccount = context?.setMaintenanceAccount || (() => {});
 
   const maintenanceWeekFee = (milesThisWeek * maintenanceCpm) / 100;
-
   // Percentage input also uses local state
   const [localPct, setLocalPct] = useState(String(takeHomePercentage));
   const [pctFocused, setPctFocused] = useState(false);
@@ -147,7 +146,7 @@ const PaySummary: React.FC = () => {
     setPctFocused(false);
   }, [localPct, setTakeHomePercentage, takeHomePercentage]);
 
-  const netPay = (weeklyEarnings * (takeHomePercentage / 100)) - fuelCost - truckCost - weekDeductions;
+  const netPay = (weeklyEarnings * (takeHomePercentage / 100)) - fuelCost - truckCost - weekDeductions - maintenanceWeekFee;
   
   const monthlyGross = weeklyEarnings * 4;
   const monthlyNet = netPay * 4;
@@ -264,7 +263,7 @@ const PaySummary: React.FC = () => {
             <div className="flex-1">
               <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Maintenance Fee — This Week</h3>
               <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
-                {formatNumber(milesThisWeek)} mi × {maintenanceCpm}¢ → auto-deposited to account
+                {formatNumber(milesThisWeek)} mi × {maintenanceCpm}¢ → deducted from weekly gross & deposited to account
               </p>
             </div>
           </div>
