@@ -350,6 +350,8 @@ const AppContent: React.FC = React.memo(() => {
   const [truckCost, setTruckCostState] = useState(() => loadLocal('truckCost', 0));
   const [weekDeductions, setWeekDeductionsState] = useState(() => loadLocal('weekDeductions', 0));
   const [takeHomePercentage, setTakeHomePercentageState] = useState(() => loadLocal('takeHomePercentage', 100));
+  const [maintenanceCpm, setMaintenanceCpmState] = useState(() => loadLocal('maintenanceCpm', 5)); // ¢/mile
+  const [maintenanceAccount, setMaintenanceAccountState] = useState(() => loadLocal('maintenanceAccount', 0));
 
   // Sync from Firestore profile on initial load (only once per session)
   const [profileSynced, setProfileSynced] = useState(false);
@@ -361,6 +363,8 @@ const AppContent: React.FC = React.memo(() => {
       if (profile.truckCost !== undefined) setTruckCostState(profile.truckCost);
       if (profile.weekDeductions !== undefined) setWeekDeductionsState(profile.weekDeductions);
       if (profile.takeHomePercentage !== undefined) setTakeHomePercentageState(profile.takeHomePercentage);
+      if ((profile as any).maintenanceCpm !== undefined) setMaintenanceCpmState((profile as any).maintenanceCpm);
+      if ((profile as any).maintenanceAccount !== undefined) setMaintenanceAccountState((profile as any).maintenanceAccount);
       setProfileSynced(true);
     }
   }, [profile, profileSynced]);
@@ -385,6 +389,18 @@ const AppContent: React.FC = React.memo(() => {
       if (isNaN(newVal)) return prev;
       saveLocal('milesThisWeek', newVal);
       updateProfile({ milesThisWeek: newVal }).catch(() => {});
+
+      // Auto-accrue maintenance fee for new miles only (skip resets / edits-down)
+      const delta = newVal - prev;
+      if (delta > 0) {
+        setMaintenanceAccountState((bal: number) => {
+          const accrued = (delta * maintenanceCpmRef.current) / 100;
+          const newBal = +(bal + accrued).toFixed(2);
+          saveLocal('maintenanceAccount', newBal);
+          updateProfile({ maintenanceAccount: newBal } as any).catch(() => {});
+          return newBal;
+        });
+      }
       return newVal;
     });
   }, [updateProfile]);
@@ -426,6 +442,32 @@ const AppContent: React.FC = React.memo(() => {
       saveLocal('takeHomePercentage', newVal);
       updateProfile({ takeHomePercentage: newVal }).catch(() => {});
       return newVal;
+    });
+  }, [updateProfile]);
+
+  // Ref so that the auto-accrue logic in setMilesThisWeek always sees the latest cpm
+  // without forcing setMilesThisWeek to depend on it (which would change its identity on every cpm edit).
+  const maintenanceCpmRef = useRef<number>(maintenanceCpm);
+  useEffect(() => { maintenanceCpmRef.current = maintenanceCpm; }, [maintenanceCpm]);
+
+  const setMaintenanceCpm = useCallback((val: any) => {
+    setMaintenanceCpmState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal) || newVal < 0) return prev;
+      saveLocal('maintenanceCpm', newVal);
+      updateProfile({ maintenanceCpm: newVal } as any).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
+
+  const setMaintenanceAccount = useCallback((val: any) => {
+    setMaintenanceAccountState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
+      const rounded = +newVal.toFixed(2);
+      saveLocal('maintenanceAccount', rounded);
+      updateProfile({ maintenanceAccount: rounded } as any).catch(() => {});
+      return rounded;
     });
   }, [updateProfile]);
 
@@ -540,6 +582,10 @@ const AppContent: React.FC = React.memo(() => {
       setWeekDeductions,
       takeHomePercentage,
       setTakeHomePercentage,
+      maintenanceCpm,
+      setMaintenanceCpm,
+      maintenanceAccount,
+      setMaintenanceAccount,
       unitSystem,
       setUnitSystem,
       dataSaver,
@@ -560,7 +606,9 @@ const AppContent: React.FC = React.memo(() => {
       takeHomePercentage,
       unitSystem,
       dataSaver,
-      isOnline
+      isOnline,
+      maintenanceCpm,
+      maintenanceAccount
     ]);
 
   const mountTimeRef = useRef(Date.now());

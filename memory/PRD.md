@@ -84,8 +84,10 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-08: ✅ Verified Truck/Driver Profile typing bug fix (useRef-based init guard) — Make/Truck#/Height typing all PASS
-- 2026-05-08: Extracted pure helpers (`calcDist`, `calcEuclideanDist`, `convertInstructionToImperial`, `synthesizeLanes`) from `NavigationView.tsx` to `/app/utils/navigationHelpers.ts` (~150 lines, no functional change). NavigationView.tsx now ~7350 lines (was 7500).
+- 2026-05-10: ✅ Added **Maintenance Fee** card to Dashboard + Pay Summary, plus new **Maintenance Account** card on Pay Summary. User-input ¢/mile rate (default 5¢). Each mile driven auto-accrues `delta × cpm/100` to the Maintenance Account balance. Manual deposit / withdraw / reset on the Account card. Persisted to localStorage + Firestore (`maintenanceCpm`, `maintenanceAccount`).
+- 2026-05-08: ✅ Added device screen wake-lock hook (`useScreenWakeLock`) wired into AppContent; auto re-acquires on visibilitychange/focus.
+- 2026-05-08: ✅ Verified Truck/Driver Profile typing bug fix.
+- 2026-05-08: Extracted helpers (`calcDist`, `calcEuclideanDist`, `convertInstructionToImperial`, `synthesizeLanes`) to `/app/utils/navigationHelpers.ts`. NavigationView.tsx ~7350 lines.
 
 ## Remaining Tasks
 - P2: Driver reputation/review system

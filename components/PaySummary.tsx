@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck } from 'lucide-react';
+import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank } from 'lucide-react';
 import { AppContext } from '../types';
 
 /** A number input that uses local string state while editing, and syncs on blur/enter */
@@ -59,6 +59,58 @@ const EditableNumberInput: React.FC<{
   );
 };
 
+/** Maintenance account inline deposit / withdraw / reset controls. */
+const MaintenanceAdjustControls: React.FC<{
+  onDeposit: (val: number) => void;
+  onWithdraw: (val: number) => void;
+  onReset: () => void;
+}> = ({ onDeposit, onWithdraw, onReset }) => {
+  const [val, setVal] = useState('');
+  const num = parseFloat(val);
+  const valid = !isNaN(num) && num > 0;
+  return (
+    <div className="mt-4 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-zinc-500 font-bold uppercase tracking-widest text-xs">$</span>
+        <input
+          data-testid="pay-maintenance-account-input"
+          type="number"
+          min="0"
+          step="0.01"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          placeholder="0.00"
+          className="w-28 bg-[#050505] border border-zinc-800 rounded-xl py-1 px-2 text-white text-sm font-bold focus:border-emerald-400 focus:outline-none transition-colors placeholder:text-zinc-700"
+        />
+        <button
+          data-testid="pay-maintenance-account-deposit"
+          disabled={!valid}
+          onClick={() => { if (valid) { onDeposit(num); setVal(''); } }}
+          className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-emerald-400/15 text-emerald-300 border border-emerald-400/30 hover:bg-emerald-400/25 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          Deposit
+        </button>
+        <button
+          data-testid="pay-maintenance-account-withdraw"
+          disabled={!valid}
+          onClick={() => { if (valid) { onWithdraw(num); setVal(''); } }}
+          className="text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-rose-400/15 text-rose-300 border border-rose-400/30 hover:bg-rose-400/25 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          Withdraw
+        </button>
+      </div>
+      <button
+        data-testid="pay-maintenance-account-reset"
+        onClick={onReset}
+        className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-amber-400 transition-colors"
+      >
+        Reset Balance
+      </button>
+    </div>
+  );
+};
+
+
 const PaySummary: React.FC = () => {
   const context = useContext(AppContext);
   const weeklyEarnings = context?.weeklyEarnings || 0;
@@ -70,6 +122,12 @@ const PaySummary: React.FC = () => {
   const takeHomePercentage = context?.takeHomePercentage || 100;
   const setTakeHomePercentage = context?.setTakeHomePercentage || (() => {});
   const milesThisWeek = context?.milesThisWeek || 0;
+  const maintenanceCpm = context?.maintenanceCpm ?? 5;
+  const setMaintenanceCpm = context?.setMaintenanceCpm || (() => {});
+  const maintenanceAccount = context?.maintenanceAccount || 0;
+  const setMaintenanceAccount = context?.setMaintenanceAccount || (() => {});
+
+  const maintenanceWeekFee = (milesThisWeek * maintenanceCpm) / 100;
 
   // Percentage input also uses local state
   const [localPct, setLocalPct] = useState(String(takeHomePercentage));
@@ -196,7 +254,67 @@ const PaySummary: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+      {/* Maintenance Fee + Maintenance Account row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div data-testid="pay-maintenance-fee-card" className="bg-black/80 backdrop-blur-3xl border border-amber-400/20 p-8 rounded-[2.5rem] shadow-2xl">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-amber-400/10 p-3 rounded-2xl text-amber-400">
+              <Wrench className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Maintenance Fee — This Week</h3>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
+                {formatNumber(milesThisWeek)} mi × {maintenanceCpm}¢ → auto-deposited to account
+              </p>
+            </div>
+          </div>
+          <div data-testid="pay-maintenance-fee-value" className="text-3xl font-bold text-white tracking-tight">{formatCurrency(maintenanceWeekFee)}</div>
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-zinc-500 font-bold uppercase tracking-widest text-xs">¢/mi</span>
+            <input
+              data-testid="pay-maintenance-cpm-input"
+              type="number"
+              min="0"
+              step="0.1"
+              value={maintenanceCpm}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 0) setMaintenanceCpm(v);
+              }}
+              className="w-24 bg-[#050505] border border-zinc-800 rounded-xl py-1 px-2 text-white text-sm font-bold focus:border-amber-400 focus:outline-none transition-colors"
+            />
+            <button
+              data-testid="pay-maintenance-cpm-reset"
+              onClick={() => setMaintenanceCpm(0)}
+              className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-amber-400 transition-colors"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <div data-testid="pay-maintenance-account-card" className="bg-black/80 backdrop-blur-3xl border border-emerald-400/20 p-8 rounded-[2.5rem] shadow-2xl">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-emerald-400/10 p-3 rounded-2xl text-emerald-400">
+              <PiggyBank className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Maintenance Account</h3>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">Running balance — fed by miles driven</p>
+            </div>
+          </div>
+          <div data-testid="pay-maintenance-account-balance" className={`text-3xl font-bold tracking-tight ${maintenanceAccount < 0 ? 'text-red-400' : 'text-emerald-300'}`}>
+            {formatCurrency(maintenanceAccount)}
+          </div>
+          <MaintenanceAdjustControls
+            onDeposit={(v) => setMaintenanceAccount(maintenanceAccount + v)}
+            onWithdraw={(v) => setMaintenanceAccount(maintenanceAccount - v)}
+            onReset={() => setMaintenanceAccount(0)}
+          />
+        </div>
+      </div>
+
+      <div data-testid="pay-summary-monthly-yearly" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs mb-4">Monthly Gross (MTG)</h3>
           <div data-testid="pay-monthly-gross" className="text-3xl font-bold text-white tracking-tight">{formatCurrency(monthlyGross)}</div>

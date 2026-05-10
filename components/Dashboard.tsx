@@ -12,7 +12,8 @@ import {
   Truck,
   Package,
   CheckCircle2,
-  Navigation2
+  Navigation2,
+  Wrench
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
 import { speak } from '../services/speechService';
@@ -151,6 +152,9 @@ const Dashboard: React.FC = React.memo(() => {
   const setTruckCost = context?.setTruckCost || (() => {});
   const weekDeductions = context?.weekDeductions || 0;
   const setWeekDeductions = context?.setWeekDeductions || (() => {});
+  const maintenanceCpm = context?.maintenanceCpm ?? 5;
+  const setMaintenanceCpm = context?.setMaintenanceCpm || (() => {});
+  const maintenanceAccount = context?.maintenanceAccount || 0;
 
   const [isEarningsInputOpen, setIsEarningsInputOpen] = useState(false);
   const [newEntryValue, setNewEntryValue] = useState('');
@@ -166,6 +170,9 @@ const Dashboard: React.FC = React.memo(() => {
 
   const [isDeductionsInputOpen, setIsDeductionsInputOpen] = useState(false);
   const [newDeductionsEntry, setNewDeductionsEntry] = useState('');
+
+  const [isMaintenanceCpmOpen, setIsMaintenanceCpmOpen] = useState(false);
+  const [newMaintenanceCpmEntry, setNewMaintenanceCpmEntry] = useState('');
 
   // ELD Dynamic Timers
   // Removed local timers state as it's now global in AppContext
@@ -257,6 +264,16 @@ const Dashboard: React.FC = React.memo(() => {
       setWeekDeductions(prev => prev + amount);
       setNewDeductionsEntry('');
       setIsDeductionsInputOpen(false);
+    }
+  };
+
+  const handleSetMaintenanceCpm = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(newMaintenanceCpmEntry);
+    if (!isNaN(amount) && amount >= 0) {
+      setMaintenanceCpm(amount);
+      setNewMaintenanceCpmEntry('');
+      setIsMaintenanceCpmOpen(false);
     }
   };
 
@@ -595,6 +612,45 @@ const Dashboard: React.FC = React.memo(() => {
                 </div>
                 <button type="submit" className="bg-blue-400 hover:bg-blue-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-blue-400/20"><Plus className="w-5 h-5" /></button>
               </form>
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <MetricCard 
+            icon={Wrench} 
+            label="MAINTENANCE FEE"
+            value={formatCurrency((milesThisWeek * maintenanceCpm) / 100)}
+            target={`${maintenanceCpm}¢/mi · Acct ${formatCurrency(maintenanceAccount)}`}
+            iconBg="bg-amber-400/10"
+            iconColor="text-amber-400"
+            isInteractive={true}
+            onClick={() => {
+              setIsMaintenanceCpmOpen(!isMaintenanceCpmOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
+              setIsTruckCostInputOpen(false);
+              setIsDeductionsInputOpen(false);
+              setNewMaintenanceCpmEntry(String(maintenanceCpm));
+            }}
+          />
+          {isMaintenanceCpmOpen && (
+            <div data-testid="maintenance-cpm-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-amber-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Maintenance Rate (¢ / mile)</span>
+                <button onClick={() => setIsMaintenanceCpmOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <form onSubmit={handleSetMaintenanceCpm} className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">¢</div>
+                  <input data-testid="maintenance-cpm-input" autoFocus type="number" step="0.1" min="0" value={newMaintenanceCpmEntry} onChange={(e) => setNewMaintenanceCpmEntry(e.target.value)} placeholder="5.0" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-amber-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                </div>
+                <button type="submit" data-testid="maintenance-cpm-save" className="bg-amber-400 hover:bg-amber-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-amber-400/20"><Plus className="w-5 h-5" /></button>
+              </form>
+              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-3 px-1">
+                Each mile contributes to your Maintenance Account
+              </div>
             </div>
           )}
         </div>

@@ -47,6 +47,8 @@ export interface UserProfile {
   weekDeductions?: number;
   takeHomePercentage?: number;
   milesThisWeek?: number;
+  maintenanceCpm?: number;
+  maintenanceAccount?: number;
   role?: 'admin' | 'user';
   currentLoad?: {
     origin: string;
@@ -194,6 +196,10 @@ export interface AppContextType {
   setWeekDeductions: React.Dispatch<React.SetStateAction<number>>;
   takeHomePercentage: number;
   setTakeHomePercentage: React.Dispatch<React.SetStateAction<number>>;
+  maintenanceCpm: number;
+  setMaintenanceCpm: React.Dispatch<React.SetStateAction<number>>;
+  maintenanceAccount: number;
+  setMaintenanceAccount: React.Dispatch<React.SetStateAction<number>>;
   unitSystem: 'imperial' | 'metric';
   setUnitSystem: React.Dispatch<React.SetStateAction<'imperial' | 'metric'>>;
   dataSaver: boolean;
