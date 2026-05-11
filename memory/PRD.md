@@ -84,7 +84,8 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-11: ✅ **5 new fee cards** added to Pay Summary (Cash Advance / Insurance·Cargo·Liability $350 / IFTA $35 / Physical Damage $150 / Trailer Charge $200) — each editable, persisted, deducted from Net Pay. Built via reusable `FlatFeeCard` component for DRY.
+- 2026-05-11: ✅ **Escrow now tracks weekly gross both up AND down** — rewrote escrow logic from delta-based accrual (broken on decreases) to a derived `useEffect` that recomputes `escrowThisWeek = gross × rate%` and `escrowBalance = priorWeeks + escrowThisWeek` on every change. Increases, decreases, edits, and rate changes all reflect instantly.
+- 2026-05-11: ✅ Added 5 new fee cards (Cash Advance / Insurance / IFTA / Physical Damage / Trailer) — see prior changelog.
 - 2026-05-11: ✅ **Cash Advance card** also added to Dashboard with inline `$ + ADD` input; resets on "New Week".
 - 2026-05-11: ✅ Net Pay breakdown popover updated to list all 11 deduction lines (Fuel, Truck, Deductions, Maintenance, Admin, Cash Advance, Insurance, IFTA, Physical Damage, Trailer, Escrow).
 - 2026-05-11: ✅ **Escrow $0.00 bug fix** — legacy users had `escrowRate=0` saved in localStorage from the first iteration. Added migration: if saved value is `0`, bump to `3%`. Plus a one-shot retroactive accrual so users with existing weekly gross immediately see escrow populate.

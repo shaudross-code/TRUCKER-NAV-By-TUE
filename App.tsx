@@ -413,30 +413,9 @@ const AppContent: React.FC = React.memo(() => {
       if (isNaN(newVal)) return prev;
       saveLocal('weeklyEarnings', newVal);
       updateProfile({ weeklyEarnings: newVal }).catch(() => {});
-
-      // Auto-accrue escrow for new earnings (gross delta > 0), capped at escrowMax
-      const grossDelta = newVal - prev;
-      const rate = escrowRateRef.current;
-      const maxBal = escrowMaxRef.current;
-      if (grossDelta > 0 && rate > 0) {
-        setEscrowBalanceState((bal) => {
-          const room = Math.max(0, maxBal - bal);
-          if (room <= 0) return bal;
-          const target = (grossDelta * rate) / 100;
-          const contribution = Math.min(target, room);
-          const newBal = +(bal + contribution).toFixed(2);
-          saveLocal('escrowBalance', newBal);
-          updateProfile({ escrowBalance: newBal } as any).catch(() => {});
-          // Track this-week portion for net-pay deduction & display
-          setEscrowThisWeekState((tw) => {
-            const newTw = +(tw + contribution).toFixed(2);
-            saveLocal('escrowThisWeek', newTw);
-            updateProfile({ escrowThisWeek: newTw } as any).catch(() => {});
-            return newTw;
-          });
-          return newBal;
-        });
-      }
+      // Note: escrow contribution is now computed by a derived useEffect that
+      // recalculates `escrowThisWeek = weeklyEarnings × rate%` on every change,
+      // so increases AND decreases to gross both reflect immediately.
       return newVal;
     });
   }, [updateProfile]);
@@ -676,35 +655,44 @@ const AppContent: React.FC = React.memo(() => {
   useEffect(() => { escrowRateRef.current = escrowRate; }, [escrowRate]);
   useEffect(() => { escrowMaxRef.current = escrowMax; }, [escrowMax]);
 
-  // One-time migration: if user has weekly gross already entered but escrow this-week
-  // is still 0 (likely because they tested before escrow defaulted to 3%), retro-apply
-  // the rate to surface their actual escrow contribution.
+  // Derived recompute: keep `escrowThisWeek` in lockstep with weekly gross.
+  // escrowThisWeek = clamp(weeklyEarnings × rate%, 0, escrowMax − priorWeeksBalance)
+  // escrowBalance  = priorWeeksBalance + escrowThisWeek
+  // where priorWeeksBalance = (escrowBalance − escrowThisWeek). This ensures both
+  // INCREASES and DECREASES (or full replacements) of weekly gross are reflected.
+  useEffect(() => {
+    if (!profileSynced) return;
+    if (escrowRate < 0) return;
+    const priorWeeksBalance = +(escrowBalance - escrowThisWeek).toFixed(2);
+    const target = +((weeklyEarnings * escrowRate) / 100).toFixed(2);
+    const room = Math.max(0, +(escrowMax - priorWeeksBalance).toFixed(2));
+    const newThisWeek = +Math.min(Math.max(0, target), room).toFixed(2);
+    const newBalance = +(priorWeeksBalance + newThisWeek).toFixed(2);
+    // Skip write if both values already match (avoids loops)
+    if (Math.abs(newThisWeek - escrowThisWeek) < 0.005 && Math.abs(newBalance - escrowBalance) < 0.005) return;
+    setEscrowThisWeekState(newThisWeek);
+    setEscrowBalanceState(newBalance);
+    saveLocal('escrowThisWeek', newThisWeek);
+    saveLocal('escrowBalance', newBalance);
+    updateProfile({ escrowThisWeek: newThisWeek, escrowBalance: newBalance } as any).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weeklyEarnings, escrowRate, escrowMax, profileSynced]);
+
+  // One-time migration: legacy users had `escrowRate=0` stored. The init logic
+  // bumps it to 3% if 0, but we still need to persist the upgrade so the next
+  // mount doesn't re-trigger it. The derived effect above handles the actual
+  // escrow recompute, so no retroactive accrual is needed here.
   const escrowMigrationRanRef = useRef(false);
   useEffect(() => {
     if (escrowMigrationRanRef.current) return;
-    if (!profileSynced) return; // wait until profile is loaded
+    if (!profileSynced) return;
     escrowMigrationRanRef.current = true;
     try {
       const migrationKey = user?.uid ? getUserStorageKey(user.uid, `trucker_escrowMigrated_v2`) : `trucker_escrowMigrated_v2`;
       if (localStorage.getItem(migrationKey) === 'true') return;
-      // Persist rate first so legacy 0 → 3% gets saved
       if (escrowRate > 0) {
         saveLocal('escrowRate', escrowRate);
         updateProfile({ escrowRate } as any).catch(() => {});
-      }
-      // If there's already gross but no contribution this week, retro-apply
-      if (escrowRate > 0 && weeklyEarnings > 0 && escrowThisWeek === 0 && escrowBalance < escrowMax) {
-        const target = (weeklyEarnings * escrowRate) / 100;
-        const room = Math.max(0, escrowMax - escrowBalance);
-        const contribution = +Math.min(target, room).toFixed(2);
-        if (contribution > 0) {
-          const newBal = +(escrowBalance + contribution).toFixed(2);
-          setEscrowBalanceState(newBal);
-          setEscrowThisWeekState(contribution);
-          saveLocal('escrowBalance', newBal);
-          saveLocal('escrowThisWeek', contribution);
-          updateProfile({ escrowBalance: newBal, escrowThisWeek: contribution } as any).catch(() => {});
-        }
       }
       localStorage.setItem(migrationKey, 'true');
     } catch (_) {}
