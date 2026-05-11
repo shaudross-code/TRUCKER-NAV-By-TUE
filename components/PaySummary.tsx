@@ -330,10 +330,10 @@ const PaySummary: React.FC = () => {
   };
 
   return (
-    <div data-testid="pay-summary-page" className="p-4 md:p-10 max-w-[1400px] mx-auto bg-[#050505] min-h-screen">
+    <div data-testid="pay-summary-page" className="p-4 md:p-10 max-w-[1400px] mx-auto bg-[#050505] min-h-screen overflow-x-hidden">
       <h1 className="text-4xl font-black tracking-tight text-white mb-8 uppercase italic tracking-tighter">Pay Summary</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mb-10">
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
             <div className="bg-[#D4AF37]/10 p-3 rounded-2xl text-[#D4AF37]">

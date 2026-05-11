@@ -84,9 +84,11 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-11: ✅ Added **Admin Fee** card ($135 default, editable) and **Escrow** card (% rate + cap, default $2500) to Dashboard + Pay Summary. Escrow auto-contributes a % of each new gross-earnings deposit (capped). Both feed Net Pay deduction.
-- 2026-05-11: ✅ Added **Maintenance Ledger** (transaction table under Maintenance Account: accrual / deposit / withdraw / reset rows with date + miles + ¢/mi snapshot + running balance, expandable to 100 entries).
-- 2026-05-11: ✅ Added **Net Pay breakdown popover** on Net Pay card showing line-by-line math (Gross × %, − Fuel, − Truck, − Deductions, − Maintenance, − Admin, − Escrow).
+- 2026-05-11: ✅ **Escrow rate now defaults to 3%** — auto-populates and contributes immediately on first weekly gross deposit, no manual setup required.
+- 2026-05-11: ✅ **Safe-area-inset support** added to root (`html/body/#root` pads for iOS notch / Android gesture bar / Capacitor WebView) + `overflow-x: hidden` on Pay Summary so wide grids never bleed past device edges. Pay Summary's top row regrid'd `sm:2 / md:3 / xl:6` instead of forced 6-col.
+- 2026-05-11: ✅ **Roads & Highways highlight layer** (`setRoadsHighlight` in `hereMapUtils.ts`) — gold-cased overlay of motorway/trunk/primary roads pulled from Mapbox `composite` source. Activates whenever an active route exists; layered beneath the route polyline so the route stays on top. Toggle button (`Construction` icon) added to MapControls when a route is active.
+- 2026-05-11: ✅ **Auto-cinematic-tilt on route start** — when route points exist AND zoom ≥ 13, the map auto-tilts to 55° once. Resets when route is cleared so user can re-engage manually.
+- 2026-05-11: ✅ Added **Admin Fee** + **Escrow** + **Maintenance Ledger** + **Net Pay Breakdown popover** (see prior changelog entries).
 - 2026-05-10: ✅ Added **Maintenance Fee** card + **Maintenance Account** card; auto-accrue per-mile and deduct from weekly gross.
 - 2026-05-08: ✅ Added device screen wake-lock hook (`useScreenWakeLock`) wired into AppContent; auto re-acquires on visibilitychange/focus.
 - 2026-05-08: ✅ Verified Truck/Driver Profile typing bug fix.

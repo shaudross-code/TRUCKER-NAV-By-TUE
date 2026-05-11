@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2, Moon, Sun } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2, Moon, Sun, Construction } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
@@ -42,6 +42,8 @@ export const MapControls: React.FC<any> = React.memo(({
   nightModeEnabled,
   setNightModeEnabled,
   isNightMode,
+  roadsHighlightEnabled,
+  setRoadsHighlightEnabled,
   className = "",
   hudScale = 1
 }) => {
@@ -346,6 +348,18 @@ export const MapControls: React.FC<any> = React.memo(({
               title={isNightMode ? 'Night Mode Active (Auto)' : 'Night Mode (Auto-dimming)'}
             >
               {isNightMode ? <Moon className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} /> : <Sun className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />}
+            </button>
+          )}
+
+          {/* Roads & Highways highlight toggle — only meaningful when a route is active */}
+          {!isCollapsed && hasActiveRoute && (
+            <button
+              data-testid="roads-highlight-btn"
+              onClick={() => setRoadsHighlightEnabled?.(!roadsHighlightEnabled)}
+              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${roadsHighlightEnabled ? 'bg-[#D4AF37] text-black shadow-[0_0_15px_rgba(212,175,55,0.4)]' : 'bg-white/5 text-[#D4AF37]'} hover:bg-white/10`}
+              title={roadsHighlightEnabled ? 'Roads & Highways Layer: ON' : 'Roads & Highways Layer: OFF'}
+            >
+              <Construction className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
             </button>
           )}
 

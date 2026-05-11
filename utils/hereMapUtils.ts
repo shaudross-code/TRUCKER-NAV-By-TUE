@@ -402,6 +402,92 @@ export function createHereMap(
   };
 }
 
+/* ----------------------------------------------------------------------
+ * Roads & Highways highlight layer
+ *
+ * Adds a styled overlay of motorway/trunk/primary roads (pulled from
+ * Mapbox's built-in `composite` source's `road` source-layer that ships
+ * with the satellite-streets-v12 style). Designed to be toggled in sync
+ * with the active route polyline so drivers see a clear "follow the
+ * gold line, stay on these roads" emphasis.
+ * ---------------------------------------------------------------------- */
+const ROADS_LAYER_ID = 'tue-highways-highlight';
+const ROADS_CASING_LAYER_ID = 'tue-highways-highlight-casing';
+
+export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#D4AF37'): void {
+  if (!map) return;
+  const mb: mapboxgl.Map | undefined = map._mbMap;
+  if (!mb) return;
+  const apply = () => {
+    try {
+      const hasComposite = !!mb.getSource('composite');
+      if (!hasComposite) return; // style not ready or non-Mapbox style
+      // Remove any existing copies first to keep things idempotent
+      if (mb.getLayer(ROADS_LAYER_ID)) mb.removeLayer(ROADS_LAYER_ID);
+      if (mb.getLayer(ROADS_CASING_LAYER_ID)) mb.removeLayer(ROADS_CASING_LAYER_ID);
+      if (!enabled) return;
+
+      // Find the route polyline layer (created by createPolyline) and insert
+      // the road highlight BENEATH it so the active route stays on top.
+      const style = mb.getStyle();
+      let beforeId: string | undefined;
+      if (style && style.layers) {
+        const routeLayer = style.layers.find((l: any) => l.id && /^route-/.test(l.id));
+        if (routeLayer) beforeId = routeLayer.id;
+      }
+
+      // Dark casing for contrast against the satellite imagery
+      mb.addLayer({
+        id: ROADS_CASING_LAYER_ID,
+        type: 'line',
+        source: 'composite',
+        'source-layer': 'road',
+        filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'motorway_link', 'trunk_link']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#000000',
+          'line-opacity': 0.55,
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 1.5,
+            10, 4,
+            14, 9,
+            18, 18,
+          ],
+        },
+      } as any, beforeId);
+
+      // Gold accent line on top — synced with route polyline color by default
+      mb.addLayer({
+        id: ROADS_LAYER_ID,
+        type: 'line',
+        source: 'composite',
+        'source-layer': 'road',
+        filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'motorway_link', 'trunk_link']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': color,
+          'line-opacity': 0.78,
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 0.6,
+            10, 1.6,
+            14, 4,
+            18, 9,
+          ],
+          'line-blur': 0.4,
+        },
+      } as any, beforeId);
+    } catch (err) {
+      console.warn('[setRoadsHighlight] failed:', (err as any)?.message || err);
+    }
+  };
+  if (mb.isStyleLoaded()) apply();
+  else mb.once('styledata', apply);
+}
+
+
+
 export function disposeHereMap(map: any) {
   if (!map) return;
   try {

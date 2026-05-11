@@ -5,7 +5,7 @@ import { calcDist, calcEuclideanDist, convertInstructionToImperial, synthesizeLa
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 // Map utility imports (Mapbox GL JS wrapper)
-import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds, createClusterProvider, buildClusterDataPoints } from '../utils/hereMapUtils';
+import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds, createClusterProvider, buildClusterDataPoints, setRoadsHighlight } from '../utils/hereMapUtils';
 import { useNightMode, useViewportCulling } from '../hooks/useNavHooks';
 import { 
   Plus, 
@@ -378,6 +378,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [eta, setEta] = useState('--:-- --');
   const [remainingDuration, setRemainingDuration] = useState<number>(0);
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
+  const [roadsHighlightEnabled, setRoadsHighlightEnabled] = useState<boolean>(() => uGet('nav_roads_highlight') !== 'false');
   
   // Convert routePoints to Mapbox coordinate format [lng, lat] for 3D view
   const routeCoordinates = routePoints.map(point => [point[1], point[0]]);
@@ -1703,6 +1704,38 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       map.getViewModel().setLookAtData({ tilt: isTilted ? 55 : 0 }, true);
     } catch (_) {}
   }, [isTilted]);
+
+  // Auto-enable cinematic tilt when a route starts and zoom is street-level (>=13).
+  // Triggered once on route start; user can still toggle off manually.
+  const tiltAutoAppliedRef = useRef(false);
+  useEffect(() => {
+    if (routePoints.length === 0) {
+      tiltAutoAppliedRef.current = false; // reset when route cleared
+      return;
+    }
+    if (tiltAutoAppliedRef.current) return;
+    if (currentZoom >= 13 && !isTilted) {
+      setIsTilted(true);
+      tiltAutoAppliedRef.current = true;
+    }
+  }, [routePoints.length, currentZoom, isTilted]);
+
+  // Roads & Highways tile overlay — synced with route polyline presence.
+  // Activates automatically whenever there is an active route AND the user
+  // hasn't disabled the toggle. Removed when the route is cleared or toggle off.
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const shouldShow = roadsHighlightEnabled && routePoints.length > 0;
+    try {
+      setRoadsHighlight(map, shouldShow, '#D4AF37');
+    } catch (_) {}
+  }, [roadsHighlightEnabled, routePoints.length, isMapReady]);
+
+  // Persist roads-highlight preference
+  useEffect(() => {
+    uSet('nav_roads_highlight', String(roadsHighlightEnabled));
+  }, [roadsHighlightEnabled, uSet]);
 
 
   const poiFiltersString = useMemo(() => Array.from(poiFilters).join(','), [poiFilters]);
@@ -7279,6 +7312,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         hasActiveRoute={routePoints.length > 1}
         nightModeEnabled={nightModeEnabled}
         setNightModeEnabled={setNightModeEnabled}
+        roadsHighlightEnabled={roadsHighlightEnabled}
+        setRoadsHighlightEnabled={setRoadsHighlightEnabled}
         isNightMode={isNightMode}
         onRouteOverview={() => {
           if (mapInstanceRef.current && routePoints.length > 1) {

@@ -361,7 +361,7 @@ const AppContent: React.FC = React.memo(() => {
     return [];
   });
   const [adminFee, setAdminFeeState] = useState(() => loadLocal('adminFee', 135));
-  const [escrowRate, setEscrowRateState] = useState(() => loadLocal('escrowRate', 0)); // % of weekly gross
+  const [escrowRate, setEscrowRateState] = useState(() => loadLocal('escrowRate', 3)); // % of weekly gross — defaults to 3% so escrow auto-accrues immediately
   const [escrowMax, setEscrowMaxState] = useState(() => loadLocal('escrowMax', 2500));
   const [escrowBalance, setEscrowBalanceState] = useState(() => loadLocal('escrowBalance', 0));
   const [escrowThisWeek, setEscrowThisWeekState] = useState(() => loadLocal('escrowThisWeek', 0));
