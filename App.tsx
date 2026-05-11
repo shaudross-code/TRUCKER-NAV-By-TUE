@@ -352,6 +352,19 @@ const AppContent: React.FC = React.memo(() => {
   const [takeHomePercentage, setTakeHomePercentageState] = useState(() => loadLocal('takeHomePercentage', 100));
   const [maintenanceCpm, setMaintenanceCpmState] = useState(() => loadLocal('maintenanceCpm', 5)); // ¢/mile
   const [maintenanceAccount, setMaintenanceAccountState] = useState(() => loadLocal('maintenanceAccount', 0));
+  const [maintenanceLedger, setMaintenanceLedgerState] = useState<import('./types').MaintenanceLedgerEntry[]>(() => {
+    try {
+      const storageKey = user?.uid ? getUserStorageKey(user.uid, `trucker_maintenanceLedger`) : `trucker_maintenanceLedger`;
+      const v = localStorage.getItem(storageKey);
+      if (v) return JSON.parse(v);
+    } catch {}
+    return [];
+  });
+  const [adminFee, setAdminFeeState] = useState(() => loadLocal('adminFee', 135));
+  const [escrowRate, setEscrowRateState] = useState(() => loadLocal('escrowRate', 0)); // % of weekly gross
+  const [escrowMax, setEscrowMaxState] = useState(() => loadLocal('escrowMax', 2500));
+  const [escrowBalance, setEscrowBalanceState] = useState(() => loadLocal('escrowBalance', 0));
+  const [escrowThisWeek, setEscrowThisWeekState] = useState(() => loadLocal('escrowThisWeek', 0));
 
   // Sync from Firestore profile on initial load (only once per session)
   const [profileSynced, setProfileSynced] = useState(false);
@@ -365,6 +378,12 @@ const AppContent: React.FC = React.memo(() => {
       if (profile.takeHomePercentage !== undefined) setTakeHomePercentageState(profile.takeHomePercentage);
       if ((profile as any).maintenanceCpm !== undefined) setMaintenanceCpmState((profile as any).maintenanceCpm);
       if ((profile as any).maintenanceAccount !== undefined) setMaintenanceAccountState((profile as any).maintenanceAccount);
+      if (Array.isArray((profile as any).maintenanceLedger)) setMaintenanceLedgerState((profile as any).maintenanceLedger);
+      if ((profile as any).adminFee !== undefined) setAdminFeeState((profile as any).adminFee);
+      if ((profile as any).escrowRate !== undefined) setEscrowRateState((profile as any).escrowRate);
+      if ((profile as any).escrowMax !== undefined) setEscrowMaxState((profile as any).escrowMax);
+      if ((profile as any).escrowBalance !== undefined) setEscrowBalanceState((profile as any).escrowBalance);
+      if ((profile as any).escrowThisWeek !== undefined) setEscrowThisWeekState((profile as any).escrowThisWeek);
       setProfileSynced(true);
     }
   }, [profile, profileSynced]);
@@ -379,9 +398,37 @@ const AppContent: React.FC = React.memo(() => {
       if (isNaN(newVal)) return prev;
       saveLocal('weeklyEarnings', newVal);
       updateProfile({ weeklyEarnings: newVal }).catch(() => {});
+
+      // Auto-accrue escrow for new earnings (gross delta > 0), capped at escrowMax
+      const grossDelta = newVal - prev;
+      const rate = escrowRateRef.current;
+      const maxBal = escrowMaxRef.current;
+      if (grossDelta > 0 && rate > 0) {
+        setEscrowBalanceState((bal) => {
+          const room = Math.max(0, maxBal - bal);
+          if (room <= 0) return bal;
+          const target = (grossDelta * rate) / 100;
+          const contribution = Math.min(target, room);
+          const newBal = +(bal + contribution).toFixed(2);
+          saveLocal('escrowBalance', newBal);
+          updateProfile({ escrowBalance: newBal } as any).catch(() => {});
+          // Track this-week portion for net-pay deduction & display
+          setEscrowThisWeekState((tw) => {
+            const newTw = +(tw + contribution).toFixed(2);
+            saveLocal('escrowThisWeek', newTw);
+            updateProfile({ escrowThisWeek: newTw } as any).catch(() => {});
+            return newTw;
+          });
+          return newBal;
+        });
+      }
       return newVal;
     });
   }, [updateProfile]);
+
+  // Forward-declared ref so setMilesThisWeek can push ledger entries without
+  // creating a circular dep (pushLedgerEntry is defined later in this component).
+  const pushLedgerEntryRef = useRef<((e: Omit<import('./types').MaintenanceLedgerEntry, 'id' | 'date'>) => void) | null>(null);
 
   const setMilesThisWeek = useCallback((val: any) => {
     setMilesThisWeekState((prev: number) => {
@@ -389,15 +436,21 @@ const AppContent: React.FC = React.memo(() => {
       if (isNaN(newVal)) return prev;
       saveLocal('milesThisWeek', newVal);
       updateProfile({ milesThisWeek: newVal }).catch(() => {});
-
-      // Auto-accrue maintenance fee for new miles only (skip resets / edits-down)
       const delta = newVal - prev;
       if (delta > 0) {
         setMaintenanceAccountState((bal: number) => {
-          const accrued = (delta * maintenanceCpmRef.current) / 100;
+          const cpm = maintenanceCpmRef.current;
+          const accrued = (delta * cpm) / 100;
           const newBal = +(bal + accrued).toFixed(2);
           saveLocal('maintenanceAccount', newBal);
           updateProfile({ maintenanceAccount: newBal } as any).catch(() => {});
+          pushLedgerEntryRef.current?.({
+            type: 'accrual',
+            amount: +accrued.toFixed(2),
+            miles: delta,
+            cpm,
+            balanceAfter: newBal,
+          });
           return newBal;
         });
       }
@@ -445,8 +498,8 @@ const AppContent: React.FC = React.memo(() => {
     });
   }, [updateProfile]);
 
-  // Ref so that the auto-accrue logic in setMilesThisWeek always sees the latest cpm
-  // without forcing setMilesThisWeek to depend on it (which would change its identity on every cpm edit).
+  // Refs so that setMilesThisWeek's auto-accrual always sees the latest cpm + ledger pusher
+  // without having to depend on them (which would change its identity on every edit).
   const maintenanceCpmRef = useRef<number>(maintenanceCpm);
   useEffect(() => { maintenanceCpmRef.current = maintenanceCpm; }, [maintenanceCpm]);
 
@@ -470,6 +523,121 @@ const AppContent: React.FC = React.memo(() => {
       return rounded;
     });
   }, [updateProfile]);
+
+  // Ledger helpers ----------------------------------------------------------
+  const saveLedger = useCallback((entries: import('./types').MaintenanceLedgerEntry[]) => {
+    try {
+      const storageKey = user?.uid ? getUserStorageKey(user.uid, `trucker_maintenanceLedger`) : `trucker_maintenanceLedger`;
+      localStorage.setItem(storageKey, JSON.stringify(entries));
+    } catch {}
+    updateProfile({ maintenanceLedger: entries } as any).catch(() => {});
+  }, [user?.uid, updateProfile]);
+
+  const pushLedgerEntry = useCallback((entry: Omit<import('./types').MaintenanceLedgerEntry, 'id' | 'date'>) => {
+    setMaintenanceLedgerState((prev) => {
+      const full: import('./types').MaintenanceLedgerEntry = {
+        ...entry,
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        date: new Date().toISOString(),
+      };
+      const next = [full, ...prev].slice(0, 100); // cap at 100 most recent
+      saveLedger(next);
+      return next;
+    });
+  }, [saveLedger]);
+
+  // Wire the ref so setMilesThisWeek's accrual callback can push to the ledger
+  useEffect(() => { pushLedgerEntryRef.current = pushLedgerEntry; }, [pushLedgerEntry]);
+
+  const depositMaintenance = useCallback((amount: number) => {
+    if (!isFinite(amount) || amount <= 0) return;
+    setMaintenanceAccountState((bal) => {
+      const newBal = +(bal + amount).toFixed(2);
+      saveLocal('maintenanceAccount', newBal);
+      updateProfile({ maintenanceAccount: newBal } as any).catch(() => {});
+      pushLedgerEntry({ type: 'deposit', amount: +amount.toFixed(2), balanceAfter: newBal });
+      return newBal;
+    });
+  }, [pushLedgerEntry, updateProfile]);
+
+  const withdrawMaintenance = useCallback((amount: number) => {
+    if (!isFinite(amount) || amount <= 0) return;
+    setMaintenanceAccountState((bal) => {
+      const newBal = +(bal - amount).toFixed(2);
+      saveLocal('maintenanceAccount', newBal);
+      updateProfile({ maintenanceAccount: newBal } as any).catch(() => {});
+      pushLedgerEntry({ type: 'withdraw', amount: +amount.toFixed(2), balanceAfter: newBal });
+      return newBal;
+    });
+  }, [pushLedgerEntry, updateProfile]);
+
+  const resetMaintenanceAccount = useCallback(() => {
+    setMaintenanceAccountState((bal) => {
+      saveLocal('maintenanceAccount', 0);
+      updateProfile({ maintenanceAccount: 0 } as any).catch(() => {});
+      pushLedgerEntry({ type: 'reset', amount: bal, balanceAfter: 0 });
+      return 0;
+    });
+  }, [pushLedgerEntry, updateProfile]);
+
+  // Admin Fee + Escrow setters -------------------------------------------
+  const setAdminFee = useCallback((val: any) => {
+    setAdminFeeState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal) || newVal < 0) return prev;
+      saveLocal('adminFee', newVal);
+      updateProfile({ adminFee: newVal } as any).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
+
+  const setEscrowRate = useCallback((val: any) => {
+    setEscrowRateState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal) || newVal < 0 || newVal > 100) return prev;
+      saveLocal('escrowRate', newVal);
+      updateProfile({ escrowRate: newVal } as any).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
+
+  const setEscrowMax = useCallback((val: any) => {
+    setEscrowMaxState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal) || newVal < 0) return prev;
+      saveLocal('escrowMax', newVal);
+      updateProfile({ escrowMax: newVal } as any).catch(() => {});
+      return newVal;
+    });
+  }, [updateProfile]);
+
+  const setEscrowBalance = useCallback((val: any) => {
+    setEscrowBalanceState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
+      const rounded = +newVal.toFixed(2);
+      saveLocal('escrowBalance', rounded);
+      updateProfile({ escrowBalance: rounded } as any).catch(() => {});
+      return rounded;
+    });
+  }, [updateProfile]);
+
+  const setEscrowThisWeek = useCallback((val: any) => {
+    setEscrowThisWeekState((prev: number) => {
+      const newVal = typeof val === 'function' ? val(prev) : val;
+      if (isNaN(newVal)) return prev;
+      const rounded = +newVal.toFixed(2);
+      saveLocal('escrowThisWeek', rounded);
+      updateProfile({ escrowThisWeek: rounded } as any).catch(() => {});
+      return rounded;
+    });
+  }, [updateProfile]);
+
+  // Refs so the escrow auto-accrual inside setWeeklyEarnings always sees latest values
+  const escrowRateRef = useRef<number>(escrowRate);
+  const escrowMaxRef = useRef<number>(escrowMax);
+  useEffect(() => { escrowRateRef.current = escrowRate; }, [escrowRate]);
+  useEffect(() => { escrowMaxRef.current = escrowMax; }, [escrowMax]);
 
   // Persistence Effects
   const [isDriving, setIsDriving] = useState(false);
@@ -586,6 +754,20 @@ const AppContent: React.FC = React.memo(() => {
       setMaintenanceCpm,
       maintenanceAccount,
       setMaintenanceAccount,
+      maintenanceLedger,
+      depositMaintenance,
+      withdrawMaintenance,
+      resetMaintenanceAccount,
+      adminFee,
+      setAdminFee,
+      escrowRate,
+      setEscrowRate,
+      escrowMax,
+      setEscrowMax,
+      escrowBalance,
+      setEscrowBalance,
+      escrowThisWeek,
+      setEscrowThisWeek,
       unitSystem,
       setUnitSystem,
       dataSaver,
@@ -608,7 +790,13 @@ const AppContent: React.FC = React.memo(() => {
       dataSaver,
       isOnline,
       maintenanceCpm,
-      maintenanceAccount
+      maintenanceAccount,
+      maintenanceLedger,
+      adminFee,
+      escrowRate,
+      escrowMax,
+      escrowBalance,
+      escrowThisWeek
     ]);
 
   const mountTimeRef = useRef(Date.now());

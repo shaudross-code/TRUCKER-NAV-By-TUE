@@ -49,6 +49,12 @@ export interface UserProfile {
   milesThisWeek?: number;
   maintenanceCpm?: number;
   maintenanceAccount?: number;
+  maintenanceLedger?: MaintenanceLedgerEntry[];
+  adminFee?: number;
+  escrowRate?: number;
+  escrowMax?: number;
+  escrowBalance?: number;
+  escrowThisWeek?: number;
   role?: 'admin' | 'user';
   currentLoad?: {
     origin: string;
@@ -137,6 +143,17 @@ export interface LocationContextType {
 
 export const LocationContext = React.createContext<LocationContextType | undefined>(undefined);
 
+export interface MaintenanceLedgerEntry {
+  id: string;
+  type: 'accrual' | 'deposit' | 'withdraw' | 'reset';
+  amount: number;        // positive number (sign implied by type)
+  date: string;          // ISO timestamp
+  miles?: number;        // miles delta for accruals
+  cpm?: number;          // ¢/mile rate at time of accrual
+  balanceAfter: number;
+}
+
+
 export interface AppContextType {
   activeView: ViewType;
   setActiveView: (view: ViewType) => void;
@@ -200,6 +217,20 @@ export interface AppContextType {
   setMaintenanceCpm: React.Dispatch<React.SetStateAction<number>>;
   maintenanceAccount: number;
   setMaintenanceAccount: React.Dispatch<React.SetStateAction<number>>;
+  maintenanceLedger: MaintenanceLedgerEntry[];
+  depositMaintenance: (amount: number) => void;
+  withdrawMaintenance: (amount: number) => void;
+  resetMaintenanceAccount: () => void;
+  adminFee: number;
+  setAdminFee: React.Dispatch<React.SetStateAction<number>>;
+  escrowRate: number;
+  setEscrowRate: React.Dispatch<React.SetStateAction<number>>;
+  escrowMax: number;
+  setEscrowMax: React.Dispatch<React.SetStateAction<number>>;
+  escrowBalance: number;
+  setEscrowBalance: React.Dispatch<React.SetStateAction<number>>;
+  escrowThisWeek: number;
+  setEscrowThisWeek: React.Dispatch<React.SetStateAction<number>>;
   unitSystem: 'imperial' | 'metric';
   setUnitSystem: React.Dispatch<React.SetStateAction<'imperial' | 'metric'>>;
   dataSaver: boolean;

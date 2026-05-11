@@ -13,7 +13,8 @@ import {
   Package,
   CheckCircle2,
   Navigation2,
-  Wrench
+  Wrench,
+  PiggyBank
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
 import { speak } from '../services/speechService';
@@ -155,6 +156,13 @@ const Dashboard: React.FC = React.memo(() => {
   const maintenanceCpm = context?.maintenanceCpm ?? 5;
   const setMaintenanceCpm = context?.setMaintenanceCpm || (() => {});
   const maintenanceAccount = context?.maintenanceAccount || 0;
+  const escrowRate = context?.escrowRate ?? 0;
+  const setEscrowRate = context?.setEscrowRate || (() => {});
+  const escrowMax = context?.escrowMax ?? 2500;
+  const setEscrowMax = context?.setEscrowMax || (() => {});
+  const escrowBalance = context?.escrowBalance || 0;
+  const escrowThisWeek = context?.escrowThisWeek || 0;
+  const setEscrowThisWeek = context?.setEscrowThisWeek || (() => {});
 
   const [isEarningsInputOpen, setIsEarningsInputOpen] = useState(false);
   const [newEntryValue, setNewEntryValue] = useState('');
@@ -173,6 +181,10 @@ const Dashboard: React.FC = React.memo(() => {
 
   const [isMaintenanceCpmOpen, setIsMaintenanceCpmOpen] = useState(false);
   const [newMaintenanceCpmEntry, setNewMaintenanceCpmEntry] = useState('');
+
+  const [isEscrowOpen, setIsEscrowOpen] = useState(false);
+  const [newEscrowRateEntry, setNewEscrowRateEntry] = useState('');
+  const [newEscrowMaxEntry, setNewEscrowMaxEntry] = useState('');
 
   // ELD Dynamic Timers
   // Removed local timers state as it's now global in AppContext
@@ -277,12 +289,24 @@ const Dashboard: React.FC = React.memo(() => {
     }
   };
 
+  const handleSetEscrow = (e: React.FormEvent) => {
+    e.preventDefault();
+    const rate = parseFloat(newEscrowRateEntry);
+    const max = parseFloat(newEscrowMaxEntry);
+    if (!isNaN(rate) && rate >= 0 && rate <= 100) setEscrowRate(rate);
+    if (!isNaN(max) && max >= 0) setEscrowMax(max);
+    setNewEscrowRateEntry('');
+    setNewEscrowMaxEntry('');
+    setIsEscrowOpen(false);
+  };
+
   const handleNewWeek = () => {
     setWeeklyEarnings(0);
     setMilesThisWeek(0);
     setFuelCost(0);
     setTruckCost(0);
     setWeekDeductions(0);
+    setEscrowThisWeek(0);
   };
 
   const handleCompleteLoad = useCallback(async () => {
@@ -650,6 +674,59 @@ const Dashboard: React.FC = React.memo(() => {
               </form>
               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-3 px-1">
                 Each mile contributes to your Maintenance Account
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Escrow card */}
+        <div className="relative">
+          <MetricCard 
+            icon={PiggyBank} 
+            label="ESCROW"
+            value={formatCurrency(escrowBalance)}
+            target={`${escrowRate}% · cap ${formatCurrency(escrowMax)} · wk ${formatCurrency(escrowThisWeek)}`}
+            progress={escrowMax > 0 ? Math.min(100, (escrowBalance / escrowMax) * 100) : 0}
+            iconBg="bg-emerald-400/10"
+            iconColor="text-emerald-400"
+            isInteractive={true}
+            onClick={() => {
+              setIsEscrowOpen(!isEscrowOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
+              setIsTruckCostInputOpen(false);
+              setIsDeductionsInputOpen(false);
+              setIsMaintenanceCpmOpen(false);
+              setNewEscrowRateEntry(String(escrowRate));
+              setNewEscrowMaxEntry(String(escrowMax));
+            }}
+          />
+          {isEscrowOpen && (
+            <div data-testid="escrow-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-emerald-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Configure Escrow</span>
+                <button onClick={() => setIsEscrowOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <form onSubmit={handleSetEscrow} className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest w-12">Rate</span>
+                  <div className="relative flex-1">
+                    <input data-testid="escrow-rate-input" autoFocus type="number" step="0.1" min="0" max="100" value={newEscrowRateEntry} onChange={(e) => setNewEscrowRateEntry(e.target.value)} placeholder="3.0" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2 pl-3 pr-7 text-white text-sm font-bold focus:border-emerald-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">%</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest w-12">Cap</span>
+                  <div className="relative flex-1">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
+                    <input data-testid="escrow-max-input" type="number" step="50" min="0" value={newEscrowMaxEntry} onChange={(e) => setNewEscrowMaxEntry(e.target.value)} placeholder="2500" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2 pl-7 pr-3 text-white text-sm font-bold focus:border-emerald-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                  </div>
+                </div>
+                <button type="submit" data-testid="escrow-save-btn" className="w-full bg-emerald-400 hover:bg-emerald-500 text-black py-2 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg shadow-emerald-400/20">Save</button>
+              </form>
+              <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-3 px-1">
+                Each week's earnings contribute {escrowRate}% until balance reaches the cap.
               </div>
             </div>
           )}

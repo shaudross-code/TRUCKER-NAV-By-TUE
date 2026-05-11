@@ -84,7 +84,10 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-10: ✅ Added **Maintenance Fee** card to Dashboard + Pay Summary, plus new **Maintenance Account** card on Pay Summary. User-input ¢/mile rate (default 5¢). Each mile driven auto-accrues `delta × cpm/100` to the Maintenance Account balance. Manual deposit / withdraw / reset on the Account card. Persisted to localStorage + Firestore (`maintenanceCpm`, `maintenanceAccount`).
+- 2026-05-11: ✅ Added **Admin Fee** card ($135 default, editable) and **Escrow** card (% rate + cap, default $2500) to Dashboard + Pay Summary. Escrow auto-contributes a % of each new gross-earnings deposit (capped). Both feed Net Pay deduction.
+- 2026-05-11: ✅ Added **Maintenance Ledger** (transaction table under Maintenance Account: accrual / deposit / withdraw / reset rows with date + miles + ¢/mi snapshot + running balance, expandable to 100 entries).
+- 2026-05-11: ✅ Added **Net Pay breakdown popover** on Net Pay card showing line-by-line math (Gross × %, − Fuel, − Truck, − Deductions, − Maintenance, − Admin, − Escrow).
+- 2026-05-10: ✅ Added **Maintenance Fee** card + **Maintenance Account** card; auto-accrue per-mile and deduct from weekly gross.
 - 2026-05-08: ✅ Added device screen wake-lock hook (`useScreenWakeLock`) wired into AppContent; auto re-acquires on visibilitychange/focus.
 - 2026-05-08: ✅ Verified Truck/Driver Profile typing bug fix.
 - 2026-05-08: Extracted helpers (`calcDist`, `calcEuclideanDist`, `convertInstructionToImperial`, `synthesizeLanes`) to `/app/utils/navigationHelpers.ts`. NavigationView.tsx ~7350 lines.

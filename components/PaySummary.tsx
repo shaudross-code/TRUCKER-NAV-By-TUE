@@ -1,6 +1,6 @@
-import React, { useContext, useState, useEffect, useCallback } from 'react';
-import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank } from 'lucide-react';
-import { AppContext } from '../types';
+import React, { useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank, Briefcase, Info } from 'lucide-react';
+import { AppContext, MaintenanceLedgerEntry } from '../types';
 
 /** A number input that uses local string state while editing, and syncs on blur/enter */
 const EditableNumberInput: React.FC<{
@@ -110,6 +110,156 @@ const MaintenanceAdjustControls: React.FC<{
   );
 };
 
+/** Compact transaction list under the Maintenance Account card. */
+const MaintenanceLedgerCard: React.FC<{ ledger: MaintenanceLedgerEntry[] }> = ({ ledger }) => {
+  const [expanded, setExpanded] = useState(false);
+  const fmt$ = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+  const fmtDate = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+  if (!ledger || ledger.length === 0) {
+    return (
+      <div data-testid="pay-maintenance-ledger-card" className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl mb-10">
+        <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs mb-3">Maintenance Ledger</h3>
+        <p className="text-zinc-600 text-sm">No transactions yet — your account will fill as you drive.</p>
+      </div>
+    );
+  }
+  const shown = expanded ? ledger : ledger.slice(0, 8);
+  const typeStyles: Record<string, { dot: string; label: string; sign: string }> = {
+    accrual:  { dot: 'bg-amber-400',   label: 'Accrual',  sign: '+' },
+    deposit:  { dot: 'bg-emerald-400', label: 'Deposit',  sign: '+' },
+    withdraw: { dot: 'bg-rose-400',    label: 'Withdraw', sign: '−' },
+    reset:    { dot: 'bg-zinc-500',    label: 'Reset',    sign: '−' },
+  };
+  return (
+    <div data-testid="pay-maintenance-ledger-card" className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl mb-10">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Maintenance Ledger</h3>
+        <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest">{ledger.length} entries</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest border-b border-white/5">
+              <th className="text-left py-2 pr-3">When</th>
+              <th className="text-left py-2 pr-3">Type</th>
+              <th className="text-right py-2 pr-3">Amount</th>
+              <th className="text-right py-2 pr-3">Miles</th>
+              <th className="text-right py-2 pr-3">¢/mi</th>
+              <th className="text-right py-2">Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((e) => {
+              const s = typeStyles[e.type] || { dot: 'bg-zinc-500', label: e.type, sign: '' };
+              return (
+                <tr key={e.id} data-testid={`pay-ledger-row-${e.type}`} className="border-b border-white/5 last:border-b-0 hover:bg-white/[0.02] transition-colors">
+                  <td className="py-2 pr-3 text-zinc-400 font-mono text-xs">{fmtDate(e.date)}</td>
+                  <td className="py-2 pr-3">
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      <span className="text-zinc-300 text-xs uppercase tracking-widest font-bold">{s.label}</span>
+                    </span>
+                  </td>
+                  <td className={`py-2 pr-3 text-right font-mono font-bold ${e.type === 'withdraw' || e.type === 'reset' ? 'text-rose-300' : 'text-emerald-300'}`}>
+                    {s.sign}{fmt$(e.amount)}
+                  </td>
+                  <td className="py-2 pr-3 text-right font-mono text-zinc-400 text-xs">{e.miles != null ? e.miles.toLocaleString() : '—'}</td>
+                  <td className="py-2 pr-3 text-right font-mono text-zinc-400 text-xs">{e.cpm != null ? `${e.cpm}¢` : '—'}</td>
+                  <td className="py-2 text-right font-mono font-bold text-white text-xs">{fmt$(e.balanceAfter)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {ledger.length > 8 && (
+        <button
+          data-testid="pay-ledger-expand-btn"
+          onClick={() => setExpanded(!expanded)}
+          className="mt-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-[#D4AF37] transition-colors"
+        >
+          {expanded ? 'Show recent only' : `Show all ${ledger.length} entries`}
+        </button>
+      )}
+    </div>
+  );
+};
+
+/** Click/hover popover showing line-by-line net-pay math. */
+const NetPayBreakdownTooltip: React.FC<{
+  gross: number;
+  pct: number;
+  grossAfterPct: number;
+  fuelCost: number;
+  truckCost: number;
+  weekDeductions: number;
+  maintenanceWeekFee: number;
+  adminFee: number;
+  escrowThisWeek: number;
+  netPay: number;
+}> = (p) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClickAway = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClickAway);
+    return () => document.removeEventListener('mousedown', onClickAway);
+  }, [open]);
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+  const row = (label: string, value: string, op: string, cls?: string) => (
+    <div className={`flex items-center justify-between gap-6 py-1 font-mono text-xs ${cls || 'text-zinc-300'}`}>
+      <span className="flex items-center gap-2"><span className="w-3 text-zinc-600 text-center font-black">{op}</span>{label}</span>
+      <span className="font-bold">{value}</span>
+    </div>
+  );
+  return (
+    <div ref={ref} className="relative">
+      <button
+        data-testid="pay-net-breakdown-toggle"
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="p-1.5 rounded-lg text-zinc-500 hover:text-emerald-300 hover:bg-emerald-400/10 transition-colors"
+        aria-label="Show net pay breakdown"
+      >
+        <Info className="w-4 h-4" />
+      </button>
+      {open && (
+        <div
+          data-testid="pay-net-breakdown-panel"
+          className="absolute right-0 top-full mt-2 z-50 w-[320px] bg-[#0a0a0a] border border-emerald-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em]">Net Pay Breakdown</span>
+            <span className="text-[9px] text-zinc-600 uppercase tracking-widest">this week</span>
+          </div>
+          <div className="space-y-0.5">
+            {row(`Gross × ${p.pct.toFixed(0)}%`, fmt(p.grossAfterPct), '', 'text-white')}
+            <div className="text-[9px] text-zinc-700 pl-5 -mt-0.5 font-mono">{fmt(p.gross)} × {p.pct}%</div>
+            {row('Fuel Cost',         fmt(p.fuelCost),           '−', p.fuelCost > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Truck Cost',        fmt(p.truckCost),          '−', p.truckCost > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Week Deductions',   fmt(p.weekDeductions),     '−', p.weekDeductions > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Maintenance Fee',   fmt(p.maintenanceWeekFee), '−', p.maintenanceWeekFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Admin Fee',         fmt(p.adminFee),           '−', p.adminFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Escrow (this wk)',  fmt(p.escrowThisWeek),     '−', p.escrowThisWeek > 0 ? 'text-rose-300' : 'text-zinc-500')}
+          </div>
+          <div className="border-t border-white/10 mt-3 pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Net Pay</span>
+              <span className={`text-lg font-black tracking-tight ${p.netPay < 0 ? 'text-rose-400' : 'text-emerald-300'}`}>{fmt(p.netPay)}</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const PaySummary: React.FC = () => {
   const context = useContext(AppContext);
@@ -126,6 +276,20 @@ const PaySummary: React.FC = () => {
   const setMaintenanceCpm = context?.setMaintenanceCpm || (() => {});
   const maintenanceAccount = context?.maintenanceAccount || 0;
   const setMaintenanceAccount = context?.setMaintenanceAccount || (() => {});
+  const maintenanceLedger = context?.maintenanceLedger || [];
+  const depositMaintenance = context?.depositMaintenance || ((_v: number) => {});
+  const withdrawMaintenance = context?.withdrawMaintenance || ((_v: number) => {});
+  const resetMaintenanceAccount = context?.resetMaintenanceAccount || (() => {});
+
+  const adminFee = context?.adminFee ?? 135;
+  const setAdminFee = context?.setAdminFee || (() => {});
+
+  const escrowRate = context?.escrowRate ?? 0;
+  const setEscrowRate = context?.setEscrowRate || (() => {});
+  const escrowMax = context?.escrowMax ?? 2500;
+  const setEscrowMax = context?.setEscrowMax || (() => {});
+  const escrowBalance = context?.escrowBalance || 0;
+  const escrowThisWeek = context?.escrowThisWeek || 0;
 
   const maintenanceWeekFee = (milesThisWeek * maintenanceCpm) / 100;
   // Percentage input also uses local state
@@ -146,7 +310,8 @@ const PaySummary: React.FC = () => {
     setPctFocused(false);
   }, [localPct, setTakeHomePercentage, takeHomePercentage]);
 
-  const netPay = (weeklyEarnings * (takeHomePercentage / 100)) - fuelCost - truckCost - weekDeductions - maintenanceWeekFee;
+  const grossAfterPct = weeklyEarnings * (takeHomePercentage / 100);
+  const netPay = grossAfterPct - fuelCost - truckCost - weekDeductions - maintenanceWeekFee - adminFee - escrowThisWeek;
   
   const monthlyGross = weeklyEarnings * 4;
   const monthlyNet = netPay * 4;
@@ -242,12 +407,24 @@ const PaySummary: React.FC = () => {
             testId="pay-deductions-input"
           />
         </div>
-        <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
+        <div className="relative bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl group">
           <div className="flex items-center gap-4 mb-4">
             <div className="bg-emerald-400/10 p-3 rounded-2xl text-emerald-400">
               <TrendingUp className="w-6 h-6" />
             </div>
-            <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Net Pay</h3>
+            <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs flex-1">Net Pay</h3>
+            <NetPayBreakdownTooltip
+              gross={weeklyEarnings}
+              pct={takeHomePercentage}
+              grossAfterPct={grossAfterPct}
+              fuelCost={fuelCost}
+              truckCost={truckCost}
+              weekDeductions={weekDeductions}
+              maintenanceWeekFee={maintenanceWeekFee}
+              adminFee={adminFee}
+              escrowThisWeek={escrowThisWeek}
+              netPay={netPay}
+            />
           </div>
           <div data-testid="pay-net-pay" className={`text-3xl font-bold tracking-tight ${netPay < 0 ? 'text-red-400' : 'text-white'}`}>{formatCurrency(netPay)}</div>
         </div>
@@ -306,10 +483,103 @@ const PaySummary: React.FC = () => {
             {formatCurrency(maintenanceAccount)}
           </div>
           <MaintenanceAdjustControls
-            onDeposit={(v) => setMaintenanceAccount(maintenanceAccount + v)}
-            onWithdraw={(v) => setMaintenanceAccount(maintenanceAccount - v)}
-            onReset={() => setMaintenanceAccount(0)}
+            onDeposit={(v) => depositMaintenance(v)}
+            onWithdraw={(v) => withdrawMaintenance(v)}
+            onReset={() => resetMaintenanceAccount()}
           />
+        </div>
+      </div>
+
+      {/* Maintenance Ledger */}
+      <MaintenanceLedgerCard ledger={maintenanceLedger} />
+
+      {/* Admin Fee + Escrow row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
+        <div data-testid="pay-admin-fee-card" className="bg-black/80 backdrop-blur-3xl border border-zinc-700/40 p-8 rounded-[2.5rem] shadow-2xl">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-zinc-400/10 p-3 rounded-2xl text-zinc-300">
+              <Briefcase className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Admin Fee</h3>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">Flat weekly carrier/admin charge — deducted from gross</p>
+            </div>
+          </div>
+          <div data-testid="pay-admin-fee-value" className="text-3xl font-bold text-white tracking-tight">{formatCurrency(adminFee)}</div>
+          <div className="mt-4 flex items-center gap-2">
+            <span className="text-zinc-500 font-bold uppercase tracking-widest text-xs">$</span>
+            <input
+              data-testid="pay-admin-fee-input"
+              type="number"
+              min="0"
+              step="1"
+              value={adminFee}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 0) setAdminFee(v);
+              }}
+              className="w-28 bg-[#050505] border border-zinc-800 rounded-xl py-1 px-2 text-white text-sm font-bold focus:border-zinc-400 focus:outline-none transition-colors"
+            />
+            <button
+              data-testid="pay-admin-fee-reset"
+              onClick={() => setAdminFee(135)}
+              className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+            >
+              Reset to $135
+            </button>
+          </div>
+        </div>
+
+        <div data-testid="pay-escrow-card" className="bg-black/80 backdrop-blur-3xl border border-emerald-400/20 p-8 rounded-[2.5rem] shadow-2xl">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-emerald-400/10 p-3 rounded-2xl text-emerald-400">
+              <PiggyBank className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Escrow</h3>
+              <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
+                {escrowRate}% of gross → escrow until ${formatNumber(escrowMax)} cap · this week {formatCurrency(escrowThisWeek)}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-end gap-3 mb-4">
+            <div>
+              <div data-testid="pay-escrow-balance" className="text-3xl font-bold text-emerald-300 tracking-tight">{formatCurrency(escrowBalance)}</div>
+              <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
+                {((escrowBalance / Math.max(escrowMax, 1)) * 100).toFixed(0)}% of cap
+              </div>
+            </div>
+          </div>
+          {/* Progress bar */}
+          <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-4">
+            <div className="h-full bg-emerald-400 transition-all duration-500" style={{ width: `${Math.min(100, (escrowBalance / Math.max(escrowMax, 1)) * 100)}%` }} />
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">Rate</span>
+            <input
+              data-testid="pay-escrow-rate-input"
+              type="number" min="0" max="100" step="0.1"
+              value={escrowRate}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 0 && v <= 100) setEscrowRate(v);
+              }}
+              className="w-20 bg-[#050505] border border-zinc-800 rounded-xl py-1 px-2 text-white text-sm font-bold focus:border-emerald-400 focus:outline-none transition-colors"
+            />
+            <span className="text-zinc-500 text-xs">%</span>
+            <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest ml-3">Cap</span>
+            <span className="text-zinc-500 text-xs">$</span>
+            <input
+              data-testid="pay-escrow-max-input"
+              type="number" min="0" step="50"
+              value={escrowMax}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v) && v >= 0) setEscrowMax(v);
+              }}
+              className="w-28 bg-[#050505] border border-zinc-800 rounded-xl py-1 px-2 text-white text-sm font-bold focus:border-emerald-400 focus:outline-none transition-colors"
+            />
+          </div>
         </div>
       </div>
 
