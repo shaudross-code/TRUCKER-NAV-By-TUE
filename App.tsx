@@ -43,6 +43,7 @@ import { LoginScreen } from './components/LoginScreen';
 import VoiceCommand from './components/VoiceCommand';
 import { speak } from './services/speechService';
 import useScreenWakeLock from './hooks/useScreenWakeLock';
+import { hasUnseenAnnouncements } from './utils/announcements';
 
 const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(() => {
@@ -258,6 +259,23 @@ const AppContent: React.FC = React.memo(() => {
   const [navTarget, setNavTarget] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
   const [forceTutorial, setForceTutorial] = useState(false);
+
+  // Announcement toast: fires once when the user opens the app after a new release
+  const [announcementToastOpen, setAnnouncementToastOpen] = useState<boolean>(false);
+  useEffect(() => {
+    if (!user) return; // wait until auth resolved so we don't pop the toast before app is interactive
+    if (showTutorial) return; // don't compete with the tutorial overlay
+    if (hasUnseenAnnouncements()) {
+      // Small delay so it appears after the initial paint
+      const t = window.setTimeout(() => setAnnouncementToastOpen(true), 1500);
+      return () => window.clearTimeout(t);
+    }
+  }, [user, showTutorial]);
+  useEffect(() => {
+    if (!announcementToastOpen) return;
+    const t = window.setTimeout(() => setAnnouncementToastOpen(false), 10000);
+    return () => window.clearTimeout(t);
+  }, [announcementToastOpen]);
 
   // Set the current user ID for storage scoping & migrate existing data
   useEffect(() => {
@@ -940,6 +958,42 @@ const AppContent: React.FC = React.memo(() => {
             {apiKeyMissing && (
               <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-rose-500 text-white px-6 py-3 rounded-2xl font-black uppercase tracking-widest shadow-2xl animate-bounce text-center">
                 API Keys Missing - Voice & Search Features Limited
+              </div>
+            )}
+
+            {/* New-features-since-last-visit toast */}
+            {announcementToastOpen && (
+              <div
+                data-testid="announcement-toast"
+                className="fixed top-4 right-4 z-[9999] max-w-sm bg-[#0a0a0a] border border-[#D4AF37]/40 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.9)] animate-in slide-in-from-top-2 duration-300"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="bg-[#D4AF37]/15 p-2 rounded-xl text-[#D4AF37] shrink-0 mt-0.5 relative">
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-[#0a0a0a] animate-pulse" />
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" /></svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[0.2em] mb-1">New Features Available</div>
+                    <div className="text-zinc-200 text-sm leading-relaxed mb-3">
+                      We just shipped <span className="font-bold text-emerald-300">9 new features</span> — Smart Escrow, Route Corridor View, Maintenance Ledger, and more.
+                    </div>
+                    <button
+                      data-testid="announcement-toast-open-btn"
+                      onClick={() => { setAnnouncementToastOpen(false); setActiveView(ViewType.ANNOUNCEMENTS); }}
+                      className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg hover:bg-[#FFD700] transition-colors"
+                    >
+                      What’s new →
+                    </button>
+                  </div>
+                  <button
+                    data-testid="announcement-toast-close"
+                    onClick={() => setAnnouncementToastOpen(false)}
+                    className="text-zinc-500 hover:text-white shrink-0 text-lg leading-none"
+                    aria-label="Dismiss"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             )}
             <Sidebar 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
+import { hasUnseenAnnouncements, ANNOUNCEMENTS_SEEN_KEY } from '../utils/announcements';
 import { 
   LayoutGrid, 
   Navigation, 
@@ -42,6 +43,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   onSignOut
 }) => {
+  // Show a red dot on the Announcements menu item until the user opens it.
+  const [unseenAnnouncements, setUnseenAnnouncements] = React.useState<boolean>(() => hasUnseenAnnouncements());
+  React.useEffect(() => {
+    // Listen for cross-tab changes & re-check whenever this sidebar mounts again.
+    const recheck = () => setUnseenAnnouncements(hasUnseenAnnouncements());
+    const onStorage = (e: StorageEvent) => { if (e.key === ANNOUNCEMENTS_SEEN_KEY) recheck(); };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', recheck);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', recheck);
+    };
+  }, []);
+  // Also re-check when the active view changes (e.g., user just opened Announcements)
+  React.useEffect(() => { setUnseenAnnouncements(hasUnseenAnnouncements()); }, [activeView]);
   const menuItems = [
     { id: ViewType.DASHBOARD, icon: LayoutGrid, label: 'Dashboard' },
     { id: ViewType.NAVIGATION, icon: Navigation, label: 'Navigation' },
@@ -90,9 +106,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           <nav className="flex-1 mt-1 px-3 space-y-0.5 overflow-y-auto">
             {menuItems.map((item) => {
               const isActive = activeView === item.id;
+              const showDot = item.id === ViewType.ANNOUNCEMENTS && unseenAnnouncements;
               return (
                 <button
                   key={item.id}
+                  data-testid={`sidebar-item-${item.id}`}
                   onClick={() => onViewChange(item.id)}
                   className={`w-full flex items-center gap-4 px-5 py-2.5 rounded-xl transition-all duration-200 group relative ${
                     isActive 
@@ -105,10 +123,23 @@ const Sidebar: React.FC<SidebarProps> = ({
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-[#D4AF37] rounded-r-full shadow-[2px_0_15px_rgba(212,175,55,0.6)]" />
                   )}
                   
-                  <item.icon className={`w-5 h-5 transition-colors shrink-0 ${isActive ? 'text-[#D4AF37]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                  <div className="relative shrink-0">
+                    <item.icon className={`w-5 h-5 transition-colors ${isActive ? 'text-[#D4AF37]' : 'text-zinc-500 group-hover:text-zinc-300'}`} />
+                    {showDot && (
+                      <span
+                        data-testid="announcements-unseen-dot"
+                        className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-black shadow-[0_0_8px_rgba(244,63,94,0.7)] animate-pulse"
+                      />
+                    )}
+                  </div>
                   {!isCollapsed && (
                     <span className={`text-[14px] font-semibold tracking-tight animate-in fade-in duration-300 ${isActive ? 'text-zinc-100' : ''}`}>
                       {item.label}
+                      {showDot && (
+                        <span data-testid="announcements-unseen-badge" className="ml-2 text-[9px] font-black uppercase tracking-widest text-rose-300 bg-rose-500/15 border border-rose-400/30 rounded-full px-1.5 py-0.5">
+                          New
+                        </span>
+                      )}
                     </span>
                   )}
                 </button>

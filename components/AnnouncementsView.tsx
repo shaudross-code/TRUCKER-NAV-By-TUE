@@ -1,5 +1,6 @@
 import React from 'react';
 import { Megaphone, TabletSmartphone, Apple, ArrowUpCircle, Sparkles, CheckCircle2, DollarSign, Route, MapPin, Construction, Smartphone, Moon, Bell } from 'lucide-react';
+import { markAnnouncementsSeen } from '../utils/announcements';
 
 interface ShippedFeature {
   icon: React.ComponentType<any>;
@@ -81,6 +82,12 @@ const tagPalette: Record<string, { bg: string; text: string }> = {
 };
 
 const AnnouncementsView: React.FC = () => {
+  // Mark announcements as seen when this view is opened so the sidebar dot disappears.
+  React.useEffect(() => {
+    markAnnouncementsSeen();
+    // Notify other tabs / sidebar instances so the dot updates immediately
+    try { window.dispatchEvent(new StorageEvent('storage', { key: 'tue_announcements_seen_version' })); } catch {}
+  }, []);
   return (
     <div data-testid="announcements-view" className="p-6 md:p-10 max-w-4xl mx-auto">
       <h1 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight mb-2 flex items-center gap-3">
