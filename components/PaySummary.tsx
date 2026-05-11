@@ -371,6 +371,44 @@ const PaySummary: React.FC = () => {
   const escrowBalance = context?.escrowBalance || 0;
   const escrowThisWeek = context?.escrowThisWeek || 0;
 
+  // Escrow Auto-Fill cap-warning toast
+  const [escrowCapToast, setEscrowCapToast] = useState<null | { calculated: number; actual: number; cap: number }>(null);
+  // Persist cap state across mounts so the toast fires when cap is first hit
+  // even if the user was on a different page (e.g., Dashboard) at the moment.
+  const wasCappedRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const target = (weeklyEarnings * escrowRate) / 100;
+    if (target <= 0) {
+      wasCappedRef.current = false;
+      try { localStorage.setItem('escrow_was_capped', 'false'); } catch {}
+      return;
+    }
+    const priorWeeks = escrowBalance - escrowThisWeek;
+    const isCapped = (priorWeeks + target) > escrowMax + 0.005;
+
+    // Read last persisted state on first effect run so transitions survive remounts
+    if (wasCappedRef.current === null) {
+      try {
+        wasCappedRef.current = localStorage.getItem('escrow_was_capped') === 'true';
+      } catch {
+        wasCappedRef.current = false;
+      }
+    }
+
+    if (isCapped && wasCappedRef.current === false) {
+      const actual = Math.max(0, escrowMax - priorWeeks);
+      setEscrowCapToast({ calculated: target, actual, cap: escrowMax });
+    }
+    wasCappedRef.current = isCapped;
+    try { localStorage.setItem('escrow_was_capped', String(isCapped)); } catch {}
+  }, [weeklyEarnings, escrowRate, escrowMax, escrowThisWeek, escrowBalance]);
+
+  useEffect(() => {
+    if (!escrowCapToast) return;
+    const t = window.setTimeout(() => setEscrowCapToast(null), 7000);
+    return () => window.clearTimeout(t);
+  }, [escrowCapToast]);
+
   const maintenanceWeekFee = (milesThisWeek * maintenanceCpm) / 100;
   // Percentage input also uses local state
   const [localPct, setLocalPct] = useState(String(takeHomePercentage));
@@ -412,6 +450,33 @@ const PaySummary: React.FC = () => {
 
   return (
     <div data-testid="pay-summary-page" className="p-4 md:p-10 max-w-[1400px] mx-auto bg-[#050505] min-h-screen overflow-x-hidden">
+      {/* Escrow cap-warning toast */}
+      {escrowCapToast && (
+        <div
+          data-testid="pay-escrow-cap-toast"
+          className="fixed bottom-6 right-6 z-[200] max-w-sm bg-[#0a0a0a] border border-amber-400/40 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.9)] animate-in slide-in-from-bottom-2 duration-300"
+        >
+          <div className="flex items-start gap-3">
+            <div className="bg-amber-400/15 p-2 rounded-xl text-amber-400 shrink-0 mt-0.5">
+              <Info className="w-4 h-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-[10px] font-black text-amber-300 uppercase tracking-[0.2em] mb-1">Escrow Cap Reached</div>
+              <div className="text-zinc-300 text-xs leading-relaxed">
+                This week's escrow capped at <span className="font-bold text-emerald-300">{formatCurrency(escrowCapToast.actual)}</span> of <span className="font-bold text-zinc-400">{formatCurrency(escrowCapToast.calculated)}</span> calculated — escrow account is now full at <span className="font-bold text-emerald-300">{formatCurrency(escrowCapToast.cap)}</span>.
+              </div>
+              <div className="text-[9px] text-zinc-600 uppercase tracking-widest mt-2 font-bold">Your net pay will increase next week — escrow stops contributing.</div>
+            </div>
+            <button
+              data-testid="pay-escrow-cap-toast-close"
+              onClick={() => setEscrowCapToast(null)}
+              className="text-zinc-500 hover:text-white shrink-0"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
       <h1 className="text-4xl font-black tracking-tight text-white mb-8 uppercase italic tracking-tighter">Pay Summary</h1>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mb-10">

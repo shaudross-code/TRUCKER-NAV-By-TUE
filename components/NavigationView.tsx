@@ -379,6 +379,8 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   const [remainingDuration, setRemainingDuration] = useState<number>(0);
   const [routePoints, setRoutePoints] = useState<[number, number][]>([]);
   const [roadsHighlightEnabled, setRoadsHighlightEnabled] = useState<boolean>(() => uGet('nav_roads_highlight') !== 'false');
+  const [corridorViewActive, setCorridorViewActive] = useState<boolean>(false);
+  const corridorAutoTriggeredRef = useRef(false);
   
   // Convert routePoints to Mapbox coordinate format [lng, lat] for 3D view
   const routeCoordinates = routePoints.map(point => [point[1], point[0]]);
@@ -1707,6 +1709,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
 
   // Auto-enable cinematic tilt when a route starts and zoom is street-level (>=13).
   // Triggered once on route start; user can still toggle off manually.
+  // Skipped if corridor view is active (corridor needs flat top-down view).
   const tiltAutoAppliedRef = useRef(false);
   useEffect(() => {
     if (routePoints.length === 0) {
@@ -1714,11 +1717,12 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       return;
     }
     if (tiltAutoAppliedRef.current) return;
+    if (corridorViewActive) return;
     if (currentZoom >= 13 && !isTilted) {
       setIsTilted(true);
       tiltAutoAppliedRef.current = true;
     }
-  }, [routePoints.length, currentZoom, isTilted]);
+  }, [routePoints.length, currentZoom, isTilted, corridorViewActive]);
 
   // Roads & Highways tile overlay — synced with route polyline presence.
   // Activates automatically whenever there is an active route AND the user
@@ -1736,6 +1740,59 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
   useEffect(() => {
     uSet('nav_roads_highlight', String(roadsHighlightEnabled));
   }, [roadsHighlightEnabled, uSet]);
+
+  // ── Corridor View ─────────────────────────────────────────────────────
+  // Shows the entire route polyline + a buffer so every POI along the
+  // corridor is visible at once. Auto-triggered once when a route starts
+  // (gives the driver a "trip preview"), then can be re-engaged manually
+  // via the MapControls button. Cancels itself when the user pans/zooms or
+  // when driving begins.
+  const engageCorridorView = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map || routePoints.length < 2) return;
+    try {
+      // Fit the polyline bounds with extra padding for ~5mi buffer
+      const bounds = boundsFromCoords(routePoints);
+      if (!bounds) return;
+      const padLng = (bounds._maxLng - bounds._minLng) * 0.12;
+      const padLat = (bounds._maxLat - bounds._minLat) * 0.12;
+      const expanded = {
+        _minLat: bounds._minLat - padLat,
+        _maxLat: bounds._maxLat + padLat,
+        _minLng: bounds._minLng - padLng,
+        _maxLng: bounds._maxLng + padLng,
+      };
+      // Drop pitch/bearing so we see the corridor flat
+      try { map.setBearing(0); } catch {}
+      try { map.getViewModel().setLookAtData({ bounds: expanded, tilt: 0 }, true); } catch {}
+      setIsFollowMode(false);
+      setIsNorthUp(true);
+      setIsTilted(false);
+      setCorridorViewActive(true);
+    } catch (err) {
+      console.warn('[corridor view] failed:', err);
+    }
+  }, [routePoints]);
+
+  // Auto-trigger corridor view once when a new route starts
+  useEffect(() => {
+    if (routePoints.length < 2) {
+      corridorAutoTriggeredRef.current = false; // reset when route cleared
+      setCorridorViewActive(false);
+      return;
+    }
+    if (corridorAutoTriggeredRef.current) return;
+    if (!isMapReady) return;
+    corridorAutoTriggeredRef.current = true;
+    // Small delay so route polyline has time to render
+    const t = window.setTimeout(() => engageCorridorView(), 400);
+    return () => window.clearTimeout(t);
+  }, [routePoints.length, isMapReady, engageCorridorView]);
+
+  // Cancel corridor view when driving begins or user manually interacts
+  useEffect(() => {
+    if (corridorViewActive && isDriving) setCorridorViewActive(false);
+  }, [isDriving, corridorViewActive]);
 
 
   const poiFiltersString = useMemo(() => Array.from(poiFilters).join(','), [poiFilters]);
@@ -7314,6 +7371,17 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
         setNightModeEnabled={setNightModeEnabled}
         roadsHighlightEnabled={roadsHighlightEnabled}
         setRoadsHighlightEnabled={setRoadsHighlightEnabled}
+        corridorViewActive={corridorViewActive}
+        onCorridorView={() => {
+          if (corridorViewActive) {
+            // Exit corridor → resume follow mode
+            setCorridorViewActive(false);
+            setIsFollowMode(true);
+            setIsNorthUp(false);
+          } else {
+            engageCorridorView();
+          }
+        }}
         isNightMode={isNightMode}
         onRouteOverview={() => {
           if (mapInstanceRef.current && routePoints.length > 1) {

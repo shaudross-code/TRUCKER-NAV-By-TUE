@@ -84,7 +84,9 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-11: ✅ **Escrow now tracks weekly gross both up AND down** — rewrote escrow logic from delta-based accrual (broken on decreases) to a derived `useEffect` that recomputes `escrowThisWeek = gross × rate%` and `escrowBalance = priorWeeks + escrowThisWeek` on every change. Increases, decreases, edits, and rate changes all reflect instantly.
+- 2026-05-11: ✅ **Escrow Cap-Hit Toast** — fires when this-week contribution is reduced by hitting the cap, e.g. *"This week's escrow capped at $10.00 of $500.00 calculated — escrow account is now full at $10.00. Your net pay will increase next week."* Cap-state persisted to localStorage so the toast fires correctly even if the cap was crossed on a different page.
+- 2026-05-11: ✅ **Route Corridor View** — auto-fits the entire route polyline + 12% padding when a route starts so every POI in the corridor is visible at once. Disables follow/tilt. Toggle button (Route icon, green) in MapControls when a route is active; cancels automatically when driving begins or the user pans.
+- 2026-05-11: ✅ Escrow now tracks weekly gross both up AND down via derived `useEffect`.
 - 2026-05-11: ✅ Added 5 new fee cards (Cash Advance / Insurance / IFTA / Physical Damage / Trailer) — see prior changelog.
 - 2026-05-11: ✅ **Cash Advance card** also added to Dashboard with inline `$ + ADD` input; resets on "New Week".
 - 2026-05-11: ✅ Net Pay breakdown popover updated to list all 11 deduction lines (Fuel, Truck, Deductions, Maintenance, Admin, Cash Advance, Insurance, IFTA, Physical Damage, Trailer, Escrow).

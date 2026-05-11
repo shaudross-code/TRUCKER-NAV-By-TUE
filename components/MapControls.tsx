@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2, Moon, Sun, Construction } from 'lucide-react';
+import { Filter, Plus, Minus, Map as MapIcon, Navigation as NavIcon, Check, Menu, Star, Building2, Mountain, Maximize2, Moon, Sun, Construction, Route } from 'lucide-react';
 import { getPoiFilterIcon } from './PoiIcon';
 import { getUserStorageKey, getCurrentUserId } from '../utils/userStorage';
 
@@ -44,6 +44,8 @@ export const MapControls: React.FC<any> = React.memo(({
   isNightMode,
   roadsHighlightEnabled,
   setRoadsHighlightEnabled,
+  corridorViewActive,
+  onCorridorView,
   className = "",
   hudScale = 1
 }) => {
@@ -360,6 +362,18 @@ export const MapControls: React.FC<any> = React.memo(({
               title={roadsHighlightEnabled ? 'Roads & Highways Layer: ON' : 'Roads & Highways Layer: OFF'}
             >
               <Construction className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
+            </button>
+          )}
+
+          {/* Corridor View — fit entire route in viewport so all POIs are visible */}
+          {!isCollapsed && hasActiveRoute && (
+            <button
+              data-testid="corridor-view-btn"
+              onClick={() => onCorridorView?.()}
+              className={`p-1.5 md:p-3 rounded-lg md:rounded-xl transition-all ${corridorViewActive ? 'bg-[#22ff88] text-black shadow-[0_0_15px_rgba(34,255,136,0.4)]' : 'bg-white/5 text-[#22ff88]'} hover:bg-white/10`}
+              title={corridorViewActive ? 'Exit corridor view — resume follow mode' : 'Show all POIs in route corridor'}
+            >
+              <Route className="w-3.5 h-3.5 md:w-4.5 md:h-4.5" strokeWidth={3} />
             </button>
           )}
 
