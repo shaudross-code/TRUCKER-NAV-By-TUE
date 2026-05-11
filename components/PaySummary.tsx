@@ -538,13 +538,26 @@ const PaySummary: React.FC = () => {
             <div className="flex-1">
               <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Escrow</h3>
               <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
-                {escrowRate}% of gross → escrow until ${formatNumber(escrowMax)} cap · this week {formatCurrency(escrowThisWeek)}
+                {escrowRate}% of gross → escrow until ${formatNumber(escrowMax)} cap
               </p>
             </div>
           </div>
-          <div className="flex items-end gap-3 mb-4">
+
+          {/* This Week's auto-calculated contribution — featured prominently */}
+          <div className="mb-4 rounded-2xl bg-emerald-400/5 border border-emerald-400/20 p-4">
+            <div className="flex items-baseline justify-between gap-3">
+              <div>
+                <div className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em]">This Week</div>
+                <div className="text-[9px] text-zinc-600 font-mono mt-0.5">{formatCurrency(weeklyEarnings)} × {escrowRate}%</div>
+              </div>
+              <div data-testid="pay-escrow-this-week" className="text-2xl font-black tracking-tight text-emerald-300">{formatCurrency(escrowThisWeek)}</div>
+            </div>
+          </div>
+
+          <div className="flex items-end gap-3 mb-3">
             <div>
-              <div data-testid="pay-escrow-balance" className="text-3xl font-bold text-emerald-300 tracking-tight">{formatCurrency(escrowBalance)}</div>
+              <div className="text-[10px] text-zinc-500 font-black uppercase tracking-[0.2em] mb-1">Total Balance</div>
+              <div data-testid="pay-escrow-balance" className={`text-3xl font-bold tracking-tight ${escrowBalance < 0 ? 'text-red-400' : 'text-emerald-300'}`}>{formatCurrency(escrowBalance)}</div>
               <div className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">
                 {((escrowBalance / Math.max(escrowMax, 1)) * 100).toFixed(0)}% of cap
               </div>

@@ -414,7 +414,7 @@ export function createHereMap(
 const ROADS_LAYER_ID = 'tue-highways-highlight';
 const ROADS_CASING_LAYER_ID = 'tue-highways-highlight-casing';
 
-export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#D4AF37'): void {
+export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#22ff88'): void {
   if (!map) return;
   const mb: mapboxgl.Map | undefined = map._mbMap;
   if (!mb) return;
@@ -424,6 +424,7 @@ export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#
       if (!hasComposite) return; // style not ready or non-Mapbox style
       // Remove any existing copies first to keep things idempotent
       if (mb.getLayer(ROADS_LAYER_ID)) mb.removeLayer(ROADS_LAYER_ID);
+      if (mb.getLayer(ROADS_LAYER_ID + '-glow')) mb.removeLayer(ROADS_LAYER_ID + '-glow');
       if (mb.getLayer(ROADS_CASING_LAYER_ID)) mb.removeLayer(ROADS_CASING_LAYER_ID);
       if (!enabled) return;
 
@@ -457,7 +458,29 @@ export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#
         },
       } as any, beforeId);
 
-      // Gold accent line on top — synced with route polyline color by default
+      // Outer glow halo — wider, more transparent green to create the "neon" feel
+      mb.addLayer({
+        id: ROADS_LAYER_ID + '-glow',
+        type: 'line',
+        source: 'composite',
+        'source-layer': 'road',
+        filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'motorway_link', 'trunk_link']]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': color,
+          'line-opacity': 0.35,
+          'line-width': [
+            'interpolate', ['linear'], ['zoom'],
+            5, 3,
+            10, 6,
+            14, 14,
+            18, 28,
+          ],
+          'line-blur': 6,
+        },
+      } as any, beforeId);
+
+      // Solid bright green core line on top — synced with route polyline by default
       mb.addLayer({
         id: ROADS_LAYER_ID,
         type: 'line',
@@ -467,15 +490,15 @@ export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': color,
-          'line-opacity': 0.78,
+          'line-opacity': 0.95,
           'line-width': [
             'interpolate', ['linear'], ['zoom'],
-            5, 0.6,
-            10, 1.6,
-            14, 4,
-            18, 9,
+            5, 0.8,
+            10, 1.8,
+            14, 4.5,
+            18, 10,
           ],
-          'line-blur': 0.4,
+          'line-blur': 0.3,
         },
       } as any, beforeId);
     } catch (err) {
@@ -592,17 +615,18 @@ export function createClusterProvider(): { provider: any; layer: any } {
         if (html) {
           el = document.createElement('div');
           el.innerHTML = `<div class="custom-poi-icon">${html}</div>`;
-          el.style.width = '24px';
-          el.style.height = '24px';
+          el.style.width = '40px';
+          el.style.height = '40px';
         } else {
           el = document.createElement('div');
-          el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12"><circle cx="6" cy="6" r="5" fill="#D4AF37" stroke="#050505" stroke-width="1.5"/></svg>`;
-          el.style.width = '12px';
-          el.style.height = '12px';
+          el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><circle cx="10" cy="10" r="8" fill="#D4AF37" stroke="#050505" stroke-width="2"/></svg>`;
+          el.style.width = '20px';
+          el.style.height = '20px';
         }
-        // Make POI markers clickable
+        // Make POI markers clickable & ensure they sit on top of map layers
         el.style.pointerEvents = 'auto';
         el.style.cursor = 'pointer';
+        el.style.zIndex = '10';
         el.classList.add('poi-cluster-marker');
         if (data.name) el.setAttribute('data-poi-name', data.name);
         if (data.poi) {

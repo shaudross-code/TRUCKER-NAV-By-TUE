@@ -84,7 +84,9 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-11: ✅ **Escrow rate now defaults to 3%** — auto-populates and contributes immediately on first weekly gross deposit, no manual setup required.
+- 2026-05-11: ✅ **POI map icons enlarged & made prominent** — markers now 40×40px (was 24×24, clipped the 40px SVG content), z-index 10, drop-shadow glow halo so they stand out on satellite imagery. Verified 5 POIs load, PILOT marker clearly visible in viewport.
+- 2026-05-11: ✅ **Roads & Highways tile now glowing green** (`#22ff88`) — added a separate `-glow` halo layer (35% opacity, 6px blur) under the bright solid green core line for a neon-glow look. Toggle in MapControls (Construction icon) when route is active.
+- 2026-05-11: ✅ **Escrow card now shows This-Week amount auto-calculated and featured prominently** — bordered green panel above the total balance, displaying `(weeklyGross × rate%)` in large bold green text plus the explicit `$X × Y%` math line. Total Balance now has its own label below.
 - 2026-05-11: ✅ **Safe-area-inset support** added to root (`html/body/#root` pads for iOS notch / Android gesture bar / Capacitor WebView) + `overflow-x: hidden` on Pay Summary so wide grids never bleed past device edges. Pay Summary's top row regrid'd `sm:2 / md:3 / xl:6` instead of forced 6-col.
 - 2026-05-11: ✅ **Roads & Highways highlight layer** (`setRoadsHighlight` in `hereMapUtils.ts`) — gold-cased overlay of motorway/trunk/primary roads pulled from Mapbox `composite` source. Activates whenever an active route exists; layered beneath the route polyline so the route stays on top. Toggle button (`Construction` icon) added to MapControls when a route is active.
 - 2026-05-11: ✅ **Auto-cinematic-tilt on route start** — when route points exist AND zoom ≥ 13, the map auto-tilts to 55° once. Resets when route is cleared so user can re-engage manually.

@@ -1728,7 +1728,7 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     if (!map) return;
     const shouldShow = roadsHighlightEnabled && routePoints.length > 0;
     try {
-      setRoadsHighlight(map, shouldShow, '#D4AF37');
+      setRoadsHighlight(map, shouldShow, '#22ff88');
     } catch (_) {}
   }, [roadsHighlightEnabled, routePoints.length, isMapReady]);
 
