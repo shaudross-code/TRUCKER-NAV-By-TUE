@@ -14,7 +14,8 @@ import {
   CheckCircle2,
   Navigation2,
   Wrench,
-  PiggyBank
+  PiggyBank,
+  HandCoins
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
 import { speak } from '../services/speechService';
@@ -163,6 +164,8 @@ const Dashboard: React.FC = React.memo(() => {
   const escrowBalance = context?.escrowBalance || 0;
   const escrowThisWeek = context?.escrowThisWeek || 0;
   const setEscrowThisWeek = context?.setEscrowThisWeek || (() => {});
+  const cashAdvance = context?.cashAdvance ?? 0;
+  const setCashAdvance = context?.setCashAdvance || (() => {});
 
   const [isEarningsInputOpen, setIsEarningsInputOpen] = useState(false);
   const [newEntryValue, setNewEntryValue] = useState('');
@@ -185,6 +188,9 @@ const Dashboard: React.FC = React.memo(() => {
   const [isEscrowOpen, setIsEscrowOpen] = useState(false);
   const [newEscrowRateEntry, setNewEscrowRateEntry] = useState('');
   const [newEscrowMaxEntry, setNewEscrowMaxEntry] = useState('');
+
+  const [isCashAdvanceOpen, setIsCashAdvanceOpen] = useState(false);
+  const [newCashAdvanceEntry, setNewCashAdvanceEntry] = useState('');
 
   // ELD Dynamic Timers
   // Removed local timers state as it's now global in AppContext
@@ -300,6 +306,17 @@ const Dashboard: React.FC = React.memo(() => {
     setIsEscrowOpen(false);
   };
 
+  const handleAddCashAdvance = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(newCashAdvanceEntry);
+    if (!isNaN(amount) && amount >= 0) {
+      // Adds to existing advance (driver may take multiple advances per week)
+      setCashAdvance(cashAdvance + amount);
+      setNewCashAdvanceEntry('');
+      setIsCashAdvanceOpen(false);
+    }
+  };
+
   const handleNewWeek = () => {
     setWeeklyEarnings(0);
     setMilesThisWeek(0);
@@ -307,6 +324,7 @@ const Dashboard: React.FC = React.memo(() => {
     setTruckCost(0);
     setWeekDeductions(0);
     setEscrowThisWeek(0);
+    setCashAdvance(0);
   };
 
   const handleCompleteLoad = useCallback(async () => {
@@ -728,6 +746,54 @@ const Dashboard: React.FC = React.memo(() => {
               <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-3 px-1">
                 Each week's earnings contribute {escrowRate}% until balance reaches the cap.
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Cash Advance card */}
+        <div className="relative">
+          <MetricCard 
+            icon={HandCoins} 
+            label="CASH ADVANCE"
+            value={formatCurrency(cashAdvance)}
+            target={cashAdvance > 0 ? 'Deducted from this week\'s gross' : 'Tap to log an advance'}
+            iconBg="bg-rose-400/10"
+            iconColor="text-rose-400"
+            isInteractive={true}
+            onClick={() => {
+              setIsCashAdvanceOpen(!isCashAdvanceOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
+              setIsTruckCostInputOpen(false);
+              setIsDeductionsInputOpen(false);
+              setIsMaintenanceCpmOpen(false);
+              setIsEscrowOpen(false);
+              setNewCashAdvanceEntry('');
+            }}
+          />
+          {isCashAdvanceOpen && (
+            <div data-testid="cash-advance-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-rose-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Log Cash Advance</span>
+                <button onClick={() => setIsCashAdvanceOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <form onSubmit={handleAddCashAdvance} className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
+                  <input data-testid="cash-advance-input" autoFocus type="number" step="0.01" min="0" value={newCashAdvanceEntry} onChange={(e) => setNewCashAdvanceEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-rose-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                </div>
+                <button type="submit" data-testid="cash-advance-add-btn" className="bg-rose-400 hover:bg-rose-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-rose-400/20"><Plus className="w-5 h-5" /></button>
+              </form>
+              {cashAdvance > 0 && (
+                <button
+                  data-testid="cash-advance-reset"
+                  onClick={() => { setCashAdvance(0); setIsCashAdvanceOpen(false); }}
+                  className="mt-3 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-rose-400 transition-colors"
+                >
+                  Clear advance (current: {formatCurrency(cashAdvance)})
+                </button>
+              )}
             </div>
           )}
         </div>

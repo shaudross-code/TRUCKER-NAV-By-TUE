@@ -51,6 +51,11 @@ export interface UserProfile {
   maintenanceAccount?: number;
   maintenanceLedger?: MaintenanceLedgerEntry[];
   adminFee?: number;
+  cashAdvance?: number;
+  insuranceFee?: number;
+  iftaFee?: number;
+  physicalDamageFee?: number;
+  trailerCharge?: number;
   escrowRate?: number;
   escrowMax?: number;
   escrowBalance?: number;
@@ -223,6 +228,16 @@ export interface AppContextType {
   resetMaintenanceAccount: () => void;
   adminFee: number;
   setAdminFee: React.Dispatch<React.SetStateAction<number>>;
+  cashAdvance: number;
+  setCashAdvance: React.Dispatch<React.SetStateAction<number>>;
+  insuranceFee: number;
+  setInsuranceFee: React.Dispatch<React.SetStateAction<number>>;
+  iftaFee: number;
+  setIftaFee: React.Dispatch<React.SetStateAction<number>>;
+  physicalDamageFee: number;
+  setPhysicalDamageFee: React.Dispatch<React.SetStateAction<number>>;
+  trailerCharge: number;
+  setTrailerCharge: React.Dispatch<React.SetStateAction<number>>;
   escrowRate: number;
   setEscrowRate: React.Dispatch<React.SetStateAction<number>>;
   escrowMax: number;

@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank, Briefcase, Info } from 'lucide-react';
+import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank, Briefcase, Info, HandCoins, Shield, Receipt, AlertOctagon, Container } from 'lucide-react';
 import { AppContext, MaintenanceLedgerEntry } from '../types';
 
 /** A number input that uses local string state while editing, and syncs on blur/enter */
@@ -110,6 +110,65 @@ const MaintenanceAdjustControls: React.FC<{
   );
 };
 
+/** Generic flat-fee card used for Admin, Cash Advance, Insurance, IFTA, Physical Damage, Trailer. */
+const FlatFeeCard: React.FC<{
+  testId: string;
+  icon: React.ComponentType<any>;
+  label: string;
+  subtitle: string;
+  value: number;
+  defaultValue: number;
+  accent: 'rose' | 'zinc' | 'sky' | 'amber' | 'violet' | 'orange';
+  onChange: (v: number) => void;
+}> = ({ testId, icon: Icon, label, subtitle, value, defaultValue, accent, onChange }) => {
+  const formatCurrency = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+  const palette: Record<string, { border: string; iconBg: string; iconText: string; focus: string }> = {
+    rose:   { border: 'border-rose-400/20',   iconBg: 'bg-rose-400/10',   iconText: 'text-rose-400',   focus: 'focus:border-rose-400'   },
+    zinc:   { border: 'border-zinc-700/40',   iconBg: 'bg-zinc-400/10',   iconText: 'text-zinc-300',   focus: 'focus:border-zinc-400'   },
+    sky:    { border: 'border-sky-400/20',    iconBg: 'bg-sky-400/10',    iconText: 'text-sky-400',    focus: 'focus:border-sky-400'    },
+    amber:  { border: 'border-amber-400/20',  iconBg: 'bg-amber-400/10',  iconText: 'text-amber-400',  focus: 'focus:border-amber-400'  },
+    violet: { border: 'border-violet-400/20', iconBg: 'bg-violet-400/10', iconText: 'text-violet-400', focus: 'focus:border-violet-400' },
+    orange: { border: 'border-orange-400/20', iconBg: 'bg-orange-400/10', iconText: 'text-orange-400', focus: 'focus:border-orange-400' },
+  };
+  const p = palette[accent] || palette.zinc;
+  return (
+    <div data-testid={`${testId}-card`} className={`bg-black/80 backdrop-blur-3xl border ${p.border} p-8 rounded-[2.5rem] shadow-2xl`}>
+      <div className="flex items-center gap-4 mb-4">
+        <div className={`${p.iconBg} p-3 rounded-2xl ${p.iconText}`}>
+          <Icon className="w-6 h-6" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">{label}</h3>
+          <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest mt-1">{subtitle}</p>
+        </div>
+      </div>
+      <div data-testid={`${testId}-value`} className="text-3xl font-bold text-white tracking-tight">{formatCurrency(value)}</div>
+      <div className="mt-4 flex items-center gap-2 flex-wrap">
+        <span className="text-zinc-500 font-bold uppercase tracking-widest text-xs">$</span>
+        <input
+          data-testid={`${testId}-input`}
+          type="number"
+          min="0"
+          step="1"
+          value={value}
+          onChange={(e) => {
+            const v = parseFloat(e.target.value);
+            if (!isNaN(v) && v >= 0) onChange(v);
+          }}
+          className={`w-28 bg-[#050505] border border-zinc-800 rounded-xl py-1 px-2 text-white text-sm font-bold ${p.focus} focus:outline-none transition-colors`}
+        />
+        <button
+          data-testid={`${testId}-reset`}
+          onClick={() => onChange(defaultValue)}
+          className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-white transition-colors"
+        >
+          Reset to ${defaultValue}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 /** Compact transaction list under the Maintenance Account card. */
 const MaintenanceLedgerCard: React.FC<{ ledger: MaintenanceLedgerEntry[] }> = ({ ledger }) => {
   const [expanded, setExpanded] = useState(false);
@@ -198,6 +257,11 @@ const NetPayBreakdownTooltip: React.FC<{
   weekDeductions: number;
   maintenanceWeekFee: number;
   adminFee: number;
+  cashAdvance: number;
+  insuranceFee: number;
+  iftaFee: number;
+  physicalDamageFee: number;
+  trailerCharge: number;
   escrowThisWeek: number;
   netPay: number;
 }> = (p) => {
@@ -246,6 +310,11 @@ const NetPayBreakdownTooltip: React.FC<{
             {row('Week Deductions',   fmt(p.weekDeductions),     '−', p.weekDeductions > 0 ? 'text-rose-300' : 'text-zinc-500')}
             {row('Maintenance Fee',   fmt(p.maintenanceWeekFee), '−', p.maintenanceWeekFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
             {row('Admin Fee',         fmt(p.adminFee),           '−', p.adminFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Cash Advance',      fmt(p.cashAdvance),        '−', p.cashAdvance > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Insurance / Liab.', fmt(p.insuranceFee),       '−', p.insuranceFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('IFTA Fee',          fmt(p.iftaFee),            '−', p.iftaFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Physical Damage',   fmt(p.physicalDamageFee),  '−', p.physicalDamageFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('Trailer Charge',    fmt(p.trailerCharge),      '−', p.trailerCharge > 0 ? 'text-rose-300' : 'text-zinc-500')}
             {row('Escrow (this wk)',  fmt(p.escrowThisWeek),     '−', p.escrowThisWeek > 0 ? 'text-rose-300' : 'text-zinc-500')}
           </div>
           <div className="border-t border-white/10 mt-3 pt-3">
@@ -284,6 +353,17 @@ const PaySummary: React.FC = () => {
   const adminFee = context?.adminFee ?? 135;
   const setAdminFee = context?.setAdminFee || (() => {});
 
+  const cashAdvance = context?.cashAdvance ?? 0;
+  const setCashAdvance = context?.setCashAdvance || (() => {});
+  const insuranceFee = context?.insuranceFee ?? 350;
+  const setInsuranceFee = context?.setInsuranceFee || (() => {});
+  const iftaFee = context?.iftaFee ?? 35;
+  const setIftaFee = context?.setIftaFee || (() => {});
+  const physicalDamageFee = context?.physicalDamageFee ?? 150;
+  const setPhysicalDamageFee = context?.setPhysicalDamageFee || (() => {});
+  const trailerCharge = context?.trailerCharge ?? 200;
+  const setTrailerCharge = context?.setTrailerCharge || (() => {});
+
   const escrowRate = context?.escrowRate ?? 0;
   const setEscrowRate = context?.setEscrowRate || (() => {});
   const escrowMax = context?.escrowMax ?? 2500;
@@ -311,7 +391,8 @@ const PaySummary: React.FC = () => {
   }, [localPct, setTakeHomePercentage, takeHomePercentage]);
 
   const grossAfterPct = weeklyEarnings * (takeHomePercentage / 100);
-  const netPay = grossAfterPct - fuelCost - truckCost - weekDeductions - maintenanceWeekFee - adminFee - escrowThisWeek;
+  const totalFlatFees = adminFee + cashAdvance + insuranceFee + iftaFee + physicalDamageFee + trailerCharge;
+  const netPay = grossAfterPct - fuelCost - truckCost - weekDeductions - maintenanceWeekFee - totalFlatFees - escrowThisWeek;
   
   const monthlyGross = weeklyEarnings * 4;
   const monthlyNet = netPay * 4;
@@ -422,6 +503,11 @@ const PaySummary: React.FC = () => {
               weekDeductions={weekDeductions}
               maintenanceWeekFee={maintenanceWeekFee}
               adminFee={adminFee}
+              cashAdvance={cashAdvance}
+              insuranceFee={insuranceFee}
+              iftaFee={iftaFee}
+              physicalDamageFee={physicalDamageFee}
+              trailerCharge={trailerCharge}
               escrowThisWeek={escrowThisWeek}
               netPay={netPay}
             />
@@ -594,6 +680,60 @@ const PaySummary: React.FC = () => {
             />
           </div>
         </div>
+      </div>
+
+      {/* Weekly fees grid — flat charges deducted from gross */}
+      <div data-testid="pay-weekly-fees-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+        <FlatFeeCard
+          testId="pay-cash-advance"
+          icon={HandCoins}
+          label="Cash Advance"
+          subtitle="Driver pre-pay — deducted from this week's gross"
+          value={cashAdvance}
+          defaultValue={0}
+          accent="rose"
+          onChange={setCashAdvance}
+        />
+        <FlatFeeCard
+          testId="pay-insurance"
+          icon={Shield}
+          label="Insurance / Cargo & Liability"
+          subtitle="Weekly insurance & liability charge"
+          value={insuranceFee}
+          defaultValue={350}
+          accent="sky"
+          onChange={setInsuranceFee}
+        />
+        <FlatFeeCard
+          testId="pay-ifta"
+          icon={Receipt}
+          label="IFTA Fee"
+          subtitle="Interstate fuel tax filing"
+          value={iftaFee}
+          defaultValue={35}
+          accent="amber"
+          onChange={setIftaFee}
+        />
+        <FlatFeeCard
+          testId="pay-physical-damage"
+          icon={AlertOctagon}
+          label="Physical Damage"
+          subtitle="Equipment damage coverage"
+          value={physicalDamageFee}
+          defaultValue={150}
+          accent="violet"
+          onChange={setPhysicalDamageFee}
+        />
+        <FlatFeeCard
+          testId="pay-trailer-charge"
+          icon={Container}
+          label="Trailer Charge"
+          subtitle="Trailer rental / lease fee"
+          value={trailerCharge}
+          defaultValue={200}
+          accent="orange"
+          onChange={setTrailerCharge}
+        />
       </div>
 
       <div data-testid="pay-summary-monthly-yearly" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">

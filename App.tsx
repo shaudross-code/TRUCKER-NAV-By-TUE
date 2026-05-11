@@ -361,7 +361,17 @@ const AppContent: React.FC = React.memo(() => {
     return [];
   });
   const [adminFee, setAdminFeeState] = useState(() => loadLocal('adminFee', 135));
-  const [escrowRate, setEscrowRateState] = useState(() => loadLocal('escrowRate', 3)); // % of weekly gross — defaults to 3% so escrow auto-accrues immediately
+  const [cashAdvance, setCashAdvanceState] = useState(() => loadLocal('cashAdvance', 0));
+  const [insuranceFee, setInsuranceFeeState] = useState(() => loadLocal('insuranceFee', 350));
+  const [iftaFee, setIftaFeeState] = useState(() => loadLocal('iftaFee', 35));
+  const [physicalDamageFee, setPhysicalDamageFeeState] = useState(() => loadLocal('physicalDamageFee', 150));
+  const [trailerCharge, setTrailerChargeState] = useState(() => loadLocal('trailerCharge', 200));
+  const [escrowRate, setEscrowRateState] = useState(() => {
+    // Legacy users had escrowRate default = 0. Treat saved 0 as "unconfigured"
+    // and bump to 3% so escrow auto-accrues out of the box.
+    const saved = loadLocal('escrowRate', 3);
+    return (saved === 0 || saved === undefined || saved === null) ? 3 : saved;
+  }); // % of weekly gross — defaults to 3% so escrow auto-accrues immediately
   const [escrowMax, setEscrowMaxState] = useState(() => loadLocal('escrowMax', 2500));
   const [escrowBalance, setEscrowBalanceState] = useState(() => loadLocal('escrowBalance', 0));
   const [escrowThisWeek, setEscrowThisWeekState] = useState(() => loadLocal('escrowThisWeek', 0));
@@ -380,6 +390,11 @@ const AppContent: React.FC = React.memo(() => {
       if ((profile as any).maintenanceAccount !== undefined) setMaintenanceAccountState((profile as any).maintenanceAccount);
       if (Array.isArray((profile as any).maintenanceLedger)) setMaintenanceLedgerState((profile as any).maintenanceLedger);
       if ((profile as any).adminFee !== undefined) setAdminFeeState((profile as any).adminFee);
+      if ((profile as any).cashAdvance !== undefined) setCashAdvanceState((profile as any).cashAdvance);
+      if ((profile as any).insuranceFee !== undefined) setInsuranceFeeState((profile as any).insuranceFee);
+      if ((profile as any).iftaFee !== undefined) setIftaFeeState((profile as any).iftaFee);
+      if ((profile as any).physicalDamageFee !== undefined) setPhysicalDamageFeeState((profile as any).physicalDamageFee);
+      if ((profile as any).trailerCharge !== undefined) setTrailerChargeState((profile as any).trailerCharge);
       if ((profile as any).escrowRate !== undefined) setEscrowRateState((profile as any).escrowRate);
       if ((profile as any).escrowMax !== undefined) setEscrowMaxState((profile as any).escrowMax);
       if ((profile as any).escrowBalance !== undefined) setEscrowBalanceState((profile as any).escrowBalance);
@@ -591,6 +606,28 @@ const AppContent: React.FC = React.memo(() => {
     });
   }, [updateProfile]);
 
+  // Generic factory for flat fee setters — all share the same shape:
+  // localStorage-backed + Firestore-synced + non-negative.
+  const makeFeeSetter = useCallback(
+    (key: string, setter: React.Dispatch<React.SetStateAction<number>>) =>
+      (val: any) => {
+        setter((prev: number) => {
+          const newVal = typeof val === 'function' ? val(prev) : val;
+          if (isNaN(newVal) || newVal < 0) return prev;
+          saveLocal(key, newVal);
+          updateProfile({ [key]: newVal } as any).catch(() => {});
+          return newVal;
+        });
+      },
+    [updateProfile]
+  );
+
+  const setCashAdvance       = useCallback(makeFeeSetter('cashAdvance', setCashAdvanceState),             [makeFeeSetter]);
+  const setInsuranceFee      = useCallback(makeFeeSetter('insuranceFee', setInsuranceFeeState),           [makeFeeSetter]);
+  const setIftaFee           = useCallback(makeFeeSetter('iftaFee', setIftaFeeState),                     [makeFeeSetter]);
+  const setPhysicalDamageFee = useCallback(makeFeeSetter('physicalDamageFee', setPhysicalDamageFeeState), [makeFeeSetter]);
+  const setTrailerCharge     = useCallback(makeFeeSetter('trailerCharge', setTrailerChargeState),         [makeFeeSetter]);
+
   const setEscrowRate = useCallback((val: any) => {
     setEscrowRateState((prev: number) => {
       const newVal = typeof val === 'function' ? val(prev) : val;
@@ -638,6 +675,41 @@ const AppContent: React.FC = React.memo(() => {
   const escrowMaxRef = useRef<number>(escrowMax);
   useEffect(() => { escrowRateRef.current = escrowRate; }, [escrowRate]);
   useEffect(() => { escrowMaxRef.current = escrowMax; }, [escrowMax]);
+
+  // One-time migration: if user has weekly gross already entered but escrow this-week
+  // is still 0 (likely because they tested before escrow defaulted to 3%), retro-apply
+  // the rate to surface their actual escrow contribution.
+  const escrowMigrationRanRef = useRef(false);
+  useEffect(() => {
+    if (escrowMigrationRanRef.current) return;
+    if (!profileSynced) return; // wait until profile is loaded
+    escrowMigrationRanRef.current = true;
+    try {
+      const migrationKey = user?.uid ? getUserStorageKey(user.uid, `trucker_escrowMigrated_v2`) : `trucker_escrowMigrated_v2`;
+      if (localStorage.getItem(migrationKey) === 'true') return;
+      // Persist rate first so legacy 0 → 3% gets saved
+      if (escrowRate > 0) {
+        saveLocal('escrowRate', escrowRate);
+        updateProfile({ escrowRate } as any).catch(() => {});
+      }
+      // If there's already gross but no contribution this week, retro-apply
+      if (escrowRate > 0 && weeklyEarnings > 0 && escrowThisWeek === 0 && escrowBalance < escrowMax) {
+        const target = (weeklyEarnings * escrowRate) / 100;
+        const room = Math.max(0, escrowMax - escrowBalance);
+        const contribution = +Math.min(target, room).toFixed(2);
+        if (contribution > 0) {
+          const newBal = +(escrowBalance + contribution).toFixed(2);
+          setEscrowBalanceState(newBal);
+          setEscrowThisWeekState(contribution);
+          saveLocal('escrowBalance', newBal);
+          saveLocal('escrowThisWeek', contribution);
+          updateProfile({ escrowBalance: newBal, escrowThisWeek: contribution } as any).catch(() => {});
+        }
+      }
+      localStorage.setItem(migrationKey, 'true');
+    } catch (_) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileSynced]);
 
   // Persistence Effects
   const [isDriving, setIsDriving] = useState(false);
@@ -760,6 +832,16 @@ const AppContent: React.FC = React.memo(() => {
       resetMaintenanceAccount,
       adminFee,
       setAdminFee,
+      cashAdvance,
+      setCashAdvance,
+      insuranceFee,
+      setInsuranceFee,
+      iftaFee,
+      setIftaFee,
+      physicalDamageFee,
+      setPhysicalDamageFee,
+      trailerCharge,
+      setTrailerCharge,
       escrowRate,
       setEscrowRate,
       escrowMax,
@@ -796,7 +878,12 @@ const AppContent: React.FC = React.memo(() => {
       escrowRate,
       escrowMax,
       escrowBalance,
-      escrowThisWeek
+      escrowThisWeek,
+      cashAdvance,
+      insuranceFee,
+      iftaFee,
+      physicalDamageFee,
+      trailerCharge
     ]);
 
   const mountTimeRef = useRef(Date.now());
