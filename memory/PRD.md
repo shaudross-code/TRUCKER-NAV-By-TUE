@@ -84,8 +84,8 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
+- 2026-05-12: ✅ **Subtract (−) button moved inside expanded panel** — per user feedback, the `−` button no longer floats at the top-right corner of every MetricCard. It now appears inline beside the `+` button only when a card is clicked (Miles, Fuel Cost, Truck Cost, Cash Advance, DEF, Week Deductions). Clicking `−` subtracts the value typed in the input from the metric (never going below zero) and closes the panel. Cleaner default UI and matches the existing Weekly Gross card pattern.
 - 2026-05-12: ✅ **DEF (Diesel Exhaust Fluid) card** added to both Dashboard & Pay Summary with cyan-droplet icon. Logs DEF purchases, deducted from gross.
-- 2026-05-12: ✅ **Subtract (−) buttons** added to Miles/Fuel Cost/Truck Cost/Cash Advance/Week Deductions/DEF cards on Dashboard. Tap "−" pill to prompt for amount to subtract; never goes below zero.
 - 2026-05-12: ✅ **9-step "What's New" walkthrough** — clicking "What's new →" toast CTA (or the Take Tour button in Announcements) launches a guided tour with glowing gold highlight on each new feature, view-switching between Pay Summary / Navigation, progress dots, back/next/skip controls.
 - 2026-05-12: ✅ **Map labels boosted** (city/state/highway-shield/road) — `boostMapLabels()` makes labels 30% larger with white-on-black halo for satellite imagery readability.
 - 2026-05-12: ✅ **Wider Roads & Highways glow tiles** — outer halo now 56px wide @ z18 (was 28), core line 26px (was 10). Covers the underlying satellite road completely.

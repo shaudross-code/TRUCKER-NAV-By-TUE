@@ -333,15 +333,23 @@ const Dashboard: React.FC = React.memo(() => {
     }
   };
 
-  // Quick subtract helper — used by the small "−" button overlay on metric cards.
-  // Prompts for an amount and subtracts (never goes below zero for non-negative metrics).
-  const promptSubtract = (currentValue: number, setter: (v: number) => void, label: string, allowNegative = false) => {
-    const raw = window.prompt(`Subtract from ${label}\nCurrent: ${currentValue}\n\nEnter amount to subtract:`);
-    if (raw === null) return;
-    const amount = parseFloat(raw);
+  // Subtracts the user-entered amount (from the expanded panel's input) from a metric.
+  // Used by the inline "−" button shown beside the "+" button inside expanded input panels.
+  const subtractFromInput = (
+    inputValue: string,
+    setter: (val: any) => void,
+    setInput: (v: string) => void,
+    closeFn: () => void,
+    allowNegative = false,
+  ) => {
+    const amount = parseFloat(inputValue);
     if (isNaN(amount) || amount <= 0) return;
-    const next = currentValue - amount;
-    setter(allowNegative ? next : Math.max(0, next));
+    setter((prev: number) => {
+      const next = prev - amount;
+      return allowNegative ? next : Math.max(0, next);
+    });
+    setInput('');
+    closeFn();
   };
 
   const handleNewWeek = () => {
@@ -597,18 +605,19 @@ const Dashboard: React.FC = React.memo(() => {
               setIsEarningsInputOpen(false);
               setIsFuelInputOpen(false);
             }}
-            onSubtract={() => promptSubtract(milesThisWeek, setMilesThisWeek, 'Miles This Week')}
-            subtractLabel="Subtract miles"
           />
           {isMilesInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Manual Miles</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Miles</span>
                 <button onClick={() => setIsMilesInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddMiles} className="flex gap-2">
                 <input autoFocus type="number" value={newMilesEntry} onChange={(e) => setNewMilesEntry(e.target.value)} placeholder="Enter miles" className="flex-1 bg-[#050505] border border-zinc-800 rounded-xl py-2.5 px-4 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
-                <button type="submit" className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+                <div className="flex gap-1.5">
+                  <button type="button" data-testid="miles-subtract-btn" title="Subtract miles" onClick={() => subtractFromInput(newMilesEntry, setMilesThisWeek, setNewMilesEntry, () => setIsMilesInputOpen(false))} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button type="submit" data-testid="miles-add-btn" className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+                </div>
               </form>
             </div>
           )}
@@ -637,13 +646,11 @@ const Dashboard: React.FC = React.memo(() => {
               setIsMilesInputOpen(false);
               setIsDeductionsInputOpen(false);
             }}
-            onSubtract={() => promptSubtract(fuelCost, setFuelCost, 'Fuel Cost')}
-            subtractLabel="Subtract fuel cost"
           />
           {isFuelInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Fuel Expense</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Fuel Cost</span>
                 <button onClick={() => setIsFuelInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddFuel} className="flex gap-2">
@@ -651,7 +658,10 @@ const Dashboard: React.FC = React.memo(() => {
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
                   <input autoFocus type="number" step="0.01" value={newFuelEntry} onChange={(e) => setNewFuelEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-[#D4AF37] focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
-                <button type="submit" className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+                <div className="flex gap-1.5">
+                  <button type="button" data-testid="fuel-subtract-btn" title="Subtract fuel cost" onClick={() => subtractFromInput(newFuelEntry, setFuelCost, setNewFuelEntry, () => setIsFuelInputOpen(false))} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button type="submit" data-testid="fuel-add-btn" className="bg-[#D4AF37] hover:bg-[#B8860B] text-black p-2.5 rounded-xl transition-all shadow-lg shadow-[#D4AF37]/20"><Plus className="w-5 h-5" /></button>
+                </div>
               </form>
             </div>
           )}
@@ -672,13 +682,11 @@ const Dashboard: React.FC = React.memo(() => {
               setIsFuelInputOpen(false);
               setIsDeductionsInputOpen(false);
             }}
-            onSubtract={() => promptSubtract(truckCost, setTruckCost, 'Truck Cost')}
-            subtractLabel="Subtract truck cost"
           />
           {isTruckCostInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-blue-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Truck Cost</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Truck Cost</span>
                 <button onClick={() => setIsTruckCostInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddTruckCost} className="flex gap-2">
@@ -686,7 +694,10 @@ const Dashboard: React.FC = React.memo(() => {
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
                   <input autoFocus type="number" step="0.01" value={newTruckCostEntry} onChange={(e) => setNewTruckCostEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-blue-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
-                <button type="submit" className="bg-blue-400 hover:bg-blue-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-blue-400/20"><Plus className="w-5 h-5" /></button>
+                <div className="flex gap-1.5">
+                  <button type="button" data-testid="truck-cost-subtract-btn" title="Subtract truck cost" onClick={() => subtractFromInput(newTruckCostEntry, setTruckCost, setNewTruckCostEntry, () => setIsTruckCostInputOpen(false))} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button type="submit" data-testid="truck-cost-add-btn" className="bg-blue-400 hover:bg-blue-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-blue-400/20"><Plus className="w-5 h-5" /></button>
+                </div>
               </form>
             </div>
           )}
@@ -805,13 +816,11 @@ const Dashboard: React.FC = React.memo(() => {
               setIsEscrowOpen(false);
               setNewCashAdvanceEntry('');
             }}
-            onSubtract={() => promptSubtract(cashAdvance, setCashAdvance, 'Cash Advance')}
-            subtractLabel="Subtract cash advance"
           />
           {isCashAdvanceOpen && (
             <div data-testid="cash-advance-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-rose-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Log Cash Advance</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Cash Advance</span>
                 <button onClick={() => setIsCashAdvanceOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddCashAdvance} className="flex gap-2">
@@ -819,7 +828,10 @@ const Dashboard: React.FC = React.memo(() => {
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
                   <input data-testid="cash-advance-input" autoFocus type="number" step="0.01" min="0" value={newCashAdvanceEntry} onChange={(e) => setNewCashAdvanceEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-rose-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
-                <button type="submit" data-testid="cash-advance-add-btn" className="bg-rose-400 hover:bg-rose-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-rose-400/20"><Plus className="w-5 h-5" /></button>
+                <div className="flex gap-1.5">
+                  <button type="button" data-testid="cash-advance-subtract-btn" title="Subtract cash advance" onClick={() => subtractFromInput(newCashAdvanceEntry, setCashAdvance, setNewCashAdvanceEntry, () => setIsCashAdvanceOpen(false))} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button type="submit" data-testid="cash-advance-add-btn" className="bg-rose-400 hover:bg-rose-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-rose-400/20"><Plus className="w-5 h-5" /></button>
+                </div>
               </form>
               {cashAdvance > 0 && (
                 <button
@@ -856,13 +868,11 @@ const Dashboard: React.FC = React.memo(() => {
               setIsCashAdvanceOpen(false);
               setNewDefEntry('');
             }}
-            onSubtract={() => promptSubtract(defCost, setDefCost, 'DEF Cost')}
-            subtractLabel="Subtract DEF cost"
           />
           {isDefOpen && (
             <div data-testid="def-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-cyan-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Log DEF Purchase</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust DEF Cost</span>
                 <button onClick={() => setIsDefOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddDef} className="flex gap-2">
@@ -870,7 +880,10 @@ const Dashboard: React.FC = React.memo(() => {
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
                   <input data-testid="def-input" autoFocus type="number" step="0.01" min="0" value={newDefEntry} onChange={(e) => setNewDefEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-cyan-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
-                <button type="submit" data-testid="def-add-btn" className="bg-cyan-400 hover:bg-cyan-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-cyan-400/20"><Plus className="w-5 h-5" /></button>
+                <div className="flex gap-1.5">
+                  <button type="button" data-testid="def-subtract-btn" title="Subtract DEF cost" onClick={() => subtractFromInput(newDefEntry, setDefCost, setNewDefEntry, () => setIsDefOpen(false))} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button type="submit" data-testid="def-add-btn" className="bg-cyan-400 hover:bg-cyan-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-cyan-400/20"><Plus className="w-5 h-5" /></button>
+                </div>
               </form>
             </div>
           )}
@@ -890,13 +903,11 @@ const Dashboard: React.FC = React.memo(() => {
               setIsMilesInputOpen(false);
               setIsFuelInputOpen(false);
             }}
-            onSubtract={() => promptSubtract(weekDeductions, setWeekDeductions, 'Week Deductions')}
-            subtractLabel="Subtract deduction"
           />
           {isDeductionsInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-rose-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
               <div className="flex items-center justify-between mb-3 px-1">
-                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Add Deduction</span>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Adjust Deduction</span>
                 <button onClick={() => setIsDeductionsInputOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
               </div>
               <form onSubmit={handleAddDeductions} className="flex gap-2">
@@ -904,7 +915,10 @@ const Dashboard: React.FC = React.memo(() => {
                   <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
                   <input autoFocus type="number" step="0.01" value={newDeductionsEntry} onChange={(e) => setNewDeductionsEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-rose-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
                 </div>
-                <button type="submit" className="bg-rose-400 hover:bg-rose-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-rose-400/20"><Plus className="w-5 h-5" /></button>
+                <div className="flex gap-1.5">
+                  <button type="button" data-testid="deductions-subtract-btn" title="Subtract deduction" onClick={() => subtractFromInput(newDeductionsEntry, setWeekDeductions, setNewDeductionsEntry, () => setIsDeductionsInputOpen(false))} className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white p-2.5 rounded-xl transition-all"><Minus className="w-5 h-5" /></button>
+                  <button type="submit" data-testid="deductions-add-btn" className="bg-rose-400 hover:bg-rose-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-rose-400/20"><Plus className="w-5 h-5" /></button>
+                </div>
               </form>
             </div>
           )}
