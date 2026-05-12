@@ -1,5 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback, useRef } from 'react';
-import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank, Briefcase, Info, HandCoins, Shield, Receipt, AlertOctagon, Container } from 'lucide-react';
+import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank, Briefcase, Info, HandCoins, Shield, Receipt, AlertOctagon, Container, Droplets } from 'lucide-react';
 import { AppContext, MaintenanceLedgerEntry } from '../types';
 
 /** A number input that uses local string state while editing, and syncs on blur/enter */
@@ -262,6 +262,7 @@ const NetPayBreakdownTooltip: React.FC<{
   iftaFee: number;
   physicalDamageFee: number;
   trailerCharge: number;
+  defCost: number;
   escrowThisWeek: number;
   netPay: number;
 }> = (p) => {
@@ -315,6 +316,7 @@ const NetPayBreakdownTooltip: React.FC<{
             {row('IFTA Fee',          fmt(p.iftaFee),            '−', p.iftaFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
             {row('Physical Damage',   fmt(p.physicalDamageFee),  '−', p.physicalDamageFee > 0 ? 'text-rose-300' : 'text-zinc-500')}
             {row('Trailer Charge',    fmt(p.trailerCharge),      '−', p.trailerCharge > 0 ? 'text-rose-300' : 'text-zinc-500')}
+            {row('DEF',               fmt(p.defCost),            '−', p.defCost > 0 ? 'text-rose-300' : 'text-zinc-500')}
             {row('Escrow (this wk)',  fmt(p.escrowThisWeek),     '−', p.escrowThisWeek > 0 ? 'text-rose-300' : 'text-zinc-500')}
           </div>
           <div className="border-t border-white/10 mt-3 pt-3">
@@ -363,6 +365,8 @@ const PaySummary: React.FC = () => {
   const setPhysicalDamageFee = context?.setPhysicalDamageFee || (() => {});
   const trailerCharge = context?.trailerCharge ?? 200;
   const setTrailerCharge = context?.setTrailerCharge || (() => {});
+  const defCost = context?.defCost ?? 0;
+  const setDefCost = context?.setDefCost || (() => {});
 
   const escrowRate = context?.escrowRate ?? 0;
   const setEscrowRate = context?.setEscrowRate || (() => {});
@@ -429,7 +433,7 @@ const PaySummary: React.FC = () => {
   }, [localPct, setTakeHomePercentage, takeHomePercentage]);
 
   const grossAfterPct = weeklyEarnings * (takeHomePercentage / 100);
-  const totalFlatFees = adminFee + cashAdvance + insuranceFee + iftaFee + physicalDamageFee + trailerCharge;
+  const totalFlatFees = adminFee + cashAdvance + insuranceFee + iftaFee + physicalDamageFee + trailerCharge + defCost;
   const netPay = grossAfterPct - fuelCost - truckCost - weekDeductions - maintenanceWeekFee - totalFlatFees - escrowThisWeek;
   
   const monthlyGross = weeklyEarnings * 4;
@@ -573,6 +577,7 @@ const PaySummary: React.FC = () => {
               iftaFee={iftaFee}
               physicalDamageFee={physicalDamageFee}
               trailerCharge={trailerCharge}
+              defCost={defCost}
               escrowThisWeek={escrowThisWeek}
               netPay={netPay}
             />
@@ -798,6 +803,16 @@ const PaySummary: React.FC = () => {
           defaultValue={200}
           accent="orange"
           onChange={setTrailerCharge}
+        />
+        <FlatFeeCard
+          testId="pay-def"
+          icon={Droplets}
+          label="DEF (Diesel Exhaust Fluid)"
+          subtitle="Logged DEF purchases — deducted from gross"
+          value={defCost}
+          defaultValue={0}
+          accent="sky"
+          onChange={setDefCost}
         />
       </div>
 

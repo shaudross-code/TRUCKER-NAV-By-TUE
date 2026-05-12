@@ -5,7 +5,7 @@ import { calcDist, calcEuclideanDist, convertInstructionToImperial, synthesizeLa
 import React, { useEffect, useLayoutEffect, useRef, useState, useContext, useMemo, useCallback } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 // Map utility imports (Mapbox GL JS wrapper)
-import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds, createClusterProvider, buildClusterDataPoints, setRoadsHighlight } from '../utils/hereMapUtils';
+import { createHereMap, disposeHereMap, createGroup, createPolyline, updatePolylineCoords, createDomMarker, createSvgMarker, boundsFromCoords, fitBounds, createClusterProvider, buildClusterDataPoints, setRoadsHighlight, boostMapLabels } from '../utils/hereMapUtils';
 import { useNightMode, useViewportCulling } from '../hooks/useNavHooks';
 import { 
   Plus, 
@@ -1319,8 +1319,11 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
     wrapper.style.position = 'relative';
     wrapper.style.width = '64px';
     wrapper.style.height = '64px';
-    wrapper.style.marginLeft = '-32px';
-    wrapper.style.marginTop = '-32px';
+    // Mapbox's `anchor: 'center'` positions the OUTER element on the geographic
+    // coordinate. The inner visual content is already centered via per-element
+    // `top:50%; left:50%; transform:translate(-50%,-50%)` so we MUST NOT add
+    // a negative margin here — that double-shifts the marker, causing visible
+    // drift especially at low zoom where the marker spans many degrees of map.
     wrapper.style.pointerEvents = 'none';
     wrapper.innerHTML = `<div class="relative flex items-center justify-center w-full h-full">
       <!-- Outer warm golden glow (large radiating halo) -->
@@ -1735,6 +1738,13 @@ const NavigationView: React.FC<NavigationViewProps> = ({ initialTarget, userLoca
       setRoadsHighlight(map, shouldShow, '#22ff88');
     } catch (_) {}
   }, [roadsHighlightEnabled, routePoints.length, isMapReady]);
+
+  // Boost city/state/highway-shield labels once when the map is ready
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !isMapReady) return;
+    try { boostMapLabels(map); } catch (_) {}
+  }, [isMapReady]);
 
   // Persist roads-highlight preference
   useEffect(() => {

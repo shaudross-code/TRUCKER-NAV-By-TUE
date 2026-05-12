@@ -44,6 +44,7 @@ import VoiceCommand from './components/VoiceCommand';
 import { speak } from './services/speechService';
 import useScreenWakeLock from './hooks/useScreenWakeLock';
 import { hasUnseenAnnouncements } from './utils/announcements';
+import FeatureWalkthrough from './components/FeatureWalkthrough';
 
 const LocationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(() => {
@@ -262,6 +263,7 @@ const AppContent: React.FC = React.memo(() => {
 
   // Announcement toast: fires once when the user opens the app after a new release
   const [announcementToastOpen, setAnnouncementToastOpen] = useState<boolean>(false);
+  const [walkthroughOpen, setWalkthroughOpen] = useState<boolean>(false);
   useEffect(() => {
     if (!user) return; // wait until auth resolved so we don't pop the toast before app is interactive
     if (showTutorial) return; // don't compete with the tutorial overlay
@@ -384,6 +386,7 @@ const AppContent: React.FC = React.memo(() => {
   const [iftaFee, setIftaFeeState] = useState(() => loadLocal('iftaFee', 35));
   const [physicalDamageFee, setPhysicalDamageFeeState] = useState(() => loadLocal('physicalDamageFee', 150));
   const [trailerCharge, setTrailerChargeState] = useState(() => loadLocal('trailerCharge', 200));
+  const [defCost, setDefCostState] = useState(() => loadLocal('defCost', 0));
   const [escrowRate, setEscrowRateState] = useState(() => {
     // Legacy users had escrowRate default = 0. Treat saved 0 as "unconfigured"
     // and bump to 3% so escrow auto-accrues out of the box.
@@ -413,6 +416,7 @@ const AppContent: React.FC = React.memo(() => {
       if ((profile as any).iftaFee !== undefined) setIftaFeeState((profile as any).iftaFee);
       if ((profile as any).physicalDamageFee !== undefined) setPhysicalDamageFeeState((profile as any).physicalDamageFee);
       if ((profile as any).trailerCharge !== undefined) setTrailerChargeState((profile as any).trailerCharge);
+      if ((profile as any).defCost !== undefined) setDefCostState((profile as any).defCost);
       if ((profile as any).escrowRate !== undefined) setEscrowRateState((profile as any).escrowRate);
       if ((profile as any).escrowMax !== undefined) setEscrowMaxState((profile as any).escrowMax);
       if ((profile as any).escrowBalance !== undefined) setEscrowBalanceState((profile as any).escrowBalance);
@@ -624,6 +628,7 @@ const AppContent: React.FC = React.memo(() => {
   const setIftaFee           = useCallback(makeFeeSetter('iftaFee', setIftaFeeState),                     [makeFeeSetter]);
   const setPhysicalDamageFee = useCallback(makeFeeSetter('physicalDamageFee', setPhysicalDamageFeeState), [makeFeeSetter]);
   const setTrailerCharge     = useCallback(makeFeeSetter('trailerCharge', setTrailerChargeState),         [makeFeeSetter]);
+  const setDefCost           = useCallback(makeFeeSetter('defCost', setDefCostState),                     [makeFeeSetter]);
 
   const setEscrowRate = useCallback((val: any) => {
     setEscrowRateState((prev: number) => {
@@ -799,7 +804,7 @@ const AppContent: React.FC = React.memo(() => {
       case ViewType.COMMUNITY:
         return <Suspense fallback={<ContentLoader />}><CommunityView /></Suspense>;
       case ViewType.ANNOUNCEMENTS:
-        return <Suspense fallback={<ContentLoader />}><AnnouncementsView /></Suspense>;
+        return <Suspense fallback={<ContentLoader />}><AnnouncementsView onStartTour={() => setWalkthroughOpen(true)} /></Suspense>;
       default:
         return <Suspense fallback={<ContentLoader />}><Dashboard /></Suspense>;
     }
@@ -848,6 +853,8 @@ const AppContent: React.FC = React.memo(() => {
       setPhysicalDamageFee,
       trailerCharge,
       setTrailerCharge,
+      defCost,
+      setDefCost,
       escrowRate,
       setEscrowRate,
       escrowMax,
@@ -889,7 +896,8 @@ const AppContent: React.FC = React.memo(() => {
       insuranceFee,
       iftaFee,
       physicalDamageFee,
-      trailerCharge
+      trailerCharge,
+      defCost
     ]);
 
   const mountTimeRef = useRef(Date.now());
@@ -962,8 +970,21 @@ const AppContent: React.FC = React.memo(() => {
             )}
 
             {/* New-features-since-last-visit toast */}
-            {announcementToastOpen && (
-              <div
+            <FeatureWalkthrough
+              open={walkthroughOpen}
+              onClose={() => {
+                setWalkthroughOpen(false);
+                // After tour, also mark announcements as seen (in case user
+                // never opens the Announcements tab)
+                try {
+                  localStorage.setItem('tue_announcements_seen_version', '2026-05-11');
+                  window.dispatchEvent(new StorageEvent('storage', { key: 'tue_announcements_seen_version' }));
+                } catch {}
+              }}
+              setActiveView={setActiveView}
+            />
+
+            {announcementToastOpen && (              <div
                 data-testid="announcement-toast"
                 className="fixed top-4 right-4 z-[9999] max-w-sm bg-[#0a0a0a] border border-[#D4AF37]/40 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.9)] animate-in slide-in-from-top-2 duration-300"
               >
@@ -979,7 +1000,7 @@ const AppContent: React.FC = React.memo(() => {
                     </div>
                     <button
                       data-testid="announcement-toast-open-btn"
-                      onClick={() => { setAnnouncementToastOpen(false); setActiveView(ViewType.ANNOUNCEMENTS); }}
+                      onClick={() => { setAnnouncementToastOpen(false); setWalkthroughOpen(true); }}
                       className="text-[10px] font-black uppercase tracking-widest bg-[#D4AF37] text-black px-3 py-1.5 rounded-lg hover:bg-[#FFD700] transition-colors"
                     >
                       What’s new →

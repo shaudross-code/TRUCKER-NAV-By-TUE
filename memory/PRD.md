@@ -84,7 +84,13 @@ Professional trucking GPS navigation app with real POIs, turn-by-turn navigation
 - nginx config resets on pod restart (must reconfigure port 3000→8001 proxy)
 
 ## Recent Changes
-- 2026-05-11: ✅ **Escrow Cap-Hit Toast** — fires when this-week contribution is reduced by hitting the cap, e.g. *"This week's escrow capped at $10.00 of $500.00 calculated — escrow account is now full at $10.00. Your net pay will increase next week."* Cap-state persisted to localStorage so the toast fires correctly even if the cap was crossed on a different page.
+- 2026-05-12: ✅ **DEF (Diesel Exhaust Fluid) card** added to both Dashboard & Pay Summary with cyan-droplet icon. Logs DEF purchases, deducted from gross.
+- 2026-05-12: ✅ **Subtract (−) buttons** added to Miles/Fuel Cost/Truck Cost/Cash Advance/Week Deductions/DEF cards on Dashboard. Tap "−" pill to prompt for amount to subtract; never goes below zero.
+- 2026-05-12: ✅ **9-step "What's New" walkthrough** — clicking "What's new →" toast CTA (or the Take Tour button in Announcements) launches a guided tour with glowing gold highlight on each new feature, view-switching between Pay Summary / Navigation, progress dots, back/next/skip controls.
+- 2026-05-12: ✅ **Map labels boosted** (city/state/highway-shield/road) — `boostMapLabels()` makes labels 30% larger with white-on-black halo for satellite imagery readability.
+- 2026-05-12: ✅ **Wider Roads & Highways glow tiles** — outer halo now 56px wide @ z18 (was 28), core line 26px (was 10). Covers the underlying satellite road completely.
+- 2026-05-12: ✅ **User location marker drift fixed at low zoom** — root cause was a double-shift from `marginLeft: -32px` combined with Mapbox's anchor:'center' transform. Marker now stays exactly on the geographic point at every zoom level.
+- 2026-05-12: ✅ **Universal responsive guards** — global media queries add gap/padding bounds on phones (<480px), force 2-col grid on tablets, and constrain root containers so cards never overflow.
 - 2026-05-11: ✅ **Route Corridor View** — auto-fits the entire route polyline + 12% padding when a route starts so every POI in the corridor is visible at once. Disables follow/tilt. Toggle button (Route icon, green) in MapControls when a route is active; cancels automatically when driving begins or the user pans.
 - 2026-05-11: ✅ Escrow now tracks weekly gross both up AND down via derived `useEffect`.
 - 2026-05-11: ✅ Added 5 new fee cards (Cash Advance / Insurance / IFTA / Physical Damage / Trailer) — see prior changelog.

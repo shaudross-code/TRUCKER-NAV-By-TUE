@@ -81,7 +81,11 @@ const tagPalette: Record<string, { bg: string; text: string }> = {
   'Driver UX':{ bg: 'bg-violet-400/10',  text: 'text-violet-300'  },
 };
 
-const AnnouncementsView: React.FC = () => {
+interface AnnouncementsViewProps {
+  onStartTour?: () => void;
+}
+
+const AnnouncementsView: React.FC<AnnouncementsViewProps> = ({ onStartTour }) => {
   // Mark announcements as seen when this view is opened so the sidebar dot disappears.
   React.useEffect(() => {
     markAnnouncementsSeen();
@@ -94,7 +98,18 @@ const AnnouncementsView: React.FC = () => {
         <Megaphone className="w-7 h-7 text-[#D4AF37]" />
         Announcements
       </h1>
-      <p className="text-zinc-500 text-sm mb-8">Latest updates and upcoming features for TRUCKERS NAV</p>
+      <p className="text-zinc-500 text-sm mb-6">Latest updates and upcoming features for TRUCKERS NAV</p>
+
+      {onStartTour && (
+        <button
+          data-testid="announcements-start-tour-btn"
+          onClick={onStartTour}
+          className="mb-8 inline-flex items-center gap-2 bg-gradient-to-r from-[#D4AF37] to-[#FFD700] hover:from-[#FFD700] hover:to-[#FFE57F] text-black font-black uppercase tracking-widest text-xs px-5 py-2.5 rounded-xl shadow-[0_4px_20px_rgba(212,175,55,0.4)] transition-all hover:scale-[1.02]"
+        >
+          <Sparkles className="w-4 h-4" />
+          Take the 9-Step Tour
+        </button>
+      )}
 
       {/* Recently Shipped */}
       <div className="mb-8">

@@ -468,15 +468,15 @@ export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': color,
-          'line-opacity': 0.35,
+          'line-opacity': 0.4,
           'line-width': [
             'interpolate', ['linear'], ['zoom'],
-            5, 3,
-            10, 6,
-            14, 14,
-            18, 28,
+            5, 6,
+            10, 14,
+            14, 28,
+            18, 56,
           ],
-          'line-blur': 6,
+          'line-blur': 8,
         },
       } as any, beforeId);
 
@@ -493,10 +493,71 @@ export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#
           'line-opacity': 0.95,
           'line-width': [
             'interpolate', ['linear'], ['zoom'],
-            5, 0.8,
-            10, 1.8,
-            14, 4.5,
-            18, 10,
+            5, 2,
+            10, 5,
+            14, 12,
+
+/**
+ * Boost the visibility of city, state, highway-shield, and road labels on
+ * the active Mapbox style. Drivers told us labels were too small to read at
+ * a glance on the truck dashboard — this function bumps font size, opacity,
+ * and halo width for all readable layers without changing their geometry.
+ */
+export function boostMapLabels(map: any): void {
+  if (!map) return;
+  const mb: mapboxgl.Map | undefined = map._mbMap;
+  if (!mb) return;
+  const apply = () => {
+    try {
+      const style = mb.getStyle();
+      if (!style || !style.layers) return;
+      for (const layer of style.layers) {
+        if (layer.type !== 'symbol') continue;
+        const id = layer.id || '';
+
+        // Match standard Mapbox label layer ids: settlement-*, state-label,
+        // road-label-*, road-number-shield-*, road-exit-shield, etc.
+        const isCity      = /settlement|place-/.test(id);
+        const isState     = /state-label|state-/i.test(id);
+        const isHighway   = /road-number|road-shield|exit-shield/.test(id);
+        const isRoad      = /^road-label/.test(id);
+        if (!isCity && !isState && !isHighway && !isRoad) continue;
+
+        try {
+          // Force layout visible if hidden
+          mb.setLayoutProperty(id, 'visibility', 'visible');
+
+          // Bump font size ~30% larger (interpolate camera vars when present)
+          const currentSize = mb.getLayoutProperty(id, 'text-size');
+          if (Array.isArray(currentSize)) {
+            // already an interpolation expression — multiply numeric stops
+            const boosted = currentSize.map((v: any) => typeof v === 'number' && v < 100 ? +(v * 1.3).toFixed(1) : v);
+            mb.setLayoutProperty(id, 'text-size', boosted as any);
+          } else if (typeof currentSize === 'number') {
+            mb.setLayoutProperty(id, 'text-size', currentSize * 1.3);
+          }
+
+          // Force bold text for highway shields and city names
+          if (isHighway || isCity || isState) {
+            try { mb.setLayoutProperty(id, 'text-font', ['DIN Pro Bold', 'Arial Unicode MS Bold']); } catch {}
+          }
+
+          // Bright label color over satellite imagery
+          mb.setPaintProperty(id, 'text-color', '#FFFFFF');
+          mb.setPaintProperty(id, 'text-halo-color', '#000000');
+          mb.setPaintProperty(id, 'text-halo-width', 2);
+          mb.setPaintProperty(id, 'text-halo-blur', 0.5);
+        } catch (_) {}
+      }
+    } catch (err) {
+      console.warn('[boostMapLabels] failed:', (err as any)?.message || err);
+    }
+  };
+  if (mb.isStyleLoaded()) apply();
+  else mb.once('styledata', apply);
+}
+
+            18, 26,
           ],
           'line-blur': 0.3,
         },

@@ -56,6 +56,7 @@ export interface UserProfile {
   iftaFee?: number;
   physicalDamageFee?: number;
   trailerCharge?: number;
+  defCost?: number;
   escrowRate?: number;
   escrowMax?: number;
   escrowBalance?: number;
@@ -238,6 +239,8 @@ export interface AppContextType {
   setPhysicalDamageFee: React.Dispatch<React.SetStateAction<number>>;
   trailerCharge: number;
   setTrailerCharge: React.Dispatch<React.SetStateAction<number>>;
+  defCost: number;
+  setDefCost: React.Dispatch<React.SetStateAction<number>>;
   escrowRate: number;
   setEscrowRate: React.Dispatch<React.SetStateAction<number>>;
   escrowMax: number;

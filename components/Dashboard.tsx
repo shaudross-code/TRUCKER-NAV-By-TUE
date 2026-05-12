@@ -15,7 +15,8 @@ import {
   Navigation2,
   Wrench,
   PiggyBank,
-  HandCoins
+  HandCoins,
+  Droplets
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, Cell, CartesianGrid } from 'recharts';
 import { speak } from '../services/speechService';
@@ -166,6 +167,8 @@ const Dashboard: React.FC = React.memo(() => {
   const setEscrowThisWeek = context?.setEscrowThisWeek || (() => {});
   const cashAdvance = context?.cashAdvance ?? 0;
   const setCashAdvance = context?.setCashAdvance || (() => {});
+  const defCost = context?.defCost ?? 0;
+  const setDefCost = context?.setDefCost || (() => {});
 
   const [isEarningsInputOpen, setIsEarningsInputOpen] = useState(false);
   const [newEntryValue, setNewEntryValue] = useState('');
@@ -191,6 +194,9 @@ const Dashboard: React.FC = React.memo(() => {
 
   const [isCashAdvanceOpen, setIsCashAdvanceOpen] = useState(false);
   const [newCashAdvanceEntry, setNewCashAdvanceEntry] = useState('');
+
+  const [isDefOpen, setIsDefOpen] = useState(false);
+  const [newDefEntry, setNewDefEntry] = useState('');
 
   // ELD Dynamic Timers
   // Removed local timers state as it's now global in AppContext
@@ -317,6 +323,27 @@ const Dashboard: React.FC = React.memo(() => {
     }
   };
 
+  const handleAddDef = (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(newDefEntry);
+    if (!isNaN(amount) && amount >= 0) {
+      setDefCost(defCost + amount);
+      setNewDefEntry('');
+      setIsDefOpen(false);
+    }
+  };
+
+  // Quick subtract helper — used by the small "−" button overlay on metric cards.
+  // Prompts for an amount and subtracts (never goes below zero for non-negative metrics).
+  const promptSubtract = (currentValue: number, setter: (v: number) => void, label: string, allowNegative = false) => {
+    const raw = window.prompt(`Subtract from ${label}\nCurrent: ${currentValue}\n\nEnter amount to subtract:`);
+    if (raw === null) return;
+    const amount = parseFloat(raw);
+    if (isNaN(amount) || amount <= 0) return;
+    const next = currentValue - amount;
+    setter(allowNegative ? next : Math.max(0, next));
+  };
+
   const handleNewWeek = () => {
     setWeeklyEarnings(0);
     setMilesThisWeek(0);
@@ -325,6 +352,7 @@ const Dashboard: React.FC = React.memo(() => {
     setWeekDeductions(0);
     setEscrowThisWeek(0);
     setCashAdvance(0);
+    setDefCost(0);
   };
 
   const handleCompleteLoad = useCallback(async () => {
@@ -569,6 +597,8 @@ const Dashboard: React.FC = React.memo(() => {
               setIsEarningsInputOpen(false);
               setIsFuelInputOpen(false);
             }}
+            onSubtract={() => promptSubtract(milesThisWeek, setMilesThisWeek, 'Miles This Week')}
+            subtractLabel="Subtract miles"
           />
           {isMilesInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
@@ -607,6 +637,8 @@ const Dashboard: React.FC = React.memo(() => {
               setIsMilesInputOpen(false);
               setIsDeductionsInputOpen(false);
             }}
+            onSubtract={() => promptSubtract(fuelCost, setFuelCost, 'Fuel Cost')}
+            subtractLabel="Subtract fuel cost"
           />
           {isFuelInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-[#D4AF37]/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
@@ -640,6 +672,8 @@ const Dashboard: React.FC = React.memo(() => {
               setIsFuelInputOpen(false);
               setIsDeductionsInputOpen(false);
             }}
+            onSubtract={() => promptSubtract(truckCost, setTruckCost, 'Truck Cost')}
+            subtractLabel="Subtract truck cost"
           />
           {isTruckCostInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-blue-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
@@ -771,6 +805,8 @@ const Dashboard: React.FC = React.memo(() => {
               setIsEscrowOpen(false);
               setNewCashAdvanceEntry('');
             }}
+            onSubtract={() => promptSubtract(cashAdvance, setCashAdvance, 'Cash Advance')}
+            subtractLabel="Subtract cash advance"
           />
           {isCashAdvanceOpen && (
             <div data-testid="cash-advance-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-rose-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
@@ -798,6 +834,48 @@ const Dashboard: React.FC = React.memo(() => {
           )}
         </div>
 
+        {/* DEF (Diesel Exhaust Fluid) card */}
+        <div className="relative">
+          <MetricCard 
+            icon={Droplets} 
+            label="DEF"
+            value={formatCurrency(defCost)}
+            target={defCost > 0 ? 'Diesel Exhaust Fluid — deducted from gross' : 'Tap to log DEF purchase'}
+            iconBg="bg-cyan-400/10"
+            iconColor="text-cyan-400"
+            isInteractive={true}
+            onClick={() => {
+              setIsDefOpen(!isDefOpen);
+              setIsEarningsInputOpen(false);
+              setIsMilesInputOpen(false);
+              setIsFuelInputOpen(false);
+              setIsTruckCostInputOpen(false);
+              setIsDeductionsInputOpen(false);
+              setIsMaintenanceCpmOpen(false);
+              setIsEscrowOpen(false);
+              setIsCashAdvanceOpen(false);
+              setNewDefEntry('');
+            }}
+            onSubtract={() => promptSubtract(defCost, setDefCost, 'DEF Cost')}
+            subtractLabel="Subtract DEF cost"
+          />
+          {isDefOpen && (
+            <div data-testid="def-input-panel" className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-cyan-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">
+              <div className="flex items-center justify-between mb-3 px-1">
+                <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Log DEF Purchase</span>
+                <button onClick={() => setIsDefOpen(false)} className="text-zinc-600 hover:text-white"><X className="w-4 h-4" /></button>
+              </div>
+              <form onSubmit={handleAddDef} className="flex gap-2">
+                <div className="relative flex-1">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">$</div>
+                  <input data-testid="def-input" autoFocus type="number" step="0.01" min="0" value={newDefEntry} onChange={(e) => setNewDefEntry(e.target.value)} placeholder="0.00" className="w-full bg-[#050505] border border-zinc-800 rounded-xl py-2.5 pl-7 pr-3 text-white text-sm font-bold focus:border-cyan-400 focus:outline-none transition-colors placeholder:text-zinc-800" />
+                </div>
+                <button type="submit" data-testid="def-add-btn" className="bg-cyan-400 hover:bg-cyan-500 text-black p-2.5 rounded-xl transition-all shadow-lg shadow-cyan-400/20"><Plus className="w-5 h-5" /></button>
+              </form>
+            </div>
+          )}
+        </div>
+
         <div className="relative">
           <MetricCard 
             icon={Minus} 
@@ -812,6 +890,8 @@ const Dashboard: React.FC = React.memo(() => {
               setIsMilesInputOpen(false);
               setIsFuelInputOpen(false);
             }}
+            onSubtract={() => promptSubtract(weekDeductions, setWeekDeductions, 'Week Deductions')}
+            subtractLabel="Subtract deduction"
           />
           {isDeductionsInputOpen && (
             <div className="absolute top-full left-0 right-0 mt-3 z-50 bg-[#0a0a0a] border border-rose-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200">

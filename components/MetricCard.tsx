@@ -1,7 +1,7 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
 
-export const MetricCard = React.memo(({ icon: Icon, label, value, trend, target, iconBg, iconColor, progress, onClick, isInteractive }: { 
+export const MetricCard = React.memo(({ icon: Icon, label, value, trend, target, iconBg, iconColor, progress, onClick, isInteractive, onSubtract, subtractLabel }: { 
   icon: any, 
   label: string, 
   value: string, 
@@ -11,7 +11,9 @@ export const MetricCard = React.memo(({ icon: Icon, label, value, trend, target,
   iconColor: string,
   progress?: number,
   onClick?: () => void,
-  isInteractive?: boolean
+  isInteractive?: boolean,
+  onSubtract?: () => void,
+  subtractLabel?: string,
 }) => (
   <div 
     onClick={onClick}
@@ -59,6 +61,17 @@ export const MetricCard = React.memo(({ icon: Icon, label, value, trend, target,
       <div className="absolute bottom-3 right-6 opacity-0 group-hover:opacity-100 transition-opacity">
         <div className="text-[10px] font-bold text-[#D4AF37] uppercase tracking-widest">Update Entry</div>
       </div>
+    )}
+
+    {onSubtract && (
+      <button
+        data-testid={`metric-subtract-${label.toLowerCase().replace(/\s+/g, '-')}`}
+        onClick={(e) => { e.stopPropagation(); onSubtract(); }}
+        title={subtractLabel || 'Subtract'}
+        className="absolute top-3 right-3 md:top-4 md:right-4 w-7 h-7 md:w-8 md:h-8 rounded-full bg-rose-500/10 hover:bg-rose-500/20 border border-rose-400/30 text-rose-300 flex items-center justify-center font-black text-lg leading-none transition-all hover:scale-110"
+      >
+        −
+      </button>
     )}
   </div>
 ));

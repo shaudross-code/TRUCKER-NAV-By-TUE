@@ -18,6 +18,51 @@ body {
   overflow-x: hidden;
 }
 
+/* ─── Universal responsive guard rails ────────────────────────────────── */
+/* Prevent fixed-pixel widths and absolute overlays from overflowing tiny
+   screens (iPhone SE ~375px, Galaxy fold ~320px). Cards/inputs/buttons
+   become fluid by default; specific layouts can opt out per-element.    */
+@media (max-width: 480px) {
+  .grid {
+    /* Most grids in the app are configured with sm:/md:/lg: prefixes
+       already; this enforces single-column on phones as a hard fallback. */
+    gap: 1rem;
+  }
+  /* Prevent over-wide modal/popover panels */
+  [data-testid$="-input-panel"],
+  [data-testid$="-popover"],
+  [data-testid$="-toast"] {
+    max-width: calc(100vw - 1.5rem);
+    left: 0.75rem;
+    right: 0.75rem;
+  }
+  /* Stop large headings from busting layout on narrow screens */
+  h1 { font-size: 1.875rem; line-height: 1.1; }
+  h2 { font-size: 1.25rem; line-height: 1.2; }
+}
+
+/* iPad / tablet portrait — most cards should be 2-col, not 1-col single column */
+@media (min-width: 481px) and (max-width: 1023px) {
+  [data-testid="pay-summary-page"] .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Catch-all: prevent ROOT-level overflow only (not deeply nested layouts).
+   Bounds the top-level app containers so they never bleed past the viewport. */
+[data-testid="pay-summary-page"],
+[data-testid="announcements-view"],
+.dashboard-root,
+main {
+  max-width: 100vw;
+  box-sizing: border-box;
+}
+
+@keyframes walkthroughPulse {
+  0%, 100% { box-shadow: 0 0 0 9999px rgba(0,0,0,0.7), 0 0 30px rgba(212,175,55,0.6), 0 0 60px rgba(212,175,55,0.4); }
+  50% { box-shadow: 0 0 0 9999px rgba(0,0,0,0.7), 0 0 50px rgba(212,175,55,0.9), 0 0 100px rgba(212,175,55,0.6); }
+}
+
 #nav-map-container::after {
   content: '';
   position: absolute;
