@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { DollarSign, TrendingUp, FileText, MapPin, Minus, Truck, Wrench, PiggyBank, Briefcase, Info, HandCoins, Shield, Receipt, AlertOctagon, Container, Droplets } from 'lucide-react';
 import { AppContext, MaintenanceLedgerEntry } from '../types';
 
@@ -267,11 +268,41 @@ const NetPayBreakdownTooltip: React.FC<{
   netPay: number;
 }> = (p) => {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+
+  // Position the floating panel anchored to the trigger button, in viewport coords.
+  // Using fixed/portal so the panel escapes the parent card's stacking context
+  // (sibling cards use `backdrop-blur-3xl` which creates a new stacking context
+  // that would otherwise render on top of an absolutely-positioned popover).
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => {
+      const btn = wrapRef.current?.querySelector('button');
+      if (!btn) return;
+      const r = btn.getBoundingClientRect();
+      const panelW = 320;
+      const left = Math.min(window.innerWidth - panelW - 12, Math.max(12, r.right - panelW));
+      const top = r.bottom + 8;
+      setCoords({ top, left });
+    };
+    reposition();
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
+    return () => {
+      window.removeEventListener('scroll', reposition, true);
+      window.removeEventListener('resize', reposition);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onClickAway = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      if (wrapRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', onClickAway);
     return () => document.removeEventListener('mousedown', onClickAway);
@@ -284,7 +315,7 @@ const NetPayBreakdownTooltip: React.FC<{
     </div>
   );
   return (
-    <div ref={ref} className="relative">
+    <div ref={wrapRef} className="relative">
       <button
         data-testid="pay-net-breakdown-toggle"
         type="button"
@@ -294,10 +325,12 @@ const NetPayBreakdownTooltip: React.FC<{
       >
         <Info className="w-4 h-4" />
       </button>
-      {open && (
+      {open && coords && createPortal(
         <div
+          ref={panelRef}
           data-testid="pay-net-breakdown-panel"
-          className="absolute right-0 top-full mt-2 z-50 w-[320px] bg-[#0a0a0a] border border-emerald-400/30 rounded-2xl p-4 shadow-[0_10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-top-2 duration-200"
+          style={{ position: 'fixed', top: coords.top, left: coords.left, width: 320, zIndex: 10001 }}
+          className="bg-[#0a0a0a] border border-emerald-400/30 rounded-2xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.9)] animate-in slide-in-from-top-2 duration-200"
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-[10px] font-black text-emerald-300 uppercase tracking-[0.2em]">Net Pay Breakdown</span>
@@ -325,7 +358,8 @@ const NetPayBreakdownTooltip: React.FC<{
               <span className={`text-lg font-black tracking-tight ${p.netPay < 0 ? 'text-rose-400' : 'text-emerald-300'}`}>{fmt(p.netPay)}</span>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -483,7 +517,7 @@ const PaySummary: React.FC = () => {
       )}
       <h1 className="text-4xl font-black tracking-tight text-white mb-8 uppercase italic tracking-tighter">Pay Summary</h1>
       
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-4 md:gap-6 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-7 gap-4 md:gap-6 mb-10">
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
             <div className="bg-[#D4AF37]/10 p-3 rounded-2xl text-[#D4AF37]">
@@ -528,6 +562,20 @@ const PaySummary: React.FC = () => {
             <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">Fuel Cost</h3>
           </div>
           <div data-testid="pay-fuel-cost" className="text-3xl font-bold text-white tracking-tight">{formatCurrency(fuelCost)}</div>
+        </div>
+        <div data-testid="pay-def-card-top" className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="bg-cyan-400/10 p-3 rounded-2xl text-cyan-400">
+              <Droplets className="w-6 h-6" />
+            </div>
+            <h3 className="text-zinc-500 font-bold uppercase tracking-widest text-xs">DEF</h3>
+          </div>
+          <div data-testid="pay-def-cost-top" className="text-3xl font-bold text-white tracking-tight">{formatCurrency(defCost)}</div>
+          <EditableNumberInput
+            value={defCost}
+            onChange={setDefCost}
+            testId="pay-def-cost-input"
+          />
         </div>
         <div className="bg-black/80 backdrop-blur-3xl border border-white/10 p-8 rounded-[2.5rem] shadow-2xl">
           <div className="flex items-center gap-4 mb-4">
@@ -803,16 +851,6 @@ const PaySummary: React.FC = () => {
           defaultValue={200}
           accent="orange"
           onChange={setTrailerCharge}
-        />
-        <FlatFeeCard
-          testId="pay-def"
-          icon={Droplets}
-          label="DEF (Diesel Exhaust Fluid)"
-          subtitle="Logged DEF purchases — deducted from gross"
-          value={defCost}
-          defaultValue={0}
-          accent="sky"
-          onChange={setDefCost}
         />
       </div>
 

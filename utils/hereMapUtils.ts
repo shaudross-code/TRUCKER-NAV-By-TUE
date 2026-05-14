@@ -496,6 +496,17 @@ export function setRoadsHighlight(map: any, enabled: boolean, color: string = '#
             5, 2,
             10, 5,
             14, 12,
+            18, 26,
+          ],
+        },
+      } as any, beforeId);
+    } catch (err) {
+      console.warn('[setRoadsHighlight] failed:', (err as any)?.message || err);
+    }
+  };
+  if (mb.isStyleLoaded()) apply();
+  else mb.once('styledata', apply);
+}
 
 /**
  * Boost the visibility of city, state, highway-shield, and road labels on
